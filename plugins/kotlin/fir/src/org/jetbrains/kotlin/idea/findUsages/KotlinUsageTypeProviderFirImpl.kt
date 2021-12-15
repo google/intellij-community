@@ -3,15 +3,15 @@
 package org.jetbrains.kotlin.idea.findUsages
 
 import com.intellij.psi.PsiPackage
+import org.jetbrains.kotlin.analysis.api.analyseWithReadAction
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.idea.findUsages.UsageTypeEnum.*
 import org.jetbrains.kotlin.idea.references.KtArrayAccessReference
 import org.jetbrains.kotlin.idea.references.KtInvokeFunctionReference
+import org.jetbrains.kotlin.idea.references.KtSimpleReference
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypeAndBranch
-import org.jetbrains.kotlin.idea.findUsages.UsageTypeEnum.*
-import org.jetbrains.kotlin.analysis.api.analyseWithReadAction
-import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.idea.references.KtSimpleReference
 
 class KotlinUsageTypeProviderFirImpl : KotlinUsageTypeProvider() {
 
@@ -23,13 +23,7 @@ class KotlinUsageTypeProviderFirImpl : KotlinUsageTypeProvider() {
         fun getFunctionUsageType(functionSymbol: KtFunctionLikeSymbol): UsageTypeEnum? {
             when (reference) {
                 is KtArrayAccessReference -> {
-                    TODO("FIR Implement implicit get/set")
-//                    return when {
-//                        //KtFirArrayAccessReference
-////                        context[BindingContext.INDEXED_LVALUE_GET, refExpr] != null -> IMPLICIT_GET
-////                        context[BindingContext.INDEXED_LVALUE_SET, refExpr] != null -> IMPLICIT_SET
-//                        else -> null
-//                    }
+                    return if (functionSymbol.valueParameters.size == 1) IMPLICIT_GET else IMPLICIT_SET
                 }
                 is KtInvokeFunctionReference -> return IMPLICIT_INVOKE
             }
@@ -41,7 +35,7 @@ class KotlinUsageTypeProviderFirImpl : KotlinUsageTypeProvider() {
 
                 with(refExpr.getParentOfTypeAndBranch<KtCallExpression> { calleeExpression }) {
                     this?.calleeExpression is KtSimpleNameExpression
-                } -> if (functionSymbol is KtConstructorSymbol) CLASS_NEW_OPERATOR else FUNCTION_CALL //HLAPI resolveCall -> CallInfo ->
+                } -> if (functionSymbol is KtConstructorSymbol) CLASS_NEW_OPERATOR else FUNCTION_CALL
 
                 refExpr.getParentOfTypeAndBranch<KtBinaryExpression> { operationReference } != null || refExpr.getParentOfTypeAndBranch<KtUnaryExpression> { operationReference } != null || refExpr.getParentOfTypeAndBranch<KtWhenConditionInRange> { operationReference } != null -> FUNCTION_CALL
 

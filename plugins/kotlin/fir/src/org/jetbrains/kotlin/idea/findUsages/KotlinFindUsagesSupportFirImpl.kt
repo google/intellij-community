@@ -11,6 +11,10 @@ import com.intellij.psi.PsiReference
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Processor
 import org.jetbrains.kotlin.analysis.api.analyseInModalWindow
+import org.jetbrains.kotlin.analysis.api.analyseWithReadAction
+import org.jetbrains.kotlin.analysis.api.calls.KtCallableMemberCall
+import org.jetbrains.kotlin.analysis.api.calls.KtImplicitReceiverValue
+import org.jetbrains.kotlin.analysis.api.calls.calls
 import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtSymbolWithKind
@@ -18,7 +22,7 @@ import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.core.util.showYesNoCancelDialog
 import org.jetbrains.kotlin.idea.refactoring.CHECK_SUPER_METHODS_YES_NO_DIALOG
 import org.jetbrains.kotlin.idea.refactoring.formatPsiClass
-import org.jetbrains.kotlin.idea.search.usagesSearch.isCallReceiverRefersToCompanionObject
+import org.jetbrains.kotlin.idea.references.KtFirInvokeFunctionReference
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.*
@@ -33,7 +37,31 @@ class KotlinFindUsagesSupportFirImpl : KotlinFindUsagesSupport {
     ): Boolean {
         // TODO: implement this
         val klass = companionObject.getStrictParentOfType<KtClass>() ?: return true
-        return !klass.anyDescendantOfType<KtElement> { false }
+        return !klass.anyDescendantOfType(fun(element: KtElement): Boolean {
+            if (element == companionObject) return false
+            var result = false
+            analyseWithReadAction(element) {
+                element.resolveCall()?.let { callInfo ->
+                    callInfo.calls.forEach { call ->
+                        if (call is KtCallableMemberCall<*, *>) {
+                            val dispatchReceiver = call.partiallyAppliedSymbol.dispatchReceiver
+                            val extensionReceiver = call.partiallyAppliedSymbol.extensionReceiver
+                            if ((dispatchReceiver as? KtImplicitReceiverValue)?.symbol == companionObject.getSymbol() ||
+                                (extensionReceiver as? KtImplicitReceiverValue)?.symbol == companionObject.getSymbol()) {
+                                result = element.references.any {
+                                    // TODO: We get both a simple named reference and an invoke function
+                                    // reference for all function calls. With FIR, they point to different
+                                    // psi ranges and are therefore not filtered out. This is probably
+                                    // not the right way to filter this.
+                                    it !is KtFirInvokeFunctionReference && !referenceProcessor.process(it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return result
+        })
     }
 
     override fun isDataClassComponentFunction(element: KtParameter): Boolean {
