@@ -1,4 +1,7 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+/*
+ * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
 
 package org.jetbrains.kotlin.idea.search.ideaExtensions
 
@@ -17,17 +20,21 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.*
 
-abstract class KotlinTargetElementEvaluator : TargetElementEvaluatorEx, TargetElementUtilExtender {
+class FirKotlinTargetElementEvaluator : KotlinTargetElementEvaluator() {
     companion object {
         const val DO_NOT_UNWRAP_LABELED_EXPRESSION = 0x100
         const val BYPASS_IMPORT_ALIAS = 0x200
     }
 
-    // Place caret after the open curly brace in lambda for generated 'it'
-    abstract fun findLambdaOpenLBraceForGeneratedIt(ref: PsiReference): PsiElement?
+    override fun findLambdaOpenLBraceForGeneratedIt(ref: PsiReference): PsiElement? {
+        // TODO: implement
+        return null
+    }
 
-    // Navigate to receiver element for this in extension declaration
-    abstract fun findReceiverForThisInExtensionFunction(ref: PsiReference): PsiElement?
+    override fun findReceiverForThisInExtensionFunction(ref: PsiReference): PsiElement? {
+        // TODO: implement
+        return null
+    }
 
     override fun getAdditionalDefinitionSearchFlags() = 0
 
