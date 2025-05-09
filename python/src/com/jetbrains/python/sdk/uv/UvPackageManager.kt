@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk.uv
 
 import com.intellij.openapi.project.Project
@@ -16,7 +16,7 @@ import java.nio.file.Path
 
 internal class UvPackageManager(project: Project, sdk: Sdk, private val uv: UvLowLevel) : PythonPackageManager(project, sdk) {
   override var installedPackages: List<PythonPackage> = emptyList()
-  override val repositoryManager: PythonRepositoryManager = PipRepositoryManager(project, sdk)
+  override val repositoryManager: PythonRepositoryManager = PipRepositoryManager(project)
 
   @Volatile
   var outdatedPackages: Map<String, PythonOutdatedPackage> = emptyMap()
@@ -66,6 +66,14 @@ internal class UvPackageManager(project: Project, sdk: Sdk, private val uv: UvLo
     }
 
     return uv.listPackages()
+  }
+
+  suspend fun sync(): Result<String> {
+    return uv.sync()
+  }
+
+  suspend fun lock(): Result<String> {
+    return uv.lock()
   }
 }
 

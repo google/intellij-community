@@ -12,22 +12,18 @@ import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.python.community.impl.venv.createVenv
 import com.jetbrains.python.PyBundle.message
-import com.jetbrains.python.errorProcessing.PyError
-import com.jetbrains.python.failure
-import com.jetbrains.python.sdk.PythonSdkType
-import com.jetbrains.python.sdk.add.v2.conda.isCondaSdk
+import com.jetbrains.python.errorProcessing.PyResult
+import com.jetbrains.python.sdk.*
 import com.jetbrains.python.sdk.conda.createCondaSdkFromExistingEnv
-import com.jetbrains.python.sdk.createSdk
-import com.jetbrains.python.sdk.excludeInnerVirtualEnv
+import com.jetbrains.python.sdk.conda.isConda
 import com.jetbrains.python.sdk.flavors.conda.PyCondaCommand
-import com.jetbrains.python.sdk.persist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 
 
 // todo should it be overriden for targets?
-suspend fun PythonMutableTargetAddInterpreterModel.setupVirtualenv(venvPath: Path, projectPath: Path): com.jetbrains.python.Result<Sdk, PyError> {
+suspend fun PythonMutableTargetAddInterpreterModel.setupVirtualenv(venvPath: Path, projectPath: Path, moduleOrProject: ModuleOrProject?): PyResult<Sdk> {
   val baseSdk = state.baseInterpreter.get()!!
 
 
@@ -40,7 +36,10 @@ suspend fun PythonMutableTargetAddInterpreterModel.setupVirtualenv(venvPath: Pat
 
   val venvPython = createVenv(baseSdkPath, venvPath, inheritSitePackages = state.inheritSitePackages.get()).getOr { return it }
 
-  if (targetEnvironmentConfiguration != null) error("Remote targets aren't supported")
+  if (targetEnvironmentConfiguration != null) {
+    error("Remote targets aren't supported")
+  }
+
   val homeFile =
     // refresh needs write action
     edtWriteAction {
@@ -53,15 +52,25 @@ suspend fun PythonMutableTargetAddInterpreterModel.setupVirtualenv(venvPath: Pat
   val newSdk = createSdk(homeFile, projectPath, existingSdks.toTypedArray())
 
   // todo check exclude
-  ProjectManager.getInstance().openProjects
-    .firstNotNullOfOrNull {
+  val module = when (moduleOrProject) {
+    is ModuleOrProject.ModuleAndProject -> moduleOrProject.module
+    is ModuleOrProject.ProjectOnly -> {
       withContext(Dispatchers.IO) {
-        ModuleUtil.findModuleForFile(homeFile, it)
+        ModuleUtil.findModuleForFile(homeFile, moduleOrProject.project)
       }
     }
-    ?.excludeInnerVirtualEnv(newSdk)
-  return com.jetbrains.python.Result.success(newSdk)
+    null -> null
+  }
 
+
+  if (module != null) {
+    module.excludeInnerVirtualEnv(newSdk)
+    if (!this.state.makeAvailableForAllProjects.get()) {
+      newSdk.setAssociationToModule(module)
+    }
+  }
+
+  return com.jetbrains.python.Result.success(newSdk)
 }
 
 
@@ -74,12 +83,13 @@ suspend fun PythonAddInterpreterModel.selectCondaEnvironment(base: Boolean): Res
     getBaseCondaOrError()
   }
   else {
-    state.selectedCondaEnv.get()?.let { Result.success(it) } ?: failure(message("python.sdk.conda.no.env.selected.error"))
+    state.selectedCondaEnv.get()?.let { Result.success(it) }
+    ?: com.jetbrains.python.failure(message("python.sdk.conda.no.env.selected.error"))
   }
     .getOrElse { return Result.failure(it) }
     .envIdentity
   val existingSdk = ProjectJdkTable.getInstance().findJdk(identity.userReadableName)
-  if (existingSdk != null && isCondaSdk(existingSdk)) return Result.success(existingSdk)
+  if (existingSdk != null && existingSdk.isConda()) return Result.success(existingSdk)
 
   val sdk = withModalProgress(ModalTaskOwner.guess(),
                               message("sdk.create.custom.conda.create.progress"),

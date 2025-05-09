@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging.conda
 
 import com.intellij.openapi.project.Project
@@ -19,14 +19,14 @@ internal class CompositePythonPackageManager(
   override var installedPackages: List<PythonPackage> = emptyList()
 
   override var repositoryManager: PythonRepositoryManager =
-    CompositePythonRepositoryManager(project, sdk, managers.map { it.repositoryManager })
+    CompositePythonRepositoryManager(project, managers.map { it.repositoryManager })
 
   private val managerNames = managers.joinToString { it.javaClass.simpleName }
 
   override suspend fun installPackageCommand(specification: PythonPackageSpecification, options: List<String>): Result<Unit> {
     return processPackageOperation(
       errorMessageKey = "python.packaging.composite.install.package.error",
-      operation = { it.installPackage(specification, options) },
+      operation = { it.installPackageCommand(specification, options) },
       name = specification.name
     )
   }
@@ -70,7 +70,7 @@ internal class CompositePythonPackageManager(
 
   private suspend fun processPackageOperation(
     errorMessageKey: String,
-    operation: suspend (PythonPackageManager) -> Result<List<PythonPackage>>,
+    operation: suspend (PythonPackageManager) -> Result<*>,
     name: String,
   ): Result<Unit> {
     val exceptions = mutableListOf<Throwable>()

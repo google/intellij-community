@@ -14,6 +14,7 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
     "//platform/lang-api:lang",
@@ -22,7 +23,7 @@ jvm_library(
     "@lib//:guava",
     "//platform/statistics",
     "//platform/util/progress",
-    "//json",
+    "//json/backend",
     "//platform/core-ui",
     "//platform/statistics/uploader",
     "@lib//:kotlinx-coroutines-core",
@@ -40,6 +41,7 @@ jvm_library(
   associates = [":devkit"],
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl:ide-impl_test_lib",
@@ -52,7 +54,7 @@ jvm_library(
     "//platform/statistics",
     "//platform/statistics:statistics_test_lib",
     "//platform/util/progress",
-    "//json",
+    "//json/backend",
     "//platform/core-ui",
     "//platform/statistics/uploader",
     "@lib//:kotlinx-coroutines-core",

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.frame;
 
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -36,7 +36,7 @@ public class XVariablesView extends XVariablesViewBase {
    */
   @Deprecated
   public XVariablesView(@NotNull XDebugSessionImpl session) {
-    this(XDebugSessionProxyKeeper.getInstance(session.getProject()).getOrCreateProxy(session));
+    this(XDebugSessionProxyKeeperKt.asProxy(session));
   }
 
   public XVariablesView(@NotNull XDebugSessionProxy proxy) {
@@ -62,13 +62,15 @@ public class XVariablesView extends XVariablesViewBase {
   protected void beforeTreeBuild(@NotNull SessionEvent event) {
   }
 
+  @ApiStatus.Internal
   @Override
-  public void processSessionEvent(@NotNull SessionEvent event, @NotNull XDebugSession session) {
+  public void processSessionEvent(@NotNull SessionEvent event, @NotNull XDebugSessionProxy session) {
     if (ApplicationManager.getApplication().isDispatchThread()) { // mark nodes obsolete asap
       getTree().markNodesObsolete();
     }
 
     if (event == SessionEvent.STOPPED) {
+      sessionStopped();
       myProxy.clear();
     }
 
@@ -158,23 +160,31 @@ public class XVariablesView extends XVariablesViewBase {
 
     private List<InlineDebugRenderer> myInlays = null;
 
+    @ApiStatus.Obsolete
     public static @Nullable InlineVariablesInfo get(@Nullable XDebugSession session) {
+      if (session == null) return null;
+     return get(XDebugSessionProxyKeeperKt.asProxy(session));
+    }
+
+    @ApiStatus.Internal
+    public static @Nullable InlineVariablesInfo get(@Nullable XDebugSessionProxy session) {
       if (session != null) {
-        return DEBUG_VARIABLES.get(((XDebugSessionImpl)session).getSessionData());
+        return DEBUG_VARIABLES.get(session.getSessionData());
       }
       return null;
     }
 
     /**
-     * @deprecated Use {@link InlineVariablesInfo#set(XDebugSessionProxy, InlineVariablesInfo)} instead
+     * Use {@link InlineVariablesInfo#set(XDebugSessionProxy, InlineVariablesInfo)} instead
      */
-    @Deprecated
+    @ApiStatus.Obsolete
     public static void set(@Nullable XDebugSession session, InlineVariablesInfo info) {
       if (session != null) {
-        set(XDebugSessionProxyKeeper.getInstance(session.getProject()).getOrCreateProxy(session), info);
+        set(XDebugSessionProxyKeeperKt.asProxy(session), info);
       }
     }
 
+    @ApiStatus.Internal
     public static void set(@Nullable XDebugSessionProxy session, InlineVariablesInfo info) {
       if (session != null) {
         DEBUG_VARIABLES.set(session.getSessionData(), info);

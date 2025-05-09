@@ -17,6 +17,47 @@ import kotlin.time.Duration.Companion.seconds
  * API for sockets. Use [hostAddressBuilder] to create arguments.
  */
 sealed interface EelTunnelsApi {
+  /**
+   * Creates a remote UNIX socket forwarding. IJent listens for a connection on the remote machine, and when the connection
+   * is accepted, the IDE communicates to the remote client via a pair of Kotlin channels.
+   *
+   * Packets sent to the channel and received from the channel may be split and/or concatenated.
+   * The packets may be split only if their size exceeds [com.intellij.platform.ijent.spi.RECOMMENDED_MAX_PACKET_SIZE].
+   *
+   * Local implementation should work for **nix and all modern Windows.
+   *
+   * The call accepts only one connection. If multiple connections should be accepted, the function is supposed to be called in a loop:
+   * ```kotlin
+   * val ijent: IjentApi = ijentApiFactory()
+   *
+   * val (socketPath, tx, rx) = listenOnUnixSocket(CreateFilePath.MkTemp(prefix = "ijent-", suffix = ".sock"))
+   * println(socketPath) // /tmp/ijent-12345678.sock
+   * launch {
+   *   handleConnection(tx, rx)
+   * }
+   * while (true) {
+   *   val (_, tx, rx) = listenOnUnixSocket(CreateFilePath.Fixed(socketPath))
+   *   launch {
+   *     handleConnection(tx, rx)
+   *   }
+   * }
+   * ```
+   */
+  @CheckReturnValue
+  suspend fun listenOnUnixSocket(path: CreateFilePath = CreateFilePath.MkTemp()): ListenOnUnixSocketResult
+
+  data class ListenOnUnixSocketResult(
+    val unixSocketPath: String,
+    val tx: EelSendChannel<IOException>,
+    val rx: EelReceiveChannel<IOException>,
+  )
+
+  sealed interface CreateFilePath {
+    data class Fixed(val path: String) : CreateFilePath
+
+    /** When [directory] is empty, the usual tmpdir is used. */
+    data class MkTemp(val directory: String = "", val prefix: String = "", val suffix: String = "") : CreateFilePath
+  }
 
   /**
    * **For applied usages, consider using [withConnectionToRemotePort]**.
@@ -40,9 +81,15 @@ sealed interface EelTunnelsApi {
    * Note, that [Connection.receiveChannel] is __not__ closed in this case.
    *
    * One should not forget to invoke [Connection.close] when the connection is not needed.
+   *
+   * To configure a socket before connection use [configureSocketBeforeConnection]. After that, use [Connection.configureSocket]
    */
   @CheckReturnValue
-  suspend fun getConnectionToRemotePort(@GeneratedBuilder address: HostAddress): EelResult<Connection, EelConnectionError>
+  suspend fun getConnectionToRemotePort(@GeneratedBuilder args: GetConnectionToRemotePortArgs): EelResult<Connection, EelConnectionError>
+
+  interface GetConnectionToRemotePortArgs : HostAddress {
+    val configureSocketBeforeConnection: ConfigurableClientSocket.() -> Unit get() = {}
+  }
 
 
   sealed interface ResolvedSocketAddress {
@@ -152,40 +199,9 @@ sealed interface EelTunnelsApi {
     val receiveChannel: EelReceiveChannel<IOException>
 
     /**
-     * Sets the size of send buffer of the socket
-     * @see java.net.SocketOptions.SO_SNDBUF
+     * Configure various socket options
      */
-    suspend fun setSendBufferSize(size: UInt)
-
-    /**
-     * Sets the receive buffer size of the socket
-     * @see java.net.SocketOptions.SO_RCVBUF
-     */
-    suspend fun setReceiveBufferSize(size: UInt)
-
-    /**
-     * Sets the keep alive option for the socket
-     * @see java.net.SocketOptions.SO_KEEPALIVE
-     */
-    suspend fun setKeepAlive(keepAlive: Boolean)
-
-    /**
-     * Sets the possibility to reuse address of the socket
-     * @see java.net.SocketOptions.SO_REUSEADDR
-     */
-    suspend fun setReuseAddr(reuseAddr: Boolean)
-
-    /**
-     * Sets linger timeout for the socket
-     * @see java.net.SocketOptions.SO_LINGER
-     */
-    suspend fun setLinger(lingerInterval: Duration)
-
-    /**
-     * Disables pending data until acknowledgement
-     * @see java.net.SocketOptions.TCP_NODELAY
-     */
-    suspend fun setNoDelay(noDelay: Boolean)
+    suspend fun configureSocket(block: suspend ConfigurableClientSocket.() -> Unit)
 
     /**
      * Closes the connection to the socket.
@@ -223,7 +239,12 @@ sealed interface EelTunnelsApi {
    * One should not forget to invoke [Connection.close] when the connection is not needed.
    */
   @CheckReturnValue
-  suspend fun getAcceptorForRemotePort(@GeneratedBuilder address: HostAddress): EelResult<ConnectionAcceptor, EelConnectionError>
+  suspend fun getAcceptorForRemotePort(@GeneratedBuilder args: GetAcceptorForRemotePort): EelResult<ConnectionAcceptor, EelConnectionError>
+
+  interface GetAcceptorForRemotePort : HostAddress {
+    // TODO Make it look and feel like all other builders.
+    val configureServerSocket: ConfigurableSocket.() -> Unit get() = {}
+  }
 
   /**
    * This is a representation of a remote server bound to [boundAddress].
@@ -249,6 +270,28 @@ sealed interface EelTunnelsApi {
 }
 
 /**
+ * Socket configuration valid both for server and client socket
+ */
+interface ConfigurableSocket {
+  /**
+   * Sets the possibility to reuse address of the socket
+   * @see java.net.SocketOptions.SO_REUSEADDR
+   */
+  suspend fun setReuseAddr(reuseAddr: Boolean)
+}
+
+/**
+ * Client only socket options
+ */
+interface ConfigurableClientSocket : ConfigurableSocket {
+  /**
+   * Disables pending data until acknowledgement
+   * @see java.net.SocketOptions.TCP_NODELAY
+   */
+  suspend fun setNoDelay(noDelay: Boolean)
+}
+
+/**
  * Convenience operator to decompose connection to a pair of channels when needed.
  * @return channel to server
  */
@@ -261,50 +304,13 @@ operator fun Connection.component1(): EelSendChannel<IOException> = sendChannel
 operator fun Connection.component2(): EelReceiveChannel<IOException> = receiveChannel
 
 interface EelTunnelsPosixApi : EelTunnelsApi {
-  /**
-   * Creates a remote UNIX socket forwarding. IJent listens for a connection on the remote machine, and when the connection
-   * is accepted, the IDE communicates to the remote client via a pair of Kotlin channels.
-   *
-   * Packets sent to the channel and received from the channel may be split and/or concatenated.
-   * The packets may be split only if their size exceeds [com.intellij.platform.ijent.spi.RECOMMENDED_MAX_PACKET_SIZE].
-   *
-   * The call accepts only one connection. If multiple connections should be accepted, the function is supposed to be called in a loop:
-   * ```kotlin
-   * val ijent: IjentApi = ijentApiFactory()
-   *
-   * val (socketPath, tx, rx) = listenOnUnixSocket(CreateFilePath.MkTemp(prefix = "ijent-", suffix = ".sock"))
-   * println(socketPath) // /tmp/ijent-12345678.sock
-   * launch {
-   *   handleConnection(tx, rx)
-   * }
-   * while (true) {
-   *   val (_, tx, rx) = listenOnUnixSocket(CreateFilePath.Fixed(socketPath))
-   *   launch {
-   *     handleConnection(tx, rx)
-   *   }
-   * }
-   * ```
-   */
-  @CheckReturnValue
-  suspend fun listenOnUnixSocket(path: CreateFilePath = CreateFilePath.MkTemp()): ListenOnUnixSocketResult
 
-  data class ListenOnUnixSocketResult(
-    val unixSocketPath: String,
-    val tx: EelSendChannel<IOException>,
-    val rx: EelReceiveChannel<IOException>,
-  )
-
-  sealed interface CreateFilePath {
-    data class Fixed(val path: String) : CreateFilePath
-
-    /** When [directory] is empty, the usual tmpdir is used. */
-    data class MkTemp(val directory: String = "", val prefix: String = "", val suffix: String = "") : CreateFilePath
-  }
 }
 
 interface EelTunnelsWindowsApi : EelTunnelsApi
 
 /**
+ * TODO: DOC
  * Convenience function for working with a connection to a remote server.
  *
  * Example:
@@ -325,12 +331,11 @@ interface EelTunnelsWindowsApi : EelTunnelsApi
  *
  * @see EelTunnelsApi.getConnectionToRemotePort for more details on the behavior of [Connection]
  */
-suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
-  hostAddress: EelTunnelsApi.HostAddress,
+suspend fun <T> EelTunnelsApiHelpers.GetConnectionToRemotePort.withConnectionToRemotePort(
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(Connection) -> T,
 ): T =
-  when (val connectionResult = getConnectionToRemotePort(hostAddress)) {
+  when (val connectionResult = eelIt()) {
     is EelResult.Error -> errorHandler(connectionResult.error)
     is EelResult.Ok -> closeWithExceptionHandling({ action(connectionResult.value) }, { connectionResult.value.close() })
   }
@@ -361,11 +366,16 @@ private suspend fun <T> closeWithExceptionHandling(action: suspend CoroutineScop
   }
 }
 
+fun EelTunnelsApiHelpers.GetConnectionToRemotePort.hostAddress(
+  addr: EelTunnelsApi.HostAddress,
+): EelTunnelsApiHelpers.GetConnectionToRemotePort =
+  hostname(addr.hostname).port(addr.port).protocolPreference(addr.protocolPreference).timeout(addr.timeout)
+
 suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
   host: String, port: UShort,
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(Connection) -> T,
-): T = withConnectionToRemotePort(EelTunnelsApi.HostAddress.Builder(port).hostname(host).build(), errorHandler, action)
+): T = getConnectionToRemotePort().hostname(host).port(port).withConnectionToRemotePort(errorHandler, action)
 
 suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
   remotePort: UShort,
@@ -374,20 +384,24 @@ suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
 ): T = withConnectionToRemotePort("localhost", remotePort, errorHandler, action)
 
 
-suspend fun <T> EelTunnelsApi.withAcceptorForRemotePort(
-  hostAddress: EelTunnelsApi.HostAddress,
+suspend fun <T> EelTunnelsApiHelpers.GetAcceptorForRemotePort.withAcceptorForRemotePort(
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(EelTunnelsApi.ConnectionAcceptor) -> T,
 ): T =
-  when (val connectionResult = getAcceptorForRemotePort(hostAddress)) {
+  when (val connectionResult = eelIt()) {
     is EelResult.Error -> errorHandler(connectionResult.error)
     is EelResult.Ok -> closeWithExceptionHandling({ action(connectionResult.value) }, { connectionResult.value.close() })
   }
 
+fun EelTunnelsApiHelpers.GetAcceptorForRemotePort.hostAddress(
+  addr: EelTunnelsApi.HostAddress,
+): EelTunnelsApiHelpers.GetAcceptorForRemotePort =
+  hostname(addr.hostname).port(addr.port).protocolPreference(addr.protocolPreference).timeout(addr.timeout)
+
 /**
  * Represents a common class for all network-related errors appearing during the interaction with IJent or local process
  */
-sealed interface EelNetworkError
+sealed interface EelNetworkError : EelError
 
 /**
  * An error that can happen during the creation of a connection to a remote server

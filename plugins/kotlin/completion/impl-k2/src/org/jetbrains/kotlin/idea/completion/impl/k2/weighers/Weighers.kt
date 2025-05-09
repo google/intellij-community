@@ -12,10 +12,17 @@ import org.jetbrains.kotlin.analysis.api.components.KaScopeContext
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
+import org.jetbrains.kotlin.analysis.api.resolution.KaAnnotationCall
+import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
+import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.getDefaultImportPaths
 import org.jetbrains.kotlin.idea.base.util.ImportableFqNameClassifier
@@ -27,6 +34,7 @@ import org.jetbrains.kotlin.idea.completion.contributors.helpers.CompletionSymbo
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.KtSymbolWithOrigin
 import org.jetbrains.kotlin.idea.completion.impl.k2.context.getOriginalDeclarationOrSelf
 import org.jetbrains.kotlin.idea.completion.impl.k2.weighers.K2SoftDeprecationWeigher
+import org.jetbrains.kotlin.idea.completion.impl.k2.weighers.PreferredSubtypeWeigher
 import org.jetbrains.kotlin.idea.completion.impl.k2.weighers.TrailingLambdaParameterNameWeigher
 import org.jetbrains.kotlin.idea.completion.impl.k2.weighers.TrailingLambdaWeigher
 import org.jetbrains.kotlin.idea.completion.implCommon.weighers.PreferKotlinClassesWeigher
@@ -34,21 +42,20 @@ import org.jetbrains.kotlin.idea.completion.isPositionInsideImportOrPackageDirec
 import org.jetbrains.kotlin.idea.completion.isPositionSuitableForNull
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.util.positionContext.*
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi.KtCallableDeclaration
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtSimpleNameExpression
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.ImportPath
 
 internal class WeighingContext private constructor(
     override val token: KaLifetimeToken,
     val languageVersionSettings: LanguageVersionSettings,
     private val positionInFakeCompletionFile: PsiElement,
-    private val myScopeContext: KaScopeContext?,
+    private val myScopeContext: KaScopeContext,
     private val myExpectedType: KaType?,
     private val myActualReceiverTypes: List<List<KaType>>,
+    private val myPreferredSubtype: KaClassType?,
     val contextualSymbolsCache: ContextualSymbolsCache,
     val importableFqNameClassifier: ImportableFqNameClassifier,
     private val mySymbolsToSkip: Set<KaSymbol>,
@@ -59,6 +66,7 @@ internal class WeighingContext private constructor(
      */
     class ContextualSymbolsCache(private val symbolsContainingPosition: Map<Name, List<KaCallableSymbol>>) {
         private val contextualOverriddenSymbols: MutableMap<Name, Set<KaCallableSymbol>> = mutableMapOf()
+
         context(KaSession)
         fun symbolIsPresentInContext(symbol: KaCallableSymbol): Boolean = withValidityAssertion {
             if (symbol !is KaNamedSymbol) return false
@@ -77,13 +85,19 @@ internal class WeighingContext private constructor(
         operator fun contains(name: Name): Boolean = withValidityAssertion { name in symbolsContainingPosition }
     }
 
-    val scopeContext: KaScopeContext?
+    val scopeContext: KaScopeContext
         get() = withValidityAssertion { myScopeContext }
 
     val expectedType: KaType?
         get() = withValidityAssertion {
             myExpectedType
         }
+
+    val preferredSubtype: KaClassType?
+        get() = withValidityAssertion {
+            myPreferredSubtype
+        }
+
 
     val actualReceiverTypes: List<List<KaType>>
         get() = withValidityAssertion { myActualReceiverTypes }
@@ -107,8 +121,9 @@ internal class WeighingContext private constructor(
             elementInCompletionFile: PsiElement,
             scopeContext: KaScopeContext? = null,
             expectedType: KaType? = null,
+            preferredSubtype: KaClassType? = null,
             actualReceiverTypes: List<List<KaType>> = emptyList(),
-            symbolsToSkip: Set<KaSymbol> = emptySet(),
+            symbolsToSkip: Set<KaSymbol> = emptySet()
         ): WeighingContext {
             val completionFile = parameters.completionFile
             val defaultImportPaths = completionFile.getDefaultImportPaths(useSiteModule = parameters.useSiteModule).toSet()
@@ -116,7 +131,7 @@ internal class WeighingContext private constructor(
                 token = token,
                 languageVersionSettings = parameters.languageVersionSettings,
                 positionInFakeCompletionFile = elementInCompletionFile,
-                myScopeContext = scopeContext,
+                myScopeContext = scopeContext ?: completionFile.importingScopeContext,
                 myExpectedType = expectedType,
                 myActualReceiverTypes = actualReceiverTypes,
                 contextualSymbolsCache = ContextualSymbolsCache(
@@ -125,9 +140,18 @@ internal class WeighingContext private constructor(
                         originalFile = parameters.originalFile,
                     )
                 ),
+                myPreferredSubtype = preferredSubtype,
                 importableFqNameClassifier = ImportableFqNameClassifier(completionFile) { defaultImportPaths.hasImport(it) },
                 mySymbolsToSkip = symbolsToSkip,
             )
+        }
+
+        // For `is` and `as` operations we want to prefer sealed inheritors
+        context(KaSession)
+        fun KtExpression.getPreferredSealedType(): KaClassType? {
+            val comparisonType = expressionType as? KaClassType ?: return null
+            if (comparisonType.symbol.modality != KaSymbolModality.SEALED) return null
+            return comparisonType
         }
 
         context(KaSession)
@@ -136,14 +160,36 @@ internal class WeighingContext private constructor(
             positionContext: KotlinNameReferencePositionContext,
         ): WeighingContext {
             val nameExpression = positionContext.nameExpression
-            val expectedType = when (positionContext) {
+            val expectedType = when {
                 // during the sorting of completion suggestions expected type from position and actual types of suggestions are compared;
                 // see `org.jetbrains.kotlin.idea.completion.weighers.ExpectedTypeWeigher`;
                 // currently in case of callable references actual types are calculated incorrectly, which is why we don't use information
                 // about expected type at all
                 // TODO: calculate actual types for callable references correctly and use information about expected type
-                is KotlinCallableReferencePositionContext -> null
-                else -> nameExpression.expectedType
+                positionContext is KotlinCallableReferencePositionContext -> null
+                nameExpression.expectedType != null -> nameExpression.expectedType
+                nameExpression.parent is KtBinaryExpression -> getEqualityExpectedType(nameExpression)
+                nameExpression.parent is KtCollectionLiteralExpression -> getAnnotationLiteralExpectedType(nameExpression)
+                else -> null
+            }
+
+            fun KtBinaryExpressionWithTypeRHS.isAsOrSafeAs(): Boolean {
+                val operationElementType = operationReference.getReferencedNameElementType()
+                return operationElementType == KtTokens.AS_KEYWORD || operationElementType == KtTokens.AS_SAFE
+            }
+
+            val preferredSubtype = when (positionContext) {
+                is KotlinTypeNameReferencePositionContext -> {
+                    val typeReferenceOwner = positionContext.typeReference?.parent
+                    val leftHandExpression = when {
+                        typeReferenceOwner is KtIsExpression -> typeReferenceOwner.leftHandSide
+                        typeReferenceOwner is KtBinaryExpressionWithTypeRHS && typeReferenceOwner.isAsOrSafeAs() -> typeReferenceOwner.left
+                        else -> null
+                    }
+                    leftHandExpression?.getPreferredSealedType()
+                }
+
+                else -> null
             }
 
             val symbolToSkip = when (positionContext) {
@@ -168,12 +214,62 @@ internal class WeighingContext private constructor(
                 elementInCompletionFile = positionContext.position,
                 scopeContext = scopeContext,
                 expectedType = expectedType,
+                preferredSubtype = preferredSubtype,
                 actualReceiverTypes = CallableMetadataProvider.calculateActualReceiverTypes(
                     explicitReceiver = positionContext.explicitReceiver,
                     implicitReceivers = ::implicitReceivers,
                 ),
-                symbolsToSkip = setOfNotNull(symbolToSkip),
+                symbolsToSkip = setOfNotNull(symbolToSkip)
             )
+        }
+
+        /**
+         * Returns the expected type for elements within the collection literal
+         * if [nameExpression] is within a collection literal.
+         *
+         * TODO: It seems like a bug in the analysis API that this is required: KT-76480
+         */
+        context(KaSession)
+        private fun getAnnotationLiteralExpectedType(
+            nameExpression: KtElement,
+        ): KaType? {
+            val collectionLiteralEntry = nameExpression.parent as? KtCollectionLiteralExpression ?: return null
+            val annotationArgument = collectionLiteralEntry.parent as? KtValueArgument ?: return null
+            val annotationEntry = annotationArgument.parentOfType<KtAnnotationEntry>() ?: return null
+            val annotationCall = annotationEntry.resolveToCall()?.successfulCallOrNull<KaAnnotationCall>() ?: return null
+            val callArgument = annotationCall.argumentMapping[collectionLiteralEntry] ?: return null
+            return callArgument.symbol.returnType
+        }
+
+        context(KaSession)
+        private fun getEqualityExpectedType(
+            nameExpression: KtElement,
+        ): KaType? {
+            val binaryExpression = nameExpression.parent as? KtBinaryExpression
+                ?: return null
+
+            val isEqualityCheck = when (binaryExpression.operationToken) {
+                KtTokens.EQEQ, KtTokens.EXCLEQ,
+                KtTokens.EQEQEQ, KtTokens.EXCLEQEQEQ -> true
+
+                else -> false
+            }
+            if (!isEqualityCheck) return null
+
+            val left = binaryExpression.left
+                ?: return null
+            val right = binaryExpression.right
+                ?: return null
+
+            val expression = when (nameExpression) {
+                left -> right
+                right -> left
+                else -> null
+            }
+
+            return expression?.expressionType
+                ?.takeUnless { it is KaErrorType }
+                ?.withNullability(newNullability = KaTypeNullability.NULLABLE)
         }
 
         private fun Set<ImportPath>.hasImport(name: FqName): Boolean {
@@ -220,13 +316,14 @@ internal object Weighers {
         NotImportedWeigher.addWeight(context, lookupElement, symbol, availableWithoutImport)
         ClassifierWeigher.addWeight(lookupElement, symbol, symbolWithOrigin.origin)
         VariableOrFunctionWeigher.addWeight(lookupElement, symbol)
+        PreferredSubtypeWeigher.addWeight(context, lookupElement, symbol)
 
         if (symbol !is KaCallableSymbol) return@also
 
         K2SoftDeprecationWeigher.addWeight(lookupElement, symbol, context.languageVersionSettings)
 
         PreferContextualCallablesWeigher.addWeight(lookupElement, symbol, context.contextualSymbolsCache)
-        PreferFewerParametersWeigher. addWeight(lookupElement, symbol)
+        PreferFewerParametersWeigher.addWeight(lookupElement, symbol)
     }
 
     fun CompletionSorter.applyWeighers(positionContext: KotlinRawPositionContext): CompletionSorter =
@@ -237,6 +334,7 @@ internal object Weighers {
             ExpectedTypeWeigher.Weigher,
             DeprecatedWeigher.Weigher,
             PriorityWeigher.Weigher,
+            PreferredSubtypeWeigher.Weigher,
             PreferGetSetMethodsToPropertyWeigher.Weigher,
             NotImportedWeigher.Weigher,
             KindWeigher.Weigher,

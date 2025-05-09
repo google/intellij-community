@@ -9,6 +9,7 @@ import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.psi.PyExpression;
 import com.jetbrains.python.psi.types.*;
 import com.jetbrains.python.psi.types.PyTypeChecker.GenericSubstitutions;
+import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -103,6 +104,78 @@ public class Py3TypeTest extends PyTestCase {
            expr = l()
            """);
   }
+
+  //// PY-76659
+  //public void testRecursiveResolve() {
+  //  doTest("int",
+  //         """
+  //           x = 42
+  //           while x:
+  //               x = x + 1
+  //           expr = x""");
+  //}
+  //
+  //// PY-76659
+  //public void testRecursiveResolve2() {
+  //  doTest("int",
+  //         """
+  //           x = 42
+  //           b: bool = ...
+  //           while x:
+  //               if b:
+  //                   x = x + 1
+  //                   expr = x
+  //               else:
+  //                   x = x - 1
+  //           """);
+  //}
+  //
+  //// PY-76659
+  //public void testDeclareAfterUse() {
+  //  doTest("int | Any",
+  //         """
+  //           from typing import Any, TypeGuard
+  //           
+  //           def is_positive_integer(value: Any) -> TypeGuard[int]:
+  //               return isinstance(value, int) and value > 0
+  //
+  //           def bar() -> object:
+  //               return 321
+  //           
+  //           def foo():
+  //               for i in range(1, 100):
+  //                   if i > 1:
+  //                       expr = x
+  //                   x = bar()
+  //                   if not is_positive_integer(x):
+  //                       break
+  //           """);
+  //}
+  //
+  //// PY-76659
+  //public void testClassChain() {
+  //  doTest("B | C | D | A",
+  //         """
+  //           class A:
+  //               def bar() -> "B":
+  //                   return B()
+  //           class B:
+  //               def bar() -> "C":
+  //                   return C()
+  //           class C:
+  //               def bar() -> "D":
+  //                   return D()
+  //           class D:
+  //               def bar() -> A:
+  //                   return A()
+  //           
+  //           def foo(b):
+  //               x = A()
+  //               while b:
+  //                   x = x.bar()
+  //           
+  //               expr = x""");
+  //}
 
   // PY-6702
   public void testYieldFromType() {
@@ -640,6 +713,12 @@ public class Py3TypeTest extends PyTestCase {
                  if (v == abc):
                      expr = v
              """);
+    doTest("Literal[\"abba\"]",
+           """
+             from typing import Literal
+             if ((v := input()) == "abba"):
+                 expr = v
+             """);
   }
 
   public void testLiteralTypeNarrowingIn() {
@@ -686,6 +765,12 @@ public class Py3TypeTest extends PyTestCase {
              def f(v: object):
                  if v in (-1, None):
                      expr = v
+             """);
+    doTest("Literal[\"abba\"]",
+           """
+             from typing import Literal
+             if (a := input()) in ("abba", False):
+                 expr = a
              """);
   }
 
@@ -776,7 +861,7 @@ public class Py3TypeTest extends PyTestCase {
              async for expr in a:
                  print(expr)""");
   }
-  
+
   // PY-60714
   public void testAsyncIteratorUnwrapsCoroutineFromAnext() {
     doTest("bytes", """
@@ -868,7 +953,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-24445
   public void testIsSubclassInsideListComprehension() {
-    doTest("list[Type[A]]",
+    doTest("list[type[A]]",
            "class A: pass\n" +
            "expr = [e for e in [] if issubclass(e, A)]");
   }
@@ -3490,6 +3575,125 @@ public class Py3TypeTest extends PyTestCase {
               pass
       expr = f()
       """);
+  }
+
+  public void testMetaclassDunderCallReturnTypeIncompatibleWithClassBeingConstructed() {
+    doTest("object", """
+      from typing import Self
+      
+      
+      class Meta(type):
+          def call(cls, p) -> object: ...
+      
+          __call__ = call
+      
+      
+      class MyClass(metaclass=Meta):
+          def __new__(cls, p) -> Self: ...
+      
+      
+      expr = MyClass(1)
+      """);
+  }
+
+  public void testMetaclassNotAnnotatedDunderCall() {
+    doTest("MyClass", """
+      from typing import Self
+      
+      
+      class Meta(type):
+          def __call__(cls, p: int): ...
+      
+      
+      class MyClass(metaclass=Meta):
+          def __new__(cls, p: int) -> Self: ...
+      
+      
+      expr = MyClass(1)
+      """);
+  }
+
+  public void testMetaclassGenericDunderCallReturnTypeCompatibleWithClassBeingConstructed() {
+    doTest("MyClass", """
+      from typing import Self
+      
+      
+      class Meta(type):
+          def __call__[T](cls: type[T], *args, **kwargs) -> T: ...
+      
+      
+      class MyClass(metaclass=Meta):
+          def __new__(cls, p) -> Self: ...
+      
+      
+      expr = MyClass(1)
+      """);
+  }
+
+  public void testMetaclassGenericDunderCallReturnTypeIncompatibleWithClassBeingConstructed() {
+    doTest("int", """
+      from typing import Self
+      
+      
+      class Meta(type):
+          def __call__[T](cls, x: T) -> T: ...
+      
+      
+      class MyClass(metaclass=Meta):
+          def __new__(cls, x) -> Self: ...
+      
+      
+      expr = MyClass(1)
+      """);
+  }
+
+  public void testMetaclassDunderCallReturnTypeCompatibleWithClassBeingConstructed() {
+    doTest("Base", """
+      from typing import Any, Self
+
+
+      class Meta(type):
+          def __call__(self, *args: Any, **kwds: Any) -> 'Derived': ...
+
+
+      class Base(metaclass=Meta):
+          def __new__(cls, *args: Any, **kwds: Any) -> Self: ...
+
+
+      class Derived(Base):
+          ...
+
+
+      expr = Base()
+      """);
+  }
+
+  // PY-79967
+  public void testTypeOfTemplateStringInferredAsTemplateForPython314() {
+    runWithLanguageLevel(LanguageLevel.PYTHON314, () -> {
+      doTest("Template", """
+        expr = t"template string"
+        """);
+    });
+  }
+
+  // PY-79967
+  public void testTypeOfTemplateStringInferredAsStrForPython314() {
+    runWithLanguageLevel(LanguageLevel.PYTHON313, () -> {
+      doTest("str", """
+        expr = t"template string"
+        """);
+    });
+  }
+
+  // PY-79967
+  public void testInterpolationExpressionTypeFromTemplateString() {
+    runWithLanguageLevel(LanguageLevel.PYTHON314, () -> {
+      doTest("str", """
+        name = "John"
+        expr = t"Hello, {name}!".interpolations[0].expression
+        """);
+    });
   }
 
   private void doTest(final String expectedType, final String text) {

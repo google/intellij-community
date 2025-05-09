@@ -33,6 +33,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
+import com.intellij.psi.util.PsiUtilCore
 import java.time.Duration
 
 internal class InlineCompletionLogsListener(private val editor: Editor) : InlineCompletionFilteringEventListener(),
@@ -77,7 +78,11 @@ internal class InlineCompletionLogsListener(private val editor: Editor) : Inline
     container.add(REQUEST_EVENT with event.request.event.javaClass)
     container.add(EDITOR_TYPE with InlineCompletionEditorType.get(event.request.editor))
     container.add(INLINE_API_PROVIDER with event.provider)
-    event.request.event.toRequest()?.file?.language?.let { container.add(FILE_LANGUAGE with it) }
+    val file = event.request.event.toRequest()?.file
+    file?.let {
+      val fileLanguage = it.language
+      container.add(FILE_LANGUAGE with fileLanguage)
+    }
     container.addAsync {
       readAction {
         InlineCompletionContextLogs.getFor(event.request)

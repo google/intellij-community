@@ -20,6 +20,7 @@ jvm_library(
   deps = [
     "//plugins/maven",
     "//plugins/maven/testFramework",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//java/testFramework",
@@ -40,7 +41,7 @@ jvm_library(
     "//platform/util/progress",
     "//platform/workspace/jps",
     "@lib//:guava",
-    "//plugins/maven/artifact-resolver/common:maven-artifactResolver-common",
+    "//plugins/maven/artifact-resolver/common",
     "@lib//:mockito",
     "//plugins/maven/jps-plugin:jps",
     "//plugins/maven/jps-plugin:jps_test_lib",
@@ -48,7 +49,7 @@ jvm_library(
     "//platform/util/jdom",
     "@lib//:kotlinx-coroutines-core",
     "//platform/code-style-impl:codeStyle-impl",
-    "//platform/external-system-api/testFramework:externalSystem-testFramework",
+    "//platform/external-system-api/testFramework",
     "//platform/backend/workspace",
     "//java/java-impl:impl",
     "//platform/backend/observation",
@@ -57,6 +58,7 @@ jvm_library(
     "@lib//:kotlin-reflect",
     "@lib//:kotlinx-serialization-core",
     "//platform/statistics/testFramework",
+    "//platform/xdebugger-api:debugger",
   ],
   runtime_deps = [":maven-tests_test_resources"]
 )

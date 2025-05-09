@@ -1,6 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 
+import com.intellij.codeInsight.Nullability
 import com.intellij.codeInsight.daemon.QuickFixBundle
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
@@ -11,6 +12,8 @@ import com.intellij.lang.jvm.JvmModifier
 import com.intellij.lang.jvm.actions.AnnotationRequest
 import com.intellij.lang.jvm.actions.CreateFieldRequest
 import com.intellij.lang.jvm.actions.EP_NAME
+import com.intellij.lang.jvm.actions.ExpectedTypeWithNullability
+import com.intellij.lang.jvm.types.JvmPrimitiveType
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
@@ -32,6 +35,7 @@ import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSo
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
@@ -64,7 +68,7 @@ object K2CreatePropertyFromUsageBuilder {
         classOrFileName: String?,
         request: CreateFieldRequest,
         lateinit: Boolean
-    ): IntentionAction? {
+    ): IntentionAction {
         if (!request.isValid) null
         return CreatePropertyFromUsageAction(targetContainer, classOrFileName, request, lateinit)
     }
@@ -93,9 +97,14 @@ object K2CreatePropertyFromUsageBuilder {
         var static = false
 
         val (defaultContainerPsi, receiverExpression) = when {
-          qualifiedElement == ref -> {
-              ref.parentOfType<KtClassOrObject>() to null
-          }
+            qualifiedElement == ref -> {
+                PsiTreeUtil.getParentOfType(
+                    /* element = */ ref,
+                    /* aClass = */ KtClassOrObject::class.java,
+                    /* strict = */ true,
+                    /* ...stopAt = */ KtSuperTypeList::class.java, KtPrimaryConstructor::class.java, KtConstructorDelegationCall::class.java, KtAnnotationEntry::class.java
+                ) to null
+            }
           qualifiedElement is KtQualifiedExpression && qualifiedElement.selectorExpression == ref -> {
               val receiverExpression = qualifiedElement.receiverExpression
               static = receiverExpression.mainReference?.resolveToSymbol() is KaClassSymbol
@@ -110,6 +119,7 @@ object K2CreatePropertyFromUsageBuilder {
         }
 
         val receiverType = receiverExpression?.expressionType
+        if (receiverType is KaErrorType) return emptyList()
 
         val lightClass = (defaultContainerPsi as? KtClassOrObject)?.toLightClass() ?: defaultContainerPsi as? PsiClass
         val isAbstract = lightClass?.hasModifier(JvmModifier.ABSTRACT)
@@ -128,7 +138,7 @@ object K2CreatePropertyFromUsageBuilder {
                 }
                 val jvmModifiers = createModifiers(ref, containingKtFile, isExtension = true, static = true, false)
                 val classId =
-                    (defaultContainerPsi as? KtClassOrObject)?.classIdIfNonLocal ?: (defaultContainerPsi as? PsiClass)?.classIdIfNonLocal
+                    (defaultContainerPsi as? KtClassOrObject)?.takeUnless { it is KtEnumEntry }?.classIdIfNonLocal ?: (defaultContainerPsi as? PsiClass)?.classIdIfNonLocal
                 if (classId != null) {
                     val targetClassType = buildClassType(if (static) ClassId.fromString(classId.asFqNameString() + ".Companion") else classId)
                     requests.add(wrapperForKtFile to CreatePropertyFromKotlinUsageRequest(ref, jvmModifiers, targetClassType, isExtension = true))
@@ -139,7 +149,8 @@ object K2CreatePropertyFromUsageBuilder {
             }
         } else {
             val jvmModifiers = createModifiers(ref, containingKtFile, isExtension = receiverExpression != null, static = true, isAbstract = false)
-            requests.add(wrapperForKtFile to CreatePropertyFromKotlinUsageRequest(ref, jvmModifiers, receiverType, isExtension = receiverExpression != null))
+            val mustBeConst = ref.parentOfType<KtAnnotationEntry>() != null
+            requests.add(wrapperForKtFile to CreatePropertyFromKotlinUsageRequest(ref, jvmModifiers, receiverType, isExtension = receiverExpression != null, isConst = mustBeConst))
         }
         return requests
     }
@@ -168,7 +179,7 @@ object K2CreatePropertyFromUsageBuilder {
         owner: KtModifierListOwner,
         target: AnnotationUseSiteTarget?,
         request: AnnotationRequest
-    ): IntentionAction? {
+    ): IntentionAction {
         if (!request.isValid) null
 
         return CreateAnnotationAction(owner, target, request)
@@ -195,12 +206,22 @@ object K2CreatePropertyFromUsageBuilder {
                         .filter { it != JvmModifier.PUBLIC && it != JvmModifier.ABSTRACT }
                         .mapNotNullTo(this, CreateFromUsageUtil::jvmModifierToKotlin)
 
-                    if (lateinit && !(request is CreatePropertyFromKotlinUsageRequest && request.isExtension)) {
+                    if (lateinit && isLateinitAllowed()) {
                         this += KtTokens.LATEINIT_KEYWORD
                     } else if (request.isConstant) {
                         this += KtTokens.CONST_KEYWORD
                     }
                 }.takeUnless { it.isEmpty() }
+
+        private fun isLateinitAllowed(): Boolean {
+            if (request is CreatePropertyFromKotlinUsageRequest) {
+                if (request.fieldType.all { it.theType is JvmPrimitiveType || (it as? ExpectedTypeWithNullability)?.nullability == Nullability.NULLABLE } ||
+                    request.modifiers.contains(JvmModifier.ABSTRACT)) {
+                    return false
+                }
+            }
+            return request !is CreatePropertyFromKotlinUsageRequest || !request.isExtension
+        }
 
         override fun getText(): String {
             return if (request is CreatePropertyFromKotlinUsageRequest) {

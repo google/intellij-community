@@ -4,6 +4,8 @@ package com.intellij.openapi.application.impl
 import com.intellij.openapi.actionSystem.ex.ActionButtonLook
 import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.fileEditor.impl.EditorTabPainterAdapter
+import com.intellij.openapi.fileEditor.impl.EditorsSplitters
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Divider
 import com.intellij.openapi.ui.Splittable
 import com.intellij.openapi.wm.IdeGlassPane
@@ -40,6 +42,7 @@ open class InternalUICustomization {
       return result
     }
   }
+  open fun progressWidget(project: Project): JComponent? = null
 
   open val aiComponentMarker: AiInternalUiComponentMarker = AiInternalUiComponentMarker()
 
@@ -49,6 +52,7 @@ open class InternalUICustomization {
 
   open val isProjectCustomDecorationActive: Boolean = true
 
+  open val isDefaultCustomization: Boolean = true
   /**
    * TODO
    * in the case of singleStripe, it is necessary to remove or recycle all actions related to the statusbar.
@@ -63,7 +67,11 @@ open class InternalUICustomization {
 
   open fun getEditorToolbarButtonLook(): ActionButtonLook? = null
 
+  open fun configureEditorsSplitters(component: EditorsSplitters) {}
+
   open fun installBackgroundUpdater(component: JComponent) {}
+
+  open fun installEditorBackground(component: JComponent) {}
 
   open fun frameHeaderBackgroundConverter(color: Color?): Color? = color
 

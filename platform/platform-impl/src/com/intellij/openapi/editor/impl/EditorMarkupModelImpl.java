@@ -260,7 +260,7 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
     connection.subscribe(AnActionListener.TOPIC, new AnActionListener() {
       @Override
       public void beforeActionPerformed(@NotNull AnAction action, @NotNull AnActionEvent event) {
-        if (action instanceof HintManagerImpl.ActionToIgnore) {
+        if (HintManagerImpl.isActionToIgnore(action)) {
           return;
         }
         myTrafficLightPopup.hidePopup();
@@ -1547,10 +1547,9 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
         private void showInspectionHint(MouseEvent me) {
           DataContext context = ActionToolbar.getDataContextFor(TrafficLightButton.this);
           AnActionEvent event = AnActionEvent.createEvent(context, presentation, place, ActionUiKind.TOOLBAR, me);
-          if (ActionUtil.lastUpdateAndCheckDumb(action, event, false)) {
-            ActionUtil.performActionDumbAwareWithCallbacks(action, event);
+          AnActionResult result = ActionUtil.performAction(action, event);
+          if (result.isPerformed()) {
             ActionsCollector.getInstance().record(event.getProject(), action, event, null);
-
             ActionToolbar toolbar = ActionToolbar.findToolbarBy(TrafficLightButton.this);
             if (toolbar != null) {
               toolbar.updateActionsImmediately();
@@ -1968,6 +1967,7 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
                                           @Nullable AnAction nextErrorAction,
                                           @Nullable AnAction prevErrorAction) {
       super(ActionPlaces.EDITOR_INSPECTIONS_TOOLBAR, actions, true);
+      putClientProperty(SUPPRESS_FAST_TRACK, true);
       myEditor = editor;
       myEditorButtonLook = editorButtonLook;
       myNextErrorAction = nextErrorAction;

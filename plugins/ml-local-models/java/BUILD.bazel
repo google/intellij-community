@@ -2,13 +2,13 @@
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
-  name = "ml-models-local-java_resources",
+  name = "java_resources",
   files = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
 
 jvm_library(
-  name = "ml-models-local-java",
+  name = "java",
   module_name = "intellij.ml.models.local.java",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
@@ -17,8 +17,9 @@ jvm_library(
     "//java/java-impl:impl",
     "//platform/backend/workspace",
     "//plugins/ml-local-models:ml-models-local",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/workspace/jps",
   ],
-  runtime_deps = [":ml-models-local-java_resources"]
+  runtime_deps = [":java_resources"]
 )
 ### auto-generated section `build intellij.ml.models.local.java` end

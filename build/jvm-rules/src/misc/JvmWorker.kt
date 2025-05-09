@@ -6,13 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.intellij.build.io.AddDirEntriesMode
 import org.jetbrains.intellij.build.io.PackageIndexBuilder
-import org.jetbrains.intellij.build.io.W_OVERWRITE
-import org.jetbrains.intellij.build.io.ZipArchiveOutputStream
-import org.jetbrains.intellij.build.io.ZipIndexWriter
-import org.jetbrains.intellij.build.io.file
+import org.jetbrains.intellij.build.io.zipWriter
 import java.io.File
 import java.io.Writer
-import java.nio.channels.FileChannel
 import java.nio.file.Path
 
 object JvmWorker : WorkRequestExecutor<WorkRequest> {
@@ -48,7 +44,7 @@ object JvmWorker : WorkRequestExecutor<WorkRequest> {
           stripPrefix = command[4]
           val index = p.indexOf(stripPrefix)
           require(index != -1)
-          stripPrefix = p.substring(0, index + stripPrefix.length)
+          stripPrefix = p.take(index + stripPrefix.length)
         }
         createZip(
           outJar = Path.of(output),
@@ -74,13 +70,12 @@ private suspend fun createZip(outJar: Path, inputs: Array<String>, baseDir: Path
   val stripPrefixWithSlash = stripPrefix.let { if (it.isEmpty()) "" else "$it/" }
   val files = ArrayList<String>(inputs.size)
   for (input in inputs) {
-    val p = input
-    if (!p.startsWith(stripPrefixWithSlash)) {
+    if (!input.startsWith(stripPrefixWithSlash)) {
       // input can contain our jar in the end
       continue
     }
 
-    files.add(p.substring(stripPrefixWithSlash.length))
+    files.add(input.substring(stripPrefixWithSlash.length).replace(File.separatorChar, '/'))
   }
 
   files.sort()
@@ -89,17 +84,12 @@ private suspend fun createZip(outJar: Path, inputs: Array<String>, baseDir: Path
   //Files.writeString(Path.of("/tmp/f2.txt"), stripPrefixWithSlash + "\n" + files.joinToString("\n") { it.toString() })
 
   withContext(Dispatchers.IO) {
-    val packageIndexBuilder = PackageIndexBuilder()
-    ZipArchiveOutputStream(
-      channel = FileChannel.open(outJar, W_OVERWRITE),
-      zipIndexWriter = ZipIndexWriter(packageIndexBuilder.indexWriter)
-    ).use { stream ->
+    val packageIndexBuilder = PackageIndexBuilder(AddDirEntriesMode.RESOURCE_ONLY)
+    zipWriter(targetFile = outJar, packageIndexBuilder = packageIndexBuilder, overwrite = true).use { stream ->
       for (path in files) {
-        val name = path.replace(File.separatorChar, '/')
-        packageIndexBuilder.addFile(name = name, addClassDir = false)
-        stream.file(nameString = name, file = root.resolve(path))
+        packageIndexBuilder.addFile(name = path)
+        stream.fileWithoutCrc(path = path.toByteArray(), file = root.resolve(path))
       }
-      packageIndexBuilder.writePackageIndex(stream = stream, addDirEntriesMode = AddDirEntriesMode.RESOURCE_ONLY)
     }
   }
 }

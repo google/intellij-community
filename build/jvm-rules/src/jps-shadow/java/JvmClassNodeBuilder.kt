@@ -1,3 +1,4 @@
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "SSBasedInspection", "ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package org.jetbrains.jps.dependency.java
@@ -7,8 +8,8 @@ import androidx.collection.MutableScatterSet
 import com.dynatrace.hash4j.hashing.Hashing
 import com.intellij.openapi.diagnostic.logger
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
-import org.jetbrains.bazel.jvm.emptyList
-import org.jetbrains.bazel.jvm.emptySet
+import org.jetbrains.bazel.jvm.util.emptyList
+import org.jetbrains.bazel.jvm.util.emptySet
 import org.jetbrains.jps.dependency.NodeBuilder
 import org.jetbrains.jps.dependency.Usage
 import org.jetbrains.jps.dependency.java.nodeBuilder.AnnotationCrawler
@@ -262,8 +263,6 @@ class JvmClassNodeBuilder private constructor(
 
     val fields = if (skipPrivateMethodsAndFields) fields.filter { !it.isPrivate } else fields
     val methods = if (skipPrivateMethodsAndFields) methods.filter { !it.isPrivate } else methods
-    val usages = if (isLibraryMode) emptySet() else usages.ifEmpty { emptySet() }
-
     return JvmClass(
       flags = flags,
       signature = signature,
@@ -277,7 +276,7 @@ class JvmClassNodeBuilder private constructor(
       annotations = toSet(annotations),
       annotationTargets = targets,
       retentionPolicy = retentionPolicy,
-      usages = usages,
+      usages = if (isLibraryMode) emptySet() else usages.ifEmpty { emptySet() },
       metadata = metadata.ifEmpty { emptyList() },
     )
   }
@@ -408,7 +407,7 @@ class JvmClassNodeBuilder private constructor(
       override fun visitEnd() {
         if ((access and Opcodes.ACC_SYNTHETIC) == 0 || (access and Opcodes.ACC_BRIDGE) > 0 || (access and Opcodes.ACC_PRIVATE) == 0) {
           if (isInlined) {
-            // use 'defaultValue' attribute to store the hash of the function body to track changes in inline method implementation
+            // use the `defaultValue` attribute to store the hash of the function body to track changes in inline method implementation
             defaultValue = buildContentHash(ContentHashBuilderImpl(), printer.getText()).getResult()
           }
           methods.add(JvmMethod(
@@ -616,7 +615,7 @@ class JvmClassNodeBuilder private constructor(
           // This invokeDynamic implements a lambda or method reference usage.
           // Need to register method usage for the corresponding SAM type.
           // The first three arguments to the bootstrap methods are provided automatically by VM.
-          // Arguments in an args array are expected to be as following:
+          // Arguments in an args array are expected to be as follows:
           // [0]: Type: Signature and return type of method to be implemented by the function object.
           // [1]: Handle: implementation method handle
           // [2]: Type: The signature and return type that should be enforced dynamically at invocation time.
@@ -681,9 +680,9 @@ class JvmClassNodeBuilder private constructor(
 
   override fun visitInnerClass(name: String?, outerName: String?, innerName: String?, access: Int) {
     if (name != null && name == className) {
-      // Set outer class name only if we are parsing the real inner class and
-      // not the reference to inner class inside some top-level class.
-      // Information about some access flags for the inner class is missing from the mask passed to 'visit' method.
+      // Set the outer class name only if we are parsing the real inner class and
+      // not the reference to an inner class inside some top-level class.
+      // Information about some access flags for the inner class is missing from the mask passed to the `visit` method.
       this.access = this.access or access
       if (outerName != null) {
         outerClassName = outerName
@@ -805,13 +804,3 @@ private fun getTypeClass(t: Type): Class<*> {
 }
 
 private fun <T> toSet(set: MutableScatterSet<T>): Set<T> = if (set.isEmpty()) emptySet() else set.asSet()
-
-//@Suppress("RemoveRedundantQualifierName")
-//private fun <T> toSet(set: MutableOrderedScatterSet<T>): Set<T> {
-//  val size = set.size
-//  return when (size) {
-//    0 -> emptySet()
-//    1 -> java.util.Set.of(set.first())
-//    else -> set.asSet()
-//  }
-//}

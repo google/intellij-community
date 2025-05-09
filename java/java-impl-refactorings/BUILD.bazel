@@ -7,6 +7,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-api:lang",
     "//java/java-psi-api:psi",
     "//platform/core-impl",
@@ -23,9 +24,10 @@ jvm_library(
     "//platform/code-style-impl:codeStyle-impl",
     "@lib//:fastutil-min",
     "//platform/diff-impl",
+    "//platform/usageView-impl",
     "//platform/util/jdom",
     "//platform/core-ui",
-    "//java/codeserver/core:java-codeserver-core",
+    "//java/codeserver/core",
   ]
 )
 ### auto-generated section `build intellij.java.impl.refactorings` end

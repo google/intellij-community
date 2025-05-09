@@ -4,7 +4,8 @@ import com.google.common.base.Ascii
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.openapi.project.Project
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
-import com.intellij.terminal.backend.startTerminalSession
+import com.intellij.terminal.backend.createTerminalSession
+import com.intellij.terminal.backend.startTerminalProcess
 import com.intellij.terminal.session.TerminalOutputEvent
 import com.intellij.terminal.session.TerminalSession
 import com.intellij.util.EnvironmentUtil
@@ -26,15 +27,17 @@ internal object TerminalSessionTestUtil {
     project: Project,
     coroutineScope: CoroutineScope,
     size: TermSize = TermSize(80, 24),
+    extraEnvVariables: Map<String, String> = emptyMap(),
   ): TerminalSession {
     TerminalTestUtil.setTerminalEngineForTest(TerminalEngine.REWORKED, coroutineScope.asDisposable())
 
     val options = ShellStartupOptions.Builder()
       .shellCommand(listOf(shellPath))
       .initialTermSize(size)
-      .envVariables(mapOf(EnvironmentUtil.DISABLE_OMZ_AUTO_UPDATE to "true", "HISTFILE" to "/dev/null"))
+      .envVariables(mapOf(EnvironmentUtil.DISABLE_OMZ_AUTO_UPDATE to "true", "HISTFILE" to "/dev/null") + extraEnvVariables)
       .build()
-    val (session, _) = startTerminalSession(project, options, JBTerminalSystemSettingsProviderBase(), coroutineScope)
+    val (ttyConnector, _) = startTerminalProcess(project, options)
+    val session = createTerminalSession(project, ttyConnector, size, JBTerminalSystemSettingsProviderBase(), coroutineScope)
     return session
   }
 

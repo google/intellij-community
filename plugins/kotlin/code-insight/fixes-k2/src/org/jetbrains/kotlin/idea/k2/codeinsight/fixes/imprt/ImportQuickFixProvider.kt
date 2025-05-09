@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt
 
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.openapi.util.registry.Registry
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
@@ -41,13 +42,14 @@ object ImportQuickFixProvider : KotlinQuickFixFactory.IntentionBased<KaDiagnosti
 
     context(KaSession)
     fun getFixes(diagnostics: Set<KaDiagnosticWithPsi<*>>): List<ImportQuickFix> {
-        val factories = listOf(
+        val factories = listOfNotNull(
             UnresolvedNameReferenceImportQuickFixFactory,
-            MismatchedArgumentsImportQuickFixFactory,
+            MismatchedArgumentsImportQuickFixFactory.takeIf { Registry.`is`("kotlin.k2.auto.import.mismatched.arguments.factory.enabled", true) },
             DelegateMethodImportQuickFixFactory,
             ArrayAccessorImportQuickFixFactory,
             ComponentFunctionImportQuickFixFactory,
             IteratorImportQuickFixFactory,
+            InvokeImportQuickFixFactory,
         )
 
         return factories.flatMap { it.run { createQuickFixes(diagnostics) } }
@@ -89,7 +91,7 @@ object ImportQuickFixProvider : KotlinQuickFixFactory.IntentionBased<KaDiagnosti
     internal fun KaSession.createImportFix(
         position: KtElement,
         data: ImportData,
-    ): ImportQuickFix? {
+    ): ImportQuickFix {
         val text = ImportFixHelper.calculateTextForFix(
             data.importsInfo,
             suggestions = data.uniqueFqNameSortedImportCandidates.map { (candidate, _) -> candidate.getFqName() }

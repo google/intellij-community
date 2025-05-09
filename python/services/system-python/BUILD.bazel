@@ -2,6 +2,12 @@
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
+  name = "python-community-services-systemPython_resources",
+  files = glob(["resources/**/*"]),
+  strip_prefix = "resources"
+)
+
+jvm_resources(
   name = "python-community-services-systemPython_test_resources",
   files = glob(["testResources/**/*"]),
   strip_prefix = "testResources"
@@ -22,12 +28,13 @@ jvm_library(
     "//platform/extensions",
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
-    "//python/services/shared:python-community-services-shared",
+    "//python/services/shared",
     "//python/services/internal-impl:python-community-services-internal-impl",
     "//platform/util",
-    "//python/installer:community-impl-installer",
+    "//python/installer",
   ],
-  exports = ["//python/services/shared:python-community-services-shared"]
+  exports = ["//python/services/shared"],
+  runtime_deps = [":python-community-services-systemPython_resources"]
 )
 
 jvm_library(
@@ -50,14 +57,14 @@ jvm_library(
     "//platform/testFramework/junit5:junit5_test_lib",
     "@lib//:junit5",
     "//platform/projectModel-api:projectModel",
-    "//python/testFramework:community-testFramework",
+    "//python/testFramework",
     "@lib//:hamcrest",
-    "//python/services/shared:python-community-services-shared",
+    "//python/services/shared",
     "//python/services/internal-impl:python-community-services-internal-impl",
     "//python/services/internal-impl:python-community-services-internal-impl_test_lib",
     "//platform/util",
     "//python/junit5Tests-framework:community-junit5Tests-framework_test_lib",
-    "//python/installer:community-impl-installer",
+    "//python/installer",
     "//python/python-venv:community-impl-venv",
     "//python/python-venv:community-impl-venv_test_lib",
     "//python/setup-test-environment:community-testFramework-testEnv",
@@ -66,7 +73,10 @@ jvm_library(
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
   ],
-  runtime_deps = [":python-community-services-systemPython_test_resources"]
+  runtime_deps = [
+    ":python-community-services-systemPython_resources",
+    ":python-community-services-systemPython_test_resources",
+  ]
 )
 
 jvm_test(

@@ -7,11 +7,9 @@ import com.intellij.concurrency.SensitiveProgressWrapper;
 import com.intellij.concurrency.ThreadContext;
 import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.ide.startup.ServiceNotReadyException;
+import com.intellij.model.SideEffectGuard;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.AccessToken;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.NonBlockingReadAction;
+import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.constraints.BaseConstrainedExecution;
 import com.intellij.openapi.application.constraints.ConstrainedExecution.ContextConstraint;
 import com.intellij.openapi.application.ex.ApplicationEx;
@@ -46,6 +44,7 @@ import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import kotlin.reflect.KClass;
 import kotlinx.coroutines.Job;
+import kotlinx.coroutines.JobKt;
 import org.jetbrains.annotations.*;
 import org.jetbrains.concurrency.AsyncPromise;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -139,8 +138,14 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
   }
 
   private static void invokeLater(@NotNull Runnable runnable) {
-    ApplicationManager.getApplication()
-      .invokeLaterOnWriteThread(runnable, ModalityState.any(), ApplicationManager.getApplication().getDisposed());
+    Application app = ApplicationManager.getApplication();
+    AppImplKt.getGlobalThreadingSupport().runWhenWriteActionIsCompleted(() -> {
+      SideEffectGuard.computeWithAllowedSideEffectsBlocking(EnumSet.of(SideEffectGuard.EffectType.INVOKE_LATER), () -> {
+        app.invokeLaterOnWriteThread(runnable, ModalityState.any(), app.getDisposed());
+        return Unit.INSTANCE;
+      });
+      return Unit.INSTANCE;
+    });
   }
 
   @Override
@@ -504,7 +509,11 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
     T executeSynchronously() {
       try {
         while (true) {
-          attemptComputation();
+          // here we override the context job in case when this code is running under non-cancellable section
+          Job tempJob = myChildContext.getJob() != null ? myChildContext.getJob() : JobKt.Job(null);
+          try (AccessToken ignored = ThreadContext.installThreadContext(ThreadContext.currentThreadContext().plus(tempJob), true)) {
+            attemptComputation();
+          }
 
           if (isDone()) {
             if (isCancelled()) {

@@ -17,6 +17,7 @@ jvm_library(
     "@lib//:guava",
     "@lib//:assert_j",
     "@lib//:assertj-swing",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-impl",
     "//platform/execution-impl",
     "//platform/platform-impl:ide-impl",
@@ -58,6 +59,7 @@ jvm_library(
     "@lib//:guava",
     "@lib//:assert_j",
     "@lib//:assertj-swing",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-impl",
     "//platform/execution-impl",
     "//platform/platform-impl:ide-impl",
@@ -86,6 +88,10 @@ jvm_library(
     "//platform/lvcs-impl:lvcs-impl_test_lib",
     "//platform/tips-of-the-day:tips",
     "//platform/diagnostic",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
+    "@lib//:mockito-kotlin",
+    "@lib//:mockito",
   ],
   runtime_deps = [":featuresTrainer_resources"]
 )

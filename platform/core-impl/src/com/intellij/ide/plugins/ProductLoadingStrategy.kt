@@ -44,14 +44,14 @@ abstract class ProductLoadingStrategy {
 
   abstract fun loadPluginDescriptors(
     scope: CoroutineScope,
-    context: DescriptorListLoadingContext,
+    loadingContext: PluginDescriptorLoadingContext,
     customPluginDir: Path,
     bundledPluginDir: Path?,
     isUnitTestMode: Boolean,
     isRunningFromSources: Boolean,
     zipPool: ZipEntryResolverPool,
     mainClassLoader: ClassLoader,
-  ): List<Deferred<IdeaPluginDescriptorImpl?>>
+  ): Deferred<List<DiscoveredPluginsList>>
   
   abstract fun isOptionalProductModule(moduleName: String): Boolean
 

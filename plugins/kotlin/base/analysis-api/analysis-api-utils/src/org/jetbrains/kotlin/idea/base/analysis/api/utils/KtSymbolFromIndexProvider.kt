@@ -11,16 +11,22 @@ import com.intellij.psi.PsiMethod
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
 import com.intellij.util.Processor
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaBuiltinTypes
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.base.analysis.isExcludedFromAutoImport
 import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.idea.stubindex.*
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.platform.isCommon
+import org.jetbrains.kotlin.platform.isMultiPlatform
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.isExpectDeclaration
 import org.jetbrains.kotlin.psi.psiUtil.isExtensionDeclaration
@@ -44,7 +50,7 @@ class KtSymbolFromIndexProvider(
             return true
         }
 
-        if (isExpectDeclaration() && !useSiteModule.targetPlatform.isCommon()) {
+        if (isIgnoredExpectDeclaration()) {
             // filter out expect declarations outside of common modules
             return false
         }
@@ -212,7 +218,8 @@ class KtSymbolFromIndexProvider(
         KotlinFunctionShortNameIndex,
         KotlinPropertyShortNameIndex,
     ).flatMap { helper ->
-        val processor = CancelableCollectFilterProcessor { declaration: KtNamedDeclaration ->
+        val results = mutableListOf<KtNamedDeclaration>()
+        val processor = cancelableCollectFilterProcessor(results) { declaration: KtNamedDeclaration ->
             declaration is KtCallableDeclaration
                     && declaration.isAcceptable(psiFilter)
         }
@@ -224,7 +231,7 @@ class KtSymbolFromIndexProvider(
             processor = processor,
         )
 
-        processor.results
+        results
     }.map { it.symbol }
         .filterIsInstance<KaCallableSymbol>() +
             resolveExtensionScopeWithTopLevelDeclarations.callables(name)
@@ -280,7 +287,8 @@ class KtSymbolFromIndexProvider(
         KotlinTopLevelFunctionFqnNameIndex,
         KotlinTopLevelPropertyFqnNameIndex,
     ).flatMap { helper ->
-        val processor = CancelableCollectFilterProcessor { declaration: KtCallableDeclaration ->
+        val results = mutableListOf<KtCallableDeclaration>()
+        val processor = cancelableCollectFilterProcessor(results) { declaration: KtCallableDeclaration ->
             declaration.isAcceptable(psiFilter)
                     && declaration.receiverTypeReference == null
         }
@@ -292,7 +300,7 @@ class KtSymbolFromIndexProvider(
             processor = processor,
         )
 
-        processor.results
+        results
     }.map { it.symbol }
         .filterIsInstance<KaCallableSymbol>() +
             resolveExtensionScopeWithTopLevelDeclarations.callables(nameFilter)
@@ -406,6 +414,11 @@ private fun findAllNamesForTypes(
 
         is KaIntersectionType -> findAllNamesForTypes(project, type.conjuncts, scope, builtinTypes)
 
+        is KaCapturedType -> type.projection
+            .type
+            ?.let { findAllNamesForType(it) }
+            ?: emptySet()
+
         is KaTypeParameterType -> {
             // when no explicit upper bounds, we consider `Any` to be an upper bound
             val upperBounds = type.symbol
@@ -479,4 +492,44 @@ private fun MutableSet<Name>.createNamesProcessor(
         ?.takeIf(nameFilter)
         ?.let(this@createNamesProcessor::add)
     true
+}
+
+/**
+ * Returns whether the module can declare expect declarations that could be implemented by an implementing module.
+ */
+private fun KaModule.canHaveExpectDeclarations(): Boolean {
+    if (targetPlatform.isMultiPlatform()) return true
+
+    @OptIn(KaPlatformInterface::class)
+    val contextModule = (this as? KaDanglingFileModule)?.contextModule ?: this
+    // We return true in this case out of caution, because we do not know for sure.
+    if (contextModule !is KaSourceModule) return true
+
+    // We can assume that only modules that have some implementing module can have expect declarations because otherwise
+    // they do not make sense.
+    return KotlinProjectStructureProvider.getInstance(project)
+        .getImplementingModules(contextModule)
+        .isNotEmpty()
+}
+
+/**
+ * We ignore expect declarations within completion in leaf modules because they will already be filled by their (more relevant)
+ * actual counterpart.
+ */
+context(KaSession)
+@ApiStatus.Internal
+fun KaDeclarationSymbol.isIgnoredExpectDeclaration(): Boolean {
+    if (!isExpect) return false
+    return !useSiteModule.canHaveExpectDeclarations()
+}
+
+
+/**
+ * See [KaDeclarationSymbol.isIgnoredExpectDeclaration].
+ */
+context(KaSession)
+@ApiStatus.Internal
+fun KtDeclaration.isIgnoredExpectDeclaration(): Boolean {
+    if (!isExpectDeclaration()) return false
+    return !useSiteModule.canHaveExpectDeclarations()
 }

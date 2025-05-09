@@ -23,6 +23,9 @@ class ModulesTree(private val tree: JTreeUiComponent) {
 
   fun selectModule(moduleName: String, fullMatch: Boolean = true) {
     val segments = moduleName.split(".",).filter { it.isNotEmpty() }.toTypedArray()
+      .takeIf { it.isNotEmpty() } ?: return
+
+    tree.waitOneText(segments.first())
     tree.clickPath(
       *segments,
       fullMatch = fullMatch

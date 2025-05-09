@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-api:lang",
     "//platform/platform-api:ide",
     "//platform/lang-impl",
@@ -29,6 +30,7 @@ jvm_library(
     "//platform/ide-core-impl",
     "//platform/structuralsearch:structuralSearch",
     "//plugins/properties/properties-common:properties",
+    "//platform/diff-impl",
   ],
   runtime_deps = [
     ":properties-backend_resources",

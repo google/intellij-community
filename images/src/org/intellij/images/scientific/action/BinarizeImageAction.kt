@@ -5,15 +5,17 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.vfs.writeBytes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.intellij.images.editor.ImageDocument
-import org.intellij.images.scientific.BinarizationThresholdConfig
-import org.intellij.images.scientific.ScientificUtils
 import org.intellij.images.scientific.statistics.ScientificImageActionsCollector
+import org.intellij.images.scientific.utils.BinarizationThresholdConfig
+import org.intellij.images.scientific.utils.ScientificUtils
+import org.intellij.images.scientific.utils.ScientificUtils.IS_NORMALIZED_KEY
+import org.intellij.images.scientific.utils.ScientificUtils.ROTATION_ANGLE_KEY
+import org.intellij.images.scientific.utils.ScientificUtils.saveImageToFile
+import org.intellij.images.scientific.utils.launchBackground
 import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
-import javax.imageio.ImageIO
-
 
 class BinarizeImageAction : AnAction() {
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
@@ -21,18 +23,23 @@ class BinarizeImageAction : AnAction() {
   override fun actionPerformed(e: AnActionEvent) {
     val imageFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
     val originalImage = imageFile.getUserData(ScientificUtils.ORIGINAL_IMAGE_KEY) ?: return
-    val thresholdConfig = BinarizationThresholdConfig.getInstance()
-    val byteArrayOutputStream = ByteArrayOutputStream()
-    val binarizedImage = applyBinarization(originalImage, thresholdConfig.threshold)
-    ImageIO.write(binarizedImage, ScientificUtils.DEFAULT_IMAGE_FORMAT, byteArrayOutputStream)
-    imageFile.writeBytes(byteArrayOutputStream.toByteArray())
     val document = e.getData(ImageDocument.IMAGE_DOCUMENT_DATA_KEY) ?: return
-    document.value = binarizedImage
-    ScientificImageActionsCollector.logBinarizeImageInvoked(this)
+    val thresholdConfig = BinarizationThresholdConfig.getInstance()
+    val currentAngle = imageFile.getUserData(ROTATION_ANGLE_KEY) ?: 0
+    imageFile.putUserData(IS_NORMALIZED_KEY, false)
+
+    launchBackground {
+      val rotatedOriginal = if (currentAngle != 0) ScientificUtils.rotateImage(originalImage, currentAngle) else originalImage
+      val binarizationThreshold = thresholdConfig.threshold
+      val binarizedImage = applyBinarization(rotatedOriginal, binarizationThreshold)
+      saveImageToFile(imageFile, binarizedImage)
+      document.value = binarizedImage
+      ScientificImageActionsCollector.logBinarizeImageInvoked(binarizationThreshold)
+    }
   }
 
-  private fun applyBinarization(image: BufferedImage, threshold: Int): BufferedImage {
-    val binarizedImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB)
+  private suspend fun applyBinarization(image: BufferedImage, threshold: Int): BufferedImage = withContext(Dispatchers.IO) {
+    val binarizedImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_BYTE_BINARY)
     for (y in 0 until image.height) {
       for (x in 0 until image.width) {
         val rgba = image.getRGB(x, y)
@@ -51,6 +58,6 @@ class BinarizeImageAction : AnAction() {
         binarizedImage.setRGB(x, y, finalColor)
       }
     }
-    return binarizedImage
+    binarizedImage
   }
 }

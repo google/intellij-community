@@ -171,6 +171,7 @@ c:com.intellij.codeInsight.CodeInsightSettings
 - isSelectAutopopupSuggestionsByChars():Z
 - loadState(org.jdom.Element):V
 - noStateLoaded():V
+- s:runWithTemporarySettings(com.intellij.util.ThrowableConvertor):java.lang.Object
 - setBackspaceMode(com.intellij.codeInsight.editorActions.SmartBackspaceMode):V
 - setCompletionCaseSensitive(I):V
 - setSelectAutopopupSuggestionsByChars(Z):V
@@ -3181,9 +3182,8 @@ c:com.intellij.lang.parser.GeneratedParserUtilBase$CompletionState
 - prefixMatches(com.intellij.lang.PsiBuilder,java.lang.String):Z
 - prefixMatches(java.lang.String,java.lang.String):Z
 c:com.intellij.lang.parser.GeneratedParserUtilBase$DummyBlock
-- com.intellij.psi.impl.source.tree.CompositePsiElement
-- getLanguage():com.intellij.lang.Language
-- getReferences():com.intellij.psi.PsiReference[]
+- com.intellij.psi.DummyBlockType$DummyBlock
+- <init>():V
 c:com.intellij.lang.parser.GeneratedParserUtilBase$ErrorState
 - altExtendsChecker:com.intellij.util.PairProcessor
 - altMode:Z

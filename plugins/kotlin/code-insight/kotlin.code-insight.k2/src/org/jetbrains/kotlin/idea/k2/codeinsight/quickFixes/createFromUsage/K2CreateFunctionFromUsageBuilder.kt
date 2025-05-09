@@ -9,11 +9,13 @@ import com.intellij.lang.jvm.actions.EP_NAME
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.asJava.toLightClass
@@ -125,7 +127,7 @@ object K2CreateFunctionFromUsageBuilder {
                 isAbstractClassOrInterface = false,
                 isForCompanion = shouldCreateCompanionClass,
             )
-            if (!hasExtensionFunction(containerClassForExtension, request.methodName)) {
+            if (explicitReceiverType !is KaErrorType && !hasExtensionFunction(containerClassForExtension, request.methodName)) {
                 requests.add(jvmClassWrapper to request)
             }
         }
@@ -208,7 +210,12 @@ object K2CreateFunctionFromUsageBuilder {
     context (KaSession)
     @OptIn(KaExperimentalApi::class)
     private fun KtSimpleNameExpression.getAbstractTypeOfContainingClass(): KaType? {
-        val containingClass = getStrictParentOfType<KtClassOrObject>() as? KtClass ?: return null
+        val containingClass = PsiTreeUtil.getParentOfType(
+            /* element = */ this,
+            /* aClass = */ KtClassOrObject::class.java,
+            /* strict = */ false,
+            /* ...stopAt = */ KtSuperTypeList::class.java, KtPrimaryConstructor::class.java, KtConstructorDelegationCall::class.java, KtObjectDeclaration::class.java
+        ) ?: return null
         if (containingClass is KtEnumEntry || containingClass.isAnnotation()) return null
 
         val classSymbol = containingClass.symbol as? KaClassSymbol ?: return null

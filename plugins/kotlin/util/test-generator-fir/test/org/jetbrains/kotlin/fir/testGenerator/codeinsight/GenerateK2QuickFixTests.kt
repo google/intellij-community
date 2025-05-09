@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.fir.testGenerator.codeinsight
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixMultiFileTest
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixMultiModuleTest
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixTest
+import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelWithPostponedQuickFixMultiModuleTest
 import org.jetbrains.kotlin.testGenerator.model.*
 import org.jetbrains.kotlin.testGenerator.model.GroupCategory.QUICKFIXES
 import org.jetbrains.kotlin.testGenerator.model.Patterns.DIRECTORY
@@ -93,8 +94,8 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/addReturnExpression", pattern = pattern)
             model("$idea/quickfix/addReturnToLastExpressionInFunction", pattern = pattern)
             model("$idea/quickfix/addReturnToUnusedLastExpressionInFunction", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/addRunBeforeLambda", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/addSemicolonBeforeLambdaExpression", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addRunBeforeLambda", pattern = pattern)
+            model("$idea/quickfix/addSemicolonBeforeLambdaExpression", pattern = pattern)
             model("$idea/quickfix/addSpreadOperatorForArrayAsVarargAfterSam", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addStarProjections", pattern = pattern)
             model("$idea/quickfix/addSuspend", pattern = pattern, isIgnored = true)
@@ -119,7 +120,11 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/convertPropertyInitializerToGetter", pattern = pattern)
             model("$idea/quickfix/convertToAnonymousObject", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/convertToIsArrayOfCall", pattern = pattern)
-            model("$idea/quickfix/createFromUsage", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/createFromUsage/createClass", pattern = pattern, excludedDirectories = listOf("importDirective/kt21515", "callExpression/typeArguments"))
+            model("$idea/quickfix/createFromUsage/createVariable", pattern = pattern)
+            model("$idea/quickfix/createFromUsage/createFunction/call", pattern = pattern,
+                  excludedDirectories = listOf("extensionByExtensionReceiver", "typeArguments"))
+            // binaryOperations, callableReferences, component, delegateAccessors, get, hasNext, invoke, iterator, next, set, unaryOperations
             model("$idea/quickfix/createLabel", pattern = pattern)
             model("$idea/quickfix/declarationCantBeInlined", pattern = pattern)
             model("$idea/quickfix/declaringJavaClass", pattern = pattern, isIgnored = true)
@@ -138,7 +143,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/inlineTypeParameterFix", pattern = pattern)
             model("$idea/quickfix/insertDelegationCall", pattern = pattern)
             model("$idea/quickfix/isEnumEntry", pattern = pattern)
-            model("$idea/quickfix/javaClassOnCompanion", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/javaClassOnCompanion", pattern = pattern)
             model("$idea/quickfix/kdocMissingDocumentation", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/leakingThis", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/libraries", pattern = pattern)
@@ -146,7 +151,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/makePrivateAndOverrideMember", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/makeTypeParameterReified", pattern = pattern)
             model("$idea/quickfix/makeUpperBoundNonNullable", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/memberVisibilityCanBePrivate", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/memberVisibilityCanBePrivate", pattern = pattern)
             model("$idea/quickfix/migration/commasInWhenWithoutArgument", pattern = pattern)
             model("$idea/quickfix/migration/missingConstructorKeyword", pattern = pattern)
             model("$idea/quickfix/migration/removeNameFromFunctionExpression", pattern = pattern)
@@ -187,7 +192,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/removeTypeVariance", pattern = pattern)
             model("$idea/quickfix/removeUnused", pattern = pattern)
             model("$idea/quickfix/removeUnusedParameter", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/removeUnusedReceiver", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/removeUnusedReceiver", pattern = pattern)
             model("$idea/quickfix/removeUseSiteTarget", pattern = pattern)
             model("$idea/quickfix/renameToUnderscore", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/renameUnresolvedReference", pattern = pattern, isIgnored = true)
@@ -200,7 +205,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/specifyAllRemainingArgumentsByName", pattern = pattern)
             model("$idea/quickfix/specifyOverrideExplicitly", pattern = pattern)
             model("$idea/quickfix/specifyRemainingRequiredArgumentsByName", pattern = pattern)
-            model("$idea/quickfix/specifySuperExplicitly", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/specifySuperExplicitly", pattern = pattern)
             model("$idea/quickfix/specifyTypeExplicitly", pattern = pattern)
             model("$idea/quickfix/superTypeIsExtensionType", pattern = pattern)
             model("$idea/quickfix/surroundWithNullCheck", pattern = pattern)
@@ -223,6 +228,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/wrongLongSuffix", pattern = pattern)
             model("$idea/quickfix/yieldUnsupported", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/changeSuperTypeListEntryTypeArgument", pattern = pattern, isRecursive = false)
+            model("$idea/quickfix/publicApiImplicitType", pattern = pattern)
         }
 
         testClass<AbstractHighLevelQuickFixMultiFileTest> {
@@ -269,10 +275,25 @@ internal fun MutableTWorkspace.generateK2FixTests() {
                 isRecursive = false,
                 testMethodName = testMethodName,
             )
+            model(
+                "$idea/quickfix/createFromUsage/createFunction",
+                pattern = pattern,
+                testMethodName = testMethodName,
+                excludedDirectories = listOf("typeArguments")
+            )
+            model(
+                "$idea/quickfix/memberVisibilityCanBePrivate",
+                pattern = pattern,
+                testMethodName = testMethodName
+            )
         }
 
         testClass<AbstractHighLevelQuickFixMultiModuleTest> {
-            model("$idea/multiModuleQuickFix", pattern = DIRECTORY, depth = 1)
+            model("$idea/multiModuleQuickFix", pattern = DIRECTORY, depth = 1, excludedDirectories = listOf("addDependency"))
+        }
+
+        testClass<AbstractHighLevelWithPostponedQuickFixMultiModuleTest> {
+            model("$idea/multiModuleQuickFix/addDependency", pattern = DIRECTORY, isRecursive = false)
         }
     }
 }

@@ -2,7 +2,7 @@
   <dependencies>
     <plugin id="com.intellij.properties"/>
     <plugin id="com.intellij.java"/>
-    <plugin id="com.intellij.modules.json"/>
+    <module name="intellij.json.backend"/>
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
   </dependencies>
@@ -649,7 +649,8 @@
                  This results in better stack traces when generated assertions throw exceptions, but might slow down the compilation."/>
     <registryKey key="kotlin.commit.message.validation.enabled" defaultValue="true"
                  description="Enables commit messages validation for kotlin plugin"/>
-
+    <registryKey key="kotlin.build.tools.code.ownership.commit.message.enabled" defaultValue="false"
+                 description="Enables commit messages validation for Kotlin Build Tools code ownership"/>
     <codeInsight.declarativeInlayProvider
       providerId="devkit.threading"
       bundle="messages.DevKitBundle"

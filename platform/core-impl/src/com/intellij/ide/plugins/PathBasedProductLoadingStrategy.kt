@@ -22,16 +22,16 @@ internal class PathBasedProductLoadingStrategy : ProductLoadingStrategy() {
 
   override fun loadPluginDescriptors(
     scope: CoroutineScope,
-    context: DescriptorListLoadingContext,
+    loadingContext: PluginDescriptorLoadingContext,
     customPluginDir: Path,
     bundledPluginDir: Path?,
     isUnitTestMode: Boolean,
     isRunningFromSources: Boolean,
     zipPool: ZipEntryResolverPool,
     mainClassLoader: ClassLoader,
-  ): List<Deferred<IdeaPluginDescriptorImpl?>> {
+  ): Deferred<List<DiscoveredPluginsList>> {
     return scope.loadPluginDescriptorsImpl(
-      context = context,
+      loadingContext = loadingContext,
       isUnitTestMode = isUnitTestMode,
       isRunningFromSources = isRunningFromSources,
       mainClassLoader = mainClassLoader,

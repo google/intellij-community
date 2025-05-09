@@ -39,6 +39,7 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/editor-ui-api:editor-ui",
     "@lib//:guava",
     "@lib//:jsoup",
     "//python/python-sdk:sdk",
@@ -46,7 +47,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "@lib//:jcef",
     "//plugins/restructuredtext",
-    "//platform/ui.jcef:ui-jcef",
+    "//platform/ui.jcef",
     ":lang-impl_provided",
     ":execution-impl_provided",
     ":python-community-impl_provided",

@@ -80,6 +80,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
         runTest("../testData/basic/multifile/ConstructorReferenceNotImported/");
     }
 
+    @TestMetadata("CovarianceExtensionFunction")
+    public void testCovarianceExtensionFunction() throws Exception {
+        runTest("../testData/basic/multifile/CovarianceExtensionFunction/");
+    }
+
     @TestMetadata("DoNotCompleteWithConstraints")
     public void testDoNotCompleteWithConstraints() throws Exception {
         runTest("../testData/basic/multifile/DoNotCompleteWithConstraints/");
@@ -103,6 +108,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("EnumEntry")
     public void testEnumEntry() throws Exception {
         runTest("../testData/basic/multifile/EnumEntry/");
+    }
+
+    @TestMetadata("EnumEntryExpectedPreferredJava")
+    public void testEnumEntryExpectedPreferredJava() throws Exception {
+        runTest("../testData/basic/multifile/EnumEntryExpectedPreferredJava/");
     }
 
     @TestMetadata("EnumValuesMethodJavaUsualPriorityWhenFeatureDisabled")
@@ -285,6 +295,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
         runTest("../testData/basic/multifile/JavaClassQualifierWithTypeArguments/");
     }
 
+    @TestMetadata("JavaConstructor")
+    public void testJavaConstructor() throws Exception {
+        runTest("../testData/basic/multifile/JavaConstructor/");
+    }
+
     @TestMetadata("JavaEnum")
     public void testJavaEnum() throws Exception {
         runTest("../testData/basic/multifile/JavaEnum/");
@@ -408,6 +423,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("NotImportedFunction")
     public void testNotImportedFunction() throws Exception {
         runTest("../testData/basic/multifile/NotImportedFunction/");
+    }
+
+    @TestMetadata("NotImportedGenericReceiverExtension")
+    public void testNotImportedGenericReceiverExtension() throws Exception {
+        runTest("../testData/basic/multifile/NotImportedGenericReceiverExtension/");
     }
 
     @TestMetadata("NotImportedInfixExtension")

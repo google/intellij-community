@@ -14,6 +14,7 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/core-api:core",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
     "//platform/ide-core-impl",
@@ -26,7 +27,7 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/util/jdom",
     "//platform/ide-core",
-    "//platform/platform-impl/rpc:ide-rpc",
+    "//platform/platform-impl/rpc",
     "//platform/project/shared:project",
     "//platform/kernel/rpc",
     "@lib//:kotlinx-coroutines-core",

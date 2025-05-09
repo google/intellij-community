@@ -2,9 +2,11 @@
 package com.intellij.openapi.extensions;
 
 import com.intellij.ReviseWhenPortedToJDK;
+import com.intellij.openapi.util.NlsSafe;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,7 +44,7 @@ public final class PluginId implements Comparable<PluginId> {
 
   @Internal
   @ReviseWhenPortedToJDK(value = "10", description = "Collectors.toUnmodifiableSet()")
-  public static @NotNull Set<PluginId> getRegisteredIds() {
+  public static @NotNull @Unmodifiable Set<PluginId> getRegisteredIds() {
     return Collections.unmodifiableSet(new HashSet<>(registeredIds.values()));
   }
 
@@ -52,7 +54,7 @@ public final class PluginId implements Comparable<PluginId> {
     this.idString = idString;
   }
 
-  public @NotNull String getIdString() {
+  public @NotNull @NlsSafe String getIdString() {
     return idString;
   }
 

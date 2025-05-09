@@ -5,6 +5,7 @@ package org.jetbrains.kotlin.idea.quickfix
 import com.intellij.codeInsight.daemon.quickFix.ActionHint
 import com.intellij.codeInsight.daemon.quickFix.LightQuickFixTestCase
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
 import com.intellij.platform.testFramework.core.FileComparisonFailedError
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.IdeaTestUtil
@@ -18,6 +19,7 @@ import org.jetbrains.kotlin.idea.codeinsight.utils.findExistingEditor
 import org.jetbrains.kotlin.idea.multiplatform.setupMppProjectFromDirStructure
 import org.jetbrains.kotlin.idea.quickfix.AbstractQuickFixTest.Companion.K1_TOOL_DIRECTIVE
 import org.jetbrains.kotlin.idea.quickfix.AbstractQuickFixTest.Companion.K2_TOOL_DIRECTIVE
+import org.jetbrains.kotlin.idea.search.ExpectActualUtils
 import org.jetbrains.kotlin.idea.test.*
 import org.jetbrains.kotlin.idea.util.application.executeCommand
 import org.jetbrains.kotlin.psi.KtFile
@@ -87,7 +89,7 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
                     "// SHOULD_FAIL_WITH: "
                 ).joinToString(separator = "\n")
 
-                TypeAccessibilityChecker.testLog = StringBuilder()
+                ExpectActualUtils.testLog = StringBuilder()
                 val log = try {
 
                     AbstractQuickFixMultiFileTest.doAction(
@@ -104,9 +106,9 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
                         shouldBeAvailableAfterExecution = InTextDirectivesUtils.isDirectiveDefined(actionFile.text, "// SHOULD_BE_AVAILABLE_AFTER_EXECUTION")
                     )
 
-                    TypeAccessibilityChecker.testLog.toString()
+                    ExpectActualUtils.testLog.toString()
                 } finally {
-                    TypeAccessibilityChecker.testLog = null
+                    ExpectActualUtils.testLog = null
                 }
 
                 if (actionFile is KtFile) {
@@ -115,6 +117,8 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
                         KotlinPluginMode.K2 -> {} // TODO check diagnostics for K2
                     }
                 }
+
+                NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
 
                 if (actionShouldBeAvailable) {
                     compareToExpected(dirPath)

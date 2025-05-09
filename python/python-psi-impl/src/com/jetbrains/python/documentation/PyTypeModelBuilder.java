@@ -30,6 +30,8 @@ import java.util.*;
 
 import static com.jetbrains.python.documentation.PyDocSignaturesHighlighterKt.highlightExpressionText;
 import static com.jetbrains.python.documentation.PyDocSignaturesHighlighterKt.styledSpan;
+import static com.jetbrains.python.documentation.PyDocumentationLink.toClass;
+import static com.jetbrains.python.psi.types.PyNoneTypeKt.isNoneType;
 
 public class PyTypeModelBuilder {
   private final Map<PyType, TypeModel> myVisited = Maps.newHashMap();
@@ -221,9 +223,11 @@ public class PyTypeModelBuilder {
 
   static class ClassObjectType extends TypeModel {
     private final TypeModel classType;
+    private final boolean useTypingAlias;
 
-    ClassObjectType(TypeModel classType) {
+    ClassObjectType(TypeModel classType, boolean useTypingAlias) {
       this.classType = classType;
+      this.useTypingAlias = useTypingAlias;
     }
 
     @Override
@@ -300,7 +304,11 @@ public class PyTypeModelBuilder {
         result = NamedType.nameOrAny(type);
       }
       else {
-        result = new ClassObjectType(build(instanceType, allowUnions));
+        boolean useTypingAlias = PythonLanguageLevelPusher
+          .getLanguageLevelForFile(myContext.getOrigin().getOriginalFile())
+          .isOlderThan(LanguageLevel.PYTHON39);
+
+        result = new ClassObjectType(build(instanceType, allowUnions), useTypingAlias);
       }
     }
     else if (type instanceof PyNamedTupleType) {
@@ -357,7 +365,10 @@ public class PyTypeModelBuilder {
       }
       else if (ContainerUtil.all(unionMembers, t -> t instanceof PyClassType && ((PyClassType)t).isDefinition())) {
         final List<TypeModel> instanceTypes = ContainerUtil.map(unionMembers, t -> build(((PyClassType)t).toInstance(), allowUnions));
-        result = new ClassObjectType(new OneOf(instanceTypes, PyTypingTypeProvider.isBitwiseOrUnionAvailable(myContext)));
+
+        final var useTypingAlias = LanguageLevel.forElement(myContext.getOrigin().getOriginalFile()).isOlderThan(LanguageLevel.PYTHON39);
+
+        result = new ClassObjectType(new OneOf(instanceTypes, PyTypingTypeProvider.isBitwiseOrUnionAvailable(myContext)), useTypingAlias);
       }
       else {
         result = new OneOf(Collections2.transform(unionMembers, t -> build(t, false)),
@@ -387,7 +398,7 @@ public class PyTypeModelBuilder {
       boolean foundNone = false;
       PyType optional = null;
       for (PyType member : members) {
-        if (PyNoneType.INSTANCE.equals(member)) {
+        if (isNoneType(member)) {
           foundNone = true;
         }
         else if (member != null) {
@@ -486,6 +497,11 @@ public class PyTypeModelBuilder {
       return HtmlChunk.raw(StringUtil.notNullize(expressionText));
     }
 
+    @Override
+    protected @NotNull HtmlChunk toClass(@NotNull String qualifiedName, @Nls @NotNull String linkText, @Nullable TextAttributesKey style) {
+      return HtmlChunk.raw(linkText);
+    }
+
     public String getString() {
       return myBody.toString();
     }
@@ -574,6 +590,12 @@ public class PyTypeModelBuilder {
     protected @NotNull HtmlChunk styledExpression(@Nls String expressionText, @NotNull PyExpression expression) {
       return highlightExpressionText(expressionText, expression);
     }
+
+    @Override
+    protected @NotNull HtmlChunk toClass(@NotNull String qualifiedName, @Nls @NotNull String linkText, @Nullable TextAttributesKey style) {
+      final var result = PyDocumentationLink.toClass(qualifiedName, linkText);
+      return style != null ? styledSpan(result, style) : result;
+    }
   }
 
   private static class TypeToDescriptionVisitor extends TypeNameVisitor {
@@ -595,6 +617,11 @@ public class PyTypeModelBuilder {
     @Override
     protected @NotNull HtmlChunk styledExpression(@Nls String expressionText, @NotNull PyExpression expression) {
       return HtmlChunk.raw(StringUtil.notNullize(expressionText));
+    }
+
+    @Override
+    protected @NotNull HtmlChunk toClass(@NotNull String qualifiedName, @Nls @NotNull String linkText, @Nullable TextAttributesKey style) {
+      return HtmlChunk.raw(linkText);
     }
 
     public @NotNull String getDescription() {
@@ -664,6 +691,8 @@ public class PyTypeModelBuilder {
     protected abstract @NotNull HtmlChunk className(@Nls String name);
 
     protected abstract @NotNull HtmlChunk styledExpression(@Nls String expressionText, @NotNull PyExpression expression);
+
+    protected abstract @NotNull HtmlChunk toClass(@NotNull String qualifiedName, @NotNull @Nls String linkText, @Nullable TextAttributesKey style);
 
     @Override
     public void collectionOf(CollectionOf collectionOf) {
@@ -767,7 +796,7 @@ public class PyTypeModelBuilder {
       if (type.bitwiseOrUnionAllowed) {
         type.type.accept(this);
         add(styled(" | ", PyHighlighter.PY_OPERATION_SIGN));
-        add(styled("None", PyHighlighter.PY_KEYWORD)); //NON-NLS
+        add(toClass(PyNames.TYPE_NONE, PyNames.NONE, PyHighlighter.PY_KEYWORD)); //NON-NLS
       }
       else {
         add(escaped("Optional")); //NON-NLS
@@ -785,20 +814,28 @@ public class PyTypeModelBuilder {
       else {
         add(styled("tuple", PyHighlighter.PY_BUILTIN_NAME)); //NON-NLS
       }
+      add(styled("[", PyHighlighter.PY_BRACKETS));
       if (!type.members.isEmpty()) {
-        add(styled("[", PyHighlighter.PY_BRACKETS));
         processList(type.members);
         if (type.homogeneous) {
           add(styled(", ", PyHighlighter.PY_COMMA));
           add(styled("...", PyHighlighter.PY_DOT));
         }
-        add(styled("]", PyHighlighter.PY_BRACKETS));
       }
+      else {
+        add(styled("()", PyHighlighter.PY_PARENTHS));
+      }
+      add(styled("]", PyHighlighter.PY_BRACKETS));
     }
 
     @Override
     public void classObject(ClassObjectType type) {
-      add(escaped("Type")); //NON-NLS
+      if (type.useTypingAlias) {
+        add(escaped("Type")); //NON-NLS
+      }
+      else {
+        add(styled("type", PyHighlighter.PY_BUILTIN_NAME)); //NON-NLS
+      }
       add(styled("[", PyHighlighter.PY_BRACKETS));
       type.classType.accept(this);
       add(styled("]", PyHighlighter.PY_BRACKETS));

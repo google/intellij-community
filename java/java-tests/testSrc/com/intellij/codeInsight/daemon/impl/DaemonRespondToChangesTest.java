@@ -99,6 +99,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -1323,7 +1324,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
         while (myDaemonCodeAnalyzer.isRunning() || !applied.contains(editor)) {
           UIUtil.dispatchAllInvocationEvents();
           if (System.currentTimeMillis() - start > 1000000) {
-            fail("Too long waiting for daemon");
+            fail("Too long waiting for daemon (" +(System.currentTimeMillis() - start)+"ms) ");
           }
         }
 
@@ -1380,7 +1381,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
         while (myDaemonCodeAnalyzer.isRunning() || !applied.contains(editor)) {
           UIUtil.dispatchAllInvocationEvents();
           if (System.currentTimeMillis() - start > 1000000) {
-            fail("Too long waiting for daemon");
+            fail("Too long waiting for daemon (" +(System.currentTimeMillis() - start)+"ms) ");
           }
         }
 
@@ -1582,7 +1583,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     while (!myDaemonCodeAnalyzer.isRunning() && !myDaemonCodeAnalyzer.isAllAnalysisFinished(psiFile)) {
       PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
       if (System.currentTimeMillis() > deadline) {
-        fail("Too long waiting for daemon to start. " +
+        fail("Too long waiting for daemon to start (" +(System.currentTimeMillis() - deadline + timeoutMs)+"ms) "+
              "daemonIsWorkingOrPending="+daemonIsWorkingOrPending(project, document)+
              "; allFinished="+myDaemonCodeAnalyzer.isAllAnalysisFinished(psiFile)+
              "; thread dump:\n------"+ThreadDumper.dumpThreadsToString()+"\n======");
@@ -2112,7 +2113,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
   // after each typing, wait for the daemon to start and immediately proceed to type the next char
   // thus making daemon interrupt itself constantly, in hope for multiple highlighting sessions overlappings to manifest themselves more quickly.
   // after all typings are over, wait for final highlighting to complete and check that no errors are left in the markup
-  private void assertDaemonRestartsAndLeavesNoErrorElementsInTheEnd(String initialText, String textToType, Runnable afterWaitForDaemon) {
+  private void assertDaemonRestartsAndLeavesNoErrorElementsInTheEnd(String initialText, String textToType, Runnable afterWaitForDaemonToStart) {
     // run expensive consistency checks on each typing
     HighlightInfoUpdaterImpl updater = (HighlightInfoUpdaterImpl)HighlightInfoUpdaterImpl.getInstance(getProject());
     updater.runAssertingInvariants(() -> {
@@ -2141,21 +2142,14 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
               }
             });
             //updater.assertNoDuplicates(myFile, getErrorsFromMarkup(markupModel), "errors from markup ");
-            TestTimeOut t = TestTimeOut.setTimeout(30, TimeUnit.SECONDS);
             myDaemonCodeAnalyzer.restart(myFile);
             List<HighlightInfo> errorsFromMarkup = getErrorsFromMarkup(markupModel);
             //updater.assertNoDuplicates(myFile, errorsFromMarkup, "errors from markup ");
             //((HighlightInfoUpdaterImpl)HighlightInfoUpdater.getInstance(getProject())).assertMarkupDataConsistent(myFile);
             PassExecutorService.LOG.debug(" errorsfrommarkup:\n" + StringUtil.join(ContainerUtil.sorted(errorsFromMarkup, Segment.BY_START_OFFSET_THEN_END_OFFSET), "\n") + "\n-----\n");
-            while (!myDaemonCodeAnalyzer.isRunning() && !myDaemonCodeAnalyzer.isAllAnalysisFinished(myFile)/*in case the highlighting has already finished miraculously by now*/) {
-              Thread.yield();
-              UIUtil.dispatchAllInvocationEvents();
-              if (t.timedOut()) {
-                throw new RuntimeException(new TimeoutException());
-              }
-            }
-            if (afterWaitForDaemon != null) {
-              afterWaitForDaemon.run();
+            waitForDaemonToStart(getProject(), myEditor.getDocument(), 30*1000);
+            if (afterWaitForDaemonToStart != null) {
+              afterWaitForDaemonToStart.run();
             }
           }
           // some chars might be inserted by TypeHandlers
@@ -2172,14 +2166,14 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     });
   }
 
-  private static @NotNull List<HighlightInfo> getErrorsFromMarkup(MarkupModel model) {
+  private static @NotNull List<HighlightInfo> getErrorsFromMarkup(@NotNull MarkupModel model) {
     return Arrays.stream(model.getAllHighlighters())
       .map(m -> HighlightInfo.fromRangeHighlighter(m))
       .filter(Objects::nonNull)
       .filter(h -> h.getSeverity() == HighlightSeverity.ERROR)
       .toList();
   }
-  private static void assertNoDuplicateInfosFromMarkup(MarkupModel model) {
+  private static void assertNoDuplicateInfosFromMarkup(@NotNull MarkupModel model) {
     List<HighlightInfo> infos = Arrays.stream(model.getAllHighlighters())
           .map(m -> HighlightInfo.fromRangeHighlighter(m))
           .filter(Objects::nonNull)
@@ -2399,4 +2393,33 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     }
     assertEquals(toString, starts, ends);
   }
+
+  public void testFileOutsideProjectRootsMustNotRestartDaemonTooOften() throws ExecutionException, InterruptedException {
+    VirtualFile root = createVirtualDirectoryForContentFile();
+    VirtualFile virtualFile = createChildData(createChildDirectory(root, ".git"), "config");
+
+    String text = "[xxx]\nblah-blah";
+    setFileText(virtualFile, text);
+
+    assertEquals(PlainTextFileType.INSTANCE, virtualFile.getFileType());
+    PsiFile psiFile = getPsiManager().findFile(virtualFile);
+    assertNull(String.valueOf(psiFile), psiFile);
+
+    AtomicInteger restarts = new AtomicInteger();
+    getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(DaemonCodeAnalyzer.DAEMON_EVENT_TOPIC,
+            new DaemonCodeAnalyzer.DaemonListener() {
+              @Override
+              public void daemonStarting(@NotNull Collection<? extends @NotNull FileEditor> fileEditors) {
+                restarts.incrementAndGet();
+              }
+            });
+    configureByExistingFile(virtualFile);
+
+    TestTimeOut t = TestTimeOut.setTimeout(10, TimeUnit.SECONDS);
+    while (!t.isTimedOut()) {
+      assertTrue(restarts.toString(), restarts.get() < 10);
+      UIUtil.dispatchAllInvocationEvents();
+    }
+  }
+
 }

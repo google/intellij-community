@@ -1,23 +1,21 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.testFramework
 
-import com.intellij.execution.testframework.AbstractTestProxy
+import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.application.runWriteActionAndWait
+import com.intellij.platform.testFramework.assertion.BuildViewAssertions
 import com.intellij.platform.testFramework.assertion.treeAssertion.SimpleTreeAssertion
 import com.intellij.testFramework.RunAll.Companion.runAll
 import com.intellij.testFramework.fixtures.BuildViewTestFixture
 import com.intellij.testFramework.utils.vfs.deleteRecursively
-import org.gradle.util.GradleVersion
-import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionConsoleFixture
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionEnvironmentFixture
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionOutputFixture
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionTestFixture
-import org.jetbrains.plugins.gradle.testFramework.fixtures.impl.GradleExecutionTestFixtureImpl
 import org.jetbrains.plugins.gradle.testFramework.fixtures.application.GradleProjectTestApplication
-import org.jetbrains.plugins.gradle.testFramework.fixtures.impl.GradleExecutionConsoleFixtureImpl
 import org.jetbrains.plugins.gradle.testFramework.fixtures.impl.GradleExecutionEnvironmentFixtureImpl
 import org.jetbrains.plugins.gradle.testFramework.fixtures.impl.GradleExecutionOutputFixtureImpl
-import org.jetbrains.plugins.gradle.testFramework.util.ExternalSystemExecutionTracer
+import org.jetbrains.plugins.gradle.testFramework.fixtures.impl.GradleExecutionTestFixtureImpl
+import org.jetbrains.plugins.gradle.testFramework.util.buildView
 import org.junit.jupiter.api.AfterEach
 
 @GradleProjectTestApplication
@@ -34,12 +32,8 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
     get() = requireNotNull(_executionEnvironmentFixture) {
       "Gradle execution environment fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
     }
-
-  private var _executionConsoleFixture: GradleExecutionConsoleFixture? = null
-  val executionConsoleFixture: GradleExecutionConsoleFixture
-    get() = requireNotNull(_executionConsoleFixture) {
-      "Gradle execution console fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
-    }
+  val executionEnvironment: ExecutionEnvironment
+    get() = executionEnvironmentFixture.getExecutionEnvironment()
 
   private var _buildViewFixture: BuildViewTestFixture? = null
   val buildViewFixture: BuildViewTestFixture
@@ -64,9 +58,6 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
     _executionEnvironmentFixture = GradleExecutionEnvironmentFixtureImpl(project)
     executionEnvironmentFixture.setUp()
 
-    _executionConsoleFixture = GradleExecutionConsoleFixtureImpl(project, executionEnvironmentFixture)
-    executionConsoleFixture.setUp()
-
     _buildViewFixture = BuildViewTestFixture(project)
     buildViewFixture.setUp()
 
@@ -80,8 +71,6 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
       { _executionFixture = null },
       { _buildViewFixture?.tearDown() },
       { _buildViewFixture = null },
-      { _executionConsoleFixture?.tearDown() },
-      { _executionConsoleFixture = null },
       { _executionEnvironmentFixture?.tearDown() },
       { _executionEnvironmentFixture = null },
       { _executionOutputFixture?.tearDown() },
@@ -107,12 +96,6 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
     }
   }
 
-  override fun test(gradleVersion: GradleVersion, fixtureBuilder: GradleTestFixtureBuilder, test: () -> Unit) {
-    super.test(gradleVersion, fixtureBuilder) {
-      ExternalSystemExecutionTracer.printExecutionOutputOnException(test)
-    }
-  }
-
   fun executeTasks(commandLine: String, isRunAsTest: Boolean = false, isDebug: Boolean = false) {
     executionFixture.executeTasks(commandLine, isRunAsTest, isDebug)
   }
@@ -125,18 +108,24 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
     buildViewFixture.assertSyncViewTree(assert)
   }
 
+  fun assertSyncViewNode(nodeText: String, assert: (String) -> Unit) {
+    buildViewFixture.assertSyncViewNode(nodeText, assert)
+  }
+
+  fun assertSyncViewSelectedNode(nodeText: String, assert: (String) -> Unit) {
+    buildViewFixture.assertSyncViewSelectedNode(nodeText, assert)
+  }
+
   fun assertBuildViewTree(assert: SimpleTreeAssertion.Node<Nothing?>.() -> Unit) {
     buildViewFixture.assertBuildViewTree(assert)
   }
 
   fun assertRunViewTree(assert: SimpleTreeAssertion.Node<Nothing?>.() -> Unit) {
-    executionConsoleFixture.assertRunTreeView(assert)
+    BuildViewAssertions.assertBuildViewTree(executionEnvironment.buildView, assert)
   }
 
-  fun SimpleTreeAssertion.Node<AbstractTestProxy>.assertPsiLocation(
-    className: String, methodName: String? = null, parameterName: String? = null
-  ) {
-    executionConsoleFixture.assertPsiLocation(this, className, methodName, parameterName)
+  fun assertRunViewConsoleText(nodeText: String, assert: (String) -> Unit) {
+    BuildViewAssertions.assertBuildViewNodeConsoleText(executionEnvironment.buildView, nodeText, assert)
   }
 
   fun assertTestEventsContain(className: String, methodName: String? = null) {

@@ -35,6 +35,26 @@ public interface TwosideTextDiffProvider extends TextDiffProvider {
                                    @NotNull List<? extends Range> linesRanges,
                                    @NotNull ProgressIndicator indicator);
 
+
+  /**
+   * Some custom diff algorithms may not be suitable for general use.
+   * <p/>
+   * If true, then callers CANNOT assume that returned fragments conform to any otherwise common constraints.
+   * That's it:
+   * <ul>
+   * <li>The 'Range' argument may be ignored</li>
+   * <li>The 'ComparisonPolicy' argument may be ignored</li>
+   * <li>The resulting fragments may be UNSORTABLE (with movement detection applied)</li>
+   * <li>The resulting fragments may OVERLAP (with multiple-copy detection applied)</li>
+   * </ul>
+   *
+   * @see com.intellij.openapi.vcs.changes.actions.diff.lst.SimpleLocalChangeListDiffViewer
+   * @see com.intellij.diff.tools.util.base.IgnorePolicy#IGNORE_LANGUAGE_SPECIFIC_CHANGES
+   */
+  default boolean noFitnessForParticularPurposePromised() {
+    return false;
+  }
+
   default boolean isHighlightingDisabled() {
     return false;
   }

@@ -59,7 +59,7 @@ object Execution {
     DataPlacement.AdditionalText(AIA_USER_PROMPT),
     presentation = EvalDataPresentation(
       PresentationCategory.EXECUTION,
-      DataRenderer.Text
+      DataRenderer.Text()
     )
   )
 
@@ -69,7 +69,7 @@ object Execution {
     DataPlacement.AdditionalText(AIA_RESPONSE),
     presentation = EvalDataPresentation(
       PresentationCategory.EXECUTION,
-      DataRenderer.Text
+      DataRenderer.Text()
     )
   )
 
@@ -79,7 +79,27 @@ object Execution {
     DataPlacement.AdditionalText(AIA_CONTEXT),
     presentation = EvalDataPresentation(
       PresentationCategory.EXECUTION,
-      DataRenderer.Text
+      DataRenderer.Text()
+    )
+  )
+
+  val LLM_SYSTEM_CONTEXT: TrivialEvalData<String> = EvalDataDescription(
+    name = "LLM system context",
+    description = "Result system prompt used for LLM",
+    DataPlacement.AdditionalText(AIA_SYSTEM_CONTEXT),
+    presentation = EvalDataPresentation(
+      PresentationCategory.EXECUTION,
+      DataRenderer.Text()
+    )
+  )
+
+  val LLM_CHAT_DUMP: TrivialEvalData<String> = EvalDataDescription(
+    name = "LLM chat dump",
+    description = "Full dump of the chat session including system context, messages, and metadata",
+    placement = DataPlacement.AdditionalText(AIA_CHAT_DUMP),
+    presentation = EvalDataPresentation(
+      PresentationCategory.EXECUTION,
+      DataRenderer.Text()
     )
   )
 
@@ -93,6 +113,28 @@ object Execution {
     name = "Preview",
     description = "Some description of an evaluation case",
     DataPlacement.AdditionalText(AIA_DESCRIPTION),
+  )
+
+  val LLMC_LOG: TrivialEvalData<String> = EvalDataDescription(
+    name = "LLMC log",
+    description = "LLMC logs during evaluation case",
+    placement = DataPlacement.AdditionalText(AIA_LLMC_LOG),
+    presentation = EvalDataPresentation(
+      PresentationCategory.EXECUTION,
+      DataRenderer.Text(wrapping = true),
+      ignoreMissingData = true,
+    )
+  )
+
+  val HTTP_LOG: TrivialEvalData<String> = EvalDataDescription(
+    name = "HTTP log",
+    description = "HTTP logs during evaluation case",
+    placement = DataPlacement.AdditionalText(AIA_HTTP_LOG),
+    presentation = EvalDataPresentation(
+      PresentationCategory.EXECUTION,
+      DataRenderer.Text(wrapping = true),
+      ignoreMissingData = true,
+    )
   )
 }
 
@@ -180,6 +222,29 @@ object Analysis {
     problemIndicators = listOf(
       ProblemIndicator.FromMetric { Metrics.FILE_VALIDATIONS_SUCCESS }
     )
+  )
+
+  val EXPECTED_FUNCTION_CALLS: TrivialEvalData<List<String>> = EvalDataDescription(
+    name = "Expected function calls",
+    description = "Bind with the list of expected internal API calls",
+    placement = DataPlacement.AdditionalConcatenatedLines(AIA_EXPECTED_FUNCTION_CALLS),
+    presentation = EvalDataPresentation(
+      PresentationCategory.ANALYSIS,
+      renderer = DataRenderer.Lines,
+    ),
+    problemIndicators = listOf(
+      ProblemIndicator.FromMetric { Metrics.FUNCTION_CALLING }
+    )
+  )
+
+  val ACTUAL_FUNCTION_CALLS: TrivialEvalData<List<String>> = EvalDataDescription(
+    name = "Actual function calls",
+    description = "Bind with the list of actual internal API calls",
+    placement = DataPlacement.AdditionalConcatenatedLines(AIA_ACTUAL_FUNCTION_CALLS),
+    presentation = EvalDataPresentation(
+      PresentationCategory.ANALYSIS,
+      renderer = DataRenderer.Lines,
+    ),
   )
 
   val HAS_NO_EFFECT: TrivialEvalData<Boolean> = EvalDataDescription(
@@ -277,6 +342,15 @@ object Metrics {
     threshold = 1.0,
     dependencies = MetricDependencies(Analysis.FAILED_RELATED_FILE_VALIDATIONS)
   ) { RelatedFileValidationSuccess() }
+
+  val FUNCTION_CALLING: EvalMetric = EvalMetric(
+    threshold = 1.0,
+    dependencies = MetricDependencies(
+      Analysis.EXPECTED_FUNCTION_CALLS,
+      Analysis.ACTUAL_FUNCTION_CALLS,
+      DataRenderer.TextDiff
+    ) { expected, actual -> TextUpdate(expected.sorted().joinToString("\n"), actual.sorted().joinToString("\n")) }
+  ) { FunctionCallingMetric() }
 
   val EXACT_MATCH: EvalMetric = EvalMetric(
     threshold = 1.0,

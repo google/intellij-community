@@ -3,17 +3,21 @@ package com.intellij.notebooks.visualization.ui.cellsDnD
 
 import com.intellij.notebooks.visualization.NotebookCellInlayManager
 import com.intellij.notebooks.visualization.getCell
+import com.intellij.notebooks.visualization.ui.EditorCell
 import com.intellij.notebooks.visualization.ui.EditorCellInput
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.impl.EditorImpl
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.openapi.util.text.StringUtil
 import org.jetbrains.annotations.Nls
+import java.awt.KeyEventDispatcher
+import java.awt.KeyboardFocusManager
 import java.awt.Point
+import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
-import kotlin.text.lines
 
 class EditorCellDragAssistant(
   private val editor: EditorImpl,
@@ -36,10 +40,52 @@ class EditorCellDragAssistant(
   private var outputInitialStates: MutableMap<Int, Boolean> = mutableMapOf()
 
   private val inlayManager = NotebookCellInlayManager.get(editor)
+  private var keyEventDispatcher: KeyEventDispatcher? = null
 
   fun initDrag(e: MouseEvent) {
     isDragging = true
     dragStartPoint = e.locationOnScreen
+    attachKeyEventDispatcher()
+  }
+
+  private fun attachKeyEventDispatcher() {
+    if (keyEventDispatcher == null) {
+      keyEventDispatcher = KeyEventDispatcher { keyEvent ->
+        if (isDragging) {
+          when (keyEvent.id) {
+            KeyEvent.KEY_PRESSED -> {
+              handleKeyPressedDuringDrag(keyEvent)
+              return@KeyEventDispatcher false
+            }
+          }
+        }
+        false
+      }
+
+      KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        .addKeyEventDispatcher(keyEventDispatcher)
+    }
+  }
+
+  private fun handleKeyPressedDuringDrag(keyEvent: KeyEvent) {
+    when (keyEvent.keyCode) {
+      KeyEvent.VK_ESCAPE -> cancelDrag()
+      KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT -> cancelDrag()
+    }
+  }
+
+  private fun cancelDrag() {
+    deleteDragPreview()
+    clearDragState()
+    unfoldCellIfNeeded()
+    removeKeyEventDispatcher()
+  }
+
+  private fun removeKeyEventDispatcher() {
+    keyEventDispatcher?.let {
+      KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(it)
+      keyEventDispatcher = null
+    }
   }
 
   fun updateDragOperation(e: MouseEvent) {
@@ -58,6 +104,8 @@ class EditorCellDragAssistant(
 
   fun finishDrag(e: MouseEvent) {
     deleteDragPreview()
+    removeKeyEventDispatcher()
+
     if (!isDragging || dragStartPoint == null) {
       isDragging = false
       return
@@ -112,7 +160,7 @@ class EditorCellDragAssistant(
 
   private fun foldDraggedCell() {
     inputFoldedState = cellInput.folded
-    if (inputFoldedState == false) foldInput()
+    if (!inputFoldedState) foldInput()
 
     cellInput.cell.view?.outputs?.outputs?.forEachIndexed { index, output ->
       outputInitialStates[index] = output.collapsed
@@ -122,14 +170,20 @@ class EditorCellDragAssistant(
   }
 
   private fun unfoldCellIfNeeded() {
-    if (wasFolded == false) return
-    if (inputFoldedState == false) unfoldInput()
+    if (!wasFolded) return
+    if (!inputFoldedState) unfoldInput()
 
     cellInput.cell.view?.outputs?.outputs?.forEachIndexed { index, output ->
       output.collapsed = outputInitialStates[index] == true
     }
     outputInitialStates.clear()
     wasFolded = false
+  }
+
+  private fun deleteDropIndicator() = when (currentlyHighlightedCell) {
+    is CellDropTarget.TargetCell -> deleteDropIndicatorForTargetCell((currentlyHighlightedCell as CellDropTarget.TargetCell).cell)
+    CellDropTarget.BelowLastCell -> removeHighlightAfterLastCell()
+    else -> {}
   }
 
   private fun updateDropIndicator(targetCell: CellDropTarget) {
@@ -139,13 +193,26 @@ class EditorCellDragAssistant(
     when (targetCell) {
       is CellDropTarget.TargetCell -> targetCell.cell.view?.addDropHighlightIfApplicable()
       CellDropTarget.BelowLastCell -> addHighlightAfterLastCell()
-      else -> { }
+      else -> {}
     }
   }
 
-  private fun addHighlightAfterLastCell() = inlayManager?.belowLastCellPanel?.addDropHighlight()
+  private fun addHighlightAfterLastCell() = inlayManager?.endNotebookInlays?.filterIsInstance<DropHighlightable>()?.forEach {
+    it.addDropHighlight()
+  }
 
-  private fun removeHighlightAfterLastCell() = inlayManager?.belowLastCellPanel?.removeDropHighlight()
+  private fun removeHighlightAfterLastCell() = inlayManager?.endNotebookInlays?.filterIsInstance<DropHighlightable>()?.forEach {
+    it.removeDropHighlight()
+  }
+
+
+  private fun deleteDropIndicatorForTargetCell(cell: EditorCell) = try {
+    cell.view?.removeDropHighlightIfPresent()
+  }
+  catch (e: NullPointerException) {
+    // cell.view? uses !! to get inlay manager, it may be already disposed - so nothing to delete here anyway
+    thisLogger().warn("Error removing drop highlight, NotebookCellInlayManager is already disposed", e)
+  }
 
   private fun clearDragState() {
     isDragging = false
@@ -157,13 +224,8 @@ class EditorCellDragAssistant(
     dragPreview = null
   }
 
-  private fun deleteDropIndicator() = when(currentlyHighlightedCell) {
-    is CellDropTarget.TargetCell -> (currentlyHighlightedCell as CellDropTarget.TargetCell).cell.view?.removeDropHighlightIfPresent()
-    CellDropTarget.BelowLastCell -> removeHighlightAfterLastCell()
-    else -> { }
-  }
-
   override fun dispose() {
+    removeKeyEventDispatcher()
     deleteDropIndicator()
     deleteDragPreview()
     unfoldCellIfNeeded()
@@ -173,7 +235,7 @@ class EditorCellDragAssistant(
 
   @Nls
   private fun getPlaceholderText(): String {
-    @NlsSafe val firstNotEmptyString = cellInput.cell.source.get ().lines().firstOrNull { it.trim().isNotEmpty() }
+    @NlsSafe val firstNotEmptyString = cellInput.cell.source.get().lines().firstOrNull { it.trim().isNotEmpty() }
     return StringUtil.shortenTextWithEllipsis(firstNotEmptyString ?: "\u2026", MAX_PREVIEW_TEXT_LENGTH, 0)
   }
 

@@ -3,6 +3,8 @@ package com.intellij.terminal.frontend
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.intellij.terminal.session.*
@@ -10,14 +12,17 @@ import com.intellij.terminal.session.dto.toState
 import com.intellij.terminal.session.dto.toStyleRange
 import com.intellij.terminal.session.dto.toTerminalState
 import com.intellij.util.EventDispatcher
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.DisposableWrapperList
 import kotlinx.coroutines.*
 import org.jetbrains.plugins.terminal.block.reworked.TerminalBlocksModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalShellIntegrationEventsListener
+import org.jetbrains.plugins.terminal.fus.*
 import java.awt.Toolkit
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeSource
 
 internal class TerminalSessionController(
   private val sessionModel: TerminalSessionModel,
@@ -26,11 +31,23 @@ internal class TerminalSessionController(
   private val blocksModel: TerminalBlocksModel,
   private val settings: JBTerminalSystemSettingsProviderBase,
   private val coroutineScope: CoroutineScope,
+  private val fusActivity: FrontendOutputActivity,
 ) {
 
   private val terminationListeners: DisposableWrapperList<Runnable> = DisposableWrapperList()
   private val shellIntegrationEventDispatcher: EventDispatcher<TerminalShellIntegrationEventsListener> =
     EventDispatcher.create(TerminalShellIntegrationEventsListener::class.java)
+
+  private val edtContext = Dispatchers.EDT + ModalityState.any().asContextElement()
+
+  private val documentUpdateLatencyReporter = BatchLatencyReporter(batchSize = 100) { samples ->
+    ReworkedTerminalUsageCollector.logFrontendDocumentUpdateLatency(
+      totalDuration = samples.totalDurationOf(DurationAndTextLength::duration),
+      duration90 = samples.percentileOf(90, DurationAndTextLength::duration),
+      thirdLargestDuration = samples.thirdLargestOf(DurationAndTextLength::duration),
+      textLength90 = samples.percentileOf(90, DurationAndTextLength::textLength),
+    )
+  }
 
   fun handleEvents(session: TerminalSession) {
     coroutineScope.launch {
@@ -66,9 +83,11 @@ internal class TerminalSessionController(
         }
       }
       is TerminalContentUpdatedEvent -> {
+        fusActivity.eventReceived(event)
         updateOutputModel { model ->
-          val styles = event.styles.map { it.toStyleRange() }
-          model.updateContent(event.startLineLogicalIndex, event.text, styles)
+          fusActivity.beforeModelUpdate()
+          updateOutputModelContent(model, event)
+          fusActivity.afterModelUpdate()
         }
       }
       is TerminalCursorPositionChangedEvent -> {
@@ -89,25 +108,25 @@ internal class TerminalSessionController(
         fireSessionTerminated()
       }
       TerminalPromptStartedEvent -> {
-        withContext(Dispatchers.EDT) {
+        withContext(edtContext) {
           blocksModel.promptStarted(outputModel.cursorOffsetState.value)
         }
         shellIntegrationEventDispatcher.multicaster.promptStarted()
       }
       TerminalPromptFinishedEvent -> {
-        withContext(Dispatchers.EDT) {
+        withContext(edtContext) {
           blocksModel.promptFinished(outputModel.cursorOffsetState.value)
         }
         shellIntegrationEventDispatcher.multicaster.promptFinished()
       }
       is TerminalCommandStartedEvent -> {
-        withContext(Dispatchers.EDT) {
+        withContext(edtContext) {
           blocksModel.commandStarted(outputModel.cursorOffsetState.value)
         }
         shellIntegrationEventDispatcher.multicaster.commandStarted(event.command)
       }
       is TerminalCommandFinishedEvent -> {
-        withContext(Dispatchers.EDT) {
+        withContext(edtContext) {
           blocksModel.commandFinished(event.exitCode)
         }
         shellIntegrationEventDispatcher.multicaster.commandFinished(event.command, event.exitCode)
@@ -116,9 +135,20 @@ internal class TerminalSessionController(
   }
 
   private suspend fun updateOutputModel(block: (TerminalOutputModel) -> Unit) {
-    withContext(Dispatchers.EDT) {
+    withContext(edtContext) {
       block(getCurrentOutputModel())
     }
+  }
+
+  @RequiresEdt
+  private fun updateOutputModelContent(model: TerminalOutputModel, event: TerminalContentUpdatedEvent) {
+    val startTime = TimeSource.Monotonic.markNow()
+
+    val styles = event.styles.map { it.toStyleRange() }
+    model.updateContent(event.startLineLogicalIndex, event.text, styles)
+
+    val latencyData = DurationAndTextLength(duration = startTime.elapsedNow(), textLength = event.text.length)
+    documentUpdateLatencyReporter.update(latencyData)
   }
 
   private fun getCurrentOutputModel(): TerminalOutputModel {

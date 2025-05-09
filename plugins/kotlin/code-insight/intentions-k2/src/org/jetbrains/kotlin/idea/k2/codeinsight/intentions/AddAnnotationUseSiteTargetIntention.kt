@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.intentions
 
 import com.intellij.modcommand.ActionContext
@@ -11,9 +11,10 @@ import org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.AddAnnotationUs
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 
 internal class AddAnnotationUseSiteTargetIntention :
-    AddAnnotationUseSiteTargetModCommandAction(), ContextProvider<KtAnnotationEntry, List<AnnotationUseSiteTarget>> {
+    AddAnnotationUseSiteTargetModCommandAction(),
+    ContextProvider<KtAnnotationEntry, List<AnnotationUseSiteTarget>> {
 
-    override fun KaSession.prepareContext(element: KtAnnotationEntry): List<AnnotationUseSiteTarget>? =
+    override fun KaSession.prepareContext(element: KtAnnotationEntry): List<AnnotationUseSiteTarget> =
         element.getApplicableUseSiteTargets()
 
     override fun getAnnotationTargets(

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.codeinsights.impl.base
 
@@ -30,6 +30,8 @@ import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.utils.ChooseValueExpression
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.TypeInfo.Companion.createByKtTypes
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.TypeInfo.Companion.createTypeByKtType
+import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.setAndShortenTypeReference
+import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.setTypeReference
 import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
@@ -71,7 +73,7 @@ object CallableReturnTypeUpdaterUtils {
         declaration: KtCallableDeclaration,
         typeInfo: TypeInfo,
         project: Project,
-    ) = updateType(
+    ): Unit = updateType(
         declaration,
         typeInfo,
         project,
@@ -254,7 +256,7 @@ object CallableReturnTypeUpdaterUtils {
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    fun getTypeInfo(declaration: KtCallableDeclaration): TypeInfo {
+    fun getTypeInfo(declaration: KtCallableDeclaration, useTemplate: Boolean = true): TypeInfo {
 
         val calculateAllTypes = calculateAllTypes(declaration) { declarationType, allTypes, cannotBeNull ->
             if (isUnitTestMode()) {
@@ -282,7 +284,7 @@ object CallableReturnTypeUpdaterUtils {
             createByKtTypes(
                 approximatedDefaultType,
                 allTypes.drop(1), // The first type is always the default type so we drop it.
-                useTemplate = true
+                useTemplate,
             )
         }
         return calculateAllTypes ?: error("unable to calculate all types for $declaration")
@@ -340,6 +342,7 @@ object CallableReturnTypeUpdaterUtils {
 
             val UNIT: Type = Type(isUnit = true, isError = false, longTypeRepresentation = "kotlin.Unit", shortTypeRepresentation = "Unit")
             val ANY: Type = Type(isUnit = false, isError = false, longTypeRepresentation = "kotlin.Any", shortTypeRepresentation = "Any")
+            val NOTHING: Type = Type(isUnit = false, isError = false, longTypeRepresentation = "kotlin.Nothing", shortTypeRepresentation = "Nothing")
         }
     }
 
@@ -355,7 +358,7 @@ object CallableReturnTypeUpdaterUtils {
                 is KtFunction -> KotlinBundle.message("specify.return.type.explicitly")
                 else -> KotlinBundle.message("specify.type.explicitly")
             }
-        )
+        ).withFixAllOption(this)
 
         override fun invoke(context: ActionContext, element: KtCallableDeclaration, updater: ModPsiUpdater): Unit =
             updateType(element, typeInfo, context.project, updater)

@@ -28,6 +28,8 @@ import com.intellij.openapi.project.*;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.openapi.vfs.newvfs.AsyncEventSupport;
@@ -905,7 +907,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
 
   private static void handleDumbMode(@Nullable Project project) throws IndexNotReadyException {
     ProgressManager.checkCanceled();
-    throw IndexNotReadyException.create(project == null ? null : DumbServiceImpl.getInstance(project).getDumbModeStartTrace());
+    throw IndexNotReadyException.create(project == null ? null : DumbService.getInstance(project).getDumbModeStartTrace());
   }
 
 
@@ -1796,6 +1798,13 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
       List<FileIndexingRequest> virtualFilesToBeUpdatedForProject = ContainerUtil.filter(allFilesToUpdate, filter::acceptsRequest);
 
       if (!virtualFilesToBeUpdatedForProject.isEmpty()) {
+        if (LOG.isDebugEnabled()) {
+          List<String> files = ContainerUtil.map(virtualFilesToBeUpdatedForProject, request -> request.getFile().getPath());
+          String message = "Indexing the following files because up-to-date indexes were requested by <see the stacktrace>. " +
+                           "Number of files: " + files.size() + " paths: " + StringUtil.trimLog(Strings.join(files, ", "), 500);
+          LOG.debug(message, new Throwable());
+        }
+
         myForceUpdateTask.processAll(virtualFilesToBeUpdatedForProject, project);
       }
     }
@@ -1887,7 +1896,9 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
                                          @NotNull Set<Project> containingProjects,
                                          @NotNull List<Project> dirtyQueueProjects) {
     myIndexableFilesFilterHolder.removeFile(fileId);
-    myDirtyFiles.addFile(Collections.emptyList(), fileId); // can be indexed by project which is currently closed
+    if (containingProjects.isEmpty() && canBeIndexed(file)) {
+      myDirtyFiles.addFile(Collections.emptyList(), fileId); // can be indexed by project which is currently closed
+    }
     IndexingFlag.cleanProcessedFlagRecursively(file);
 
     List<ID<?, ?>> nontrivialFileIndexedStates = IndexingStamp.getNontrivialFileIndexedStates(fileId);
@@ -1921,7 +1932,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
                                       boolean onlyContentChanged,
                                       @NotNull List<Project> dirtyQueueProjects) {
     Set<Project> containingProjects = getContainingProjects(file);
-    if (containingProjects.isEmpty() || !file.isValid() || (!file.isDirectory() && isTooLarge(file))) {
+    if (containingProjects.isEmpty() || !canBeIndexed(file)) {
       // large file might be scheduled for update in before event when its size was not large
       doInvalidateIndicesForFile(fileId, file, containingProjects, dirtyQueueProjects);
       return;
@@ -1976,6 +1987,10 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
         IndexingFlag.setFileIndexed(file, indexingStamp);
       }
     });
+  }
+
+  private boolean canBeIndexed(@NotNull VirtualFile file) {
+    return file.isValid() && (file.isDirectory() || !isTooLarge(file));
   }
 
   // TODO-ank (IJPL-412): use UnindexedFilesFinder.tryIndexWithoutContent instead

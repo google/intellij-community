@@ -135,8 +135,6 @@ import org.jetbrains.kotlin.nj2k.*
 import org.jetbrains.kotlin.nj2k.inference.common.AbstractCommonConstraintCollectorTest
 import org.jetbrains.kotlin.nj2k.inference.mutability.AbstractMutabilityInferenceTest
 import org.jetbrains.kotlin.nj2k.inference.nullability.AbstractNullabilityInferenceTest
-import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK1CheckerTest
-import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK1QuickFixTest
 import org.jetbrains.kotlin.psi.patternMatching.AbstractK1PsiUnifierTest
 import org.jetbrains.kotlin.search.AbstractAnnotatedMembersSearchTest
 import org.jetbrains.kotlin.search.AbstractInheritorsSearchTest
@@ -287,6 +285,12 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
 
         testClass<AbstractFlowAsyncStackTraceTest> {
             model("asyncStackTrace/flows")
+        }
+
+        listOf(AbstractCoroutineAsyncStackTraceTest::class, AbstractK2CoroutineAsyncStackTraceTest::class).forEach {
+            testClass(it) {
+                model("asyncStackTrace/coroutines")
+            }
         }
 
         listOf(AbstractCoroutineDumpTest::class, AbstractK1IdeK2CodeCoroutineDumpTest::class).forEach {
@@ -441,6 +445,7 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
                     "simplifyExpression",
                     "redundantInterpolationPrefix", // K2-only multi-dollar interpolation
                     "addInterpolationPrefixUnresolvedReference", // K2-only multi-dollar interpolation
+                    "unsupportedFeature", // K2-related features only
                 )
             )
         }
@@ -580,11 +585,16 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
             model(
                 "intentions", pattern = Patterns.forRegex("^([\\w\\-_]+)\\.(kt|kts)$"),
                 excludedDirectories = listOf(
-                    "convertToMultiDollarString", // K2-only
-                    "branched/ifWhen/ifToWhen/whenGuards", // K2-only
-                    "concatenationToBuildCollection", // K2-only
-                    "convertStringTemplateToBuildStringMultiDollarPrefix", // K2-only
-                    "convertToConcatenatedStringMultiDollarPrefix", // K2-only
+                    // disabled K2-only features
+                    "convertToMultiDollarString",
+                    "branched/ifWhen/ifToWhen/whenGuards",
+                    "concatenationToBuildCollection",
+                    "convertStringTemplateToBuildStringMultiDollarPrefix",
+                    "convertToConcatenatedStringMultiDollarPrefix",
+                    "convertToStringTemplateInterpolationPrefix",
+                    "addAnnotationUseSiteTarget/allTarget",
+                    "contextParameters",
+                    // end K2-only features
                 )
             )
         }
@@ -613,6 +623,8 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
                     "contextParametersMigration", // K2-only
                     "defaultAnnotationTarget", // K2-only
                     "orInWhenGuard", // K2-only
+                    "convertFromMultiDollarToRegularString", // K2-only
+                    "javaCollectionsWithNullableTypes", // K2-only
                 )
             )
         }
@@ -1086,8 +1098,8 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
         testClass<AbstractKotlinLambdasHintsProvider> {
             model("codeInsight/hints/lambda")
         }
-        testClass<AbstractKotlinRangesHintsProviderTest> {
-            model("codeInsight/hints/ranges")
+        testClass<AbstractKotlinValuesHintsProviderTest> {
+            model("codeInsight/hints/values")
         }
 
         testClass<AbstractKotlinCallChainHintsProviderTest> {
@@ -1298,15 +1310,16 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
         }
     }
 
-    testGroup("compiler-plugins/parcelize/tests/k1", testDataPath = "../testData") {
-        testClass<AbstractParcelizeK1QuickFixTest> {
-            model("quickfix", pattern = Patterns.forRegex("^([\\w\\-_]+)\\.kt$"))
-        }
-
-        testClass<AbstractParcelizeK1CheckerTest> {
-            model("checker", pattern = KT)
-        }
-    }
+    // TODO: KTIJ-33510
+    //testGroup("compiler-plugins/parcelize/tests/k1", testDataPath = "../testData") {
+    //    testClass<AbstractParcelizeK1QuickFixTest> {
+    //        model("quickfix", pattern = Patterns.forRegex("^([\\w\\-_]+)\\.kt$"))
+    //    }
+    //
+    //    testClass<AbstractParcelizeK1CheckerTest> {
+    //        model("checker", pattern = KT)
+    //    }
+    //}
 
     testGroup("completion/tests-k1", testDataPath = "../testData", category = COMPLETION) {
         testClass<AbstractCompiledKotlinInJavaCompletionTest> {

@@ -27,7 +27,7 @@ fun JTextComponent.bindTextOnShow(textState: MutableStateFlow<String>, launchDeb
 @Suppress("DuplicatedCode")
 @Experimental
 fun JTextComponent.bindTextIn(textState: MutableStateFlow<String>, coroutineScope: CoroutineScope) {
-  val listener = object: DocumentAdapter() {
+  val listener = object : DocumentAdapter() {
     override fun textChanged(e: javax.swing.event.DocumentEvent) {
       textState.update { text }
     }

@@ -20,7 +20,15 @@ import com.intellij.refactoring.util.RefactoringDescriptionLocation
 import com.intellij.usageView.UsageInfo
 import com.intellij.util.Processor
 import com.intellij.util.containers.map2Array
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
+import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
+import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
+import org.jetbrains.kotlin.analysis.api.resolution.KaSmartCastedReceiverValue
+import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
+import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
+import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
@@ -45,10 +53,7 @@ import org.jetbrains.kotlin.idea.searching.inheritors.findAllOverridings
 import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.containingClass
-import org.jetbrains.kotlin.psi.psiUtil.getNonStrictParentOfType
-import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
-import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
+import org.jetbrains.kotlin.psi.psiUtil.*
 
 class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
     override fun handlesElement(element: PsiElement?) = element.canDeleteElement()
@@ -103,16 +108,40 @@ class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
                 }
             }
         }
-        
+
         if (element is KtParameter) {
-            val function = element.getNonStrictParentOfType<KtFunction>()
-            if (function != null) {
-                val parameterIndexAsJavaCall = element.parameterIndex() + if (function.receiverTypeReference != null) 1 else 0
-                findCallArgumentsToDelete(result, element, parameterIndexAsJavaCall, function)
+            if (element.isContextParameter) {
+                findCallsWithContextParameters(result, element, element.ownerDeclaration)
+            } else {
+                val function = element.getNonStrictParentOfType<KtFunction>()
+                if (function != null) {
+                    val parameterIndexAsJavaCall = element.parameterIndex() + if (function.receiverTypeReference != null) 1 else 0
+                    findCallArgumentsToDelete(result, element, parameterIndexAsJavaCall, function)
+                }
             }
         }
-        
+
         return NonCodeUsageSearchInfo(isInside, element)
+    }
+
+    @OptIn(KaExperimentalApi::class)
+    private fun findCallsWithContextParameters(
+        result: MutableList<in UsageInfo>,
+        element: KtParameter,
+        decl: KtDeclaration?
+    ) {
+        decl?.forEachDescendantOfType<KtExpression> { expression ->
+            analyze(expression) {
+                val declarationSymbol = decl.symbol as? KaCallableSymbol ?: return@forEachDescendantOfType
+                val functionCall = expression.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>() ?: return@forEachDescendantOfType
+                if (expression is KtCallExpression && (functionCall as? KaSimpleFunctionCall)?.isImplicitInvoke != true) return@forEachDescendantOfType
+                val resolvedSymbol = functionCall.partiallyAppliedSymbol
+                if (declarationSymbol.allOverriddenSymbols.firstOrNull { it == resolvedSymbol.symbol } != null) return@forEachDescendantOfType
+                if (resolvedSymbol.contextArguments.any { (((it as? KaSmartCastedReceiverValue)?.original ?: it) as? KaImplicitReceiverValue)?.symbol == element.symbol }) {
+                    result.add(SafeDeleteReferenceSimpleDeleteUsageInfo(expression, element, false))
+                }
+            }
+        }
     }
 
     private fun findFunctionUsages(
@@ -336,6 +365,12 @@ class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
                     }
                 }
                 deleteSeparatingComma(element)
+                if (element.isContextParameter) {
+                    val receiverList = element.parent as KtContextReceiverList
+                    if (receiverList.contextParameters().size == 1) {
+                        receiverList.delete()
+                    }
+                }
             }
         }
     }

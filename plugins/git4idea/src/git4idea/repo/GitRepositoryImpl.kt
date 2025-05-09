@@ -4,6 +4,7 @@ package git4idea.repo
 import com.intellij.dvcs.DvcsUtil
 import com.intellij.dvcs.repo.Repository
 import com.intellij.dvcs.repo.RepositoryImpl
+import com.intellij.ide.vfs.rpcId
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -14,7 +15,8 @@ import com.intellij.openapi.vcs.VcsScope
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager.Companion.getInstance
 import com.intellij.platform.diagnostic.telemetry.helpers.use
-import com.intellij.platform.util.coroutines.childScope
+import com.intellij.platform.project.projectId
+import com.intellij.platform.vcs.impl.shared.rpc.RepositoryId
 import git4idea.GitDisposable
 import git4idea.GitLocalBranch
 import git4idea.GitUtil
@@ -22,6 +24,7 @@ import git4idea.GitVcs
 import git4idea.branch.GitBranchesCollection
 import git4idea.ignore.GitRepositoryIgnoredFilesHolder
 import git4idea.merge.GitResolvedMergeConflictsFilesHolder
+import git4idea.remoteApi.GitRepositoryFrontendSynchronizer
 import git4idea.status.GitStagingAreaHolder
 import git4idea.telemetry.GitTelemetrySpan
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +41,7 @@ class GitRepositoryImpl private constructor(
   private val gitDir: VirtualFile,
   parentDisposable: Disposable,
 ) : RepositoryImpl(project, rootDir, parentDisposable), GitRepository {
+  private val rpcId = RepositoryId(projectId = project.projectId(), rootPath = root.rpcId())
 
   private val vcs = GitVcs.getInstance(project)
 
@@ -55,7 +59,7 @@ class GitRepositoryImpl private constructor(
   @Volatile
   private var recentCheckoutBranches = emptyList<GitLocalBranch>()
 
-  private val coroutineScope = GitDisposable.getInstance(project).coroutineScope.childScope("GitRepositoryImpl")
+  private val coroutineScope = GitDisposable.getInstance(project).childScope("GitRepositoryImpl")
 
   /**
    * @see [git4idea.repo.GitRepositoryImpl.createInstance]
@@ -169,6 +173,7 @@ class GitRepositoryImpl private constructor(
     ApplicationManager.getApplication().assertIsNonDispatchThread()
     val previousInfo = repoInfo
     repoInfo = readRepoInfo()
+    project.messageBus.syncPublisher(GitRepositoryFrontendSynchronizer.TOPIC).repositoryUpdated(this)
     notifyIfRepoChanged(this, previousInfo, repoInfo)
   }
 
@@ -212,6 +217,10 @@ class GitRepositoryImpl private constructor(
 
   override fun toLogString(): String {
     return "GitRepository $root : $repoInfo"
+  }
+
+  override fun getRpcId(): RepositoryId {
+    return rpcId
   }
 
   companion object {
@@ -269,6 +278,7 @@ class GitRepositoryImpl private constructor(
         val initialRepoInfo = repoInfo
         val updater = GitRepositoryUpdater(this, this.repositoryFiles)
         updater.installListeners()
+        project.messageBus.syncPublisher(GitRepositoryFrontendSynchronizer.TOPIC).repositoryCreated(this)
         notifyIfRepoChanged(this, null, initialRepoInfo)
         this.untrackedFilesHolder.invalidate()
         this.resolvedConflictsFilesHolder.invalidate()

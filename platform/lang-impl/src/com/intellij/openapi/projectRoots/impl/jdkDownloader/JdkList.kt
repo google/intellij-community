@@ -72,6 +72,7 @@ data class JdkItem(
 
   /** there are some JdkList items that are not shown in the downloader but suggested for JdkAuto **/
   val isVisibleOnUI: Boolean,
+  val isPreview: Boolean,
 
   val jdkMajorVersion: Int,
   @NlsSafe
@@ -197,6 +198,7 @@ data class JdkItem(
   companion object {
     fun detectVariant(vendorText: @NlsSafe String): JdkVersionDetector.Variant {
       if (vendorText.contains("Oracle OpenJDK")) return JdkVersionDetector.Variant.Oracle
+      if (vendorText.contains("Microsoft")) return JdkVersionDetector.Variant.Microsoft
       if (vendorText.contains("Corretto")) return JdkVersionDetector.Variant.Corretto
       if (vendorText.contains("BellSoft")) return JdkVersionDetector.Variant.Liberica
       if (vendorText.contains("Azul")) return JdkVersionDetector.Variant.Zulu
@@ -449,6 +451,7 @@ object JdkListParser {
         product = product,
         isDefaultItem = item["default"]?.let { filters.testPredicate(it) == true } ?: false,
         isVisibleOnUI = item["listed"]?.let { filters.testPredicate(it) == true } ?: true,
+        isPreview = item["preview"]?.let { filters.testPredicate(it) == true } ?: false,
 
         jdkMajorVersion = (item["jdk_version_major"] as? JsonPrimitive)?.intOrNull ?: return emptyList(),
         jdkVersion = (item["jdk_version"] as? JsonPrimitive)?.contentOrNull ?: return emptyList(),

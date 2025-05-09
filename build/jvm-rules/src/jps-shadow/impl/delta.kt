@@ -1,3 +1,4 @@
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("PackageDirectoryMismatch", "UnstableApiUsage", "SSBasedInspection", "ReplaceGetOrSet", "ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package org.jetbrains.jps.dependency.impl
@@ -12,9 +13,9 @@ import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.plus
 import kotlinx.collections.immutable.toPersistentHashSet
 import org.h2.mvstore.MVMap
-import org.jetbrains.bazel.jvm.emptySet
-import org.jetbrains.bazel.jvm.removeAll
-import org.jetbrains.bazel.jvm.toPersistentHashSet
+import org.jetbrains.bazel.jvm.util.emptySet
+import org.jetbrains.bazel.jvm.util.removeAll
+import org.jetbrains.bazel.jvm.util.toPersistentHashSet
 import org.jetbrains.jps.dependency.BackDependencyIndex
 import org.jetbrains.jps.dependency.DeltaEx
 import org.jetbrains.jps.dependency.Graph
@@ -106,7 +107,7 @@ class DeltaImpl(
 class MemoryMultiMaplet<K : Any, V : Any, C : MutableCollection<V>>(
   @Suppress("unused") collectionFactory: Supplier<C>?,
 ) : MultiMapletEx<K, V> {
-  private val map = MutableScatterMap<K, PersistentSet<V>>()
+  @JvmField val map = MutableScatterMap<K, PersistentSet<V>>()
 
   override fun containsKey(key: K): Boolean {
     return map.containsKey(key)

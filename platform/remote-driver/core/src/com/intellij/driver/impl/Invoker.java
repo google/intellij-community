@@ -1,9 +1,6 @@
 package com.intellij.driver.impl;
 
-import com.intellij.driver.model.DriverIllegalStateException;
-import com.intellij.driver.model.OnDispatcher;
-import com.intellij.driver.model.ProductVersion;
-import com.intellij.driver.model.RdTarget;
+import com.intellij.driver.model.*;
 import com.intellij.driver.model.transport.*;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl;
@@ -18,6 +15,7 @@ import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.BuildNumber;
 import com.intellij.openapi.util.ClearableLazyValue;
+import com.intellij.openapi.util.Computable;
 import com.intellij.platform.diagnostic.telemetry.IJTracer;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.containers.ContainerUtil;
@@ -41,6 +39,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -149,9 +148,15 @@ public class Invoker implements InvokerMBean {
       catch (Throwable e) {
         throw new RuntimeException(e);
       }
-      ApplicationManager.getApplication().invokeAndWait(() -> {
+      Application app = ApplicationManager.getApplication();
+      Runnable runnable = () -> {
         res[0] = withSemantics(call, () -> invokeMethod(callTarget, instance, transformedArgs));
-      }, modalityState[0]);
+      };
+      if (call.getLockSemantics() == LockSemantics.NO_LOCK && app instanceof ApplicationEx applicationEx) {
+        applicationEx.invokeAndWaitRelaxed(runnable, modalityState[0]);
+      } else {
+        app.invokeAndWait(runnable, modalityState[0]);
+      }
       result = res[0];
     }
     else {
@@ -239,7 +244,12 @@ public class Invoker implements InvokerMBean {
         return call(call, supplier);
       }
       case READ_ACTION -> {
-        return ReadAction.compute(() -> call(call, supplier));
+        if (call.getDispatcher() == OnDispatcher.EDT) {
+          return WriteIntentReadAction.compute((Computable<Object>)() -> call(call, supplier));
+        }
+        else {
+          return ReadAction.compute(() -> call(call, supplier));
+        }
       }
       case WRITE_ACTION -> {
         return WriteAction.compute(() -> call(call, supplier));
@@ -426,9 +436,9 @@ public class Invoker implements InvokerMBean {
       IdeaPluginDescriptor plugin = PluginManagerCore.getPlugin(PluginId.getId(mainId));
       if (plugin == null) throw new DriverIllegalStateException("No such plugin " + mainId);
 
-      List<PluginContentDescriptor.ModuleItem> modules = ((IdeaPluginDescriptorImpl)plugin).content.modules;
+      List<PluginContentDescriptor.ModuleItem> modules = ((IdeaPluginDescriptorImpl)plugin).getContent().modules;
       for (PluginContentDescriptor.ModuleItem module : modules) {
-        if (Objects.equals(moduleId, module.name)) {
+        if (Objects.equals(moduleId, module.getName())) {
           return requireNonNull(module.requireDescriptor().getPluginClassLoader());
         }
       }
@@ -554,7 +564,7 @@ public class Invoker implements InvokerMBean {
   }
 
   private Object transformArg(@NotNull RemoteCall call, Object arg) {
-    if (arg != null && arg.getClass().isArray() && Array.getLength(arg) > 0 && ContainerUtil.and((Object[])arg, item -> item instanceof Ref)) {
+    if (arg != null && arg.getClass().isArray() && Array.getLength(arg) > 0 && arrayAll(arg, item -> item instanceof Ref)) {
       var componentType = getReference(call.getSessionId(), ((Ref)Array.get(arg, 0)).id()).getClass();
       var result = Array.newInstance(componentType, Array.getLength(arg));
       for (int i = 0; i < Array.getLength(arg); i++) {
@@ -652,6 +662,13 @@ public class Invoker implements InvokerMBean {
 
   private String genId() {
     return rdTarget.name() + "_" + REF_SEQUENCE.getAndIncrement();
+  }
+
+  private static boolean arrayAll(Object array, Predicate<Object> predicate) {
+    for (int i = 0; i < Array.getLength(array); i++) {
+      if (!predicate.test(Array.get(array, i))) return false;
+    }
+    return true;
   }
 
   interface Session {

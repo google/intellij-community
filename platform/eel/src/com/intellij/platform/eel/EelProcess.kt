@@ -1,16 +1,16 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel
 
-import java.io.IOException
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
 import kotlinx.coroutines.Deferred
+import java.io.IOException
 
 /**
- * Represents some process that was launched via [EelExecApi.executeProcess].
+ * Represents some process that was launched via [EelExecApi.execute].
  *
  */
-interface EelProcess: KillableProcess {
+sealed interface EelProcess {
   val pid: EelApi.Pid
 
   /**
@@ -24,6 +24,21 @@ interface EelProcess: KillableProcess {
   val stderr: EelReceiveChannel<IOException>
   val exitCode: Deferred<Int>
 
+  /**
+   * Sends `SIGKILL` on Unix.
+   *
+   * Calls [`TerminateProcess`](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess)
+   * on Windows.
+   */
+  suspend fun kill()
+
+  /**
+   * Sends `SIGINT` on Unix.
+   * Sends `CTRL+C` on Windows by attaching a console.
+   *
+   * Warning: This signal can be ignored.
+   */
+  suspend fun interrupt()
 
   /**
    * Converts to the JVM [Process] which can be used instead of [EelProcess] for compatibility reasons.
@@ -40,4 +55,15 @@ interface EelProcess: KillableProcess {
     class NoPty : ResizePtyError("Process has no PTY")
     data class Errno(val errno: Int, override val message: String) : ResizePtyError("[$errno] $message")
   }
+}
+
+interface EelPosixProcess : EelProcess {
+  /**
+   * Sends `SIGTERM` on Unix.
+   */
+  suspend fun terminate()
+}
+
+interface EelWindowsProcess : EelProcess {
+  // Nothing yet.
 }

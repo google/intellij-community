@@ -38,12 +38,14 @@ internal class CreateKotlinCallableAction(
     @IntentionName private val myText: String,
     private val pointerToContainer: SmartPsiElementPointer<*>,
 ) : JvmGroupIntentionAction, PriorityAction {
+
     private val methodName: String = request.methodName
     private val callPointer: SmartPsiElementPointer<PsiElement>? = when (request) {
-        is CreateMethodFromKotlinUsageRequest -> request.call.createSmartPointer()
-        is CreateExecutableFromJavaUsageRequest<*> -> request.call.createSmartPointer()
+        is CreateMethodFromKotlinUsageRequest -> request.call
+        is CreateExecutableFromJavaUsageRequest<*> -> request.call
         else -> null
-    }
+    }?.createSmartPointer()
+
     private val call: PsiElement?
         get() = callPointer?.element
 
@@ -114,8 +116,6 @@ internal class CreateKotlinCallableAction(
             listOf(), listOf()
         )
 
-        val call = call
-        require(call != null)
         val createKotlinCallablePsiEditor = CreateKotlinCallablePsiEditor(
             project, callableInfo,
         )
@@ -123,9 +123,9 @@ internal class CreateKotlinCallableAction(
             callableInfo.definitionAsString
         )
         val passedContainerElement = pointerToContainer.element ?: return
-        val anchor = call
-        val shouldComputeContainerFromAnchor =
-            if (passedContainerElement is PsiFile) passedContainerElement == anchor.containingFile && !isExtension || !passedContainerElement.isWritable
+        val anchor = call ?: passedContainerElement
+        val shouldComputeContainerFromAnchor = if (call == null) false
+        else if (passedContainerElement is PsiFile) !passedContainerElement.isWritable
             else passedContainerElement.getContainer() == anchor.getContainer()
         val insertContainer: PsiElement = if (shouldComputeContainerFromAnchor) {
             anchor.getExtractionContainers().firstOrNull() ?:return
@@ -134,7 +134,7 @@ internal class CreateKotlinCallableAction(
         }
         createKotlinCallablePsiEditor.showEditor(
             function,
-            call,
+            anchor,
             isExtension,
             requestTargetClassPointer?.element,
             insertContainer,
@@ -148,11 +148,21 @@ internal class CreateKotlinCallableAction(
 
     private fun buildCallableAsString(request: CreateMethodRequest): String? {
         val container = getContainer()
-        if (call == null || container == null) return null
-        val modifierListAsString =
-            request.modifiers.mapNotNull(CreateFromUsageUtil::visibilityModifierToString).joinToString(separator = " ")
+            ?: return null
+
         return buildString {
-            append(modifierListAsString)
+            for (annotation in request.annotations) {
+                append('@')
+                append(annotation.qualifiedName)
+                append(' ')
+            }
+
+            for (modifier in request.modifiers) {
+                val string = CreateFromUsageUtil.visibilityModifierToString(modifier) ?: continue
+                append(string)
+                append(' ')
+            }
+
             if (abstract) {
                 if (isNotEmpty()) append(" ")
                 append("abstract")

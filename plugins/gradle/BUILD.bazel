@@ -19,8 +19,9 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["generated/**/*.kt", "generated/**/*.java", "src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/external-system-api:externalSystem",
-    "//platform/observable:ide-observable",
+    "//platform/observable",
     "//platform/external-system-impl:externalSystem-impl",
     "//plugins/gradle/tooling-extension-api:toolingExtension",
     "//plugins/gradle/tooling-extension-impl:toolingExtension-impl",
@@ -56,10 +57,11 @@ jvm_library(
     "//platform/backend/workspace",
     "//platform/workspace/jps",
     "//platform/backend/observation",
-    "//platform/platform-impl/ui:ide-ui",
+    "//platform/platform-impl/ui",
     "//platform/eel-provider",
     "//platform/ijent",
     "//platform/core-api:core",
+    "//java/java-psi-api:psi",
   ],
   exports = [
     "//platform/external-system-api:externalSystem",
@@ -117,8 +119,9 @@ jvm_library(
     "//plugins/gradle",
     "//plugins/gradle:gradle-common",
     "//platform/backend/workspace",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/external-system-api/dependency-updater:externalSystem-dependencyUpdater",
-    "//platform/observable:ide-observable",
+    "//platform/observable",
     "//plugins/gradle/java",
     "//java/openapi:java",
     "//platform/testFramework",
@@ -126,10 +129,10 @@ jvm_library(
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
     "//platform/external-system-impl:externalSystem-tests_test_lib",
-    "//platform/external-system-api/testFramework:externalSystem-testFramework",
+    "//platform/external-system-api/testFramework",
     "//java/testFramework",
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
-    "//java/execution/impl:java-execution-impl",
+    "//java/execution/impl",
     "@lib//:assert_j",
     "@lib//:org-codehaus-groovy-groovy-json",
     "@lib//:commons-cli",
@@ -152,7 +155,7 @@ jvm_library(
   ],
   runtime_deps = [
     ":gradle-tests_test_resources",
-    "//platform/execution.dashboard:execution-dashboard",
+    "//platform/execution.dashboard",
   ]
 )
 

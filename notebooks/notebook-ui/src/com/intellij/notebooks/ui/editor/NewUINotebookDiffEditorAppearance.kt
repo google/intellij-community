@@ -8,7 +8,7 @@ class NewUINotebookDiffEditorAppearance(editor: Editor): DefaultNotebookEditorAp
   override fun shouldShowCellLineNumbers(): Boolean = false
   override fun shouldShowExecutionCounts(): Boolean = false  // not needed for DIFF -> execution does not reach it
   override fun shouldShowOutExecutionCounts(): Boolean = false
-  override fun shouldShowRunButtonInGutter(): Boolean = false
+  override fun shouldShowRunButtonInGutter(): Boolean = true
   // see comments in org.jetbrains.plugins.notebooks.ui.visualization.DefaultNotebookEditorAppearanceSizes
   override val CODE_CELL_LEFT_LINE_PADDING: Int = 5
   override val LINE_NUMBERS_MARGIN: Int = 10
@@ -27,11 +27,6 @@ class NewUINotebookDiffEditorAppearance(editor: Editor): DefaultNotebookEditorAp
   override val CELL_TOOLBAR_TOTAL_HEIGHT: Int = INNER_CELL_TOOLBAR_HEIGHT + SPACE_BELOW_CELL_TOOLBAR
   override val PROGRESS_STATUS_HEIGHT: Int = 2
 
-  override val JUPYTER_CELL_SPACERS_INLAY_PRIORITY: Int = 10
-  override val JUPYTER_BELOW_OUTPUT_CELL_SPACERS_INLAY_PRIORITY: Int = -10
-  override val jupyterBelowLastCellInlayPriority: Int = -20
-  override val JUPYTER_CELL_TOOLBAR_INLAY_PRIORITY: Int = JUPYTER_CELL_SPACERS_INLAY_PRIORITY + 10
-  override val NOTEBOOK_OUTPUT_INLAY_PRIORITY: Int = 5
 
   override val EXTRA_PADDING_EXECUTION_COUNT: Int = 0
 

@@ -35,10 +35,9 @@ import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.platform.eel.EelDescriptor;
-import com.intellij.platform.eel.path.EelPath;
 import com.intellij.platform.eel.provider.EelProviderUtil;
 import com.intellij.platform.eel.provider.LocalEelDescriptor;
-import com.intellij.pom.java.LanguageLevel;
+import com.intellij.pom.java.JavaRelease;
 import com.intellij.util.PathUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
@@ -123,7 +122,9 @@ public final class JavaSdkImpl extends JavaSdk {
   public @Nullable String getDefaultDocumentationUrl(@NotNull Sdk sdk) {
     JavaSdkVersion version = getVersion(sdk);
     int release = version != null ? version.ordinal() : 0;
-    if (release > LanguageLevel.HIGHEST.feature()) return "https://download.java.net/java/early_access/jdk" + release + "/docs/api/";
+    if (release > JavaRelease.getHighest().feature()) {
+      return "https://download.java.net/java/early_access/jdk" + release + "/docs/api/";
+    }
     if (release >= 11) return "https://docs.oracle.com/en/java/javase/" + release + "/docs/api/";
     if (release >= 6) return "https://docs.oracle.com/javase/" + release + "/docs/api/";
     if (release == 5) return "https://docs.oracle.com/javase/1.5.0/docs/api/";
@@ -236,7 +237,7 @@ public final class JavaSdkImpl extends JavaSdk {
   @Override
   public boolean isValidSdkHome(@NotNull String path) {
     Path homePath = Path.of(path);
-    return JdkUtil.checkForJdk(homePath, EelProviderUtil.getEelDescriptor(homePath).getOperatingSystem() == EelPath.OS.WINDOWS);
+    return JdkUtil.checkForJdk(homePath);
   }
 
   @Override
@@ -295,10 +296,15 @@ public final class JavaSdkImpl extends JavaSdk {
       addSources(jdkHome, sdkModificator);
       addDocs(jdkHome, sdkModificator, sdk);
       attachJdkAnnotations(sdkModificator);
+      if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+        sdkModificator.commitChanges();
+      }
+      else {
       ApplicationManager.getApplication().invokeAndWait(() -> {
         ApplicationManager.getApplication().runWriteAction(() ->
                                                              sdkModificator.commitChanges());
       });
+      }
     };
     Application application = ApplicationManager.getApplication();
       if (application.isDispatchThread()) {

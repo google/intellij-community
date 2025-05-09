@@ -1,19 +1,22 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.gradle.scripting.k2.importing
 
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.psi.PsiManager
 import org.gradle.tooling.model.kotlin.dsl.KotlinDslScriptsModel
-import org.jetbrains.kotlin.gradle.scripting.k2.GradleScriptConfigurationsSource
 import org.jetbrains.kotlin.gradle.scripting.k2.GradleScriptDefinitionsHolder
-import org.jetbrains.kotlin.gradle.scripting.k2.GradleScriptModel
+import org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptModel
+import org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptRefinedConfigurationProvider
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.kotlinDslSyncListenerInstance
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.processScriptModel
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.saveGradleBuildEnvironment
 import org.jetbrains.kotlin.gradle.scripting.shared.kotlinDslScriptsModelImportSupported
 import org.jetbrains.kotlin.gradle.scripting.shared.loadGradleDefinitions
-import org.jetbrains.kotlin.idea.core.script.scriptConfigurationsSourceOfType
+import org.jetbrains.kotlin.idea.core.script.k2.DefaultScriptResolutionStrategy
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.plugins.gradle.service.project.ProjectResolverContext
 import org.jetbrains.plugins.gradle.service.syncAction.GradleSyncContributor
 import org.jetbrains.plugins.gradle.service.syncAction.GradleSyncProjectConfigurator.project
@@ -56,13 +59,22 @@ class KotlinDslScriptSyncContributor : GradleSyncContributor {
         GradleScriptDefinitionsHolder.getInstance(project).updateDefinitions(definitions)
 
         val gradleScripts = sync.models.mapNotNullTo(mutableSetOf()) {
-            val path = Path.of(it.file)
-            VirtualFileManager.getInstance().findFileByNioPath(path)?.let { virtualFile ->
-                GradleScriptModel(virtualFile, it.classPath, it.sourcePath, it.imports, sync.javaHome)
-            }
+            val virtualFile = VirtualFileManager.getInstance().findFileByNioPath(Path.of(it.file)) ?: return@mapNotNullTo null
+            GradleScriptModel(
+                virtualFile,
+                it.classPath,
+                it.sourcePath,
+                it.imports,
+                sync.javaHome
+            )
         }
 
-        project.scriptConfigurationsSourceOfType<GradleScriptConfigurationsSource>()
-            ?.updateDependenciesAndCreateModules(gradleScripts, storage)
+        GradleScriptRefinedConfigurationProvider.getInstance(project).processScripts(gradleScripts, storage)
+
+        val ktFiles = gradleScripts.mapNotNull {
+            readAction { PsiManager.getInstance(project).findFile(it.virtualFile) as? KtFile }
+        }.toTypedArray()
+
+        DefaultScriptResolutionStrategy.getInstance(project).execute(*ktFiles).join()
     }
 }

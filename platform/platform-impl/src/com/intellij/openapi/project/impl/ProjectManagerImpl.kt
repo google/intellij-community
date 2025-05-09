@@ -11,8 +11,12 @@ import com.intellij.diagnostic.ActivityCategory
 import com.intellij.diagnostic.PluginException
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector
+import com.intellij.featureStatistics.fusCollectors.WslUsagesCollector
 import com.intellij.ide.*
-import com.intellij.ide.impl.*
+import com.intellij.ide.impl.OpenProjectTask
+import com.intellij.ide.impl.ProjectNewWindowDoNotAskOption
+import com.intellij.ide.impl.ProjectUtil
+import com.intellij.ide.impl.runUnderModalProgressIfIsEdt
 import com.intellij.ide.lightEdit.LightEdit
 import com.intellij.ide.lightEdit.LightEditCompatible
 import com.intellij.ide.lightEdit.LightEditService
@@ -62,7 +66,7 @@ import com.intellij.openapi.vfs.impl.ZipHandler
 import com.intellij.openapi.vfs.impl.jar.TimedZipHandler
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.WindowManager
-import com.intellij.openapi.wm.impl.WindowManagerImpl
+import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.platform.PlatformProjectOpenProcessor
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.isLoadedFromCacheButHasNoModules
@@ -71,7 +75,7 @@ import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.project.ProjectEntitiesStorage
 import com.intellij.platform.workspace.jps.JpsMetrics
 import com.intellij.projectImport.ProjectAttachProcessor
-import com.intellij.serviceContainer.ComponentManagerImpl
+import com.intellij.serviceContainer.getComponentManagerImpl
 import com.intellij.ui.IdeUICustomization
 import com.intellij.util.ArrayUtil
 import com.intellij.util.ConcurrencyUtil
@@ -346,7 +350,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     }
     else if (!isProjectOpened(project) && !LightEdit.owns(project)) {
       if (dispose) {
-        if (project is ComponentManagerImpl) {
+        if (project is ComponentManagerEx) {
           project.stopServicePreloading()
         }
         app.runWriteAction {
@@ -364,8 +368,8 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
       return false
     }
 
-    if (project is ComponentManagerImpl) {
-      (project as ComponentManagerImpl).stopServicePreloading()
+    if (project is ComponentManagerEx) {
+      (project as ComponentManagerEx).stopServicePreloading()
     }
     closePublisher.projectClosingBeforeSave(project)
     publisher.projectClosingBeforeSave(project)
@@ -519,17 +523,12 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   final override fun createProject(name: String?, path: String): Project {
     @Suppress("DEPRECATION")
     return runUnderModalProgressIfIsEdt {
-      val file = toCanonicalName(path)
-      prepareNewProject(
-        file,
-        name,
-        beforeInit = null,
-        useDefaultProjectAsTemplate = true,
-        preloadServices = true,
-        markAsNew = false
-      ).also { project ->
-        TrustedProjects.setProjectTrusted(project, true)
-      }
+      newProjectAsync(toCanonicalName(path), OpenProjectTask {
+        projectName = name
+        beforeInit = null
+        useDefaultProjectAsTemplate = true
+        preloadServices = true
+      })
     }
   }
 
@@ -741,6 +740,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     blockingContext {
       LifecycleUsageTriggerCollector.onProjectOpened(project)
     }
+    WslUsagesCollector.logProjectOpened(project)
 
     options.callback?.projectOpened(project, module ?: ModuleManager.getInstance(project).modules.firstOrNull())
 
@@ -807,8 +807,9 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     }
   }
 
-  override suspend fun newProjectAsync(file: Path, options: OpenProjectTask): Project =
-    prepareNewProject(
+  override suspend fun newProjectAsync(file: Path, options: OpenProjectTask): Project {
+    TrustedProjects.setProjectTrusted(file, true)
+    return prepareNewProject(
       file,
       options.projectName,
       options.beforeInit,
@@ -818,6 +819,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     ).also { project ->
       TrustedProjects.setProjectTrusted(project, true)
     }
+  }
 
   protected open fun handleErrorOnNewProject(t: Throwable) {
     LOG.warn(t)
@@ -841,7 +843,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     val project = span("project instantiation") {
       ProjectImpl(filePath = projectStoreBaseDir,
                   projectName = projectName,
-                  parent = ApplicationManager.getApplication() as ComponentManagerImpl)
+                  parent = ApplicationManager.getApplication().getComponentManagerImpl())
     }
     beforeInit?.let { beforeInit ->
       span("options.beforeInit") {
@@ -859,7 +861,6 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     preloadServices: Boolean,
     markAsNew: Boolean = true,
   ): Project {
-    TrustedProjects.setProjectTrusted(projectStoreBaseDir, true)
     return coroutineScope {
       val templateAsync = if (useDefaultProjectAsTemplate) {
         async {
@@ -949,7 +950,9 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
         project = project,
         newProject = options.isProjectCreatedWithWizard,
       )
-      options.preparedToOpen?.invoke(module)
+      if (module != null) {
+        options.preparedToOpen?.invoke(module)
+      }
       return module
     }
     return null
@@ -1047,7 +1050,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     return withContext(Dispatchers.EDT) {
       try {
         writeIntentReadAction {
-          (WindowManager.getInstance() as WindowManagerImpl).withFrameReuseEnabled().use {
+          (WindowManager.getInstance() as WindowManagerEx).withFrameReuseEnabled().use {
             closeProject(project, checkCanClose = true)
           }
         }
@@ -1091,7 +1094,7 @@ fun CoroutineScope.runInitProjectActivities(project: Project) {
   }
 
   @Suppress("DEPRECATION")
-  val projectComponents = (project as ComponentManagerImpl)
+  val projectComponents = (project as ComponentManagerEx)
     .collectInitializedComponents(com.intellij.openapi.components.ProjectComponent::class.java)
   if (projectComponents.isEmpty()) {
     return
@@ -1150,7 +1153,7 @@ private fun fireProjectClosed(project: Project) {
   closePublisher.projectClosed(project)
   publisher.projectClosed(project)
   @Suppress("DEPRECATION")
-  val projectComponents = (project as ComponentManagerImpl)
+  val projectComponents = (project as ComponentManagerEx)
     .collectInitializedComponents(com.intellij.openapi.components.ProjectComponent::class.java)
 
   // see "why is called after message bus" in the fireProjectOpened

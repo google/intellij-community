@@ -860,6 +860,18 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
     checkHTMLOnly();
   }
 
+  // PY-77171
+  public void testImplicitResolve() {
+    checkHTMLOnly();
+  }
+
+  // PY-38169
+  public void testUnderscoreCollectionsAbcSymbolRealOrigin() {
+    runWithAdditionalFileInLibDir("_collections_abc.py", "class Mapping: ...", ignored -> {
+      checkHTMLOnly();
+    });
+  }
+
   @Override
   protected String getTestDataPath() {
     return super.getTestDataPath() + "/quickdoc/";

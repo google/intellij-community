@@ -9,9 +9,11 @@ import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.InvalidVirtualFileAccessException
 import com.intellij.openapi.vfs.VfsUtil
@@ -183,6 +185,7 @@ class IndexUpdateRunner(
         repeat(INDEXING_PARALLELIZATION) { workerNo ->
           launch {
             try {
+              var i = 0
               for (fileIndexingRequest in channel) {
                 while (fileSet.shouldPause()) { // TODO: get rid of legacy suspender
                   delay(1)
@@ -195,7 +198,10 @@ class IndexUpdateRunner(
                     processRequestTask(fileIndexingRequest)
                   }
 
-                yield()
+                i++
+                if (i % 10 == 0) {
+                  yield()
+                }
               }
             }
             //FIXME RC: for profiling, remove afterwards
@@ -265,7 +271,7 @@ class IndexUpdateRunner(
     private val fileBasedIndex: FileBasedIndexImpl,
     private val indexingRequest: IndexingRequestToken,
   ) {
-
+    private val doubleCheckFilesAreStillInProject = Registry.`is`("indexing.double.check.files.still.in.project", true)
     private val indexingAttemptCount = AtomicInteger()
     private val indexingSuccessfulCount = AtomicInteger()
 
@@ -282,6 +288,21 @@ class IndexUpdateRunner(
         //  here with an invalid file, but in a (badly isolated) tests it could happen
         LOG.warn("Invalid (alien?) file: #${(file as VirtualFileWithId).id}")
         return
+      }
+
+      if (doubleCheckFilesAreStillInProject && !fileIndexingRequest.isDeleteRequest) {
+        // WorkspaceFileIndex.getInstance(project).isInContent(file) does not contain libraries
+        // WorkspaceFileIndex.getInstance(project).isInWorkspace(file) does not contain files contributed via
+        //  indexing contributors (See com.intellij.flex.completion.ActionScriptCompletionTest.testSOE which indexes file
+        //  out/classes/production/intellij.flex/com/intellij/lang/javascript/flex/library/ECMAScript.js2)
+        // ProjectRootManager.isExcluded looks safe enough, but not exactly the same check as done by scanning.
+        val excluded = readAction { ProjectRootManager.getInstance(project).fileIndex.isExcluded(file) }
+        if (excluded) {
+          // respect user: only log file names in debug level
+          val fileDebugDetails = if (LOG.isDebugEnabled) file.name else ""
+          LOG.info("File has been excluded: $fileDebugDetails #${(file as VirtualFileWithId).id}")
+          return
+        }
       }
 
       // snapshot at the beginning: if file changes while being processed, we can detect this on the following scanning

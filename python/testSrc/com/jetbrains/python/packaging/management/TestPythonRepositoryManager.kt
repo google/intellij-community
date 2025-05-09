@@ -1,17 +1,17 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging.management
 
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.projectRoots.Sdk
 import com.jetbrains.python.packaging.PyPackageVersion
 import com.jetbrains.python.packaging.common.PythonPackageDetails
 import com.jetbrains.python.packaging.common.PythonPackageSpecification
-import com.jetbrains.python.packaging.repository.PyEmptyPackagePackageRepository
 import com.jetbrains.python.packaging.repository.PyPackageRepository
 import org.jetbrains.annotations.TestOnly
 
 @TestOnly
-class TestPythonRepositoryManager(project: Project, sdk: Sdk) : PythonRepositoryManager(project, sdk) {
+internal class TestPythonRepositoryManager(
+  override val project: Project,
+) : PythonRepositoryManager {
 
   private var packageNames: Set<String> = emptySet()
   private var packageDetails: PythonPackageDetails? = null
@@ -39,13 +39,9 @@ class TestPythonRepositoryManager(project: Project, sdk: Sdk) : PythonRepository
   }
 
   override val repositories: List<PyPackageRepository>
-    get() = listOf(PyEmptyPackagePackageRepository)
+    get() = listOf(TestPackageRepository(packageNames))
 
   override fun allPackages(): Set<String> {
-    return packageNames
-  }
-
-  override fun packagesFromRepository(repository: PyPackageRepository): Set<String> {
     return packageNames
   }
 
@@ -62,5 +58,11 @@ class TestPythonRepositoryManager(project: Project, sdk: Sdk) : PythonRepository
   }
 
   override suspend fun initCaches() {
+  }
+}
+
+internal class TestPackageRepository(private val packages: Set<String>): PyPackageRepository("test repository", null, null) {
+  override fun getPackages(): Set<String> {
+    return packages
   }
 }

@@ -8,10 +8,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.ObjectUtils;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Unmodifiable;
+import org.jetbrains.annotations.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,12 +32,14 @@ public abstract class NullableNotNullManager {
   /**
    * @return list of default non-container annotations that apply to the nullable element
    */
-  abstract @NotNull List<String> getDefaultNullables();
+  @ApiStatus.Internal
+  public abstract @NotNull List<String> getDefaultNullables();
 
   /**
    * @return list of default non-container annotations that apply to the not-null element
    */
-  abstract @NotNull List<String> getDefaultNotNulls();
+  @ApiStatus.Internal
+  public abstract @NotNull List<String> getDefaultNotNulls();
 
   public abstract @NotNull Optional<Nullability> getAnnotationNullability(String name);
 
@@ -208,11 +207,11 @@ public abstract class NullableNotNullManager {
   }
 
   /**
-   * @return an annotation (if any) with the given nullability semantics on the given declaration or its type. In case of conflicts,
+   * @return the annotation info (if any) with the given nullability semantics on the given declaration or its type. In case of conflicts,
    * type annotations are preferred.
    */
-  public @Nullable PsiAnnotation findExplicitNullabilityAnnotation(@NotNull PsiModifierListOwner owner,
-                                                                   @NotNull Collection<Nullability> nullabilities) {
+  public @Nullable NullabilityAnnotationInfo findNullabilityAnnotationInfo(@NotNull PsiModifierListOwner owner,
+                                                                           @NotNull Collection<Nullability> nullabilities) {
     NullabilityAnnotationDataHolder holder = getAllNullabilityAnnotationsWithNickNames();
     Set<String> filteredSet =
       holder.qualifiedNames().stream().filter(qName -> nullabilities.contains(holder.getNullability(qName))).collect(Collectors.toSet());
@@ -229,7 +228,7 @@ public abstract class NullableNotNullManager {
       }
     };
     NullabilityAnnotationInfo result = findPlainAnnotation(owner, false, filtered);
-    return result == null || !nullabilities.contains(result.getNullability()) ? null : result.getAnnotation();
+    return result == null || !nullabilities.contains(result.getNullability()) ? null : result;
   }
 
   private @Nullable NullabilityAnnotationInfo findPlainAnnotation(
@@ -276,11 +275,15 @@ public abstract class NullableNotNullManager {
     return nullability;
   }
 
-  protected @NotNull List<String> getNullablesWithNickNames() {
+  @ApiStatus.Internal
+  @NotNull
+  public List<String> getNullablesWithNickNames() {
     return getNullables();
   }
 
-  protected @NotNull List<String> getNotNullsWithNickNames() {
+  @ApiStatus.Internal
+  @NotNull
+  public List<String> getNotNullsWithNickNames() {
     return getNotNulls();
   }
 
@@ -365,9 +368,9 @@ public abstract class NullableNotNullManager {
     return null;
   }
 
-  abstract @Nullable NullabilityAnnotationInfo getNullityDefault(@NotNull PsiModifierListOwner container,
-                                                                 PsiAnnotation.TargetType @NotNull [] placeTargetTypes,
-                                                                 @NotNull PsiElement context, boolean superPackage);
+  protected abstract @Nullable NullabilityAnnotationInfo getNullityDefault(@NotNull PsiModifierListOwner container,
+                                                                           PsiAnnotation.TargetType @NotNull [] placeTargetTypes,
+                                                                           @NotNull PsiElement context, boolean superPackage);
 
   public abstract @NotNull List<String> getNullables();
 

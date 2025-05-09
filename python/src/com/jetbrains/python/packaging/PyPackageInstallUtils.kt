@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging
 
 import com.intellij.icons.AllIcons
@@ -14,7 +14,6 @@ import com.intellij.openapi.ui.popup.Balloon
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.Version
-import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.ui.JBUI
 import com.jetbrains.python.PyBundle
@@ -24,14 +23,21 @@ import com.jetbrains.python.inspections.quickfix.InstallPackageQuickFix
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.common.runPackagingOperationOrShowErrorDialog
 import com.jetbrains.python.packaging.management.PythonPackageManager
+import com.jetbrains.python.packaging.management.createSpecification
 import com.jetbrains.python.packaging.ui.PyChooseRequirementsDialog
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
 import com.jetbrains.python.statistics.PyPackagesUsageCollector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import javax.swing.JLabel
 import javax.swing.UIManager
 
+/**
+ * PyCharm doesn't provide any API for package management for external plugins.
+ * The closest thing is [PythonPackageManager], although it is also subject to change
+ */
+@ApiStatus.Internal
 object PyPackageInstallUtils {
   fun offeredPackageForNotFoundModule(project: Project, sdk: Sdk, moduleName: String): String? {
     val shouldToInstall = checkShouldToInstall(project, sdk, moduleName)
@@ -45,7 +51,7 @@ object PyPackageInstallUtils {
     return !checkIsInstalled(project, sdk, packageName) && checkExistsInRepository(packageName)
   }
 
-  private fun checkIsInstalled(project: Project, sdk: Sdk, packageName: String): Boolean {
+  fun checkIsInstalled(project: Project, sdk: Sdk, packageName: String): Boolean {
     val isStdLib = (PyStdlibUtil.getPackages() as Set<*>).contains(packageName)
     if (isStdLib) {
       return true
@@ -60,16 +66,13 @@ object PyPackageInstallUtils {
   }
 
 
-  suspend fun confirmAndInstall(project: Project, sdk: Sdk, packageName: String) {
+  suspend fun confirmAndInstall(project: Project, sdk: Sdk, packageName: String, versionSpec: String? = null) {
     val isConfirmed = withContext(Dispatchers.EDT) {
       confirmInstall(project, packageName)
     }
     if (!isConfirmed)
       return
-    val result = withBackgroundProgress(project = project, PyBundle.message("python.packaging.installing.package", packageName),
-                                        cancellable = true) {
-      installPackage(project, sdk, packageName)
-    }
+    val result = installPackage(project, sdk, packageName, true, versionSpec = versionSpec)
     result.getOrThrow()
   }
 
@@ -99,22 +102,37 @@ object PyPackageInstallUtils {
     return pythonPackageManager.updatePackage(packageSpecification)
   }
 
-  suspend fun initPackages(project: Project, sdk: Sdk) {
-    val pythonPackageManager = getPackageManagerOrNull(project, sdk)
-    if (pythonPackageManager?.installedPackages.isNullOrEmpty()) {
-      withContext(Dispatchers.IO) {
-        pythonPackageManager?.reloadPackages()
+  suspend fun installPackage(
+    project: Project,
+    sdk: Sdk,
+    packageName: String,
+    withBackgroundProgress: Boolean,
+    versionSpec: String? = null,
+    options: List<String> = emptyList(),
+  ): Result<List<PythonPackage>> {
+    return try {
+      val pythonPackageManager = runCatching {
+        PythonPackageManager.forSdk(project, sdk)
+      }.getOrElse {
+        return Result.failure(it)
       }
+
+      val spec = withContext(Dispatchers.IO) {
+        pythonPackageManager.repositoryManager.createSpecification(packageName, versionSpec)
+      } ?: return Result.failure(Exception("Package $packageName not found in any repository"))
+
+      return if (withBackgroundProgress) {
+        pythonPackageManager.installPackage(spec, options, withBackgroundProgress = true)
+      }
+      else {
+        pythonPackageManager.installPackage(spec, options, withBackgroundProgress)
+      }
+    }
+    catch (t: Throwable) {
+      Result.failure(t)
     }
   }
 
-  suspend fun installPackage(project: Project, sdk: Sdk, packageName: String, version: String? = null): Result<List<PythonPackage>> {
-    val pythonPackageManager = getPackageManagerOrNull(project, sdk)
-    val packageSpecification = pythonPackageManager?.repositoryManager?.repositories?.firstOrNull()?.createPackageSpecification(packageName, version)
-                               ?: return Result.failure(Exception("Could not find any repositories"))
-
-    return pythonPackageManager.installPackage(packageSpecification, emptyList())
-  }
 
   /**
    * NOTE calling this functions REQUIRED init package list before the calling!
@@ -144,14 +162,13 @@ object PyPackageInstallUtils {
   }
 
 
-
-  fun invokeInstallPackage(project: Project, pythonSdk: Sdk, packageName: String, point: RelativePoint) {
+  fun invokeInstallPackage(project: Project, pythonSdk: Sdk, packageName: String, point: RelativePoint, versionSpec: String? = null) {
     PyPackageCoroutine.launch(project) {
       runPackagingOperationOrShowErrorDialog(pythonSdk, PyBundle.message("python.new.project.install.failed.title", packageName),
                                              packageName) {
         val loadBalloon = showBalloon(point, PyBundle.message("python.packaging.installing.package", packageName), BalloonStyle.INFO)
         try {
-          confirmAndInstall(project, pythonSdk, packageName)
+          confirmAndInstall(project, pythonSdk, packageName, versionSpec = versionSpec)
           loadBalloon.hide()
           PyPackagesUsageCollector.installPackageFromConsole.log(project)
           showBalloon(point, PyBundle.message("python.packaging.notification.description.installed.packages", packageName), BalloonStyle.SUCCESS)
@@ -172,7 +189,8 @@ object PyPackageInstallUtils {
     sdk: Sdk,
   ): PythonPackageManager? = try {
     PythonPackageManager.forSdk(project, sdk)
-  } catch (_: Throwable) {
+  }
+  catch (_: Throwable) {
     null
   }
 

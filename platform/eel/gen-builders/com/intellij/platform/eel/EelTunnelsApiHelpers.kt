@@ -5,7 +5,9 @@
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.*
+import com.intellij.platform.eel.EelExecApi.*
 import com.intellij.platform.eel.EelTunnelsApi.Connection
+import com.intellij.platform.eel.EelTunnelsApi.GetAcceptorForRemotePort
 import kotlinx.coroutines.channels.SendChannel
 import org.jetbrains.annotations.CheckReturnValue
 import kotlin.time.Duration
@@ -62,6 +64,8 @@ fun EelTunnelsApi.getAcceptorForRemotePort(): EelTunnelsApiHelpers.GetAcceptorFo
  * Note, that [Connection.receiveChannel] is __not__ closed in this case.
  *
  * One should not forget to invoke [Connection.close] when the connection is not needed.
+ *
+ * To configure a socket before connection use [configureSocketBeforeConnection]. After that, use [Connection.configureSocket]
  */
 @GeneratedBuilder.Result
 fun EelTunnelsApi.getConnectionToRemotePort(): EelTunnelsApiHelpers.GetConnectionToRemotePort =
@@ -77,6 +81,8 @@ object EelTunnelsApiHelpers {
   class GetAcceptorForRemotePort(
     private val owner: EelTunnelsApi,
   ) : OwnedBuilder<EelResult<EelTunnelsApi.ConnectionAcceptor, EelConnectionError>> {
+    private var configureServerSocket: Function1<ConfigurableSocket, Unit> = {}
+
     private var hostname: String = "localhost"
 
     private var port: UShort = 0u
@@ -84,6 +90,10 @@ object EelTunnelsApiHelpers {
     private var protocolPreference: EelIpPreference = EelIpPreference.USE_SYSTEM_DEFAULT
 
     private var timeout: Duration = 10.seconds
+
+    fun configureServerSocket(arg: Function1<ConfigurableSocket, Unit>): GetAcceptorForRemotePort = apply {
+      this.configureServerSocket = arg
+    }
 
     fun hostname(arg: String): GetAcceptorForRemotePort = apply {
       this.hostname = arg
@@ -118,12 +128,13 @@ object EelTunnelsApiHelpers {
 
     /**
      * Complete the builder and call [com.intellij.platform.eel.EelTunnelsApi.getAcceptorForRemotePort]
-     * with an instance of [com.intellij.platform.eel.EelTunnelsApi.HostAddress].
+     * with an instance of [com.intellij.platform.eel.EelTunnelsApi.GetAcceptorForRemotePort].
      */
     @org.jetbrains.annotations.CheckReturnValue
     override suspend fun eelIt(): EelResult<EelTunnelsApi.ConnectionAcceptor, EelConnectionError> =
       owner.getAcceptorForRemotePort(
-        HostAddressImpl(
+        GetAcceptorForRemotePortImpl(
+          configureServerSocket = configureServerSocket,
           hostname = hostname,
           port = port,
           protocolPreference = protocolPreference,
@@ -139,6 +150,8 @@ object EelTunnelsApiHelpers {
   class GetConnectionToRemotePort(
     private val owner: EelTunnelsApi,
   ) : OwnedBuilder<EelResult<Connection, EelConnectionError>> {
+    private var configureSocketBeforeConnection: Function1<ConfigurableClientSocket, Unit> = {}
+
     private var hostname: String = "localhost"
 
     private var port: UShort = 0u
@@ -146,6 +159,10 @@ object EelTunnelsApiHelpers {
     private var protocolPreference: EelIpPreference = EelIpPreference.USE_SYSTEM_DEFAULT
 
     private var timeout: Duration = 10.seconds
+
+    fun configureSocketBeforeConnection(arg: Function1<ConfigurableClientSocket, Unit>): GetConnectionToRemotePort = apply {
+      this.configureSocketBeforeConnection = arg
+    }
 
     fun hostname(arg: String): GetConnectionToRemotePort = apply {
       this.hostname = arg
@@ -180,12 +197,13 @@ object EelTunnelsApiHelpers {
 
     /**
      * Complete the builder and call [com.intellij.platform.eel.EelTunnelsApi.getConnectionToRemotePort]
-     * with an instance of [com.intellij.platform.eel.EelTunnelsApi.HostAddress].
+     * with an instance of [com.intellij.platform.eel.EelTunnelsApi.GetConnectionToRemotePortArgs].
      */
     @org.jetbrains.annotations.CheckReturnValue
     override suspend fun eelIt(): EelResult<Connection, EelConnectionError> =
       owner.getConnectionToRemotePort(
-        HostAddressImpl(
+        GetConnectionToRemotePortArgsImpl(
+          configureSocketBeforeConnection = configureSocketBeforeConnection,
           hostname = hostname,
           port = port,
           protocolPreference = protocolPreference,

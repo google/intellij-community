@@ -62,6 +62,7 @@
     <virtualFileSystem key="ghpr" implementationClass="org.jetbrains.plugins.github.pullrequest.GHPRVirtualFileSystem"/>
     <fileIconProvider implementation="org.jetbrains.plugins.github.pullrequest.GHPRVirtualFileIconProvider" order="first"/>
     <fileEditorProvider implementation="org.jetbrains.plugins.github.pullrequest.GHPREditorProvider"/>
+    <editorTabTitleProvider implementation="org.jetbrains.plugins.github.pullrequest.GHPRDiffVirtualFile$TitleProvider"/>
 
     <toolWindow id="Pull Requests" icon="org.jetbrains.plugins.github.GithubIcons.PullRequestsToolWindow"
                 anchor="left" doNotActivateOnStart="true" canCloseContents="true"
@@ -78,6 +79,9 @@
                  description="Milliseconds margin used when comparing known last seen date with last updated at date for PRs"
                  key="github.last.seen.state.margin.millis"/>
 
+    <registryKey defaultValue="true"
+                 description="Whether to check that the PR list is up-to-date using ETags"
+                 key="github.pr.list.automatic.refresh.seconds"/>
     <registryKey defaultValue="30"
                  description="Seconds between checking the ETag for the PR list"
                  key="github.pr.list.automatic.refresh.seconds"/>

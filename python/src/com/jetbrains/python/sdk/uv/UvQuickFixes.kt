@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk.uv
 
 import com.intellij.codeInspection.LocalQuickFix
@@ -11,21 +11,22 @@ import com.jetbrains.python.inspections.requirement.RunningPackagingTasksListene
 import com.jetbrains.python.packaging.PyPackageManagerUI
 import com.jetbrains.python.sdk.pythonSdk
 import com.jetbrains.python.sdk.setAssociationToModule
+import com.jetbrains.python.ui.pyModalBlocking
 
 internal class UvAssociationQuickFix : LocalQuickFix {
   private val quickFixName = PyBundle.message("python.sdk.quickfix.use.uv.name")
 
   override fun getFamilyName() = quickFixName
 
-  override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
+  override fun applyFix(project: Project, descriptor: ProblemDescriptor): Unit = pyModalBlocking {
     val element = descriptor.psiElement
     if (element == null) {
-      return
+      return@pyModalBlocking
     }
 
     val module = ModuleUtilCore.findModuleForPsiElement(element)
     if (module == null) {
-      return
+      return@pyModalBlocking
     }
 
     module.pythonSdk?.setAssociationToModule(module)

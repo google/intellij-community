@@ -22,9 +22,18 @@ public class ClassCanBeRecordInspectionTest extends LightQuickFixParameterizedTe
   protected String getBasePath() {
     return "/inspection/classCanBeRecord";
   }
-  
-   @Override
+
+  @Override
   public void runSingle() throws Throwable {
-    BaseRefactoringProcessor.ConflictsInTestsException.withIgnoredConflicts(() -> super.runSingle());
+    try {
+      super.runSingle();
+    }
+    catch (BaseRefactoringProcessor.ConflictsInTestsException e) {
+      // Verify that no content was changed. See IDEA-371645.
+      checkResultByFile(getTestName(false) + ".java", getBasePath() + "/before" + getTestName(false), false);
+    }
+
+
+    BaseRefactoringProcessor.ConflictsInTestsException.withIgnoredConflicts(super::runSingle);
   }
 }

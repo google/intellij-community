@@ -48,7 +48,7 @@ interface FeedbackSurveyConfig {
   fun checkIdeIsSuitable(): Boolean
 
   /**
-   * Checks whether the extra conditions for showing the survey are satisfied.
+   * Checks whether the extra conditions for showing the survey notification are satisfied.
    *
    * Usually needed when you want to show a survey only to users who have already used some feature.
    * Or when you want to show a survey only to users of a particular version of the IDE.

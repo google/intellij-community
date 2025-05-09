@@ -13,6 +13,7 @@ module fleet.util.core {
 
   requires kotlin.stdlib;
   requires kotlinx.coroutines.core;
+  requires java.management;
   requires transitive kotlinx.collections.immutable.jvm;
   requires transitive fleet.util.logging.api;
   requires transitive fleet.fastutil;
@@ -22,6 +23,6 @@ module fleet.util.core {
   requires fleet.reporting.shared;
   requires kotlinx.datetime;
   requires fleet.reporting.api;
-  requires fleet.util.multiplatform;
+  requires static fleet.util.multiplatform;
   requires kotlin.codepoints.jvm;
 }

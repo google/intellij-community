@@ -258,7 +258,7 @@ class MavenCompilerConfigurator : MavenApplicableConfigurator(GROUP_ID, ARTIFACT
   }
 
   private fun collectCompilerArgs(module: Module, mavenProject: MavenProject, configData: MavenCompilerConfigurationRawData): List<String> {
-    val result = LinkedHashSet<String>()
+    val result = mutableListOf<String>()
     configData.propertyCompilerParameters?.let {
       if (it.toBoolean()) {
         result.add("-parameters")
@@ -311,12 +311,13 @@ class MavenCompilerConfigurator : MavenApplicableConfigurator(GROUP_ID, ARTIFACT
         }
       }
     }
-    MavenJDOMUtil.findChildrenValuesByPath(element, "compilerArgs", "arg").forEach {
-      val text = getResolvedText(it)
+    element.getChild("compilerArgs")?.children?.forEach {
+      val text = getResolvedText(it.text)
       if (text != null && !hasUnresolvedProperty(text)) {
         result.add(text)
       }
     }
+
     element.getChild("compilerArgument")?.textTrim?.let {
       val text = getResolvedText(it)
       if (text != null && !hasUnresolvedProperty(text)) {

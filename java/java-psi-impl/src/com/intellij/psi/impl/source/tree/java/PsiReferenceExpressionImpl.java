@@ -1,6 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source.tree.java;
 
+import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -64,10 +65,6 @@ public class PsiReferenceExpressionImpl extends ExpressionPsiElement implements 
 
     if (getQualifierExpression() != null) {
       throw new IncorrectOperationException("Reference is qualified: "+getText());
-    }
-    if (!isPhysical()) {
-      // don't qualify reference: the isReferenceTo() check fails anyway, whether we have a static import for this member or not
-      return this;
     }
     String staticName = getReferenceName();
     PsiFile containingFile = getContainingFile();
@@ -637,7 +634,7 @@ public class PsiReferenceExpressionImpl extends ExpressionPsiElement implements 
       throw new IncorrectOperationException();
     }
     String oldRefName = oldIdentifier.getText();
-    if (PsiKeyword.THIS.equals(oldRefName) || PsiKeyword.SUPER.equals(oldRefName) || newElementName.equals(oldRefName)) return this;
+    if (JavaKeywords.THIS.equals(oldRefName) || JavaKeywords.SUPER.equals(oldRefName) || newElementName.equals(oldRefName)) return this;
     PsiIdentifier identifier = JavaPsiFacade.getElementFactory(getProject()).createIdentifier(newElementName);
     oldIdentifier.replace(identifier);
     return this;

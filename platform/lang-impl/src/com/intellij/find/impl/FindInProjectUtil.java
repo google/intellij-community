@@ -25,7 +25,7 @@ import com.intellij.openapi.progress.ProgressIndicatorProvider;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.util.ProgressWrapper;
 import com.intellij.openapi.progress.util.TooManyUsagesStatus;
-import com.intellij.openapi.project.DumbServiceImpl;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.LibraryOrderEntry;
@@ -87,7 +87,7 @@ public final class FindInProjectUtil {
       if (session != null) editor = session.getEditor();
     }
     PsiElement psiElement = null;
-    if (project != null && editor == null && !DumbServiceImpl.getInstance(project).isDumb()) {
+    if (project != null && editor == null && !DumbService.getInstance(project).isDumb()) {
       try {
         psiElement = CommonDataKeys.PSI_ELEMENT.getData(dataContext);
       }
@@ -480,7 +480,7 @@ public final class FindInProjectUtil {
     }
   }
 
-  public static class StringUsageTarget implements ConfigurableUsageTarget, ItemPresentation, DataProvider {
+  public static class StringUsageTarget implements ConfigurableUsageTarget, ItemPresentation, UiDataProvider {
     protected final @NotNull Project myProject;
     protected final @NotNull FindModel myFindModel;
 
@@ -539,18 +539,10 @@ public final class FindInProjectUtil {
     }
 
     @Override
-    public @Nullable Object getData(@NotNull String dataId) {
-      if (PlatformCoreDataKeys.BGT_DATA_PROVIDER.is(dataId)) {
-        return (DataProvider)slowId -> getSlowData(slowId);
-      }
-      return null;
-    }
-
-    private @Nullable Object getSlowData(@NotNull String dataId) {
-      if (UsageView.USAGE_SCOPE.is(dataId)) {
+    public void uiDataSnapshot(@NotNull DataSink sink) {
+      sink.lazy(UsageView.USAGE_SCOPE, () -> {
         return getScopeFromModel(myProject, myFindModel);
-      }
-      return null;
+      });
     }
   }
 

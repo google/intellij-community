@@ -12,6 +12,7 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.psi.codeStyle.MinusculeMatcher
+import com.intellij.ui.SimpleTextAttributes
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
@@ -26,7 +27,19 @@ sealed interface SeItemPresentation {
 
 @ApiStatus.Internal
 @Serializable
-class SeTextItemPresentation(override val text: @Nls String) : SeItemPresentation
+class SeSimpleItemPresentation(
+  val iconId: IconId? = null,
+  val textChunk: SerializableTextChunk? = null,
+  val selectedTextChunk: SerializableTextChunk? = null,
+  val description: @NlsSafe String? = null) : SeItemPresentation {
+    override val text: @Nls String get() = textChunk?.text ?: ""
+
+  constructor(iconId: IconId? = null, text: @NlsSafe String? = null, description: @NlsSafe String? = null) : this(
+    iconId,
+    text?.let { SerializableTextChunk(it, null, 0) },
+    null,
+    description)
+  }
 
 @ApiStatus.Internal
 sealed interface SeActionItemPresentation : SeItemPresentation {
@@ -36,9 +49,14 @@ sealed interface SeActionItemPresentation : SeItemPresentation {
   @Serializable
   data class Common(
     val text: @Nls String,
-    val switcherState: Boolean? = null,
     val location: @Nls String? = null,
-  )
+    private var _switcherState: Boolean? = null,
+  ) {
+    val switcherState: Boolean? get() = _switcherState
+    fun toggleStateIfSwitcher() {
+      _switcherState = _switcherState?.not()
+    }
+  }
 }
 
 @ApiStatus.Internal
@@ -80,6 +98,7 @@ class SeTargetItemPresentation(
   private val iconId: IconId?,
   val presentableText: @Nls String,
   val presentableTextMatchedRanges: List<SerializableRange>?,
+  private val presentableTextFgColorId: ColorId?,
   val containerText: @Nls String?,
   val containerTextMatchedRanges: List<SerializableRange>?,
   val locationText: @Nls String?,
@@ -90,6 +109,7 @@ class SeTargetItemPresentation(
   val backgroundColor: Color? get() = backgroundColorId?.color()
   val icon: Icon? get() = iconId?.icon()
   val locationIcon: Icon? get() = locationIconId?.icon()
+  val presentableTextFgColor: Color? get() = presentableTextFgColorId?.color()
 
   @Serializable
   data class SerializableRange(val start: Int, val end: Int) {
@@ -104,6 +124,7 @@ class SeTargetItemPresentation(
                                iconId = tp.icon?.rpcId(),
                                presentableText = tp.presentableText,
                                presentableTextMatchedRanges = matchers?.calcMatchedRanges(tp.presentableText),
+                               presentableTextFgColorId = tp.presentableTextAttributes?.foregroundColor?.rpcId(),
                                containerText = tp.containerText,
                                containerTextMatchedRanges = matchers?.calcMatchedRanges(tp.containerText),
                                locationText = tp.locationText,
@@ -114,4 +135,23 @@ class SeTargetItemPresentation(
       return (nameMatcher as? MinusculeMatcher)?.matchingFragments(text)?.map { SerializableRange(it) }
     }
   }
+}
+
+@ApiStatus.Internal
+@Serializable
+class SeTextSearchItemPresentation(
+  override val text: @NlsSafe String,
+  val textChunks: List<SerializableTextChunk>,
+  private val backgroundColorId: ColorId?,
+  val fileString: @NlsSafe String,
+) : SeItemPresentation {
+  val backgroundColor: Color? get() = backgroundColorId?.color()
+}
+
+@ApiStatus.Internal
+@Serializable
+class SerializableTextChunk(val text: @NlsSafe String, val foregroundColorId: ColorId?, val fontType: Int) {
+  @Suppress("USELESS_CAST")
+  constructor(text: @NlsSafe String, attributes: SimpleTextAttributes) :
+    this(text, (attributes.fgColor as? Color)?.rpcId(), attributes.fontStyle)
 }

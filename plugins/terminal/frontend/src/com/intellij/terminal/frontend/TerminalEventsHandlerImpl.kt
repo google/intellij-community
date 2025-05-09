@@ -2,16 +2,19 @@
 package com.intellij.terminal.frontend
 
 import com.google.common.base.Ascii
+import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.codeInsight.lookup.impl.LookupTypedHandler
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.psi.util.PsiUtilBase
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.intellij.terminal.session.TerminalState
 import com.jediterm.terminal.emulator.mouse.MouseButtonCodes
 import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags
 import com.jediterm.terminal.emulator.mouse.MouseFormat
 import com.jediterm.terminal.emulator.mouse.MouseMode
-import org.jetbrains.plugins.terminal.block.output.TerminalEventsHandler
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
+import org.jetbrains.plugins.terminal.block.reworked.TerminalUsageLocalStorage
 import java.awt.Point
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -40,20 +43,21 @@ internal open class TerminalEventsHandlerImpl(
   private val terminalState: TerminalState
     get() = sessionModel.terminalState.value
 
-  override fun keyTyped(e: KeyEvent) {
+  override fun keyTyped(e: TimedKeyEvent) {
+    updatePopUpCompletion(e.original.keyChar)
     val selectionModel = editor.selectionModel
     if (selectionModel.hasSelection()) {
       selectionModel.removeSelection()
     }
 
     if (ignoreNextKeyTypedEvent) {
-      e.consume()
+      e.original.consume()
       return
     }
-    if (!Character.isISOControl(e.keyChar)) { // keys filtered out here will be processed in processTerminalKeyPressed
+    if (!Character.isISOControl(e.original.keyChar)) { // keys filtered out here will be processed in processTerminalKeyPressed
       try {
         if (processCharacter(e)) {
-          e.consume()
+          e.original.consume()
         }
       }
       catch (ex: Exception) {
@@ -62,18 +66,18 @@ internal open class TerminalEventsHandlerImpl(
     }
   }
 
-  override fun keyPressed(e: KeyEvent) {
+  override fun keyPressed(e: TimedKeyEvent) {
     ignoreNextKeyTypedEvent = false
     if (processTerminalKeyPressed(e)) {
-      e.consume()
+      e.original.consume()
       ignoreNextKeyTypedEvent = true
     }
   }
 
-  private fun processTerminalKeyPressed(e: KeyEvent): Boolean {
+  private fun processTerminalKeyPressed(e: TimedKeyEvent): Boolean {
     try {
-      val keyCode = e.keyCode
-      val keyChar = e.keyChar
+      val keyCode = e.original.keyCode
+      val keyChar = e.original.keyChar
 
       // numLock does not change the code sent by keypad VK_DELETE,
       // although it send the char '.'
@@ -82,23 +86,26 @@ internal open class TerminalEventsHandlerImpl(
         return true
       }
       // CTRL + Space is not handled in KeyEvent; handle it manually
-      if (keyChar == ' ' && e.modifiersEx and InputEvent.CTRL_DOWN_MASK != 0) {
+      if (keyChar == ' ' && e.original.modifiersEx and InputEvent.CTRL_DOWN_MASK != 0) {
         terminalInput.sendBytes(byteArrayOf(Ascii.NUL))
         return true
       }
-      val code = encodingManager.getCode(keyCode, e.modifiers)
+      val code = encodingManager.getCode(keyCode, e.original.modifiers)
       if (code != null) {
         terminalInput.sendBytes(code)
         if (isCodeThatScrolls(keyCode)) {
           scrollingModel?.scrollToCursor(force = true)
         }
+        if (keyCode == KeyEvent.VK_ENTER) {
+          TerminalUsageLocalStorage.getInstance().recordEnterKeyPressed()
+        }
         return true
       }
-      if (isAltPressedOnly(e) && Character.isDefined(keyChar) && settings.altSendsEscape()) {
+      if (isAltPressedOnly(e.original) && Character.isDefined(keyChar) && settings.altSendsEscape()) {
         // Cannot use e.getKeyChar() on macOS:
         //  Option+f produces e.getKeyChar()='ƒ' (402), but 'f' (102) is needed.
         //  Option+b produces e.getKeyChar()='∫' (8747), but 'b' (98) is needed.
-        val string = String(charArrayOf(Ascii.ESC.toInt().toChar(), simpleMapKeyCodeToChar(e)))
+        val string = String(charArrayOf(Ascii.ESC.toInt().toChar(), simpleMapKeyCodeToChar(e.original)))
         terminalInput.sendString(string)
         return true
       }
@@ -112,16 +119,19 @@ internal open class TerminalEventsHandlerImpl(
     return false
   }
 
-  private fun processCharacter(e: KeyEvent): Boolean {
-    if (isAltPressedOnly(e) && settings.altSendsEscape()) {
+  private fun processCharacter(e: TimedKeyEvent): Boolean {
+    if (isAltPressedOnly(e.original) && settings.altSendsEscape()) {
       return false
     }
-    val keyChar = e.keyChar
-    if (keyChar == '`' && e.modifiersEx and InputEvent.META_DOWN_MASK != 0) {
+    val keyChar = e.original.keyChar
+    if (keyChar == '`' && e.original.modifiersEx and InputEvent.META_DOWN_MASK != 0) {
       // Command + backtick is a short-cut on Mac OSX, so we shouldn't type anything
       return false
     }
-    terminalInput.sendString(keyChar.toString())
+    if (e.original.id == KeyEvent.KEY_TYPED) {
+      terminalInput.sendTrackedString(keyChar.toString(), eventTime = e.initTime)
+    }
+    else terminalInput.sendString(keyChar.toString())
 
     scrollingModel?.scrollToCursor(force = true)
 
@@ -227,7 +237,7 @@ internal open class TerminalEventsHandlerImpl(
       // mousePressed() handles mouse wheel using SCROLLDOWN and SCROLLUP buttons
       mousePressed(x, y, event)
     }
-    if (terminalState.isAlternateScreenBuffer && settings.sendArrowKeysInAlternativeMode()) {
+    else if (terminalState.isAlternateScreenBuffer && settings.sendArrowKeysInAlternativeMode()) {
       //Send Arrow keys instead
       val arrowKeys = if (event.wheelRotation < 0) {
         encodingManager.getCode(KeyEvent.VK_UP, 0)
@@ -310,6 +320,21 @@ internal open class TerminalEventsHandlerImpl(
     }
     LOG.debug(mouseFormat.toString() + " (" + charset + ") report : " + button + ", " + x + "x" + y + " = " + command)
     return command.toByteArray(Charset.forName(charset))
+  }
+
+  private fun updatePopUpCompletion(charTyped: Char) {
+    val project = editor.project ?: return
+    val lookup = LookupManager.getActiveLookup(editor)
+    if (lookup != null) {
+      val psiFile = PsiUtilBase.getPsiFileInEditor(editor, project)
+      LookupTypedHandler.beforeCharTyped(
+        charTyped,
+        project,
+        editor,
+        editor,
+        psiFile
+      )
+    }
   }
 
   companion object {

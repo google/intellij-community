@@ -24,6 +24,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/util",
     "//platform/util/jdom",
     "//platform/extensions",
@@ -34,7 +35,6 @@ jvm_library(
     "//platform/vcs-api:vcs",
     "//xml/dom-openapi:dom",
     "//platform/refactoring",
-    "//resources-en:java-resources-en",
     "//java/java-psi-api:psi",
     "//java/java-indexing-api:indexing",
     "//java/java-analysis-api:analysis",
@@ -51,7 +51,6 @@ jvm_library(
     "//platform/extensions",
     "//xml/openapi:xml",
     "//platform/lang-api:lang",
-    "//resources-en:java-resources-en",
     "//java/java-psi-api:psi",
     "//java/java-indexing-api:indexing",
     "//java/java-analysis-api:analysis",

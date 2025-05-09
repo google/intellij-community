@@ -14,9 +14,11 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "//plugins/evaluation-plugin/languages:evaluationPlugin-languages",
-    "//plugins/evaluation-plugin/core:evaluationPlugin-core",
+    "//plugins/evaluation-plugin/languages",
+    "//plugins/evaluation-plugin/core",
     "//plugins/completion-ml-ranking:completionMlRanking",
+    "//libraries/ktor-client",
+    "//platform/editor-ui-api:editor-ui",
     "//plugins/stats-collector:statsCollector",
     "//platform/ide-core-impl",
     "//platform/platform-impl:ide-impl",
@@ -32,8 +34,7 @@ jvm_library(
     "//platform/warmup",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:jetbrains-annotations",
-    "@lib//:ktor-client-core",
-    "@lib//:ktor-client-java",
+    "@lib//:ktor-client-logging",
   ],
   runtime_deps = [":evaluationPlugin_resources"]
 )
@@ -41,23 +42,30 @@ jvm_library(
 
 ### auto-generated section `build intellij.evaluationPlugin.tests` start
 load("@rules_java//java:defs.bzl", "java_library")
-load("@rules_jvm//:jvm.bzl", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-jvm_test(
-  name = "evaluationPlugin-tests_test",
+jvm_library(
+  name = "evaluationPlugin-tests_test_lib",
+  visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "//plugins/evaluation-plugin/core:evaluationPlugin-core",
+    "//plugins/evaluation-plugin/core",
     "//plugins/evaluation-plugin:evaluationPlugin",
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl:ide-impl_test_lib",
     "@lib//:mockito",
     "@lib//:junit5",
     "@lib//:gson",
-    "//plugins/evaluation-plugin/languages:evaluationPlugin-languages",
+    "//plugins/evaluation-plugin/languages",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
+    "//plugins/evaluation-plugin/languages/python",
   ]
+)
+
+jvm_test(
+  name = "evaluationPlugin-tests_test",
+  runtime_deps = [":evaluationPlugin-tests_test_lib"]
 )
 ### auto-generated section `build intellij.evaluationPlugin.tests` end

@@ -11,6 +11,7 @@ jvm_library(
     "//java/java-analysis-impl:analysis-impl",
     "@lib//:stream_ex",
     "//java/java-impl:impl",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
     "@lib//:fastutil-min",
     "//platform/ide-core-impl",
@@ -22,8 +23,9 @@ jvm_library(
     "//platform/backend/workspace",
     "//platform/core-ui",
     "//platform/util/text-matching",
-    "//java/codeserver/highlighting:java-codeserver-highlighting",
-    "//java/codeserver/core:java-codeserver-core",
+    "//java/codeserver/highlighting",
+    "//java/codeserver/core",
+    "//java/java-syntax:syntax",
   ]
 )
 ### auto-generated section `build intellij.java.impl.inspections` end

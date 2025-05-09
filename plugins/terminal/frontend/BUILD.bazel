@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
     "//platform/core-impl",
     "//plugins/terminal",
@@ -29,7 +30,8 @@ jvm_library(
     "//platform/statistics",
     "//platform/indexing-api:indexing",
     "//platform/lang-impl",
-    "//platform/platform-impl/ui:ide-ui",
+    "//platform/platform-impl/ui",
+    "//platform/feedback",
   ],
   runtime_deps = [":frontend_resources"]
 )
@@ -40,6 +42,7 @@ jvm_library(
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   associates = [":frontend"],
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/core-impl",
@@ -59,7 +62,8 @@ jvm_library(
     "//platform/statistics:statistics_test_lib",
     "//platform/indexing-api:indexing",
     "//platform/lang-impl",
-    "//platform/platform-impl/ui:ide-ui",
+    "//platform/platform-impl/ui",
+    "//platform/feedback",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
   ],

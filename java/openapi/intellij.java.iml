@@ -9,6 +9,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="intellij.platform.editor.ui" />
     <orderEntry type="module" module-name="intellij.platform.util" exported="" />
     <orderEntry type="module" module-name="intellij.platform.util.jdom" />
     <orderEntry type="module" module-name="intellij.java.guiForms.rt" scope="PROVIDED" />
@@ -20,7 +21,6 @@
     <orderEntry type="module" module-name="intellij.platform.vcs" />
     <orderEntry type="module" module-name="intellij.xml.dom" />
     <orderEntry type="module" module-name="intellij.platform.refactoring" />
-    <orderEntry type="module" module-name="intellij.java.resources.en" exported="" />
     <orderEntry type="module" module-name="intellij.java.psi" exported="" />
     <orderEntry type="module" module-name="intellij.java.indexing" exported="" />
     <orderEntry type="module" module-name="intellij.java.analysis" exported="" />

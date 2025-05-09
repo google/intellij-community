@@ -75,7 +75,7 @@ def _write_launcher_action(ctx, rjars, main_class, jvm_flags):
     return []
 
 def _jvm_test(ctx):
-    providers = kt_jvm_produce_jar_actions(ctx, "kt_jvm_test")
+    providers = kt_jvm_produce_jar_actions(ctx, True)
     runtime_jars = depset(ctx.files._bazel_test_runner, transitive = [providers.java.transitive_runtime_jars])
 
     #     coverage_runfiles = []
@@ -162,6 +162,11 @@ Setup a simple kotlin_test.
         ),
         "_lcov_merger": attr.label(
             default = Label("@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main"),
+        ),
+        "_java_stub_template": attr.label(
+            cfg = "exec",
+            default = Label("@bazel_tools//tools/java:java_stub_template.txt"),
+            allow_single_file = True,
         ),
     }),
     executable = True,

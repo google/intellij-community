@@ -21,6 +21,7 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.python.community.impl.installer.CondaInstallManager
+import com.intellij.python.community.services.shared.PythonWithLanguageLevel
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleColoredComponent
@@ -33,6 +34,7 @@ import com.intellij.ui.dsl.builder.components.ValidationType
 import com.intellij.ui.dsl.builder.components.validationTooltip
 import com.intellij.ui.util.preferredHeight
 import com.intellij.util.SystemProperties
+import com.intellij.util.ui.JBUI
 import com.jetbrains.python.PyBundle.message
 import com.jetbrains.python.errorProcessing.ErrorSink
 import com.jetbrains.python.psi.icons.PythonPsiApiIcons
@@ -46,6 +48,7 @@ import com.jetbrains.python.sdk.flavors.conda.PyCondaEnvIdentity
 import com.jetbrains.python.util.ShowingMessageErrorSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -65,6 +68,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.pathString
 
 
 internal fun <T> PropertyGraph.booleanProperty(dependency: ObservableProperty<T>, value: T) =
@@ -240,14 +244,14 @@ class PythonEnvironmentComboBoxRenderer : ColoredListCellRenderer<Any>() {
 internal fun Row.pythonInterpreterComboBox(
   selectedSdkProperty: ObservableMutableProperty<PythonSelectableInterpreter?>, // todo not sdk
   model: PythonAddInterpreterModel,
-  onPathSelected: (String) -> Unit, busyState: StateFlow<Boolean>? = null,
+  onPathSelected: (PythonWithLanguageLevel) -> Unit, busyState: StateFlow<Boolean>? = null,
 ): Cell<PythonInterpreterComboBox> {
 
   val comboBox = PythonInterpreterComboBox(selectedSdkProperty, model, onPathSelected, ShowingMessageErrorSync)
   val cell = cell(comboBox)
     .bindItem(selectedSdkProperty)
     .applyToComponent {
-      preferredHeight = 30
+      preferredHeight = JBUI.scale(30)
       isEditable = true
     }.validationOnApply {
       // This component must set sdk: clients expect it not to be null (PY-77463)
@@ -273,13 +277,9 @@ internal fun Row.pythonInterpreterComboBox(
 internal class PythonInterpreterComboBox(
   private val backingProperty: ObservableMutableProperty<PythonSelectableInterpreter?>,
   val controller: PythonAddInterpreterModel,
-  val onPathSelected: (String) -> Unit,
+  val onPathSelected: (PythonWithLanguageLevel) -> Unit,
   private val errorSink: ErrorSink,
 ) : ComboBox<PythonSelectableInterpreter?>() {
-
-  private lateinit var itemsFlow: StateFlow<List<PythonSelectableInterpreter>>
-  val items: List<PythonSelectableInterpreter>
-    get() = itemsFlow.value
 
   private val interpreterToSelect = controller.propertyGraph.property<String?>(null)
 
@@ -288,7 +288,7 @@ internal class PythonInterpreterComboBox(
     val newOnPathSelected: (String) -> Unit = {
       runWithModalProgressBlocking(ModalTaskOwner.guess(), message("python.sdk.validating.environment")) {
         controller.getSystemPythonFromSelection(it, errorSink)?.let { python ->
-          interpreterToSelect.set(python)
+          interpreterToSelect.set(python.pythonBinary.pathString)
           onPathSelected(python)
         }
       }
@@ -296,8 +296,7 @@ internal class PythonInterpreterComboBox(
     editor = PythonSdkComboBoxWithBrowseButtonEditor(this, controller, newOnPathSelected)
   }
 
-  fun setItems(flow: StateFlow<List<PythonSelectableInterpreter>>) {
-    itemsFlow = flow
+  fun setItems(flow: Flow<List<PythonSelectableInterpreter>>) {
     controller.scope.launch(start = CoroutineStart.UNDISPATCHED) {
       flow.collectLatest { interpreters ->
         withContext(controller.uiContext) {

@@ -99,6 +99,7 @@ class JavaCommentingStrategy extends JavaIntentionPolicy {
                                       intentionText.equals("Remove 'while' statement") ||
                                       intentionText.startsWith("Unimplement Class") || intentionText.startsWith("Unimplement Interface") ||//remove methods in batch
                                       intentionText.startsWith("Suppress with 'NON-NLS' comment") ||
+                                      intentionText.equals("Suppress all inspections for class") || // While suppress 'all' adds an annotation, it may remove individual suppressions from comments
                                       intentionText.startsWith("Suppress for ") || // Suppressions often modify comments 
                                       intentionText.startsWith("Move comment to separate line") ||//merge comments on same line
                                       intentionText.startsWith("Remove redundant arguments to call") ||//removes arg with all comments inside
@@ -124,6 +125,7 @@ class JavaCommentingStrategy extends JavaIntentionPolicy {
                                       intentionText.matches("Remove '.*' from '.*' throws list") ||
                                       intentionText.matches(JavaAnalysisBundle.message("inspection.redundant.type.remove.quickfix")) ||
                                       intentionText.matches("Remove .+ suppression") ||
+                                      intentionText.startsWith("Add import for ") || // Add import for may shorten references from Javadoc
                                       familyName.equals("Fix typo") ||
                                       familyName.equals("Remove annotation") || // may remove comment inside annotation
                                       familyName.equals("Reformat the whole file"); // may update @noinspection lines

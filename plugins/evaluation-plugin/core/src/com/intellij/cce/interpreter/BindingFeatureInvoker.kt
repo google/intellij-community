@@ -2,6 +2,8 @@ package com.intellij.cce.interpreter
 
 import com.intellij.cce.core.Lookup
 import com.intellij.cce.core.Session
+import com.intellij.cce.core.Suggestion
+import com.intellij.cce.core.SuggestionSource
 import com.intellij.cce.core.TokenProperties
 import com.intellij.cce.evaluable.AIA_PROBLEMS
 import com.intellij.cce.evaluation.data.Binding
@@ -15,8 +17,8 @@ import com.intellij.cce.evaluation.data.DataProps
 interface BindingFeatureInvoker : FeatureInvoker {
   fun invoke(properties: TokenProperties): BoundEvalData
 
-  override fun callFeature(expectedText: String, offset: Int, properties: TokenProperties): Session =
-    invoke(properties).session(expectedText, offset, properties)
+  override fun callFeature(expectedText: String, offset: Int, properties: TokenProperties, sessionId: String): Session =
+    invoke(properties).session(expectedText, offset, properties, sessionId)
 
   override fun comparator(generated: String, expected: String): Boolean = true
 
@@ -26,8 +28,8 @@ interface BindingFeatureInvoker : FeatureInvoker {
 interface BoundEvalData {
   val allBindings: List<Binding<EvalDataDescription<*, *>>>
 
-  fun session(expectedText: String, offset: Int, tokenProperties: TokenProperties): Session {
-    val session = Session(offset, expectedText, expectedText.length, tokenProperties)
+  fun session(expectedText: String, offset: Int, tokenProperties: TokenProperties, sessionId: String): Session {
+    val session = Session(offset, expectedText, expectedText.length, tokenProperties, sessionId)
 
     var lookup = Lookup(
       "",
@@ -57,6 +59,13 @@ interface BoundEvalData {
       desc.problemIndices(props).map { desc.data.valueId(it) }
     }
     lookup = lookup.copy(additionalInfo = lookup.additionalInfo + mapOf(AIA_PROBLEMS to problems.joinToString("\n")))
+
+    // we add artificial suggestion to be able to set `isRelevant` for precision and recall metrics
+    if (lookup.suggestions.isEmpty()) {
+      lookup = lookup.copy(suggestions = listOf(
+        Suggestion(expectedText, expectedText, SuggestionSource.INTELLIJ)
+      ))
+    }
 
     // we have to calculate position after everything else has been added to the lookup since a position relies on metric calculation
     val selectedPosition = if (problems.isNotEmpty()) -1 else 0

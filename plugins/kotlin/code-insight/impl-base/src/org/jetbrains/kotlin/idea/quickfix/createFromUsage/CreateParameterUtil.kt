@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
 object CreateParameterUtil {
     private fun chooseContainingClass(psiElement: PsiElement, varExpected: Boolean): Pair<KtClass?,ValVar> {
-        return Pair(psiElement.parents.firstIsInstanceOrNull<KtClassOrObject>() as? KtClass, if (varExpected) ValVar.VAR else ValVar.VAL)
+        return Pair((psiElement.parents.firstIsInstanceOrNull<KtClassOrObject>() as? KtClass)?.takeUnless { it.isInterface() }, if (varExpected) ValVar.VAR else ValVar.VAL)
     }
     enum class ValVar { VAL, VAR, NONE }
     private val toxicPill: Pair<Nothing?, ValVar> = Pair(null, ValVar.NONE) // means do not check above this psi element, it's no use
@@ -40,11 +40,17 @@ object CreateParameterUtil {
                         varExpected
                     )
 
+                    it is KtPrimaryConstructor -> Pair(it, if (varExpected) ValVar.VAR else ValVar.VAL)
+
                     it is KtAnonymousInitializer -> Pair(it.parents.match(KtClassBody::class, last = KtClass::class), ValVar.NONE)
                     it is KtSuperTypeListEntry -> {
                         val klass = it.getStrictParentOfType<KtClassOrObject>()
                         if (klass is KtClass && klass.isInterface() || klass is KtEnumEntry) toxicPill else // couldn't add param to enum entry or interface
                             Pair(if (klass is KtClass) klass else null, ValVar.NONE)
+                    }
+
+                    it is KtConstructorDelegationCall -> {
+                        Pair(it.getStrictParentOfType<KtClassOrObject>(), ValVar.NONE)
                     }
 
                     it is KtClassBody -> {

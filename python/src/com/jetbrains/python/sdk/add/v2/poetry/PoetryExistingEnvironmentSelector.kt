@@ -7,7 +7,7 @@ import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.vfs.toNioPathOrNull
 import com.jetbrains.python.Result
-import com.jetbrains.python.errorProcessing.PyError
+import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.errorProcessing.asPythonResult
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.add.v2.CustomExistingEnvironmentSelector
@@ -15,7 +15,7 @@ import com.jetbrains.python.sdk.add.v2.DetectedSelectableInterpreter
 import com.jetbrains.python.sdk.add.v2.PythonMutableTargetAddInterpreterModel
 import com.jetbrains.python.sdk.poetry.detectPoetryEnvs
 import com.jetbrains.python.sdk.poetry.isPoetry
-import com.jetbrains.python.sdk.poetry.pyProjectToml
+import com.jetbrains.python.sdk.poetry.findPyProjectToml
 import com.jetbrains.python.sdk.poetry.setupPoetrySdkUnderProgress
 import com.jetbrains.python.statistics.InterpreterType
 import com.jetbrains.python.statistics.version
@@ -26,7 +26,7 @@ internal class PoetryExistingEnvironmentSelector(model: PythonMutableTargetAddIn
   override val executable: ObservableMutableProperty<String> = model.state.poetryExecutable
   override val interpreterType: InterpreterType = InterpreterType.POETRY
 
-  override suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): Result<Sdk, PyError> {
+  override suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): PyResult<Sdk> {
     val selectedInterpreter = selectedEnv.get()
     ProjectJdkTable.getInstance().allJdks.find { sdk -> sdk.isPoetry && sdk.homePath == selectedInterpreter?.homePath }?.let { return Result.success(it) }
     val module = when (moduleOrProject) {
@@ -47,5 +47,5 @@ internal class PoetryExistingEnvironmentSelector(model: PythonMutableTargetAddIn
     existingEnvironments.value = existingEnvs
   }
 
-  override suspend fun findModulePath(module: Module): Path? = pyProjectToml(module)?.toNioPathOrNull()?.parent
+  override suspend fun findModulePath(module: Module): Path? = findPyProjectToml(module)?.toNioPathOrNull()?.parent
 }

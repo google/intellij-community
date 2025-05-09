@@ -69,6 +69,7 @@ internal class ContextCollectionEvaluationCommand : CompletionEvaluationStarter.
         evaluationRootInfo,
         environment.project,
         environment.processor,
+        environment.setupSteps,
         feature.name,
         environment.featureInvoker
       ) {
@@ -123,14 +124,14 @@ private class ContextCollectionActionsInvoker(
   language: Language,
   private val strategy: CompletionContextCollectionStrategy
 ) : BaseCompletionActionsInvoker(project, language) {
-  override fun callFeature(expectedText: String, offset: Int, properties: TokenProperties): Session {
+  override fun callFeature(expectedText: String, offset: Int, properties: TokenProperties, sessionId: String): Session {
     val editor = runReadAction {
       getEditorSafe(project)
     }
     runInEdt {
       PsiDocumentManager.getInstance(project).commitDocument(editor.document)
     }
-    val session = Session(offset, expectedText, expectedText.length, TokenProperties.UNKNOWN)
+    val session = Session(offset, expectedText, expectedText.length, TokenProperties.UNKNOWN, sessionId)
     val lookup = getSuggestions(expectedText, editor, strategy.suggestionsProvider)
     session.addLookup(lookup)
     return session

@@ -10,10 +10,10 @@ import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bind
 import com.intellij.ui.dsl.builder.bindItem
 import com.jetbrains.python.PyBundle.message
+import com.jetbrains.python.errorProcessing.ErrorSink
 import com.jetbrains.python.newProject.collector.InterpreterStatisticsInfo
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.add.v2.PythonSupportedEnvironmentManagers.*
-import com.jetbrains.python.errorProcessing.ErrorSink
 import com.jetbrains.python.sdk.add.v2.conda.CondaExistingEnvironmentSelector
 import com.jetbrains.python.sdk.add.v2.conda.CondaNewEnvironmentCreator
 import com.jetbrains.python.sdk.add.v2.hatch.HatchExistingEnvironmentSelector
@@ -22,11 +22,9 @@ import com.jetbrains.python.sdk.add.v2.poetry.EnvironmentCreatorPoetry
 import com.jetbrains.python.sdk.add.v2.poetry.PoetryExistingEnvironmentSelector
 import com.jetbrains.python.sdk.add.v2.uv.EnvironmentCreatorUv
 import com.jetbrains.python.sdk.add.v2.uv.UvExistingEnvironmentSelector
-import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.ApiStatus.Internal
-import java.nio.file.Path
 
-class PythonAddCustomInterpreter(val model: PythonMutableTargetAddInterpreterModel, val moduleOrProject: ModuleOrProject? = null, projectPathFlow: Flow<Path>? = null, private val errorSink: ErrorSink) {
+class PythonAddCustomInterpreter(val model: PythonMutableTargetAddInterpreterModel, val moduleOrProject: ModuleOrProject? = null, private val errorSink: ErrorSink) {
 
   private val propertyGraph = model.propertyGraph
   private val selectionMethod = propertyGraph.property(PythonInterpreterSelectionMethod.CREATE_NEW)
@@ -43,12 +41,12 @@ class PythonAddCustomInterpreter(val model: PythonMutableTargetAddInterpreterMod
     CONDA to CondaNewEnvironmentCreator(model),
     PIPENV to EnvironmentCreatorPip(model),
     POETRY to EnvironmentCreatorPoetry(model, moduleOrProject),
-    UV to EnvironmentCreatorUv(model),
+    UV to EnvironmentCreatorUv(model, moduleOrProject),
     HATCH to HatchNewEnvironmentCreator(model),
   )
 
   private val existingInterpreterSelectors = buildMap {
-    put(PYTHON, PythonExistingEnvironmentSelector(model))
+    put(PYTHON, PythonExistingEnvironmentSelector(model, moduleOrProject))
     put(CONDA, CondaExistingEnvironmentSelector(model, errorSink))
     if (moduleOrProject != null) {
       put(POETRY, PoetryExistingEnvironmentSelector(model, moduleOrProject))
@@ -129,8 +127,8 @@ class PythonAddCustomInterpreter(val model: PythonMutableTargetAddInterpreterMod
 
 
   fun onShown() {
-    newInterpreterCreators.values.forEach(PythonAddEnvironment::onShown)
-    existingInterpreterSelectors.values.forEach(PythonAddEnvironment::onShown)
+    newInterpreterCreators.values.forEach { it.onShown() }
+    existingInterpreterSelectors.values.forEach { it.onShown() }
   }
 
   fun createStatisticsInfo(): InterpreterStatisticsInfo {

@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
     "@lib//:jetbrains-intellij-deps-eclipse-jgit",
@@ -53,10 +54,11 @@ jvm_library(
 
 ### auto-generated section `build intellij.settingsRepository.tests` start
 load("@rules_java//java:defs.bzl", "java_library")
-load("@rules_jvm//:jvm.bzl", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-jvm_test(
-  name = "settingsRepository-tests_test",
+jvm_library(
+  name = "settingsRepository-tests_test_lib",
+  visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   deps = [
     "//platform/platform-api:ide",
@@ -84,5 +86,10 @@ jvm_test(
     "//platform/util/jdom",
     "//platform/workspace/jps",
   ]
+)
+
+jvm_test(
+  name = "settingsRepository-tests_test",
+  runtime_deps = [":settingsRepository-tests_test_lib"]
 )
 ### auto-generated section `build intellij.settingsRepository.tests` end

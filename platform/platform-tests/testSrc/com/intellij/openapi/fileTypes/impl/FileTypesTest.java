@@ -92,7 +92,7 @@ public class FileTypesTest extends HeavyPlatformTestCase {
   protected void setUp() throws Exception {
     super.setUp();
     // we test against myFileTypeManager instance only, standard FileTypeManager.getInstance() must not be changed in any way
-    myFileTypeManager = new FileTypeManagerImpl(((ComponentManagerEx)myProject).getCoroutineScope());
+    myFileTypeManager = new FileTypeManagerImpl(((ComponentManagerEx)ApplicationManager.getApplication()).getCoroutineScope());
     myFileTypeManager.listenAsyncVfsEvents();
     myFileTypeManager.initializeComponent();
     myFileTypeManager.getRegisteredFileTypes();
@@ -682,7 +682,7 @@ public class FileTypesTest extends HeavyPlatformTestCase {
     bean.implementationClass = MyTestFileType.class.getName();
     bean.extensions = MyTestFileType.EXTENSION;
     IdeaPluginDescriptorImpl pluginDescriptor =
-      PluginDescriptorLoadUtilsKt.readDescriptorForTest(Path.of(""), false, "<idea-plugin/>".getBytes(StandardCharsets.UTF_8), PluginId.getId("myPlugin"));
+      PluginDescriptorLoadUtilsKt.readAndInitDescriptorFromBytesForTest(Path.of(""), false, "<idea-plugin/>".getBytes(StandardCharsets.UTF_8), PluginId.getId("myPlugin"));
     Disposable disposable = registerFileType(bean, pluginDescriptor);
     try {
       reInitFileTypeManagerComponent(element);
@@ -1161,7 +1161,7 @@ public class FileTypesTest extends HeavyPlatformTestCase {
       bean.implementationClass = MyFileTypeWithStaticField.class.getName();
       bean.fieldName = "INSTANCE518";
       try {
-        assertThrows(NoSuchFieldException.class, () -> registerFileType(bean, FileTypeManagerImpl.coreIdeaPluginDescriptor()));
+        assertThrows(PluginException.class, () -> registerFileType(bean, FileTypeManagerImpl.coreIdeaPluginDescriptor()));
       }
       finally {
         FileTypeManagerImpl.EP_NAME.getPoint().unregisterExtension(bean);

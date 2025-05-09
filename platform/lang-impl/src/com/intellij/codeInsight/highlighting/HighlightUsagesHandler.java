@@ -378,7 +378,7 @@ public final class HighlightUsagesHandler extends HighlightHandlerBase {
     return result;
   }
 
-  public static void collectHighlightRanges(@NotNull PsiReference ref, @NotNull Collection<? super TextRange> result) {
+  public static void collectHighlightRanges(@NotNull PsiReference ref, @NotNull Collection<? super @NotNull TextRange> result) {
     for (TextRange relativeRange : ReferenceRange.getRanges(ref)) {
       collectHighlightRanges(ref.getElement(), relativeRange, result);
     }
@@ -386,10 +386,10 @@ public final class HighlightUsagesHandler extends HighlightHandlerBase {
 
   public static void collectHighlightRanges(@NotNull PsiElement element,
                                             @NotNull TextRange rangeInElement,
-                                            @NotNull Collection<? super TextRange> result) {
+                                            @NotNull Collection<? super TextRange> hostResult) {
     TextRange range = safeCut(element.getTextRange(), rangeInElement);
     if (range.isEmpty()) return;
-    result.add(InjectedLanguageManager.getInstance(element.getProject()).injectedToHost(element, range));
+    hostResult.add(InjectedLanguageManager.getInstance(element.getProject()).injectedToHost(element, range));
   }
 
   private static @NotNull TextRange safeCut(@NotNull TextRange range, @NotNull TextRange relative) {

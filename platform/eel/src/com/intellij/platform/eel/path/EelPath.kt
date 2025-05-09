@@ -1,9 +1,10 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel.path
 
 import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.EelPlatform
-import com.intellij.platform.eel.path.EelPath.OS
+
+val EelPath.platform: EelPlatform get() = descriptor.platform
 
 /**
  * An interface for **absolute** paths on some environment.
@@ -131,16 +132,6 @@ sealed interface EelPath {
   fun endsWith(suffix: List<String>): Boolean
 
   /**
-   * Returns [EelPath.OS] that corresponds to this path.
-   *
-   *  ```kotlin
-   *  EelPath.parse("/abc/").os == EelPath.OS.UNIX
-   *  EelPath.parse("C:\\abc\").os == EelPath.OS.WINDOWS
-   *  ```
-   */
-  val os: OS
-
-  /**
    * ```kotlin
    * EelPath.parse("/abc", OS.UNIX).getChild("..") == EelPath.parse("abc/..", false)
    * EelPath.parse("/abc", OS.UNIX).getChild("x/y/z") will throw
@@ -154,35 +145,17 @@ sealed interface EelPath {
 
   fun toDebugString(): String
 
+  /**
+   * @return path in the particular eel, i.e.: `/foo` or `c:\bar`
+   */
   override fun toString(): String
 
+  @Deprecated("Use EelPlatform instead, will be removed soon")
   enum class OS {
     WINDOWS, UNIX
   }
 }
 
 operator fun EelPath.div(part: String): EelPath = resolve(part)
-
-val OS.pathSeparator: String
-  get() = when (this) {
-    OS.UNIX -> ":"
-    OS.WINDOWS -> ";"
-  }
-
-val EelPlatform.pathOs: OS
-  get() = when (this) {
-    is EelPlatform.Posix -> OS.UNIX
-    is EelPlatform.Windows -> OS.WINDOWS
-  }
-
-private val UNIX_DIRECTORY_SEPARATORS = charArrayOf('/')
-private val WINDOWS_DIRECTORY_SEPARATORS = charArrayOf('/', '\\')
-
-val OS.directorySeparators: CharArray
-  get() = when (this) {
-    OS.UNIX -> UNIX_DIRECTORY_SEPARATORS
-    OS.WINDOWS -> WINDOWS_DIRECTORY_SEPARATORS
-}
-
 
 class EelPathException(val raw: String, val reason: String) : RuntimeException("`$raw`: $reason")

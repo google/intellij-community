@@ -38,6 +38,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -201,12 +202,12 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
    */
   @ApiStatus.Internal
   public static @NotNull RangeMarker createRangeMarkerForVirtualFile(@NotNull VirtualFile file,
-                                                     int offset,
-                                                     int startLine,
-                                                     int startCol,
-                                                     int endLine,
-                                                     int endCol,
-                                                     boolean persistent) {
+                                                                     int offset,
+                                                                     int startLine,
+                                                                     int startCol,
+                                                                     int endLine,
+                                                                     int endCol,
+                                                                     boolean persistent) {
     int estimatedLength = RangeMarkerImpl.estimateDocumentLength(file);
     offset = Math.min(offset, estimatedLength);
     RangeMarkerImpl marker = persistent
@@ -353,20 +354,18 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
       }
     }
     int finalTargetOffsetPos = targetOffsetPos;
+    boolean executeInBulk = finalTargetOffsetPos > STRIP_TRAILING_SPACES_BULK_MODE_LINES_LIMIT * 2;
     // Document must be unblocked by now. If not, some Save handler attempted to modify PSI
     // which should have been caught by assertion in com.intellij.pom.core.impl.PomModelImpl.runTransaction
-    DocumentUtil.writeInRunUndoTransparentAction(new DocumentRunnable(this, project) {
-      @Override
-      public void run() {
-        DocumentUtil.executeInBulk(DocumentImpl.this, finalTargetOffsetPos > STRIP_TRAILING_SPACES_BULK_MODE_LINES_LIMIT * 2, () -> {
-          int pos = finalTargetOffsetPos;
-          while (pos > 0) {
-            int endOffset = targetOffsets[--pos];
-            int startOffset = targetOffsets[--pos];
-            deleteString(startOffset, endOffset);
-          }
-        });
-      }
+    DocumentUtil.writeInRunUndoTransparentAction(() -> {
+      DocumentUtil.executeInBulk(this, executeInBulk, () -> {
+        int pos = finalTargetOffsetPos;
+        while (pos > 0) {
+          int endOffset = targetOffsets[--pos];
+          int startOffset = targetOffsets[--pos];
+          deleteString(startOffset, endOffset);
+        }
+      });
     });
     return markAsNeedsStrippingLater;
   }
@@ -386,6 +385,10 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
   @Override
   public void setReadOnly(boolean isReadOnly) {
     if (myIsReadOnly != isReadOnly) {
+      if (LOG.isTraceEnabled()) {
+        String message = MessageFormat.format("Setting readonly flag, myIsReadOnly = \"{0}\" for {1}", isReadOnly, this);
+        LOG.trace(new Throwable(message));
+      }
       myIsReadOnly = isReadOnly;
       myPropertyChangeSupport.firePropertyChange(PROP_WRITABLE, !isReadOnly, isReadOnly);
     }
@@ -687,7 +690,9 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
     }
     else {
       newText = myText.replace(startOffset, endOffset, changedPart);
-      changedPart = newText.subtext(startOffset, startOffset + changedPart.length());
+      if (!(changedPart instanceof String)) {
+        changedPart = newText.subtext(startOffset, startOffset + changedPart.length());
+      }
     }
     boolean wasOptimized = initialStartOffset != startOffset || endOffset - startOffset != initialOldLength;
     updateText(newText, startOffset, sToDelete, changedPart, wholeTextReplaced, newModificationStamp,
@@ -935,8 +940,6 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
       if (LOG.isTraceEnabled()) LOG.trace(new Throwable(event.toString()));
       else if (LOG.isDebugEnabled()) LOG.debug(event.toString());
 
-      assert event.getOldFragment().length() ==  event.getOldLength() : "event.getOldFragment().length() = " + event.getOldFragment().length()+"; event.getOldLength() = " + event.getOldLength();
-      assert event.getNewFragment().length() ==  event.getNewLength() : "event.getNewFragment().length() = " + event.getNewFragment().length()+"; event.getNewLength() = " + event.getNewLength();
       assert prevText.length() + event.getNewLength() - event.getOldLength() == getTextLength() : "prevText.length() = " + prevText.length()+ "; event.getNewLength() = " + event.getNewLength()+ "; event.getOldLength() = " + event.getOldLength()+ "; getTextLength() = " + getTextLength();
 
       myLineSet = getLineSet().update(prevText, event.getOffset(), event.getOffset() + event.getOldLength(), event.getNewFragment(), event.isWholeTextReplaced());

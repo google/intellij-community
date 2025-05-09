@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/vcs-api:vcs",
     "//platform/vcs-impl",
     "//platform/lvcs-api:lvcs",
@@ -28,7 +29,8 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/statistics",
     "//platform/util",
-    "//platform/vcs-impl/shared:vcs-impl-shared",
+    "//platform/vcs-impl/shared",
+    "@lib//:jetbrains-annotations",
   ],
   runtime_deps = [":lvcs-impl_resources"]
 )
@@ -39,6 +41,7 @@ jvm_library(
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   associates = [":lvcs-impl"],
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/vcs-api:vcs",
     "//platform/vcs-impl",
     "//platform/vcs-impl:vcs-impl_test_lib",
@@ -63,7 +66,8 @@ jvm_library(
     "@lib//:easymock",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
-    "//platform/vcs-impl/shared:vcs-impl-shared",
+    "//platform/vcs-impl/shared",
+    "@lib//:jetbrains-annotations",
   ],
   runtime_deps = [":lvcs-impl_resources"]
 )

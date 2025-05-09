@@ -11,6 +11,7 @@ private val VCS_ALIAS_ID = PluginId.getId("com.intellij.modules.vcs")
 private val RIDER_ALIAS_ID = PluginId.getId("com.intellij.modules.rider")
 private val COVERAGE_ALIAS_ID = PluginId.getId("com.intellij.modules.coverage")
 private val ML_INLINE_ALIAS_ID = PluginId.getId("com.intellij.ml.inline.completion")
+private val JSON_ALIAS_ID = PluginId.getId("com.intellij.modules.json")
 
 internal class ModulesWithDependencies(val modules: List<IdeaPluginDescriptorImpl>,
                                        val directDependencies: Map<IdeaPluginDescriptorImpl, List<IdeaPluginDescriptorImpl>>) {
@@ -54,7 +55,9 @@ internal fun createModulesWithDependenciesAndAdditionalEdges(plugins: Collection
   for (module in modules) {
     // If a plugin does not include any module dependency tags in its plugin.xml, it's assumed to be a legacy plugin
    // and is loaded only in IntelliJ IDEA, so it may use classes from Java plugin.
-    val implicitDep = if (hasAllModules && isCheckingForImplicitDependencyNeeded(module)) moduleMap.get(PluginManagerCore.JAVA_MODULE_ID.idString) else null
+    val implicitDep = if (hasAllModules && PluginCompatibilityUtils.isLegacyPluginWithoutPlatformAliasDependencies(module)) {
+      moduleMap.get(PluginManagerCore.JAVA_MODULE_ID.idString)
+    } else null
     if (implicitDep != null) {
       if (module === implicitDep) {
         PluginManagerCore.logger.error("Plugin $module depends on self")
@@ -79,6 +82,10 @@ internal fun createModulesWithDependenciesAndAdditionalEdges(plugins: Collection
       if (!strictCheck) {
         if (System.getProperty("enable.implicit.json.dependency").toBoolean()) {
           moduleMap.get("com.intellij.modules.json")?.let { dependenciesCollector.add(it) }
+          moduleMap.get("intellij.json.backend")?.let { dependenciesCollector.add(it) }
+        }
+        if (doesDependOnPluginAlias(module, JSON_ALIAS_ID)) {
+          moduleMap.get("intellij.json.backend")?.let { dependenciesCollector.add(it) }
         }
         moduleMap.get("intellij.platform.collaborationTools")?.let { dependenciesCollector.add(it) }
       }
@@ -112,7 +119,7 @@ internal fun createModulesWithDependenciesAndAdditionalEdges(plugins: Collection
 
       /* if the plugin containing the module is incompatible with some other plugins, make sure that the module is processed after that plugins (and all their required modules) 
          to ensure that the proper module is disabled in case of package conflict */
-      for (incompatibility in main.incompatibilities) {
+      for (incompatibility in main.incompatiblePlugins) {
         val incompatibleDescriptor = moduleMap.get(incompatibility.idString)
         if (incompatibleDescriptor != null) {
           additionalEdgesForCurrentModule.add(incompatibleDescriptor)
@@ -141,7 +148,7 @@ internal fun createModulesWithDependenciesAndAdditionalEdges(plugins: Collection
 
 // alias in most cases points to Core plugin, so, we cannot use computed dependencies to check
 private fun doesDependOnPluginAlias(plugin: IdeaPluginDescriptorImpl, @Suppress("SameParameterValue") aliasId: PluginId): Boolean {
-  return plugin.pluginDependencies.any { it.pluginId == aliasId } || plugin.dependencies.plugins.any { it.id == aliasId }
+  return plugin.dependencies.any { it.pluginId == aliasId } || plugin.moduleDependencies.plugins.any { it.id == aliasId }
 }
 
 internal fun toCoreAwareComparator(comparator: Comparator<IdeaPluginDescriptorImpl>): Comparator<IdeaPluginDescriptorImpl> {
@@ -167,7 +174,7 @@ private val knownNotFullyMigratedPluginIds: Set<String> = hashSetOf(
 private fun collectDirectDependenciesInOldFormat(rootDescriptor: IdeaPluginDescriptorImpl,
                                                  idMap: Map<String, IdeaPluginDescriptorImpl>,
                                                  dependenciesCollector: MutableSet<IdeaPluginDescriptorImpl>) {
-  for (dependency in rootDescriptor.pluginDependencies) {
+  for (dependency in rootDescriptor.dependencies) {
     // check for missing optional dependency
     val dep = idMap.get(dependency.pluginId.idString) ?: continue
     if (dep.pluginId != PluginManagerCore.CORE_ID || dep.moduleName != null) {
@@ -195,7 +202,7 @@ private fun collectDirectDependenciesInOldFormat(rootDescriptor: IdeaPluginDescr
     }
   }
 
-  for (moduleId in rootDescriptor.incompatibilities) {
+  for (moduleId in rootDescriptor.incompatiblePlugins) {
     idMap.get(moduleId.idString)?.let {
       dependenciesCollector.add(it)
     }
@@ -208,7 +215,7 @@ private fun collectDirectDependenciesInNewFormat(
   dependenciesCollector: MutableCollection<IdeaPluginDescriptorImpl>,
   additionalEdges: MutableSet<IdeaPluginDescriptorImpl>
 ) {
-  for (item in module.dependencies.modules) {
+  for (item in module.moduleDependencies.modules) {
     val dependency = idMap.get(item.name)
     if (dependency != null) {
       dependenciesCollector.add(dependency)
@@ -224,7 +231,7 @@ private fun collectDirectDependenciesInNewFormat(
       }
     }
   }
-  for (item in module.dependencies.plugins) {
+  for (item in module.moduleDependencies.plugins) {
     val descriptor = idMap.get(item.id.idString)
     // fake v1 module maybe located in a core plugin
     if (descriptor != null && descriptor.pluginId != PluginManagerCore.CORE_ID) {

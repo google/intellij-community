@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.highlighting;
 
 import com.intellij.codeInsight.CodeInsightSettings;
@@ -11,6 +11,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Trinity;
 import com.intellij.psi.PsiBinaryFile;
 import com.intellij.psi.PsiCompiledFile;
@@ -27,8 +28,19 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiFunction;
 
+import static com.intellij.idea.AppModeAssertions.checkFrontend;
+import static com.intellij.openapi.editor.rd.LocalEditorSupportUtil.isLocalEditorSupport;
+
 @ApiStatus.Internal
 public final class BackgroundHighlightingUtil {
+  /**
+   * Add this key to the {@link Editor}'s user data to prohibit running all background highlighting activities.
+   */
+  private static final Key<Boolean> IGNORE_EDITOR = Key.create("BackgroundHighlightingUtil.IGNORE_EDITOR");
+  public static void disableBackgroundHighlightingForeverIn(@NotNull Editor editor) {
+    editor.putUserData(IGNORE_EDITOR, true);
+  }
+
   /**
    * start background thread where find injected fragment at the caret position,
    * invoke {@code backgroundProcessor} on that fragment and invoke later {@code edtProcessor} in EDT,
@@ -80,11 +92,17 @@ public final class BackgroundHighlightingUtil {
 
   static boolean isValidEditor(@NotNull Editor editor) {
     Project editorProject = editor.getProject();
-    return editorProject != null && !editorProject.isDisposed() && !editor.isDisposed() &&
+    return editorProject != null &&
+           !editorProject.isDisposed() &&
+           !editor.isDisposed() &&
+           !Boolean.TRUE.equals(editor.getUserData(IGNORE_EDITOR)) &&
            UIUtil.isShowing(editor.getContentComponent());
   }
 
   static boolean needMatching(@NotNull Editor newEditor, @NotNull CodeInsightSettings codeInsightSettings) {
+    if (isLocalEditorSupport(newEditor)) {
+      return checkFrontend();
+    }
     if (!codeInsightSettings.HIGHLIGHT_BRACES) return false;
 
     if (newEditor.getSelectionModel().hasSelection()) return false;

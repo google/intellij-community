@@ -17,7 +17,6 @@ import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.DocumentRunnable;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.DocumentEx;
@@ -36,6 +35,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.file.impl.FileManager;
+import com.intellij.psi.impl.file.impl.FileManagerEx;
 import com.intellij.psi.impl.file.impl.FileManagerImpl;
 import com.intellij.psi.impl.smartPointers.SmartPointerManagerImpl;
 import com.intellij.psi.impl.source.PsiFileImpl;
@@ -159,7 +159,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
    */
   @ApiStatus.Internal
   public final @Nullable PsiFile getRawCachedFile(@NotNull VirtualFile virtualFile, @NotNull CodeInsightContext context) {
-    FileManagerImpl manager = ((FileManagerImpl)getFileManager());
+    FileManagerEx manager = ((FileManagerEx)getFileManager());
     return manager.getRawCachedFile(virtualFile, context);
   }
 
@@ -393,8 +393,10 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
 
   @ApiStatus.Internal
   public boolean isEventSystemEnabled(@NotNull Document document) {
-    List<FileViewProvider> viewProviders = getCachedViewProviders(document);
-    return FileViewProviderUtil.isEventSystemEnabled(viewProviders);
+    return ReadAction.compute(() -> {
+      List<FileViewProvider> viewProviders = getCachedViewProviders(document);
+      return FileViewProviderUtil.isEventSystemEnabled(viewProviders);
+    });
   }
 
   @ApiStatus.Internal
@@ -412,11 +414,8 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       ok[0] = finishCommitInWriteAction(document, finishProcessors, reparseInjectedProcessors, true);
     }
     else {
-      ApplicationManager.getApplication().runWriteAction(new DocumentRunnable(document, myProject) {
-        @Override
-        public void run() {
-          ok[0] = finishCommitInWriteAction(document, finishProcessors, reparseInjectedProcessors, false);
-        }
+      ApplicationManager.getApplication().runWriteAction(() -> {
+        ok[0] = finishCommitInWriteAction(document, finishProcessors, reparseInjectedProcessors, false);
       });
     }
 
@@ -514,7 +513,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       });
     }
     if (virtualFile != null) {
-      ((FileManagerImpl)getFileManager()).forceReload(virtualFile);
+      ((FileManagerEx)getFileManager()).forceReload(virtualFile);
     }
   }
 
@@ -991,7 +990,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       return;
     }
 
-    // todo ijpl-339 is this check correct at all? How can we get view providers from an alien project here???
+    // todo IJPL-339 is this check correct at all? How can we get view providers from an alien project here???
     boolean inMyProject = ContainerUtil.exists(viewProviders, viewProvider -> viewProvider.getManager() == myPsiManager);
     if (!isRelevant || !inMyProject) {
       clearUncommittedInfo(document);
@@ -1100,7 +1099,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       }
       else if (FileIndexFacade.getInstance(myProject).isInContent(virtualFile)) {
         ApplicationManager.getApplication().runWriteAction((ExternalChangeAction)() ->
-          ((FileManagerImpl)fileManager).firePropertyChangedForUnloadedPsi());
+          ((FileManagerEx)fileManager).firePropertyChangedForUnloadedPsi());
       }
     }
 
@@ -1240,12 +1239,12 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
 
   @NotNull
   @ApiStatus.Internal
-  protected List<BooleanRunnable> reparseChangedInjectedFragments(@NotNull Document hostDocument,
-                                                        @NotNull PsiFile hostPsiFile,
-                                                        @NotNull TextRange range,
-                                                        @NotNull ProgressIndicator indicator,
-                                                        @NotNull ASTNode oldRoot,
-                                                        @NotNull ASTNode newRoot) {
+  public List<BooleanRunnable> reparseChangedInjectedFragments(@NotNull Document hostDocument,
+                                                               @NotNull PsiFile hostPsiFile,
+                                                               @NotNull TextRange range,
+                                                               @NotNull ProgressIndicator indicator,
+                                                               @NotNull ASTNode oldRoot,
+                                                               @NotNull ASTNode newRoot) {
     return Collections.emptyList();
   }
 

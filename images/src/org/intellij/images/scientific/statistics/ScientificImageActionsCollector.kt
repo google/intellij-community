@@ -3,44 +3,66 @@ package org.intellij.images.scientific.statistics
 import com.intellij.internal.statistic.eventLog.EventLogGroup
 import com.intellij.internal.statistic.eventLog.events.EventFields
 import com.intellij.internal.statistic.service.fus.collectors.CounterUsagesCollector
-import org.intellij.images.scientific.action.*
 
 object ScientificImageActionsCollector : CounterUsagesCollector() {
-  private val GROUP = EventLogGroup("scientific.image.actions", 1)
-
-  private val ACTION_HANDLER_FIELD = EventFields.Class("action_handler")
-  private val IMAGE_FORMAT_FIELD = EventFields.String("image_format", listOf("png", "jpg", "jpeg", "bmp"))
-
-  private val INVOKED_COPY_IMAGE_EVENT = GROUP.registerEvent("copy_image_action", ACTION_HANDLER_FIELD)
-  private val INVOKED_SAVE_IMAGE_EVENT = GROUP.registerEvent("save_image_action", ACTION_HANDLER_FIELD, IMAGE_FORMAT_FIELD)
-  private val INVOKED_RESTORE_ORIGINAL_IMAGE_EVENT = GROUP.registerEvent("restore_original_image_action", ACTION_HANDLER_FIELD)
-  private val INVOKED_INVERT_IMAGE_CHANNELS_EVENT = GROUP.registerEvent("invert_channels_action", ACTION_HANDLER_FIELD)
-  private val INVOKED_GRAYSCALE_IMAGE_EVENT = GROUP.registerEvent("grayscale_image_action", ACTION_HANDLER_FIELD)
-  private val INVOKED_BINARY_IMAGE_EVENT = GROUP.registerEvent("binarize_image_action", ACTION_HANDLER_FIELD)
-
+  @JvmStatic
+  private val GROUP = EventLogGroup("scientific.image.actions", 6)
   override fun getGroup(): EventLogGroup = GROUP
 
-  fun logCopyImageInvoked(action: CopyImageAction) {
-    INVOKED_COPY_IMAGE_EVENT.log(action::class.java)
+  private val imageFormatField = EventFields.String("image_format", listOf("png", "jpg", "jpeg", "bmp", "svg"))
+  private val channelIndexField = EventFields.Int("channel_index")
+  private val rotateAngleField = EventFields.Int("rotate_angle")
+  private val isNormalizedField = EventFields.Boolean("is_normalized")
+  private val binarizationThresholdField = EventFields.Int("binarization_threshold")
+
+  private val invokedCopyImageEvent = GROUP.registerEvent("debug.image.view.copy")
+  private val invokedSaveImageEvent = GROUP.registerEvent("debug.image.view.save", imageFormatField)
+  private val invokedRestoreOriginalImageEvent = GROUP.registerEvent("debug.image.view.restore.original")
+  private val invokedInvertChannelsEvent = GROUP.registerEvent("debug.image.view.invert.channels")
+  private val invokedGrayscaleImageEvent = GROUP.registerEvent("debug.image.view.grayscale")
+  private val invokedBinaryImageEvent = GROUP.registerEvent("debug.image.view.binarize", binarizationThresholdField)
+  private val invokedRotateImageEvent = GROUP.registerEvent("debug.image.view.rotate", rotateAngleField)
+  private val invokedChannelSelectionEvent = GROUP.registerEvent("debug.image.view.channel.selection", channelIndexField)
+  private val invokedNormalizedImageEvent = GROUP.registerEvent("debug.image.view.normalize", isNormalizedField)
+  private val invokedReverseChannelsOrderEvent = GROUP.registerEvent("debug.image.view.reverse")
+
+  fun logCopyImageInvoked() {
+    invokedCopyImageEvent.log()
   }
 
-  internal fun logSaveAsImageInvoked(action: SaveImageAction, imageFormat: String) {
-    INVOKED_SAVE_IMAGE_EVENT.log(action::class.java, imageFormat)
+  internal fun logSaveAsImageInvoked(imageFormat: String) {
+    invokedSaveImageEvent.log(imageFormat)
   }
 
-  fun logRestoreOriginalImageInvoked(action: RestoreOriginalImageAction) {
-    INVOKED_RESTORE_ORIGINAL_IMAGE_EVENT.log(action::class.java)
+  fun logRestoreOriginalImageInvoked() {
+    invokedRestoreOriginalImageEvent.log()
   }
 
-  fun logInvertChannelsInvoked(action: InvertChannelsAction) {
-    INVOKED_INVERT_IMAGE_CHANNELS_EVENT.log(action::class.java)
+  fun logInvertChannelsInvoked() {
+    invokedInvertChannelsEvent.log()
   }
 
-  fun logGrayscaleImageInvoked(action: GrayscaleImageAction) {
-    INVOKED_GRAYSCALE_IMAGE_EVENT.log(action::class.java)
+  fun logGrayscaleImageInvoked() {
+    invokedGrayscaleImageEvent.log()
   }
 
-  fun logBinarizeImageInvoked(action: BinarizeImageAction) {
-    INVOKED_BINARY_IMAGE_EVENT.log(action::class.java)
+  fun logBinarizeImageInvoked(binarizationThreshold: Int) {
+    invokedBinaryImageEvent.log(binarizationThreshold)
+  }
+
+  fun logRotateImageInvoked(rotationAngle: Int) {
+    invokedRotateImageEvent.log(rotationAngle)
+  }
+
+  fun logChannelSelection(channelIndex: Int) {
+    invokedChannelSelectionEvent.log(channelIndex)
+  }
+
+  fun logNormalizedImageInvoked(isNormalized: Boolean) {
+    invokedNormalizedImageEvent.log(isNormalized)
+  }
+
+  fun logReverseChannelsOrderInvoked() {
+    invokedReverseChannelsOrderEvent.log()
   }
 }

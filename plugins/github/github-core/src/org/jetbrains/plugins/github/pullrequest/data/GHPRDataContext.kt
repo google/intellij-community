@@ -1,6 +1,9 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.jetbrains.plugins.github.pullrequest.data
 
+import com.intellij.collaboration.async.collectScoped
+import com.intellij.collaboration.async.launchNow
+import com.intellij.collaboration.async.withInitial
 import com.intellij.collaboration.ui.html.AsyncHtmlImageLoader
 import com.intellij.collaboration.ui.icon.IconsProvider
 import com.intellij.openapi.util.Disposer
@@ -33,10 +36,18 @@ class GHPRDataContext internal constructor(
   private val listenersDisposable = Disposer.newDisposable("GH PR context listeners disposable")
 
   init {
-    listLoader.addDataListener(listenersDisposable, object : GHListLoader.ListDataListener {
-      override fun onDataAdded(startIdx: Int) = listUpdatesChecker.start()
-      override fun onAllDataRemoved() = listUpdatesChecker.stop()
-    })
+    scope.launchNow {
+      listLoader.refreshOrReloadRequests.withInitial(Unit).collectScoped {
+        try {
+          listUpdatesChecker.start()
+          awaitCancellation()
+        }
+        finally {
+          listUpdatesChecker.stop()
+        }
+      }
+    }
+
     dataProviderRepository.addDetailsLoadedListener(listenersDisposable) { details: GHPullRequest ->
       listLoader.updateData {
         if (it.id == details.id) details else null
@@ -51,7 +62,6 @@ class GHPRDataContext internal constructor(
       finally {
         Disposer.dispose(listenersDisposable)
         Disposer.dispose(dataProviderRepository)
-        Disposer.dispose(listLoader)
         Disposer.dispose(listUpdatesChecker)
       }
     }

@@ -1,10 +1,17 @@
 *:com.intellij.platform.syntax.CancellationProvider
 - a:checkCancelled():V
 *:com.intellij.platform.syntax.Logger
+- a:debug(java.lang.String,java.lang.Throwable):V
+- bs:debug$default(com.intellij.platform.syntax.Logger,java.lang.String,java.lang.Throwable,I,java.lang.Object):V
 - a:error(java.lang.String):V
 - a:error(java.lang.String,com.intellij.platform.syntax.Logger$Attachment[]):V
-- a:warn(java.lang.String,java.lang.RuntimeException):V
-- bs:warn$default(com.intellij.platform.syntax.Logger,java.lang.String,java.lang.RuntimeException,I,java.lang.Object):V
+- a:info(java.lang.String,java.lang.Throwable):V
+- bs:info$default(com.intellij.platform.syntax.Logger,java.lang.String,java.lang.Throwable,I,java.lang.Object):V
+- a:isDebugEnabled():Z
+- a:trace(java.lang.String):V
+- a:trace(java.lang.Throwable):V
+- a:warn(java.lang.String,java.lang.Throwable):V
+- bs:warn$default(com.intellij.platform.syntax.Logger,java.lang.String,java.lang.Throwable,I,java.lang.Object):V
 *f:com.intellij.platform.syntax.Logger$Attachment
 - <init>(java.lang.String,java.lang.String):V
 - f:getContent():java.lang.String
@@ -76,7 +83,7 @@
 - getTokenText(I):java.lang.CharSequence
 - a:getTokenType(I):com.intellij.platform.syntax.SyntaxElementType
 - a:getTokenizedText():java.lang.CharSequence
-*f:com.intellij.platform.syntax.lexer.TokenListKt
+*f:com.intellij.platform.syntax.lexer.TokenListUtil
 - sf:TokenList(I[],com.intellij.platform.syntax.SyntaxElementType[],I,java.lang.CharSequence):com.intellij.platform.syntax.lexer.TokenList
 - sf:backWhile(com.intellij.platform.syntax.lexer.TokenList,I,com.intellij.platform.syntax.SyntaxElementTypeSet):I
 - sf:backWithBraceMatching(com.intellij.platform.syntax.lexer.TokenList,I,com.intellij.platform.syntax.SyntaxElementType,com.intellij.platform.syntax.SyntaxElementType):I
@@ -84,9 +91,11 @@
 - sf:hasType(com.intellij.platform.syntax.lexer.TokenList,I,com.intellij.platform.syntax.SyntaxElementType):Z
 - sf:hasType(com.intellij.platform.syntax.lexer.TokenList,I,com.intellij.platform.syntax.SyntaxElementTypeSet):Z
 - sf:hasType(com.intellij.platform.syntax.lexer.TokenList,I,com.intellij.platform.syntax.SyntaxElementType[]):Z
-- sf:performLexing(java.lang.CharSequence,com.intellij.platform.syntax.lexer.Lexer,com.intellij.platform.syntax.CancellationProvider):com.intellij.platform.syntax.lexer.TokenList
-- bs:performLexing$default(java.lang.CharSequence,com.intellij.platform.syntax.lexer.Lexer,com.intellij.platform.syntax.CancellationProvider,I,java.lang.Object):com.intellij.platform.syntax.lexer.TokenList
-- sf:tokenListLexer(com.intellij.platform.syntax.lexer.TokenList):com.intellij.platform.syntax.lexer.Lexer
+- sf:performLexing(java.lang.CharSequence,com.intellij.platform.syntax.lexer.Lexer,com.intellij.platform.syntax.CancellationProvider,com.intellij.platform.syntax.Logger):com.intellij.platform.syntax.lexer.TokenList
+- sf:tokenListLexer(com.intellij.platform.syntax.lexer.TokenList,com.intellij.platform.syntax.Logger):com.intellij.platform.syntax.lexer.Lexer
+- bs:tokenListLexer$default(com.intellij.platform.syntax.lexer.TokenList,com.intellij.platform.syntax.Logger,I,java.lang.Object):com.intellij.platform.syntax.lexer.Lexer
+*f:com.intellij.platform.syntax.logger.NoopLogger
+- *sf:noopLogger():com.intellij.platform.syntax.Logger
 *:com.intellij.platform.syntax.parser.OpaqueElementPolicy
 - a:getTextOfOpaqueElement(com.intellij.platform.syntax.SyntaxElementType):java.lang.String
 *:com.intellij.platform.syntax.parser.ProductionMarkerList

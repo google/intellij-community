@@ -1,14 +1,21 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal
 
-import com.intellij.application.options.EditorFontsConstants
+import com.intellij.application.options.colors.ColorAndFontOptions
+import com.intellij.codeWithMe.ClientId
 import com.intellij.execution.configuration.EnvironmentVariablesTextFieldWithBrowseButton
-import com.intellij.icons.AllIcons
+import com.intellij.ide.DataManager
 import com.intellij.ide.IdeBundle
+import com.intellij.openapi.application.ApplicationBundle
+import com.intellij.openapi.client.ClientKind
+import com.intellij.openapi.client.ClientSystemInfo
+import com.intellij.openapi.client.sessions
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.options.UnnamedConfigurable
+import com.intellij.openapi.options.advanced.AdvancedSettings
+import com.intellij.openapi.options.colors.pages.ANSIColoredConsoleColorsPage
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
@@ -18,6 +25,7 @@ import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.FontComboBox
 import com.intellij.ui.FontInfoRenderer
+import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.textFieldWithHistoryWithBrowseButton
 import com.intellij.ui.dsl.builder.*
@@ -29,11 +37,11 @@ import com.intellij.util.execution.ParametersListUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.TerminalBundle.message
 import org.jetbrains.plugins.terminal.block.BlockTerminalOptions
+import org.jetbrains.plugins.terminal.block.feedback.askForFeedbackIfReworkedTerminalDisabled
 import org.jetbrains.plugins.terminal.block.prompt.TerminalPromptStyle
 import org.jetbrains.plugins.terminal.runner.LocalTerminalStartCommandBuilder
-import org.jetbrains.plugins.terminal.settings.TerminalOsSpecificOptions
 import java.awt.Color
-import java.util.*
+import java.awt.Component
 import javax.swing.JComponent
 import javax.swing.JTextField
 import javax.swing.UIManager
@@ -49,7 +57,6 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
 ) {
   override fun createPanel(): DialogPanel {
     val optionsProvider = TerminalOptionsProvider.instance
-    val osSpecificOptions = TerminalOsSpecificOptions.getInstance()
     val projectOptionsProvider = TerminalProjectOptionsProvider.getInstance(project)
     val blockTerminalOptions = BlockTerminalOptions.getInstance()
 
@@ -69,14 +76,19 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
 
           val renderer = listCellRenderer<TerminalEngine?> {
             text(value?.presentableName ?: "")
-            if (value == TerminalEngine.REWORKED) {
-              icon(AllIcons.General.Beta)
-            }
           }
 
           terminalEngineComboBox = comboBox(values, renderer)
             .label(message("settings.terminal.engine"))
-            .bindItem(optionsProvider::terminalEngine.toNullableProperty())
+            .bindItem(
+              getter = { optionsProvider.terminalEngine },
+              setter = {
+                val oldEngine = optionsProvider.terminalEngine
+                val newEngine = it!!
+                optionsProvider.terminalEngine = newEngine
+                askForFeedbackIfReworkedTerminalDisabled(project, oldEngine, newEngine)
+              }
+            )
             .component
         }
         indent {
@@ -125,7 +137,7 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
       }
 
       group(message("settings.terminal.font.settings")) {
-        var fontSettings = TerminalFontOptions.getInstance().getSettings()
+        var fontSettings = TerminalFontSettingsService.getInstance().getSettings()
         row(message("settings.font.name")) {
           cell(fontComboBox())
             .bind(
@@ -143,27 +155,37 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
             .label(message("settings.font.size"))
             .columns(4)
             .bindText(
-              getter = { fontSettings.fontSize.fontSizeToString() },
-              setter = { fontSettings = fontSettings.copy(fontSize = it.parseFontSize()) },
+              getter = { fontSettings.fontSize.toFormattedString() },
+              setter = { fontSettings = fontSettings.copy(fontSize = TerminalFontSize.parse(it)) },
             )
           textField()
             .label(message("settings.line.height"))
             .columns(4)
             .bindText(
-              getter = { fontSettings.lineSpacing.spacingToString() },
-              setter = { fontSettings = fontSettings.copy(lineSpacing = it.parseSpacing()) },
+              getter = { fontSettings.lineSpacing.toFormattedString() },
+              setter = { fontSettings = fontSettings.copy(lineSpacing = TerminalLineSpacing.parse(it)) },
             )
           textField()
             .label(message("settings.column.width"))
             .columns(4)
             .bindText(
-              getter = { fontSettings.columnSpacing.spacingToString() },
-              setter = { fontSettings = fontSettings.copy(columnSpacing = it.parseSpacing()) },
+              getter = { fontSettings.columnSpacing.toFormattedString() },
+              setter = { fontSettings = fontSettings.copy(columnSpacing = TerminalColumnSpacing.parse(it)) },
             )
         }
 
+        row {
+          cell(ActionLink(message("settings.colors")) { actionEvent ->
+            ColorAndFontOptions.selectOrEditColor(
+              DataManager.getInstance().getDataContext(actionEvent.source as? Component?),
+              ANSIColoredConsoleColorsPage.getSearchableReworkedTerminalName(),
+              ANSIColoredConsoleColorsPage.getSearchableName(),
+            )
+          })
+        }.visibleIf(terminalEngineComboBox.selectedValueIs(TerminalEngine.REWORKED))
+
         onApply {
-          TerminalFontOptions.getInstance().setSettings(fontSettings)
+          TerminalFontSettingsService.getInstance().setSettings(fontSettings)
         }
       }
 
@@ -214,8 +236,16 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
             .bindSelected(optionsProvider::mouseReporting)
         }
         row {
+          checkBox(ApplicationBundle.message("advanced.setting.terminal.escape.moves.focus.to.editor"))
+            .bindSelected(
+              getter = { AdvancedSettings.getBoolean("terminal.escape.moves.focus.to.editor") },
+              setter = { AdvancedSettings.setBoolean("terminal.escape.moves.focus.to.editor", it) },
+            )
+        }
+        row {
           checkBox(message("settings.copy.to.clipboard.on.selection"))
-            .bindSelected(osSpecificOptions::copyOnSelection)
+            .bindSelected(optionsProvider::copyOnSelection)
+            .visible(isMac(project) || isWindows(project))
         }
         row {
           checkBox(message("settings.paste.on.middle.mouse.button.click"))
@@ -236,7 +266,7 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
         row {
           checkBox(message("settings.use.option.as.meta.key.label"))
             .bindSelected(optionsProvider::useOptionAsMetaKey)
-            .visible(SystemInfo.isMac)
+            .visible(isMac(project))
         }
         panel {
           configurables(LocalTerminalCustomizer.EP_NAME.extensionList.mapNotNull { it.getConfigurable(project) })
@@ -320,28 +350,24 @@ private fun fontComboBox(): FontComboBox = FontComboBox().apply {
   isMonospacedOnly = true
 }
 
-private fun Float.fontSizeToString(): String = formatWithOneDecimalDigit()
+/**
+ * [TerminalOptionsConfigurable] is created on backend under local [ClientId].
+ * But some options need to be shown depending on client OS.
+ * So, it is a hack to check the client OS from the configurable code.
+ */
+private fun isMac(project: Project): Boolean {
+  return getClientSystemInfo(project)?.macClient ?: SystemInfo.isMac
+}
 
-private fun String.parseFontSize(): Float =
-  try {
-    toFloat().coerceIn(EditorFontsConstants.getMinEditorFontSize().toFloat()..EditorFontsConstants.getMaxEditorFontSize().toFloat())
-  }
-  catch (_: Exception) {
-    EditorFontsConstants.getDefaultEditorFontSize().toFloat()
-  }
+private fun isWindows(project: Project): Boolean {
+  return getClientSystemInfo(project)?.windowsClient ?: SystemInfo.isWindows
+}
 
-private fun Float.spacingToString(): String = formatWithOneDecimalDigit()
-
-private fun Float.formatWithOneDecimalDigit(): String = String.format(Locale.ROOT, "%.1f", this)
-
-// We only have getMin/MaxEditorLineSpacing(), and nothing for column spacing,
-// but using the same values for column spacing seems reasonable.
-private fun String.parseSpacing(): Float =
-  try {
-    toFloat().coerceIn(EditorFontsConstants.getMinEditorLineSpacing()..EditorFontsConstants.getMaxEditorLineSpacing())
+private fun getClientSystemInfo(project: Project): ClientSystemInfo? {
+  val clientId = project.sessions(ClientKind.CONTROLLER).singleOrNull()?.clientId ?: return null
+  return ClientId.withExplicitClientId(clientId) {
+    ClientSystemInfo.getInstance()
   }
-  catch (_: Exception) {
-    1.0f
-  }
+}
 
 private val LOG = logger<TerminalOptionsConfigurable>()

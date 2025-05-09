@@ -74,7 +74,7 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
   private SortedSet<String> myTags;
 
   private static final Set<IdeaPluginDescriptor> myInstallingPlugins = new HashSet<>();
-  private static final Set<IdeaPluginDescriptor> myInstallingWithUpdatesPlugins = new HashSet<>();
+  private static final Set<PluginId> myInstallingWithUpdatesPlugins = new HashSet<>();
   static final Map<PluginId, InstallPluginInfo> myInstallingInfos = new HashMap<>();
 
   public boolean needRestart;
@@ -378,8 +378,12 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
     return myInstallingPlugins;
   }
 
+  public static boolean isInstallingOrUpdate(PluginId pluginId) {
+    return myInstallingWithUpdatesPlugins.contains(pluginId);
+  }
+
   static boolean isInstallingOrUpdate(@NotNull IdeaPluginDescriptor descriptor) {
-    return myInstallingWithUpdatesPlugins.contains(descriptor);
+    return myInstallingWithUpdatesPlugins.contains(descriptor.getPluginId());
   }
 
   void installOrUpdatePlugin(@Nullable JComponent parentComponent,
@@ -390,6 +394,11 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
     IdeaPluginDescriptor actionDescriptor = isUpdate ? updateDescriptor : descriptor;
     if (!PluginManagerMain.checkThirdPartyPluginsAllowed(List.of(actionDescriptor))) {
       return;
+    }
+
+    var customization = PluginInstallationCustomization.findPluginInstallationCustomization(descriptor.getPluginId());
+    if (customization != null) {
+      customization.beforeInstallOrUpdate(isUpdate);
     }
 
     if (myInstallSource != null) {
@@ -588,7 +597,7 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
     if (myInstallingWithUpdatesPlugins.isEmpty()) {
       myTopController.showProgress(true);
     }
-    myInstallingWithUpdatesPlugins.add(descriptor);
+    myInstallingWithUpdatesPlugins.add(descriptor.getPluginId());
     if (info.install) {
       myInstallingPlugins.add(descriptor);
     }
@@ -745,7 +754,7 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
   static @NotNull InstallPluginInfo finishInstall(@NotNull IdeaPluginDescriptor descriptor) {
     InstallPluginInfo info = myInstallingInfos.remove(descriptor.getPluginId());
     info.close();
-    myInstallingWithUpdatesPlugins.remove(descriptor);
+    myInstallingWithUpdatesPlugins.remove(descriptor.getPluginId());
     if (info.install) {
       myInstallingPlugins.remove(descriptor);
     }
@@ -871,7 +880,7 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
       myTags = new TreeSet<>(String::compareToIgnoreCase);
 
       for (IdeaPluginDescriptor descriptor : getInstalledDescriptors()) {
-        myTags.addAll(PluginManagerConfigurable.getTags(descriptor));
+        myTags.addAll(PluginUtilsKt.getTags(descriptor));
       }
     }
     return Collections.unmodifiableSortedSet(myTags);
@@ -984,9 +993,9 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
 
     for (PluginId pluginId : requiredPluginIds) {
       IdeaPluginDescriptor result = ContainerUtil.find(view, d -> pluginId.equals(d.getPluginId()));
-      if (result == null && PluginManagerCore.isModuleDependency(pluginId)) {
+      if (result == null && PluginManagerCore.looksLikePlatformPluginAlias(pluginId)) {
         result = ContainerUtil.find(view, d -> {
-          return d instanceof IdeaPluginDescriptorImpl && ((IdeaPluginDescriptorImpl)d).pluginAliases.contains(pluginId);
+          return d instanceof IdeaPluginDescriptorEx && ((IdeaPluginDescriptorEx)d).getPluginAliases().contains(pluginId);
         });
         if (result != null) {
           setEnabled(pluginId, PluginEnabledState.ENABLED); // todo
@@ -1207,8 +1216,8 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
       return List.of();
     }
 
-    PluginLoadingError loadingError = PluginManagerCore.INSTANCE.getLoadingError(pluginId);
-    PluginId disabledDependency = loadingError != null ? loadingError.disabledDependency : null;
+    PluginNonLoadReason loadingError = PluginManagerCore.INSTANCE.getLoadingError(pluginId);
+    PluginId disabledDependency = loadingError instanceof PluginDependencyIsDisabled error ? error.getDependencyId() : null;
     if (disabledDependency == null) {
       return loadingError != null ?
              List.of(createTextChunk(loadingError.getShortMessage())) :
@@ -1305,7 +1314,7 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
       }
 
       for (PluginId dependencyPluginId : entry.getValue()) {
-        if (PluginManagerCore.isModuleDependency(dependencyPluginId)) {
+        if (PluginManagerCore.looksLikePlatformPluginAlias(dependencyPluginId)) {
           continue;
         }
 
@@ -1337,8 +1346,8 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
       .stream()
       .map(requiredPluginId -> {
         IdeaPluginDescriptorImpl requiredDescriptor = pluginIdMap.get(requiredPluginId);
-        return Pair.create(requiredPluginId, requiredDescriptor == null && PluginManagerCore.isModuleDependency(requiredPluginId) ?
-                                             PluginManagerCore.INSTANCE.findPluginByModuleDependency(requiredPluginId) :
+        return Pair.create(requiredPluginId, requiredDescriptor == null && PluginManagerCore.looksLikePlatformPluginAlias(requiredPluginId) ?
+                                             PluginManagerCore.findPluginByPlatformAlias(requiredPluginId) :
                                              requiredDescriptor);
       });
   }

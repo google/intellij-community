@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onEach
 import org.jetbrains.plugins.terminal.block.reworked.*
 import org.jetbrains.plugins.terminal.block.ui.TerminalUiUtils
+import org.jetbrains.plugins.terminal.fus.*
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeSource
 
 /**
  * TerminalSession implementation that stores the state of the [delegate] session output.
@@ -29,6 +31,23 @@ internal class StateAwareTerminalSession(private val delegate: TerminalSession) 
   private val outputModel: TerminalOutputModel
   private val alternateBufferModel: TerminalOutputModel
   private val blocksModel: TerminalBlocksModel
+
+  private val outputLatencyReporter = BatchLatencyReporter(batchSize = 100) { samples ->
+    ReworkedTerminalUsageCollector.logBackendOutputLatency(
+      totalDuration = samples.totalDuration(),
+      duration90 = samples.percentile(90),
+      thirdLargestDuration = samples.thirdLargest(),
+    )
+  }
+
+  private val documentUpdateLatencyReporter = BatchLatencyReporter(batchSize = 100) { samples ->
+    ReworkedTerminalUsageCollector.logBackendDocumentUpdateLatency(
+      totalDuration = samples.totalDurationOf(DurationAndTextLength::duration),
+      duration90 = samples.percentileOf(90, DurationAndTextLength::duration),
+      thirdLargestDuration = samples.thirdLargestOf(DurationAndTextLength::duration),
+      textLength90 = samples.percentileOf(90, DurationAndTextLength::textLength),
+    )
+  }
 
   init {
     // Create a Non-AWT thread document to be able to update it without switching to EDT and Write Action.
@@ -80,9 +99,13 @@ internal class StateAwareTerminalSession(private val delegate: TerminalSession) 
   private fun handleEvent(event: TerminalOutputEvent) {
     when (event) {
       is TerminalContentUpdatedEvent -> {
-        val styles = event.styles.map { it.toStyleRange() }
         val model = getCurrentOutputModel()
-        model.updateContent(event.startLineLogicalIndex, event.text, styles)
+        updateOutputModelContent(model, event)
+
+        val latency = event.readTime?.elapsedNow()
+        if (latency != null) {
+          outputLatencyReporter.update(latency)
+        }
       }
       is TerminalCursorPositionChangedEvent -> {
         val model = getCurrentOutputModel()
@@ -121,5 +144,15 @@ internal class StateAwareTerminalSession(private val delegate: TerminalSession) 
 
   private fun getCurrentOutputModel(): TerminalOutputModel {
     return if (sessionModel.terminalState.value.isAlternateScreenBuffer) alternateBufferModel else outputModel
+  }
+
+  private fun updateOutputModelContent(model: TerminalOutputModel, event: TerminalContentUpdatedEvent) {
+    val startTime = TimeSource.Monotonic.markNow()
+
+    val styles = event.styles.map { it.toStyleRange() }
+    model.updateContent(event.startLineLogicalIndex, event.text, styles)
+
+    val latencyData = DurationAndTextLength(duration = startTime.elapsedNow(), textLength = event.text.length)
+    documentUpdateLatencyReporter.update(latencyData)
   }
 }

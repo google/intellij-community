@@ -1,16 +1,19 @@
 package com.intellij.terminal.frontend.action
 
-import com.intellij.icons.AllIcons
+import com.intellij.configurationStore.saveSettingsForRemoteDevelopment
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
-import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.ui.ExperimentalUI
+import com.intellij.util.application
 import org.jetbrains.plugins.terminal.TerminalEngine
 import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import org.jetbrains.plugins.terminal.TerminalUtil
+import org.jetbrains.plugins.terminal.block.feedback.askForFeedbackIfReworkedTerminalDisabled
+import org.jetbrains.plugins.terminal.fus.TerminalOpeningWay
+import org.jetbrains.plugins.terminal.fus.TerminalStartupFusInfo
 
 internal sealed class TerminalChangeEngineAction(private val engine: TerminalEngine) : DumbAwareToggleAction() {
   init {
@@ -23,9 +26,14 @@ internal sealed class TerminalChangeEngineAction(private val engine: TerminalEng
 
   override fun setSelected(e: AnActionEvent, state: Boolean) {
     if (state) {
+      val project = e.project ?: return
+      askForFeedbackIfReworkedTerminalDisabled(project, TerminalOptionsProvider.instance.terminalEngine, engine)
       TerminalOptionsProvider.instance.terminalEngine = engine
+      // Call save manually, because otherwise this change will be synced to backend only at some time later.
+      saveSettingsForRemoteDevelopment(application)
 
-      TerminalToolWindowManager.getInstance(e.project!!).createNewSession()
+      val startupFusInfo = TerminalStartupFusInfo(TerminalOpeningWay.SWITCH_ENGINE)
+      TerminalToolWindowManager.getInstance(project).createNewSession(startupFusInfo)
     }
   }
 
@@ -41,10 +49,6 @@ internal sealed class TerminalChangeEngineAction(private val engine: TerminalEng
                                           // show this option as well to avoid strange behavior when nothing is selected in the popup.
                                           TerminalOptionsProvider.instance.terminalEngine == TerminalEngine.NEW_TERMINAL)
     e.presentation.keepPopupOnPerform = KeepPopupOnPerform.IfRequested
-
-    if (engine == TerminalEngine.REWORKED) {
-      e.presentation.putClientProperty(ActionUtil.SECONDARY_ICON, AllIcons.General.Beta)
-    }
   }
 
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT

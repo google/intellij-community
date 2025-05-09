@@ -6,19 +6,20 @@ import com.intellij.dvcs.branch.DvcsBranchesDivergedBanner
 import com.intellij.dvcs.ui.DvcsBundle
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.PopupStep
+import com.intellij.platform.project.projectId
 import com.intellij.ui.popup.WizardPopup
 import com.intellij.util.ui.tree.TreeUtil
+import com.intellij.vcs.git.shared.ref.GitReferenceName
+import com.intellij.vcs.git.shared.repo.GitRepositoriesFrontendHolder
+import com.intellij.vcs.git.shared.rpc.GitRepositoryApi
 import git4idea.GitReference
 import git4idea.actions.branch.GitBranchActionsUtil
-import git4idea.branch.GitRefType
 import git4idea.i18n.GitBundle
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
-import git4idea.ui.branch.GitBranchManager
 import git4idea.ui.branch.GitBranchPopupFetchAction
 import git4idea.ui.branch.popup.GitBranchesTreePopupStep.Companion.SINGLE_REPOSITORY_ACTION_PLACE
 import git4idea.ui.branch.tree.GitBranchesTreeModel.RefUnderRepository
@@ -38,7 +39,7 @@ internal class GitBranchesTreePopup(
 ) : GitBranchesTreePopupBase<GitBranchesTreePopupStep>(project, step, parent, parentValue, DIMENSION_SERVICE_KEY) {
   init {
     installGeneralShortcutActions()
-    if (!isChild()) {
+    if (!isNestedPopup()) {
       warnThatBranchesDivergedIfNeeded()
     }
   }
@@ -78,11 +79,15 @@ internal class GitBranchesTreePopup(
     val refUnderRepository = userObject as? RefUnderRepository
     val reference = userObject as? GitReference ?: refUnderRepository?.ref ?: return
     val repositories = refUnderRepository?.repository?.let(::listOf) ?: treeStep.affectedRepositories
-    val branchType = GitRefType.of(reference)
-    val branchManager = project.service<GitBranchManager>()
-    val anyNotFavorite = repositories.any { repository -> !branchManager.isFavorite(branchType, repository, reference.name) }
-    repositories.forEach { repository ->
-      branchManager.setFavorite(branchType, repository, reference.name, anyNotFavorite)
+
+    val holder = GitRepositoriesFrontendHolder.getInstance(project)
+    val makeFavorite = repositories.any { repository -> !holder.get(repository.rpcId).favoriteRefs.contains(reference) }
+
+    GitRepositoryApi.launchRequest(project) {
+      toggleFavorite(project.projectId(),
+                     repositories.map { it.rpcId },
+                     GitReferenceName(reference.fullName),
+                     favorite = makeFavorite)
     }
   }
 
@@ -117,7 +122,7 @@ internal class GitBranchesTreePopup(
     return DvcsBranchesDivergedBanner.create("reference.VersionControl.Git.SynchronousBranchControl", text)
   }
 
-  override fun getShortcutActionPlace(): String = if (isChild()) SINGLE_REPOSITORY_ACTION_PLACE else TOP_LEVEL_ACTION_PLACE
+  override fun getShortcutActionPlace(): String = if (isNestedPopup()) SINGLE_REPOSITORY_ACTION_PLACE else TOP_LEVEL_ACTION_PLACE
 
   companion object {
     private const val DIMENSION_SERVICE_KEY = "Git.Branch.Popup"
@@ -140,6 +145,7 @@ internal class GitBranchesTreePopup(
     @JvmStatic
     fun create(project: Project, selectedRepository: GitRepository?): JBPopup {
       return GitBranchesTreePopup(project, createBranchesTreePopupStep(project, selectedRepository))
+        .apply { setIsMovable(true) }
     }
 
     @VisibleForTesting

@@ -54,7 +54,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
   private static final @NonNls Set<String> WHITE_LIST = Set.of("ExternalSystem.ProjectRefreshAction", "LoadConfigurationAction");
 
   /** @deprecated Use {@link ActionUtil#HIDE_DROPDOWN_ICON} instead */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   public static final Key<Boolean> HIDE_DROPDOWN_ICON = ActionUtil.HIDE_DROPDOWN_ICON;
 
   public static final Key<HelpTooltip> CUSTOM_HELP_TOOLTIP = Key.create("CUSTOM_HELP_TOOLTIP");
@@ -215,8 +215,11 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
     ActionToolbar toolbar = ActionToolbar.findToolbarBy(this);
     ActionUiKind uiKind = toolbar instanceof ActionUiKind o ? o : ActionUiKind.TOOLBAR;
     AnActionEvent event = AnActionEvent.createEvent(getDataContext(), myPresentation, myPlace, uiKind, e);
-    if (ActionUtil.lastUpdateAndCheckDumb(myAction, event, false) && isEnabled()) {
-      ActionUtil.performDumbAwareWithCallbacks(myAction, event, () -> actionPerformed(event));
+    if (!isEnabled()) return;
+    ActionManagerEx actionManager = (ActionManagerEx)event.getActionManager();
+    AnActionResult result = actionManager.performWithActionCallbacks(
+      myAction, event, () -> actionPerformed(event));
+    if (result.isPerformed()) {
       if (event.getInputEvent() instanceof MouseEvent) {
         ToolbarClicksCollector.record(myAction, myPlace, e, event.getDataContext());
       }
@@ -336,7 +339,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
     ActionToolbar toolbar = ActionToolbar.findToolbarBy(this);
     ActionUiKind uiKind = toolbar instanceof ActionUiKind o ? o : ActionUiKind.TOOLBAR;
     AnActionEvent e = AnActionEvent.createEvent(getDataContext(), myPresentation, myPlace, uiKind, null);
-    ActionUtil.performDumbAwareUpdate(myAction, e, false);
+    ActionUtil.updateAction(myAction, e);
     updateToolTipText();
     updateIcon();
   }

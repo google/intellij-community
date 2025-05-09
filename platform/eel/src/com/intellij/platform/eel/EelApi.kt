@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.fs.EelFileSystemApi
@@ -14,7 +14,8 @@ interface LocalEelApi : EelApi
 interface EelApi {
   val descriptor: EelDescriptor
 
-  val platform: EelPlatform
+  // TODO: should it be extension property?
+  val platform: EelPlatform get() = descriptor.platform
 
   /** Docs: [EelFileSystemApi] */
   val fs: EelFileSystemApi
@@ -42,14 +43,16 @@ interface EelApi {
 }
 
 interface EelPosixApi : EelApi {
-  override val platform: EelPlatform.Posix
+  override val exec: EelExecPosixApi
+  override val platform: EelPlatform.Posix get() = descriptor.platform as EelPlatform.Posix
   override val tunnels: EelTunnelsPosixApi
   override val userInfo: EelUserPosixInfo
   override val fs: EelFileSystemPosixApi
 }
 
 interface EelWindowsApi : EelApi {
-  override val platform: EelPlatform.Windows
+  override val exec: EelExecWindowsApi
+  override val platform: EelPlatform.Windows get() = descriptor.platform as EelPlatform.Windows
   override val tunnels: EelTunnelsWindowsApi
   override val userInfo: EelUserWindowsInfo
   override val fs: EelFileSystemWindowsApi

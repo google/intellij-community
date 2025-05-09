@@ -66,16 +66,18 @@ class KotlinChangeSignatureConflictSearcher(
 
         val parametersToRemove = originalInfo.parametersToRemove
         if (originalInfo.checkUsedParameters) {
-            checkParametersToDelete(function, parametersToRemove)
+            checkParametersToDelete(function, originalInfo)
         }
 
         for (parameter in originalInfo.getNonReceiverParameters()) {
             val parameterName = parameter.name
             if (parameter.oldName != parameterName || parameter.isNewParameter) {
                 val unresolvableCollisions = mutableListOf<UsageInfo>()
-                val ktParameter = if (!parameter.isNewParameter)
-                    function.valueParameters[max(0, parameter.oldIndex - if (function.receiverTypeReference != null) 1 else 0)]
-                else null
+                val ktParameter = when {
+                    parameter.isNewParameter -> null
+                    parameter.wasContextParameter -> function.modifierList?.contextReceiverList?.contextParameters()?.getOrNull(parameter.oldIndex)
+                    else -> function.valueParameters[max(0, parameter.oldIndex - if (function.receiverTypeReference != null) 1 else 0)]
+                }
                 if (ktParameter != null) {
                     checkRedeclarationConflicts(ktParameter, parameterName, unresolvableCollisions)
                 }
@@ -121,7 +123,7 @@ class KotlinChangeSignatureConflictSearcher(
             when (usageInfo) {
                 is KotlinOverrideUsageInfo -> {
                     if (originalInfo.checkUsedParameters) {
-                        checkParametersToDelete(usageInfo.element as KtCallableDeclaration, parametersToRemove)
+                        checkParametersToDelete(usageInfo.element as KtCallableDeclaration, originalInfo)
                     }
                 }
                 is OverriderUsageInfo -> {
@@ -169,8 +171,9 @@ class KotlinChangeSignatureConflictSearcher(
 
     private fun checkParametersToDelete(
         callableDeclaration: KtCallableDeclaration,
-        toRemove: BooleanArray,
+        changeInfo: KotlinChangeInfo,
     ) {
+        val toRemove = changeInfo.parametersToRemove
         val valueParameters = callableDeclaration.valueParameters
         val hasReceiver = callableDeclaration.receiverTypeReference != null
         if (hasReceiver && toRemove[0]) {
@@ -188,6 +191,15 @@ class KotlinChangeSignatureConflictSearcher(
             val index = (if (hasReceiver) 1 else 0) + i
             if (toRemove[index]) {
                 registerConflictIfUsed(parameter)
+            }
+        }
+
+        val oldContextParameters = callableDeclaration.modifierList?.contextReceiverList?.contextParameters()
+        if (oldContextParameters != null && oldContextParameters.isNotEmpty()) {
+            val usedIndexes = changeInfo.newParameters.filter { it.wasContextParameter }.map { it.oldIndex }
+            oldContextParameters.withIndex().filter { it.index !in usedIndexes }.forEach {
+                registerConflictIfUsed(it.value)
+                // t o d o search implicit usages
             }
         }
     }

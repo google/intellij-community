@@ -133,19 +133,21 @@ class JdkInstaller : JdkInstallerBase() {
       path.asEelPath().toString()
 
     override fun execute(command: List<String>, dir: String, timeout: Int): ProcessOutput = runBlockingCancellable {
-      val builder = EelExecApi
-        .ExecuteProcessOptions.Builder(command.first())
+      val builder = eel.exec.execute(command.first())
         .args(command.drop(1))
         .workingDirectory(EelPath.parse(dir, eel.descriptor))
-        .build()
-      val process = eel.exec.execute(builder).getOrThrow()
+      val process = builder.getOrThrow()
       try {
         withTimeout(timeout.milliseconds) {
           process.awaitProcessResult().let { ProcessOutput(it.stdoutString, it.stderrString, it.exitCode, false, false) }
         }
       }
       catch (_: TimeoutCancellationException) {
-        process.terminate()  // TODO Originally there was a much more difficult logic of termination.
+        // TODO Originally there was a much more difficult logic of termination.
+        when (process) {
+          is EelPosixProcess -> process.terminate()
+          is EelWindowsProcess -> process.kill()
+        }
         ProcessOutput("", "", -1, true, false)
       }
     }

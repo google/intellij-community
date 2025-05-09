@@ -71,11 +71,13 @@ object PluginAutoUpdater {
 
     val currentDescriptors = span("loading existing descriptors") {
       ZipFilePoolImpl().use { pool ->
-        val result = loadDescriptors(
+        val discoveredPlugins = loadDescriptors(
           CompletableDeferred(pool),
-          CompletableDeferred(PluginAutoUpdateRepository::class.java.classLoader)
-        )
-        result.second
+          CompletableDeferred(PluginAutoUpdateRepository::class.java.classLoader),
+        ).second
+        val loadingResult = PluginLoadingResult()
+        loadingResult.initAndAddAll(descriptorLoadingResult = discoveredPlugins, initContext = ProductPluginInitContext())
+        loadingResult
       }
     }
     // shadowing intended
@@ -89,7 +91,7 @@ object PluginAutoUpdater {
       updates.mapValues { (_, info) ->
         val updateFile = autoupdatesDir.resolve(info.updateFilename)
         async(Dispatchers.IO) {
-          runCatching { loadDescriptorFromArtifact(updateFile, null) }
+          runCatching { loadAndInitDescriptorFromArtifact(updateFile, null) }
         }
       }.mapValues { it.value.await() }
     }.filter {
@@ -166,7 +168,7 @@ object PluginAutoUpdater {
       // the behavior may actually differ from the honest check. To implement it better, the plugin loading implementation should be a little
       // bit more formalized and a bit more flexible to be reused here (TODO).
       val unmetDependencies = findUnsatisfiedDependencies(
-        updateDesc.pluginDependencies,
+        updateDesc.dependencies,
         enabledPluginsAndModulesIds
       )
       if (unmetDependencies.isNotEmpty()) {

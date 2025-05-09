@@ -2,23 +2,19 @@
 package org.jetbrains.plugins.terminal;
 
 import com.intellij.execution.process.LocalPtyOptions;
-import com.intellij.execution.process.ProcessService;
+import com.intellij.execution.process.LocalProcessService;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.registry.Registry;
-import com.intellij.terminal.pty.PtyProcessTtyConnector;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.TimeoutUtil;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import com.jediterm.core.util.TermSize;
 import com.jediterm.terminal.TtyConnector;
 import com.pty4j.PtyProcess;
-import com.pty4j.unix.UnixPtyProcess;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.terminal.block.TerminalUsageLocalStorage;
 import org.jetbrains.plugins.terminal.fus.ReworkedTerminalUsageCollector;
 import org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector;
 import org.jetbrains.plugins.terminal.runner.LocalOptionsConfigurer;
@@ -32,10 +28,10 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.*;
+import static org.jetbrains.plugins.terminal.TerminalStartupKt.shouldUseEelApi;
 import static org.jetbrains.plugins.terminal.TerminalStartupKt.startProcess;
 import static org.jetbrains.plugins.terminal.util.ShellNameUtil.*;
 
@@ -107,10 +103,6 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
       TerminalUsageTriggerCollector.triggerLocalShellStarted(myProject, command, isBlockTerminal);
     }
 
-    if (isBlockTerminal) {
-      TerminalUsageLocalStorage.getInstance().recordBlockTerminalUsed();
-    }
-
     Path workingDirPath = null;
     try {
       workingDirPath = Path.of(workingDir);
@@ -124,17 +116,14 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
         process = startProcess(List.of(command), envs, workingDirPath, Objects.requireNonNull(initialTermSize));
       }
       else {
-        process = (PtyProcess)ProcessService.getInstance().startPtyProcess(
-          command,
+        process = (PtyProcess)LocalProcessService.getInstance().startPtyProcess(
+          List.of(command),
           workingDir,
           envs,
           LocalPtyOptions.defaults().builder()
             .initialColumns(initialTermSize != null ? initialTermSize.getColumns() : -1)
             .initialRows(initialTermSize != null ? initialTermSize.getRows() : -1)
             .build(),
-          null,
-          false,
-          false,
           false
         );
       }
@@ -189,32 +178,7 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
 
   @Override
   public @NotNull TtyConnector createTtyConnector(@NotNull PtyProcess process) {
-    return new PtyProcessTtyConnector(process, myDefaultCharset) {
-
-      @Override
-      public void close() {
-        if (process instanceof UnixPtyProcess) {
-          ((UnixPtyProcess)process).hangup();
-          AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-            if (process.isAlive()) {
-              LOG.info("Terminal hasn't been terminated by SIGHUP, performing default termination");
-              process.destroy();
-            }
-          }, 1000, TimeUnit.MILLISECONDS);
-        }
-        else {
-          process.destroy();
-        }
-      }
-
-      @Override
-      public void resize(@NotNull TermSize termSize) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("resize to " + termSize);
-        }
-        super.resize(termSize);
-      }
-    };
+    return new LocalTerminalTtyConnector(process, myDefaultCharset);
   }
 
   @Override
@@ -277,9 +241,5 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
            || SystemInfo.isMac && shellName.equals(SH_NAME)
            || shellName.equals(ZSH_NAME)
            || shellName.equals(FISH_NAME) && Registry.is(BLOCK_TERMINAL_FISH_REGISTRY, false);
-  }
-
-  private static boolean shouldUseEelApi() {
-    return Registry.is("terminal.use.EelApi", false);
   }
 }

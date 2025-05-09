@@ -7,14 +7,16 @@ import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.Panel
 import com.jetbrains.python.PyBundle.message
 import com.jetbrains.python.Result
+import com.jetbrains.python.errorProcessing.ErrorSink
+import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.newProject.collector.InterpreterStatisticsInfo
 import com.jetbrains.python.sdk.ModuleOrProject
+import com.jetbrains.python.sdk.moduleIfExists
 import com.jetbrains.python.statistics.InterpreterCreationMode
 import com.jetbrains.python.statistics.InterpreterType
-import com.jetbrains.python.errorProcessing.ErrorSink
-import com.jetbrains.python.errorProcessing.PyError
+import kotlinx.coroutines.flow.map
 
-class PythonExistingEnvironmentSelector(model: PythonAddInterpreterModel) : PythonExistingEnvironmentConfigurator(model) {
+class PythonExistingEnvironmentSelector(model: PythonAddInterpreterModel, private val moduleOrProject: ModuleOrProject?) : PythonExistingEnvironmentConfigurator(model) {
 
   private lateinit var comboBox: PythonInterpreterComboBox
 
@@ -32,10 +34,10 @@ class PythonExistingEnvironmentSelector(model: PythonAddInterpreterModel) : Pyth
   }
 
   override fun onShown() {
-    comboBox.setItems(model.allInterpreters)
+    comboBox.setItems(model.allInterpreters.map { sortForExistingEnvironment(it, moduleOrProject?.moduleIfExists) })
   }
 
-  override suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): com.jetbrains.python.Result<Sdk, PyError> {
+  override suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): PyResult<Sdk> {
     // todo error handling, nullability issues
     return Result.success(setupSdkIfDetected(model.state.selectedInterpreter.get()!!, model.existingSdks)!!)
   }
@@ -48,7 +50,7 @@ class PythonExistingEnvironmentSelector(model: PythonAddInterpreterModel) : Pyth
                                      false,
                                      false,
                                      true,
-                                     //presenter.projectLocationContext is WslContext,
+      //presenter.projectLocationContext is WslContext,
                                      false, // todo fix for wsl
                                      InterpreterCreationMode.CUSTOM)
   }

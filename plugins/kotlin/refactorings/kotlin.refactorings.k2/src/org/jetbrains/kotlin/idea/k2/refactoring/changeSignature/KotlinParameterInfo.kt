@@ -28,6 +28,9 @@ import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 import org.jetbrains.kotlin.types.Variance
 
 class KotlinParameterInfo(
+    /**
+     * Indexes in the `context parameters` list and in the `normal` list are different
+     */
     override val originalIndex: Int = -1,
     val originalType: KotlinTypeInfo,
     private var name: String,
@@ -35,11 +38,13 @@ class KotlinParameterInfo(
     override var defaultValueForCall: KtExpression?,
     override var defaultValueAsDefaultParameter: Boolean,
     override var defaultValue: KtExpression?,
+    override var isContextParameter: Boolean = false,
     val modifierList: KtModifierList? = null,
     val context: KtElement
 ) : KotlinModifiableParameterInfo {
     val oldName: String = name
     var currentType: KotlinTypeInfo = originalType
+    val wasContextParameter: Boolean = isContextParameter
 
     override fun getName(): @NlsSafe String {
         return name
@@ -128,6 +133,7 @@ class KotlinParameterInfo(
     }
 
     private fun getOriginalParameter(inheritedCallable: KtDeclaration?): KtParameter? {
+        if (isContextParameter) return null
         val indexInVariableParameters = oldIndex - (if ((inheritedCallable as? KtCallableDeclaration)?.receiverTypeReference != null) 1 else 0)
         return (inheritedCallable as? KtCallableDeclaration)?.valueParameters?.getOrNull(indexInVariableParameters)
     }
@@ -157,7 +163,7 @@ class KotlinParameterInfo(
             )
         }
 
-        if (!isInherited) {
+        if (!isInherited && !isContextParameter) {
             defaultValue?.let { buffer.append(" = ").append(it.text) }
         }
 

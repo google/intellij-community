@@ -15,6 +15,7 @@ import com.intellij.idea.ActionsBundle;
 import com.intellij.injected.editor.EditorWindow;
 import com.intellij.lang.LangBundle;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.ActionButton;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -231,7 +232,7 @@ final class LookupUi {
       lookup.pack();
       rectangle = calculatePosition();
     }
-    HintManagerImpl.updateLocation(lookup, editor, rectangle.getLocation());
+    lookup.updateLocation(rectangle.getLocation());
 
     if (reused || selectionVisible || onExplicitAction) {
       lookup.ensureSelectionVisible(false);
@@ -384,7 +385,7 @@ final class LookupUi {
     final JPanel mainPanel = new JPanel(new BorderLayout());
 
     private LookupLayeredPane() {
-      mainPanel.setBackground(LookupCellRenderer.BACKGROUND_COLOR);
+      mainPanel.setBackground(lookup.getBackgroundColor());
       add(mainPanel, 0, 0);
 
       setLayout(new AbstractLayoutManager() {
@@ -456,7 +457,7 @@ final class LookupUi {
   private static final class MenuAction extends DefaultActionGroup implements HintManagerImpl.ActionToIgnore {
     MenuAction() {
       getTemplatePresentation().setIcon(AllIcons.Actions.More);
-      getTemplatePresentation().putClientProperty(ActionButton.HIDE_DROPDOWN_ICON, Boolean.TRUE);
+      getTemplatePresentation().putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, Boolean.TRUE);
       getTemplatePresentation().setPopupGroup(true);
     }
   }

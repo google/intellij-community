@@ -90,6 +90,7 @@ private val PLATFORM_IMPLEMENTATION_MODULES = java.util.List.of(
 
   "intellij.platform.externalSystem.impl",
   "intellij.platform.credentialStore.ui",
+  "intellij.platform.ide.impl.wsl",
 
   // do we need it?
   "intellij.platform.sqlite",
@@ -165,12 +166,12 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
     "intellij.platform.util.xmlDom",
     "intellij.platform.tracing.rt",
     "intellij.platform.util.base",
-    "intellij.platform.util.base.kmp",
+    "intellij.platform.util.base.multiplatform",
     "intellij.platform.diagnostic",
     // it contains common telemetry related code (utils, TelemetryContext) for OpenTelemetry
     "intellij.platform.diagnostic.telemetry.rt",
     "intellij.platform.util",
-    "intellij.platform.util.kmp",
+    "intellij.platform.util.multiplatform",
     "intellij.platform.core",
     // it has package `kotlin.coroutines.jvm.internal` - should be packed into the same JAR as coroutine lib,
     // to ensure that package index will not report one more JAR in a search path
@@ -633,10 +634,19 @@ private fun getModuleDescriptor(moduleName: String, jpsModuleName: String, xIncl
 
 private suspend fun collectAndEmbedProductModules(root: Element, xIncludePathResolver: XIncludePathResolver, context: BuildContext): Set<ModuleItem> {
   val frontendModuleFilter = context.getFrontendModuleFilter()
+  val contentModuleFilter = context.getContentModuleFilter()
   val result = LinkedHashSet<ModuleItem>()
-  for (moduleElement in (root.getChildren("content").asSequence().flatMap { it.getChildren("module") })) {
+  val moduleElements = root.getChildren("content").flatMap { it.getChildren("module") }
+  for (moduleElement in moduleElements) {
     val moduleName = moduleElement.getAttributeValue("name") ?: continue
     val loadingRule = moduleElement.getAttributeValue("loading")
+    val dependencyHelper = (context as BuildContextImpl).jarPackagerDependencyHelper
+    if (dependencyHelper.isOptionalLoadingRule(loadingRule) && !contentModuleFilter.isOptionalModuleIncluded(moduleName, pluginMainModuleName = null)) {
+      Span.current().addEvent("Tag for module '$moduleName' is removed from the core plugin by $contentModuleFilter")
+      moduleElement.parent.removeContent(moduleElement)
+      continue
+    }
+
     val relativeOutFile = if (loadingRule == "embedded") getProductModuleJarName(moduleName, context, frontendModuleFilter) else "modules/$moduleName.jar"
     result.add(ModuleItem(moduleName = moduleName, relativeOutputFile = relativeOutFile, reason = ModuleIncludeReasons.PRODUCT_MODULES))
     PRODUCT_MODULE_IMPL_COMPOSITION.get(moduleName)?.let {

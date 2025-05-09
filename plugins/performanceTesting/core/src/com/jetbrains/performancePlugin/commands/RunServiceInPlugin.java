@@ -1,3 +1,4 @@
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.performancePlugin.commands;
 
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
@@ -32,10 +33,10 @@ public class RunServiceInPlugin extends RunClassInPlugin {
 
     ClassLoader loader = null;
     // requires to avoid "class must not be requested from main classloader of plugin" error
-    List<PluginContentDescriptor.ModuleItem> modules = ((IdeaPluginDescriptorImpl)plugin).content.modules;
+    List<PluginContentDescriptor.ModuleItem> modules = ((IdeaPluginDescriptorImpl)plugin).getContent().modules;
     if (!modules.isEmpty()) {
       for (PluginContentDescriptor.ModuleItem module : modules) {
-        if (myClazzName.contains(module.name)) {
+        if (myClazzName.contains(module.getName())) {
           loader = module.requireDescriptor().getClassLoader();
         }
       }

@@ -34,7 +34,6 @@ import com.jetbrains.python.venvReader.VirtualEnvReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.BorderLayout
-import java.awt.Insets
 import java.io.FileNotFoundException
 import java.nio.file.Path
 import javax.swing.JComponent
@@ -146,7 +145,7 @@ internal class PyPipfileSdkConfiguration : PyProjectSdkConfigurationExtension {
 
     override fun createCenterPanel(): JComponent {
       return JPanel(BorderLayout()).apply {
-        val border = IdeBorderFactory.createEmptyBorder(Insets(4, 0, 6, 0))
+        val border = IdeBorderFactory.createEmptyBorder(JBUI.insets(4, 0, 6, 0))
         val message = PyCharmCommunityCustomizationBundle.message("sdk.create.pipenv.permission")
 
         add(

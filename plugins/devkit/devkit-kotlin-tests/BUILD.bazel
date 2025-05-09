@@ -22,6 +22,7 @@ jvm_library(
     "//plugins/devkit/devkit-tests:testFramework",
     "//plugins/devkit/devkit-tests:testFramework_test_lib",
     "@lib//:kotlin-stdlib",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/devkit/devkit-java-tests:java-tests_test_lib",
@@ -38,14 +39,14 @@ jvm_library(
     "//platform/testRunner:testRunner_test_lib",
     "@lib//:kotlin-test",
     "//plugins/devkit/devkit-core:core",
-    "//plugins/kotlin/base/test:kotlin-base-test_test_lib",
+    "//plugins/kotlin/base/test:test_test_lib",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
-    "//plugins/kotlin/base/plugin:kotlin-base-plugin",
-    "//plugins/kotlin/base/plugin:kotlin-base-plugin_test_lib",
+    "//plugins/kotlin/base/plugin",
+    "//plugins/kotlin/base/plugin:plugin_test_lib",
   ],
   runtime_deps = [
     ":kotlin-tests_test_resources",
-    "//plugins/devkit/intellij.devkit:devkit",
+    "//plugins/devkit",
   ]
 )
 

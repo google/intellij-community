@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.importing
 
 import com.intellij.build.events.MessageEvent
@@ -28,8 +28,8 @@ import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.platform.workspace.jps.entities.exModuleOptions
 import com.intellij.platform.workspace.storage.entities
 import com.intellij.pom.java.AcceptedLanguageLevelsSettings
+import com.intellij.pom.java.JavaRelease
 import com.intellij.pom.java.LanguageLevel
-import com.intellij.pom.java.LanguageLevel.HIGHEST
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.text.VersionComparatorUtil
 import com.intellij.workspaceModel.ide.legacyBridge.findModuleEntity
@@ -144,7 +144,7 @@ object MavenImportUtil {
         getTargetLanguageLevel(it),
         getTestTargetLanguageLevel(it)
       )
-    }.filterNotNull().maxWithOrNull(Comparator.naturalOrder()) ?: HIGHEST
+    }.filterNotNull().maxWithOrNull(Comparator.naturalOrder()) ?: JavaRelease.getHighest()
     return maxLevel
   }
 
@@ -280,7 +280,7 @@ object MavenImportUtil {
       if (highestAcceptedLevel.isLessThan(level)) {
         MavenProjectsManager.getInstance(project).getSyncConsole().addBuildIssue(NonAcceptedJavaLevelIssue(level), MessageEvent.Kind.WARNING)
       }
-      level = if (highestAcceptedLevel.isAtLeast(level)) LanguageLevel.HIGHEST else highestAcceptedLevel
+      level = if (highestAcceptedLevel.isAtLeast(level)) JavaRelease.getHighest() else highestAcceptedLevel
     }
     return level
   }
@@ -324,7 +324,7 @@ object MavenImportUtil {
       if (compilerArgs != null) {
         if (isPreviewText(compilerArgs) ||
             compilerArgs.getChildren("arg").any { isPreviewText(it) } ||
-            compilerArgs.getChildren("compilerArg").any{ isPreviewText(it) }
+            compilerArgs.getChildren("compilerArg").any { isPreviewText(it) }
         ) {
           return level.getPreviewLevel() ?: level
         }
@@ -399,13 +399,12 @@ object MavenImportUtil {
     })
   }
 
-  internal fun MavenProject.getAllCompilerConfigs(): List<Element> {
+  internal fun MavenProject.compilerConfigsForCompilePhase(): List<Element> {
     val result = ArrayList<Element>(1)
     this.getPluginConfiguration(COMPILER_PLUGIN_GROUP_ID, COMPILER_PLUGIN_ARTIFACT_ID)?.let(result::add)
 
     this.findCompilerPlugin()
-      ?.executions?.filter { it.goals.contains("compile") }
-      ?.filter { it.phase != "none" }
+      ?.executions?.filter { it.isCompilePhase() }
       ?.mapNotNull { it.configurationElement }
       ?.forEach(result::add)
     return result
@@ -413,15 +412,15 @@ object MavenImportUtil {
 
   internal val MavenProject.declaredAnnotationProcessors: List<String>
     get() {
-      return compilerConfigsOrPluginConfig.flatMap { getDeclaredAnnotationProcessors(it) }
+      return compilerExecutions
+        .filter { it.isCompilePhase() }
+        .mapNotNull { it.configurationElement }
+        .ifEmpty { pluginConfig }.flatMap { getDeclaredAnnotationProcessors(it) }
     }
 
-  private val MavenProject.compilerConfigsOrPluginConfig: List<Element>
-    get() {
-      val configurations: List<Element> = compilerConfigs
-      if (!configurations.isEmpty()) return configurations
-      return pluginConfig
-    }
+  private fun MavenPlugin.Execution.isCompilePhase(): Boolean {
+    return (phase.isNullOrBlank() && goals.contains("compile")) || phase == "compile"
+  }
 
   private val MavenProject.pluginConfig: List<Element>
     get() {

@@ -780,12 +780,14 @@ a:com.intellij.lang.injection.InjectedLanguageManager
 - a:injectedToHost(com.intellij.psi.PsiElement,I,Z):I
 - a:injectedToHost(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange):com.intellij.openapi.util.TextRange
 - a:intersectWithAllEditableFragments(com.intellij.psi.PsiFile,com.intellij.openapi.util.TextRange):java.util.List
+- a:isFrankensteinInjection(com.intellij.psi.PsiElement):Z
 - isInjectedFragment(com.intellij.psi.PsiFile):Z
 - a:isInjectedViewProvider(com.intellij.psi.FileViewProvider):Z
 - mapInjectedOffsetToUnescaped(com.intellij.psi.PsiFile,I):I
 - mapUnescapedOffsetToInjected(com.intellij.psi.PsiFile,I):I
 - a:mightHaveInjectedFragmentAtOffset(com.intellij.openapi.editor.Document,I):Z
 - a:registerMultiHostInjector(com.intellij.lang.injection.MultiHostInjector,com.intellij.openapi.Disposable):V
+- a:shouldInspectionsBeLenient(com.intellij.psi.PsiElement):Z
 com.intellij.lang.injection.MultiHostInjector
 - com.intellij.openapi.project.PossiblyDumbAware
 - sf:MULTIHOST_INJECTOR_EP_NAME:com.intellij.openapi.extensions.ProjectExtensionPointName
@@ -794,6 +796,9 @@ com.intellij.lang.injection.MultiHostInjector
 com.intellij.lang.injection.MultiHostRegistrar
 - a:addPlace(java.lang.String,java.lang.String,com.intellij.psi.PsiLanguageInjectionHost,com.intellij.openapi.util.TextRange):com.intellij.lang.injection.MultiHostRegistrar
 - a:doneInjecting():V
+- frankensteinInjection(Z):com.intellij.lang.injection.MultiHostRegistrar
+- makeInspectionsLenient(Z):com.intellij.lang.injection.MultiHostRegistrar
+- putInjectedFileUserData(com.intellij.openapi.util.Key,java.lang.Object):com.intellij.lang.injection.MultiHostRegistrar
 - a:startInjecting(com.intellij.lang.Language):com.intellij.lang.injection.MultiHostRegistrar
 - startInjecting(com.intellij.lang.Language,java.lang.String):com.intellij.lang.injection.MultiHostRegistrar
 com.intellij.lang.injection.general.Injection
@@ -803,6 +808,7 @@ com.intellij.lang.injection.general.Injection
 - a:getSuffix():java.lang.String
 - a:getSupportId():java.lang.String
 com.intellij.lang.injection.general.LanguageInjectionContributor
+- com.intellij.openapi.project.PossiblyDumbAware
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - sf:INJECTOR_EXTENSION:com.intellij.lang.LanguageExtension
 - a:getInjection(com.intellij.psi.PsiElement):com.intellij.lang.injection.general.Injection
@@ -842,6 +848,7 @@ com.intellij.lexer.DocCommentTokenTypes
 - tagValueQuote():com.intellij.psi.tree.IElementType
 - a:tagValueRParen():com.intellij.psi.tree.IElementType
 - a:tagValueSharp():com.intellij.psi.tree.IElementType
+- tagValueSlash():com.intellij.psi.tree.IElementType
 - a:tagValueToken():com.intellij.psi.tree.IElementType
 c:com.intellij.lexer.DummyLexer
 - com.intellij.lexer.LexerBase
@@ -1376,7 +1383,6 @@ f:com.intellij.openapi.components.ServiceBean
 f:com.intellij.openapi.components.ServiceDescriptor
 - f:client:com.intellij.openapi.client.ClientKind
 - f:headlessImplementation:java.lang.String
-- f:os:com.intellij.openapi.extensions.ExtensionDescriptor$Os
 - f:overrides:Z
 - f:serviceImplementation:java.lang.String
 - f:serviceInterface:java.lang.String
@@ -1390,6 +1396,71 @@ f:com.intellij.openapi.components.ServicesKt
 - sf:serviceNotFoundError(com.intellij.openapi.components.ComponentManager,java.lang.Class):java.lang.IllegalStateException
 f:com.intellij.openapi.editor.CharacterSequences
 - sf:codePointAt(java.lang.CharSequence,I):I
+f:com.intellij.openapi.editor.DefaultLanguageHighlighterColors
+- sf:AI_INLAY_BUTTON_DEFAULT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:AI_INLAY_BUTTON_FOCUSED:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:AI_INLAY_BUTTON_HOVERED:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:BLOCK_COMMENT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:BRACES:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:BRACKETS:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:CLASS_NAME:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:CLASS_REFERENCE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:COMMA:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:CONSTANT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_CODE_BLOCK:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_CODE_INLINE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_COMMENT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_COMMENT_GUIDE:com.intellij.openapi.editor.colors.ColorKey
+- sf:DOC_COMMENT_LINK:com.intellij.openapi.editor.colors.ColorKey
+- sf:DOC_COMMENT_MARKUP:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_COMMENT_TAG:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_COMMENT_TAG_VALUE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOC_TIPS_SHORTCUT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:DOT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:FUNCTION_CALL:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:FUNCTION_DECLARATION:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:GLOBAL_VARIABLE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:HIGHLIGHTED_REFERENCE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:IDENTIFIER:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_BUTTON_DEFAULT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_BUTTON_FOCUSED:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_BUTTON_HINT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_BUTTON_HOVERED:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_DEFAULT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLAY_TEXT_WITHOUT_BACKGROUND:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLINE_PARAMETER_HINT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLINE_PARAMETER_HINT_CURRENT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLINE_PARAMETER_HINT_HIGHLIGHTED:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INLINE_REFACTORING_SETTINGS_DEFAULT:com.intellij.openapi.editor.colors.ColorKey
+- sf:INLINE_REFACTORING_SETTINGS_FOCUSED:com.intellij.openapi.editor.colors.ColorKey
+- sf:INLINE_REFACTORING_SETTINGS_HOVERED:com.intellij.openapi.editor.colors.ColorKey
+- sf:INLINE_SUGGESTION:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INSTANCE_FIELD:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INSTANCE_METHOD:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INTERFACE_NAME:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:INVALID_STRING_ESCAPE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:KEYWORD:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:LABEL:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:LINE_COMMENT:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:LOCAL_VARIABLE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:MARKUP_ATTRIBUTE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:MARKUP_ENTITY:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:MARKUP_TAG:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:METADATA:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:NUMBER:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:OPERATION_SIGN:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:PARAMETER:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:PARENTHESES:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:PREDEFINED_SYMBOL:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:REASSIGNED_LOCAL_VARIABLE:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:REASSIGNED_PARAMETER:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:SEMICOLON:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:STATIC_FIELD:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:STATIC_METHOD:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:STRING:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:TEMPLATE_LANGUAGE_COLOR:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:VALID_STRING_ESCAPE:com.intellij.openapi.editor.colors.TextAttributesKey
+- <init>():V
 com.intellij.openapi.editor.Document
 - com.intellij.openapi.util.UserDataHolder
 - sf:EMPTY_ARRAY:com.intellij.openapi.editor.Document[]
@@ -1440,6 +1511,10 @@ f:com.intellij.openapi.editor.FoldingGroup
 - equals(java.lang.Object):Z
 - hashCode():I
 - s:newGroup(java.lang.String):com.intellij.openapi.editor.FoldingGroup
+com.intellij.openapi.editor.HighlighterColors
+- sf:BAD_CHARACTER:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:NO_HIGHLIGHTING:com.intellij.openapi.editor.colors.TextAttributesKey
+- sf:TEXT:com.intellij.openapi.editor.colors.TextAttributesKey
 com.intellij.openapi.editor.RangeMarker
 - com.intellij.openapi.util.Segment
 - com.intellij.openapi.util.UserDataHolder
@@ -4380,6 +4455,7 @@ com.intellij.psi.codeStyle.DocCommentSettings
 - a:isLeadingAsteriskEnabled():Z
 - a:isRemoveEmptyTags():Z
 - a:setDocFormattingEnabled(Z):V
+- setRemoveEmptyLines(Z):V
 - a:setRemoveEmptyTags(Z):V
 f:com.intellij.psi.codeStyle.DocCommentSettings$Defaults
 - com.intellij.psi.codeStyle.DocCommentSettings
@@ -4445,6 +4521,13 @@ a:com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistry
 - s:getReferencesFromProviders(com.intellij.psi.PsiElement):com.intellij.psi.PsiReference[]
 - s:getReferencesFromProviders(com.intellij.psi.PsiElement,com.intellij.psi.PsiReferenceService$Hints):com.intellij.psi.PsiReference[]
 - a:getRegistrar(com.intellij.lang.Language):com.intellij.psi.PsiReferenceRegistrar
+com.intellij.psi.jsp.IJspClassLevelDeclarationStatement
+com.intellij.psi.jsp.JspClassLevelDeclarationStatementType
+com.intellij.psi.jsp.JspCodeBlockType
+com.intellij.psi.jsp.JspCommentType
+com.intellij.psi.jsp.JspJavaCodeType
+com.intellij.psi.jsp.JspScriptletType
+com.intellij.psi.jsp.JspTemplateExpressionType
 com.intellij.psi.meta.MetaDataContributor
 - a:contributeMetaData(com.intellij.psi.meta.MetaDataRegistrar):V
 a:com.intellij.psi.meta.MetaDataRegistrar
@@ -4555,6 +4638,7 @@ c:com.intellij.psi.search.GlobalSearchScope$FilesScope
 - getFiles():com.intellij.openapi.vfs.VirtualFileSet
 f:com.intellij.psi.search.GlobalSearchScopeUtil
 - <init>():V
+- s:flattenUnionScope(com.intellij.psi.search.GlobalSearchScope):java.util.List
 - s:getLocalScopeFiles(com.intellij.psi.search.LocalSearchScope):java.util.Set
 - s:toGlobalSearchScope(com.intellij.psi.search.SearchScope,com.intellij.openapi.project.Project):com.intellij.psi.search.GlobalSearchScope
 c:com.intellij.psi.search.LocalSearchScope
@@ -5349,6 +5433,8 @@ f:com.intellij.testFramework.TestModeFlags
 - s:get(com.intellij.openapi.util.Key):java.lang.Object
 - s:is(com.intellij.openapi.util.Key):Z
 - s:reset(com.intellij.openapi.util.Key):V
+- s:runWithFlag(com.intellij.openapi.util.Key,java.lang.Object,com.intellij.openapi.util.ThrowableComputable):java.lang.Object
+- s:runWithFlag(com.intellij.openapi.util.Key,java.lang.Object,java.lang.Runnable):V
 - s:set(com.intellij.openapi.util.Key,java.lang.Object):java.lang.Object
 - s:set(com.intellij.openapi.util.Key,java.lang.Object,com.intellij.openapi.Disposable):V
 com.intellij.testIntegration.TestFramework
@@ -5627,9 +5713,11 @@ f:com.intellij.util.PsiIconUtil
 - sf:getIconFromProviders(com.intellij.psi.PsiElement,I):javax.swing.Icon
 - sf:getProvidersIcon(com.intellij.psi.PsiElement,I):javax.swing.Icon
 f:com.intellij.util.QueriesKt
+- sf:filteringNotNull(com.intellij.util.Query):com.intellij.util.Query
 - sf:mappingNotNull(com.intellij.util.Query,kotlin.jvm.functions.Function1):com.intellij.util.Query
 com.intellij.util.Query
 - java.lang.Iterable
+- kotlin.jvm.internal.markers.KMappedMarker
 - allMatch(java.util.function.Predicate):Z
 - allowParallelProcessing():com.intellij.util.Query
 - anyMatch(java.util.function.Predicate):Z

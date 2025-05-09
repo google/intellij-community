@@ -6,12 +6,13 @@ import com.intellij.core.rwmutex.*
 import com.intellij.openapi.application.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.Cancellation
+import com.intellij.openapi.util.coroutines.runSuspend
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.platform.util.coroutines.internal.runSuspend
 import com.intellij.util.ReflectionUtil
 import com.intellij.util.containers.Stack
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -106,7 +107,7 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   private var myWriteActionListener: WriteActionListener? = null
   private var myWriteIntentActionListener: WriteIntentReadActionListener? = null
   private var myLockAcquisitionListener: LockAcquisitionListener? = null
-  private var mySuspendingWriteActionListener: SuspendingWriteActionListener? = null
+  private var myWriteLockReacquisitionListener: WriteLockReacquisitionListener? = null
   private var myLegacyProgressIndicatorProvider: LegacyProgressIndicatorProvider? = null
 
   private val myWriteActionsStack = Stack<Class<*>>()
@@ -535,8 +536,14 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   @ApiStatus.Internal
   override fun setWriteIntentReadActionListener(listener: WriteIntentReadActionListener) {
     if (myWriteIntentActionListener != null)
-      error("WriteActionListener already registered")
+      error("WriteIntentReadActionListener already registered")
     myWriteIntentActionListener = listener
+  }
+
+  override fun removeWriteIntentReadActionListener(listener: WriteIntentReadActionListener) {
+    if (myWriteIntentActionListener != listener)
+      error("WriteActionListener is not registered")
+    myWriteIntentActionListener = null
   }
 
   @ApiStatus.Internal
@@ -549,22 +556,22 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   @ApiStatus.Internal
   override fun setLockAcquisitionListener(listener: LockAcquisitionListener) {
     if (myLockAcquisitionListener != null)
-      error("WriteActionListener already registered")
+      error("LockAcquisitionListener already registered")
     myLockAcquisitionListener = listener
   }
 
   @ApiStatus.Internal
-  override fun setSuspendingWriteActionListener(listener: SuspendingWriteActionListener) {
-    if (mySuspendingWriteActionListener != null)
-      error("SuspendingWriteActionListener already registered")
-    mySuspendingWriteActionListener = listener
+  override fun setWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener) {
+    if (myWriteLockReacquisitionListener != null)
+      error("WriteLockReacquisitionListener already registered")
+    myWriteLockReacquisitionListener = listener
   }
 
   @ApiStatus.Internal
-  override fun removeSuspendingWriteActionListener(listener: SuspendingWriteActionListener) {
-    if (mySuspendingWriteActionListener != listener)
-      error("SuspendingWriteActionListener is not registered")
-    mySuspendingWriteActionListener = null
+  override fun removeWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener) {
+    if (myWriteLockReacquisitionListener != listener)
+      error("WriteLockReacquisitionListener is not registered")
+    myWriteLockReacquisitionListener = null
   }
 
   @ApiStatus.Internal
@@ -584,7 +591,7 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   @ApiStatus.Internal
   override fun removeLockAcquisitionListener(listener: LockAcquisitionListener) {
     if (myLockAcquisitionListener != listener)
-      error("WriteActionListener is not registered")
+      error("LockAcquisitionListener is not registered")
     myLockAcquisitionListener = null
   }
 
@@ -716,7 +723,7 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
       runWithTemporaryThreadLocal(ts) { action() }
     }
     finally {
-      mySuspendingWriteActionListener?.beforeWriteLockReacquired()
+      myWriteLockReacquisitionListener?.beforeWriteLockReacquired()
       ts.acquire(getWritePermit(ts))
       myWriteAcquired = Thread.currentThread()
       myWriteStackBase = prevBase
@@ -1025,5 +1032,9 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
 
   private fun throwCannotWriteException() {
     throw java.lang.IllegalStateException("Write actions are prohibited")
+  }
+
+  override fun runWhenWriteActionIsCompleted(action: () -> Unit) {
+    return SwingUtilities.invokeLater { action() }
   }
 }

@@ -7,7 +7,11 @@ import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.provider.EelNioBridgeService
 import com.intellij.util.containers.forEachGuaranteed
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
+import org.jetbrains.annotations.VisibleForTesting
+import java.io.Closeable
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Path
@@ -17,12 +21,19 @@ import kotlin.io.path.Path
 import kotlin.io.path.pathString
 
 @ApiStatus.Internal
-internal class EelNioBridgeServiceImpl(private val coroutineScope: CoroutineScope) : EelNioBridgeService {
+@VisibleForTesting
+class EelNioBridgeServiceImpl(coroutineScope: CoroutineScope) : EelNioBridgeService {
   private val multiRoutingFileSystemProvider = FileSystems.getDefault().provider()
 
   private val rootRegistry = ConcurrentHashMap<EelDescriptor, MutableSet<Path>>()
   private val fsRegistry = ConcurrentHashMap<String, FileSystem>()
   private val idRegistry = ConcurrentHashMap<EelDescriptor, String>()
+
+  init {
+    coroutineScope.coroutineContext.job.invokeOnCompletion {
+      idRegistry.keys().asSequence().forEach { unregister(it) }
+    }
+  }
 
   override fun tryGetEelDescriptor(nioPath: Path): EelDescriptor? {
     return rootRegistry.entries.asSequence()

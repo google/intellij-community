@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.core.fileIndex.impl
 
 import com.intellij.openapi.components.serviceIfCreated
@@ -96,6 +96,13 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
   fun getDirectoriesByPackageName(packageName: String, scope: GlobalSearchScope): Query<VirtualFile>
 
   /**
+   * Returns a query producing single file source root files which correspond to [packageName].
+   * This is an internal function, plugins must use [com.intellij.openapi.roots.PackageIndex.getFilesByPackageName] instead.
+   */
+  @ApiStatus.Experimental
+  fun getFilesByPackageName(packageName: String): Query<VirtualFile>
+
+  /**
    * Initialize the index data. The index must not be accessed before this function is called.
    */
   suspend fun initialize()
@@ -161,7 +168,7 @@ sealed interface WorkspaceFileInternalInfo {
 
   /**
    * Returns file sets stored in this instance which satisfies the given [condition]
-   * todo ijpl-339 mark experimental
+   * todo IJPL-339 mark experimental
    */
   @ApiStatus.Internal
   fun findFileSets(condition: (WorkspaceFileSetWithCustomData<*>) -> Boolean): List<WorkspaceFileSetWithCustomData<*>>
@@ -177,7 +184,7 @@ internal sealed interface MultipleWorkspaceFileSets : WorkspaceFileInternalInfo 
 @ApiStatus.Experimental
 @ApiStatus.Internal
 fun interface WorkspaceFileSetVisitor {
-  fun visitIncludedRoot(fileSet: WorkspaceFileSet, entityPointer: EntityPointer<WorkspaceEntity>, recursive: Boolean)
+  fun visitIncludedRoot(fileSet: WorkspaceFileSet, entityPointer: EntityPointer<WorkspaceEntity>)
 }
 
 @ApiStatus.Internal

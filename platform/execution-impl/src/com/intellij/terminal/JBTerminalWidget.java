@@ -148,24 +148,44 @@ public class JBTerminalWidget extends JediTermWidget implements Disposable, UiCo
     return bar;
   }
 
+  /**
+   * @deprecated use {@link JBTerminalSystemSettingsProviderBase#getTerminalFontSize()} instead
+   */
+  @Deprecated
   public int getFontSize() {
-    return getSettingsProvider().getUiSettingsManager().getFontSize();
+    return Math.round(getSettingsProvider().getTerminalFontSize());
   }
 
+  /**
+   * @deprecated use {@link JBTerminalSystemSettingsProviderBase#getTerminalFontSize()} instead
+   */
+  @Deprecated
   public float getFontSize2D() {
-    return getSettingsProvider().getUiSettingsManager().getFontSize2D();
+    return getSettingsProvider().getTerminalFontSize();
   }
 
+  /**
+   * @deprecated use {@link JBTerminalSystemSettingsProviderBase#setTerminalFontSize(float)} instead
+   */
+  @Deprecated
   public void setFontSize(int fontSize) {
-    setFontSize((float)fontSize);
+    getSettingsProvider().setTerminalFontSize(fontSize);
   }
 
+  /**
+   * @deprecated use {@link JBTerminalSystemSettingsProviderBase#setTerminalFontSize(float)} instead
+   */
+  @Deprecated
   public void setFontSize(float fontSize) {
-    getSettingsProvider().getUiSettingsManager().setFontSize(fontSize);
+    getSettingsProvider().setTerminalFontSize(fontSize);
   }
 
+  /**
+   * @deprecated use {@link JBTerminalSystemSettingsProviderBase#resetTerminalFontSize()} instead
+   */
+  @Deprecated
   public void resetFontSize() {
-    getSettingsProvider().getUiSettingsManager().resetFontSize();
+    getSettingsProvider().resetTerminalFontSize();
   }
 
   public @Nullable ProcessTtyConnector getProcessTtyConnector() {

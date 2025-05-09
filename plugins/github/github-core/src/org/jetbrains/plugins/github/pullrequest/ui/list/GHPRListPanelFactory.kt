@@ -7,9 +7,12 @@ import com.intellij.collaboration.async.nestedDisposable
 import com.intellij.collaboration.ui.CollaborationToolsUIUtil.wrapWithProgressStripe
 import com.intellij.collaboration.ui.VerticalListPanel
 import com.intellij.collaboration.ui.codereview.list.ReviewListUtil.wrapWithLazyVerticalScroll
+import com.intellij.collaboration.ui.util.toListModelIn
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.ScrollableContentBorder
 import com.intellij.ui.Side
 import com.intellij.ui.components.ActionLink
@@ -18,6 +21,7 @@ import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.isActive
 import org.jetbrains.annotations.ApiStatus
@@ -40,7 +44,10 @@ object GHPRListPanelFactory {
   fun create(project: Project, cs: CoroutineScope, dataContext: GHPRDataContext, listVm: GHPRListViewModel): JComponent {
     val ghostUser = dataContext.securityService.ghostUser
     val currentUser = dataContext.securityService.currentUser
-    val listModel = cs.scopedDelegatingListModel(listVm.listModel)
+
+    val listModel = cs.childScope("EDT", Dispatchers.EDT).let { cs ->
+      cs.scopedDelegatingListModel(listVm.loadedData.toListModelIn(cs))
+    }
     val list = GHPRListComponentFactory(dataContext.interactionState, listModel)
       .create(listVm.avatarIconsProvider, ghostUser, currentUser)
 
@@ -54,14 +61,14 @@ object GHPRListPanelFactory {
       border = JBUI.Borders.empty(4, 0)
       add(JLabel(GithubBundle.message("pull.request.list.outdated")))
       add(ActionLink(GithubBundle.message("pull.request.list.refresh")) {
-        listVm.refresh()
+        listVm.reload()
       })
 
       isVisible = false
     }
 
     cs.launchNow {
-      combineAndCollect(listVm.loading, listVm.error, listVm.outdated) { loading, error, outdated ->
+      combineAndCollect(listVm.isLoading, listVm.error, listVm.outdated) { loading, error, outdated ->
         outdatedStatePanel.isVisible = outdated && (!loading && error == null)
       }
     }
@@ -73,7 +80,7 @@ object GHPRListPanelFactory {
 
     val listLoaderPanel = wrapWithLazyVerticalScroll(cs, list, listVm::requestMore)
     val listWrapper = Wrapper()
-    val progressStripe = wrapWithProgressStripe(cs, listVm.loading, listWrapper)
+    val progressStripe = wrapWithProgressStripe(cs, listVm.isLoading, listWrapper)
     ScrollableContentBorder.setup(listLoaderPanel, Side.TOP, progressStripe)
 
     GHPRListPanelController(project, cs, listVm, list.emptyText, listLoaderPanel, listWrapper)

@@ -61,7 +61,7 @@ internal object ChangeVisibilityFixFactories {
                 elementName,
                 visibilityModifier,
             )
-            return Presentation.of(actionName)
+            return Presentation.of(actionName).withFixAllOption(this)
         }
 
         override fun invoke(
@@ -136,11 +136,6 @@ internal object ChangeVisibilityFixFactories {
 
     val exposedPropertyTypeInConstructorError =
         KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ExposedPropertyTypeInConstructorError ->
-            createChangeVisibilityFixOnExposure(diagnostic.psi, diagnostic.elementVisibility, diagnostic.restrictingDeclaration, diagnostic.restrictingVisibility)
-        }
-
-    val exposedPropertyTypeInConstructorWarning =
-        KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ExposedPropertyTypeInConstructorWarning ->
             createChangeVisibilityFixOnExposure(diagnostic.psi, diagnostic.elementVisibility, diagnostic.restrictingDeclaration, diagnostic.restrictingVisibility)
         }
 

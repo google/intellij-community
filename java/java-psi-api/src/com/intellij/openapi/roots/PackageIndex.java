@@ -2,9 +2,12 @@
 package com.intellij.openapi.roots;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.util.EmptyQuery;
 import com.intellij.util.Query;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,10 +32,19 @@ public abstract class PackageIndex {
   public abstract VirtualFile @NotNull [] getDirectoriesByPackageName(@NotNull String packageName, boolean includeLibrarySources);
 
   /**
-   * @return all directories in the given scope corresponding to the given package name.
+   * @return all directories in the given scope corresponding to the given package name. Note that package may also contain
+   * single file source roots. Use {@link #getFilesByPackageName(String)} to get them.
    */
   public Query<VirtualFile> getDirsByPackageName(@NotNull String packageName, @NotNull GlobalSearchScope scope) {
     return getDirsByPackageName(packageName, true).filtering(scope::contains);
+  }
+
+  /**
+   * @return Returns a query producing single file source root files which correspond to {@code packageName}.
+   */
+  @ApiStatus.Experimental
+  public Query<VirtualFile> getFilesByPackageName(@NotNull @NlsSafe String packageName) { 
+    return EmptyQuery.getEmptyQuery();
   }
 
   /**
@@ -46,7 +58,7 @@ public abstract class PackageIndex {
   public abstract @NotNull Query<VirtualFile> getDirsByPackageName(@NotNull String packageName, boolean includeLibrarySources);
 
   /**
-   * Returns the name of the package corresponding to the specified directory.
+   * Returns the name of the package corresponding to the specified directory or a specific file if the file is a single-file root.
    *
    * @return the package name, or null if the directory does not correspond to any package.
    */

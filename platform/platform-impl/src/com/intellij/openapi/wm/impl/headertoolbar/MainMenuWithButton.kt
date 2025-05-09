@@ -23,9 +23,11 @@ import com.intellij.ui.util.width
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import java.awt.event.ActionEvent
+import java.beans.PropertyChangeEvent
+import java.beans.PropertyChangeListener
 import java.util.concurrent.ConcurrentHashMap
 import javax.swing.*
-import javax.swing.event.ChangeEvent
+import javax.swing.event.ChangeListener
 import kotlin.math.roundToInt
 
 private val LOG = Logger.getInstance(MainMenuWithButton::class.java)
@@ -133,12 +135,12 @@ class MainMenuWithButton(
 
   private fun supportKeyNavigationToFullMenu() {
     val selectionManager = MenuSelectionManager.defaultManager()
-    val listener: (ChangeEvent) -> Unit = {
+    val listener = ChangeListener {
       val path = selectionManager.selectedPath
       if (path.size > 0 && path[0] === toolbarMainMenu) {
         val map = frame.rootPane.actionMap
-        addAction(map, "selectChild")
-        addAction(map, "selectParent")
+        addAction(map, MenuNavigationAction.SELECT_CHILD)
+        addAction(map, MenuNavigationAction.SELECT_PARENT)
       }
     }
     selectionManager.addChangeListener(listener)
@@ -168,15 +170,21 @@ class MergedMainMenu(coroutineScope: CoroutineScope, frame: JFrame) : IdeJMenuBa
     isOpaque = false
     isVisible = ShowMode.getCurrent() == ShowMode.TOOLBAR_WITH_MENU
     border = null
-    JBUIScale.addUserScaleChangeListener {
-      val oldScale = it.oldValue as? Float ?: return@addUserScaleChangeListener
-      val newScale = it.newValue as? Float ?: return@addUserScaleChangeListener
-      if (oldScale == newScale || invisibleItems.isEmpty()) return@addUserScaleChangeListener
-      invisibleItems.forEach {
-        (name, itemToWidth) ->
-        val width = (itemToWidth.second / oldScale * newScale).roundToInt()
-        invisibleItems.put(name, Pair(itemToWidth.first, width))
-      } }
+    val userScaleListener = object : PropertyChangeListener {
+      override fun propertyChange(evt: PropertyChangeEvent) {
+        val oldScale = evt.oldValue as? Float ?: return
+        val newScale = evt.newValue as? Float ?: return
+        if (oldScale == newScale || invisibleItems.isEmpty()) return
+        invisibleItems.forEach { (name, itemToWidth) ->
+          val width = (itemToWidth.second / oldScale * newScale).roundToInt()
+          invisibleItems.put(name, Pair(itemToWidth.first, width))
+        }
+      }
+    }
+    JBUIScale.addUserScaleChangeListener(userScaleListener)
+    coroutineScope.coroutineContext.job.invokeOnCompletion {
+      JBUIScale.removeUserScaleChangeListener(userScaleListener)
+    }
   }
 
   fun addInvisibleItem(item: ActionMenu) {
@@ -247,10 +255,16 @@ internal class MenuNavigationAction(
   val toolbarMainMenu: MergedMainMenu,
 ) : AbstractAction(name) {
 
+  companion object {
+    const val SELECT_CHILD = "selectChild"
+    const val SELECT_PARENT = "selectParent"
+  }
+
   override fun actionPerformed(e: ActionEvent) {
     val path = MenuSelectionManager.defaultManager().selectedPath
     if (path.size > 0 && path[0] === toolbarMainMenu) {
-      if (name == "selectParent") {
+      if (name == SELECT_PARENT) {
+        // if we try to navigate to previous element before first item we just expand full menu and select last element
         if (path.size == 4 && path[1] === toolbarMainMenu.getMenu(0)) {
           if (mainMenuButton.expandableMenu?.isEnabled() == true) {
             mainMenuButton.expandableMenu!!.switchState(itemInd = mainMenuButton.expandableMenu!!.ideMenu.rootMenuItems.lastIndex)
@@ -261,6 +275,7 @@ internal class MenuNavigationAction(
           return
         }
       }
+      // if we try to navigate to next element after last item we just expand full menu
       else if (path.size > 3 && path[1] === toolbarMainMenu.rootMenuItems.last()) {
         val element = path.last()
         if (element is ActionMenu && element.itemCount == 0 || element is ActionMenuItem) {

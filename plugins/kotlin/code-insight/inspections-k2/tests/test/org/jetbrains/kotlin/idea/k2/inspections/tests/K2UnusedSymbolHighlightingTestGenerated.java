@@ -287,6 +287,21 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/dataInlineClassDeclarationk2.kt");
         }
 
+        @TestMetadata("deprecationLevelHidden.kt")
+        public void testDeprecationLevelHidden() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/deprecationLevelHidden.kt");
+        }
+
+        @TestMetadata("deprecationLevelHidden2.kt")
+        public void testDeprecationLevelHidden2() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/deprecationLevelHidden2.kt");
+        }
+
+        @TestMetadata("deprecationLevelHidden3.kt")
+        public void testDeprecationLevelHidden3() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/deprecationLevelHidden3.kt");
+        }
+
         @TestMetadata("effectivelyFinalFunctionParameter.kt")
         public void testEffectivelyFinalFunctionParameter() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/effectivelyFinalFunctionParameter.kt");
@@ -360,6 +375,11 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
         @TestMetadata("functionWithInlineClassReceiver.kt")
         public void testFunctionWithInlineClassReceiver() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/functionWithInlineClassReceiver.kt");
+        }
+
+        @TestMetadata("functionalLiteral.kt")
+        public void testFunctionalLiteral() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/functionalLiteral.kt");
         }
 
         @TestMetadata("inAnonymous.kt")
@@ -545,6 +565,11 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
         @TestMetadata("privateOperatorUsed.kt")
         public void testPrivateOperatorUsed() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/privateOperatorUsed.kt");
+        }
+
+        @TestMetadata("privateOperatorUsed2.kt")
+        public void testPrivateOperatorUsed2() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/privateOperatorUsed2.kt");
         }
 
         @TestMetadata("privateProperty.kt")

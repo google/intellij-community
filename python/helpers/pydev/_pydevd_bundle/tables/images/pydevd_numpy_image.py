@@ -1,17 +1,8 @@
 #  Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 import numpy as np
-import io
-import base64
+from _pydevd_bundle.tables.images.pydevd_image_loader import (save_image_to_storage, GRAYSCALE_MODE, RGB_MODE, RGBA_MODE)
 
-
-DEFAULT_IMAGE_FORMAT = 'PNG'
-DEFAULT_ENCODING = 'utf-8'
-GRAYSCALE_MODE = 'L'
-RGB_MODE = 'RGB'
-RGBA_MODE = 'RGBA'
-
-
-def get_bytes(arr):
+def create_image(arr):
     # type: (np.ndarray) -> str
     try:
         from PIL import Image
@@ -31,8 +22,12 @@ def get_bytes(arr):
         arr_min, arr_max = np.min(arr_to_convert), np.max(arr_to_convert)
         if arr_min == arr_max:  # handle constant values
             arr_to_convert = np.full_like(arr_to_convert, 127, dtype=np.uint8)
+        elif 0 <= arr_min <= 1 and 0 <= arr_max <= 1:
+            arr_to_convert = (arr_to_convert * 255).astype(np.uint8)
+        elif arr_min < 0 or arr_max > 255:
+            arr_to_convert = ((arr_to_convert - arr_min) * 255 / (arr_max - arr_min)).astype(np.uint8)
         else:
-            arr_to_convert = ((arr_to_convert - arr_min) / (arr_max - arr_min) * 255).astype(np.uint8)
+            arr_to_convert = arr_to_convert.astype(np.uint8)
 
         arr_to_convert_ndim = arr_to_convert.ndim
         if arr_to_convert_ndim == 2:
@@ -41,10 +36,9 @@ def get_bytes(arr):
             mode = RGBA_MODE
         else:
             mode = RGB_MODE
-        bytes_buffer = io.BytesIO()
-        image = Image.fromarray(arr_to_convert, mode=mode)
-        image.save(bytes_buffer, format=DEFAULT_IMAGE_FORMAT)
-        return base64.b64encode(bytes_buffer.getvalue()).decode(DEFAULT_ENCODING)
+
+        return save_image_to_storage(Image.fromarray(arr_to_convert, mode=mode))
+
     except ImportError:
         return "Error: Pillow library is not installed."
     except (TypeError, ValueError):

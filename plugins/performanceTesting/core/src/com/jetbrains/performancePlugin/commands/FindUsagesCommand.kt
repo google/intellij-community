@@ -1,3 +1,4 @@
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.performancePlugin.commands
 
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction
@@ -44,8 +45,9 @@ class FindUsagesCommand(text: String, line: Int) : PerformanceCommandCoroutineAd
     private val LOG = logger<FindUsagesCommand>()
 
     @Suppress("TestOnlyProblems")
-    suspend fun getElement(project: Project, editor: Editor, offset: Int): PsiElement? {
+    suspend fun getElement(project: Project, editor: Editor): PsiElement? {
       return smartReadAction(project) {
+        val offset = editor.caretModel.offset
         if (GotoDeclarationAction.findElementToShowUsagesOf(editor, offset) == null) {
           GotoDeclarationAction.findTargetElement(project, editor, offset)
         }
@@ -88,17 +90,17 @@ class FindUsagesCommand(text: String, line: Int) : PerformanceCommandCoroutineAd
           throw Exception("No editor is opened")
         }
 
-        val (offset, scope) = writeIntentReadAction {
-          Pair(editor.caretModel.offset, FindUsagesOptions.findScopeByName(project, null, options.scope))
+        val scope = readAction {
+          FindUsagesOptions.findScopeByName(project, null, options.scope)
         }
 
         AdvancedSettings.setInt("ide.usages.page.size", Int.MAX_VALUE) //by default, it's 100; we need to find all usages to compare
         val popupPosition = JBPopupFactory.getInstance().guessBestPopupLocation(editor)
 
-        val element = getElement(project, editor, offset)
+        val element = getElement(project, editor)
 
         val searchTargets = readAction {
-          PsiDocumentManager.getInstance(project).getPsiFile(editor.document)?.let { searchTargets(it, offset) }
+          PsiDocumentManager.getInstance(project).getPsiFile(editor.document)?.let { searchTargets(it, editor.caretModel.offset) }
         }
         if (!searchTargets.isNullOrEmpty()) {
           val target = searchTargets.first()
@@ -125,7 +127,7 @@ class FindUsagesCommand(text: String, line: Int) : PerformanceCommandCoroutineAd
         }
 
         if (findUsagesFuture == null) {
-          throw Exception("Can't find an element or search target under $offset offset.")
+          throw Exception("Can't find an element or search target at $position.")
         }
       }
     }

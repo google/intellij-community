@@ -1,23 +1,23 @@
 <idea-plugin allow-bundled-update="true">
   <id>org.jetbrains.idea.maven</id>
   <name>Maven</name>
-  <category>Build Tools</category>
-  <description>
-    <![CDATA[
-      Provides <a href="https://maven.apache.org/">Maven</a> support.
-      The following features are available:
-        <ul>
-        <li>Maven Projects tool window.</li>
-        <li>Dedicated module type.</li>
-        <li>Maven repositories support.</li>
-        <li>Full editing support for pom.xml file.</li>
-        <li>Possibility to import Maven projects.</li>
-        <li>Running and debugging Maven goals.</li>
-        <li>Compiling.</li>
-        </ul>
-      ]]>
-  </description>
   <vendor>JetBrains</vendor>
+  <category>Build Tools</category>
+
+  <description><![CDATA[
+    Provides <a href="https://maven.apache.org/">Maven</a> support.
+    The following features are available:
+    <ul>
+      <li>Maven Projects tool window.</li>
+      <li>Dedicated module type.</li>
+      <li>Maven repositories support.</li>
+      <li>Full editing support for the pom.xml file.</li>
+      <li>Possibility to import Maven projects.</li>
+      <li>Running and debugging Maven goals.</li>
+      <li>Compiling.</li>
+    </ul>
+  ]]></description>
+
   <resource-bundle>messages.MavenProjectBundle</resource-bundle>
 
   <extensionPoints>
@@ -61,21 +61,25 @@
     <extensionPoint name="mavenRemoteConnectionCreator" interface="org.jetbrains.idea.maven.execution.MavenRemoteConnectionCreator" dynamic="true"/>
   </extensionPoints>
 
-  <depends>com.intellij.properties</depends>
-  <depends>com.intellij.modules.java</depends>
-  <depends>org.jetbrains.idea.reposearch</depends>
-  <depends>org.jetbrains.idea.maven.model</depends>
-  <depends>org.jetbrains.idea.maven.server.api</depends>
+  <dependencies>
+    <module name="intellij.properties.backend"/>
+    <plugin id="com.intellij.java"/>
+    <plugin id="org.jetbrains.idea.reposearch"/>
+  </dependencies>
+
   <depends optional="true" config-file="groovy-support.xml">org.intellij.groovy</depends>
   <depends optional="true" config-file="errorProne-compiler-support.xml">Error-prone plugin</depends>
   <depends optional="true" config-file="maven-performance-plugin-support.xml">com.jetbrains.performancePlugin</depends>
+
+  <content>
+    <module name="intellij.maven.profiler"/>
+  </content>
 
   <extensions defaultExtensionNs="com.intellij">
     <postStartupActivity implementation="org.jetbrains.idea.maven.project.MavenProjectsManagerProjectActivity"/>
 
     <pathMacroContributor implementation="org.jetbrains.idea.maven.utils.MavenPathMacroContributor"/>
-    <projectPathMacroContributor implementation="org.jetbrains.idea.maven.utils.MavenPathMacroContributor"/>
-    <ignoredFileProvider implementation="org.jetbrains.idea.maven.utils.MavenIgnoreFileProvider"/>
+    <projectPathMacroContributor implementation="org.jetbrains.idea.maven.utils.MavenProjectPathMacroContributor"/>
     <buildProcess.parametersProvider implementation="org.jetbrains.idea.maven.utils.MavenBuildProcessParameterProvider"/>
     <customJavadocTagProvider implementation="org.jetbrains.idea.maven.javadoc.MojoClassAnnotationTagProvider"/>
     <fileType name="MavenConfig" implementationClass="org.jetbrains.idea.maven.config.MavenConfigFileType"
@@ -327,6 +331,9 @@
 
     <registryKey key="maven.use.scripts" defaultValue="true"
                  description="Run maven goals via mvn.sh/mvn.bat"/>
+
+    <registryKey key="maven.use.scripts.debug.agent" defaultValue="true"
+                 description="Use instrumentation agent when debugging with maven"/>
 
     <registryKey key="maven.dedicated.indexer.vmargs" defaultValue="-Xmx1024m"
                  description="Dedicated maven indexer VM arguments, restart maven server or IDEA after changing this parameter"/>
@@ -639,7 +646,6 @@
     <provider implementation="org.jetbrains.idea.maven.onlinecompletion.MavenCompletionProviderFactory"/>
   </extensions>
 
-
   <actions>
     <action id="Maven.SyncIncrementally" class="org.jetbrains.idea.maven.project.actions.IncrementalSyncAction"
             icon="AllIcons.Actions.Refresh">
@@ -940,6 +946,7 @@
   <projectListeners>
     <listener class="org.jetbrains.idea.maven.project.MavenDependencyUpdater" topic="org.jetbrains.idea.maven.project.MavenImportListener"/>
   </projectListeners>
+
   <applicationListeners>
     <listener class="org.jetbrains.idea.maven.project.MavenImportListenerBridge"
               topic="org.jetbrains.idea.maven.project.MavenSyncListener"

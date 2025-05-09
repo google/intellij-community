@@ -7,18 +7,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.plugins.parser.impl.XmlReadUtils.getNullifiedAttributeValue
 import com.intellij.platform.plugins.parser.impl.XmlReadUtils.getNullifiedContent
+import com.intellij.platform.plugins.parser.impl.elements.*
 import com.intellij.platform.plugins.parser.impl.elements.ActionElement.*
-import com.intellij.platform.plugins.parser.impl.elements.ClientKind
-import com.intellij.platform.plugins.parser.impl.elements.ComponentElement
-import com.intellij.platform.plugins.parser.impl.elements.ContentElement
-import com.intellij.platform.plugins.parser.impl.elements.DependenciesElement
-import com.intellij.platform.plugins.parser.impl.elements.DependsElement
-import com.intellij.platform.plugins.parser.impl.elements.ExtensionPointElement
-import com.intellij.platform.plugins.parser.impl.elements.ListenerElement
-import com.intellij.platform.plugins.parser.impl.elements.MiscExtensionElement
-import com.intellij.platform.plugins.parser.impl.elements.OS
-import com.intellij.platform.plugins.parser.impl.elements.PreloadMode
-import com.intellij.platform.plugins.parser.impl.elements.ServiceElement
 import com.intellij.util.Java11Shim
 import com.intellij.util.xml.dom.XmlInterner
 import com.intellij.util.xml.dom.createNonCoalescingXmlStreamReader
@@ -110,7 +100,7 @@ private fun readRootAttributes(reader: XMLStreamReader2, builder: PluginDescript
       PluginXmlConst.PLUGIN_URL_ATTR -> builder.url = getNullifiedAttributeValue(reader, i)
       PluginXmlConst.PLUGIN_USE_IDEA_CLASSLOADER_ATTR -> builder.isUseIdeaClassLoader = reader.getAttributeAsBoolean(i)
       PluginXmlConst.PLUGIN_ALLOW_BUNDLED_UPDATE_ATTR -> builder.isBundledUpdateAllowed = reader.getAttributeAsBoolean(i)
-      PluginXmlConst.PLUGIN_IMPLEMENTATION_DETAIL_ATTR -> builder.implementationDetail = reader.getAttributeAsBoolean(i)
+      PluginXmlConst.PLUGIN_IMPLEMENTATION_DETAIL_ATTR -> builder.isImplementationDetail = reader.getAttributeAsBoolean(i)
       PluginXmlConst.PLUGIN_REQUIRE_RESTART_ATTR -> builder.isRestartRequired = reader.getAttributeAsBoolean(i)
       PluginXmlConst.PLUGIN_DEPENDENT_ON_CORE_ATTR -> builder.isIndependentFromCoreClassLoader = !reader.getAttributeAsBoolean(i)
       PluginXmlConst.PLUGIN_IS_SEPARATE_JAR_ATTR -> builder.isSeparateJar = reader.getAttributeAsBoolean(i)
@@ -144,8 +134,9 @@ fun isKotlinPlugin(pluginId: String): Boolean =
 private val K2_ALLOWED_PLUGIN_IDS = Java11Shim.INSTANCE.copyOf(KNOWN_KOTLIN_PLUGIN_IDS + listOf(
   "org.jetbrains.android",
   "androidx.compose.plugins.idea",
-  "com.intellij.kmm",
+  "com.jetbrains.kmm",
   "com.jetbrains.kotlin.ocswift",
+  "com.jetbrains.rider.android"
 ))
 
 private fun readRootElementChild(
@@ -370,7 +361,7 @@ private fun readExtensions(reader: XMLStreamReader2, builder: PluginDescriptorBu
           }
         }
 
-        val extensionElement = MiscExtensionElement(
+        val extensionElement = ExtensionElement(
           implementation = implementation,
           os = os,
           orderId = orderId,
@@ -806,11 +797,6 @@ private fun readInclude(
     null
   }
   if (loadedXInclude != null) {
-    // TODO
-    //(consumer.readContext as? DescriptorListLoadingContext)?.debugData?.recordIncludedPath(
-    //  rawPluginDescriptor = builder.raw,
-    //  path = loadedXInclude.diagnosticReferenceLocation ?: LoadPathUtil.toLoadPath(relativePath = path, baseDir = consumer.includeBase),
-    //)
     consumer.pushIncludeBase(LoadPathUtil.getChildBaseDir(base = consumer.includeBase, relativePath = path))
     try {
       consumer.consume(loadedXInclude.inputStream, loadedXInclude.diagnosticReferenceLocation)

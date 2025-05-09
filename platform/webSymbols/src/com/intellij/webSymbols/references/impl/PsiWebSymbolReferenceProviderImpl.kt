@@ -32,6 +32,7 @@ import com.intellij.webSymbols.references.PsiWebSymbolReferenceProvider
 import com.intellij.webSymbols.references.WebSymbolReference
 import com.intellij.webSymbols.references.WebSymbolReferenceProblem
 import com.intellij.webSymbols.references.WebSymbolReferenceProblem.ProblemKind
+import com.intellij.webSymbols.utils.WebSymbolDeclaredInPsi
 import com.intellij.webSymbols.utils.asSingleSymbol
 import com.intellij.webSymbols.utils.getProblemKind
 import com.intellij.webSymbols.utils.hasOnlyExtensions
@@ -44,12 +45,12 @@ internal const val IJ_IGNORE_REFS = "ij-no-psi-refs"
 class PsiWebSymbolReferenceProviderImpl : PsiSymbolReferenceProvider {
 
   override fun getReferences(element: PsiExternalReferenceHost, hints: PsiSymbolReferenceHints): Collection<PsiSymbolReference> =
-    getSymbolOffsetsAndReferences(element).second
+    getSymbolOffsetsAndReferences(element, hints).second
 
   override fun getSearchRequests(project: Project, target: Symbol): Collection<SearchRequest> =
     emptyList()
 
-  internal fun getSymbolOffsetsAndReferences(element: PsiExternalReferenceHost): Pair<MultiMap<Int, WebSymbol>, List<WebSymbolReference>> =
+  internal fun getSymbolOffsetsAndReferences(element: PsiExternalReferenceHost, hints: PsiSymbolReferenceHints): Pair<MultiMap<Int, WebSymbol>, List<WebSymbolReference>> =
     CachedValuesManager.getCachedValue(element, CachedValuesManager.getManager(element.project).getKeyForClass(this.javaClass)) {
       val beans = PsiWebSymbolReferenceProviders.byLanguage(element.getLanguage()).byHostClass(element.javaClass)
       val result = SmartList<WebSymbolReference>()
@@ -58,7 +59,7 @@ class PsiWebSymbolReferenceProviderImpl : PsiSymbolReferenceProvider {
         @Suppress("UNCHECKED_CAST")
         val provider = bean.instance as PsiWebSymbolReferenceProvider<PsiExternalReferenceHost>
         val showProblems = provider.shouldShowProblems(element)
-        val offsetsFromProvider = provider.getOffsetsToReferencedSymbols(element)
+        val offsetsFromProvider = provider.getOffsetsToReferencedSymbols(element, hints)
         result.addAll(offsetsFromProvider.flatMap { (offset, symbol) ->
           getReferences(element, offset, symbol, showProblems)
         })
@@ -121,7 +122,7 @@ internal fun getReferences(element: PsiElement, symbolNameOffset: Int, symbol: W
           ?.firstOrNull()
       }.takeIf { it.size == segments.size }?.firstOrNull()
       if (showProblems && (deprecation != null || problemOnly || segments.any { it.problem != null })) {
-        NameSegmentReferenceWithProblem(element, symbol, range.shiftRight(symbolNameOffset), segments, deprecation, problemOnly)
+        NameSegmentReferenceWithProblem(element, symbol, range.shiftRight(symbolNameOffset), segments, symbolNameOffset,deprecation, problemOnly)
       }
       else if (!range.isEmpty && !problemOnly) {
         NameSegmentReference(element, range.shiftRight(symbolNameOffset), segments)
@@ -164,6 +165,7 @@ private class NameSegmentReferenceWithProblem(
   private val symbol: WebSymbol,
   rangeInElement: TextRange,
   nameSegments: Collection<WebSymbolNameSegment>,
+  private val segmentsOffset: Int,
   private val apiStatus: WebSymbolApiStatus?,
   private val problemOnly: Boolean,
 ) : NameSegmentReference(element, rangeInElement, nameSegments) {
@@ -184,7 +186,7 @@ private class NameSegmentReferenceWithProblem(
           segment.symbolKinds,
           problemKind,
           inspectionManager.createProblemDescriptor(
-            element, TextRange(segment.start, segment.end),
+            element, TextRange(segment.start + segmentsOffset, segment.end + segmentsOffset),
             toolMapping?.getProblemMessage(segment.displayName)
             ?: getDefaultProblemMessage(problemKind, segment.displayName),
             ProblemHighlightType.GENERIC_ERROR_OR_WARNING, true,

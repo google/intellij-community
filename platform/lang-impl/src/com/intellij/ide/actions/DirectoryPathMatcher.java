@@ -20,8 +20,8 @@ import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.util.Processor;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.indexing.FileBasedIndex;
-import com.intellij.util.indexing.FileBasedIndexImpl;
 import com.intellij.util.indexing.IdFilter;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,7 +35,6 @@ final class DirectoryPathMatcher {
   private final @NotNull GotoFileModel myModel;
   private final @Nullable List<Pair<VirtualFile, String>> myFiles;
   private final @NotNull Predicate<VirtualFile> myProjectFileFilter;
-  private final @NotNull DirectoryPathMatcherService myService;
 
   final @NotNull String dirPattern;
 
@@ -46,9 +45,7 @@ final class DirectoryPathMatcher {
 
     FileBasedIndex fileBasedIndex = FileBasedIndex.getInstance();
     Project project = model.getProject();
-    IdFilter projectIndexableFilesFilter = fileBasedIndex instanceof FileBasedIndexImpl
-                                           ? ((FileBasedIndexImpl)fileBasedIndex).projectIndexableFiles(project)
-                                           : null;
+    IdFilter projectIndexableFilesFilter = fileBasedIndex.projectIndexableFiles(project);
     var allScope = GlobalSearchScope.allScope(project);
     if (projectIndexableFilesFilter == null) {
       myProjectFileFilter = vFile -> allScope.contains(vFile);
@@ -60,8 +57,6 @@ final class DirectoryPathMatcher {
                : allScope.contains(vFile);
       };
     }
-
-    myService = DirectoryPathMatcherService.getInstance(project);
   }
 
   static @Nullable DirectoryPathMatcher root(@NotNull GotoFileModel model, @NotNull String pattern) {
@@ -146,7 +141,7 @@ final class DirectoryPathMatcher {
 
       @Override
       public boolean visitFile(@NotNull VirtualFile file) {
-        return (myService.shouldProcess(file) || myProjectFileFilter.test(file)) && consumer.process(file);
+        return myProjectFileFilter.test(file) && consumer.process(file);
       }
 
       @Override
@@ -160,7 +155,8 @@ final class DirectoryPathMatcher {
     return StringUtil.indexOf(name, c, 0, name.length(), false) >= 0;
   }
 
-  private static @NotNull List<Pair<VirtualFile, String>> getProjectRoots(GotoFileModel model) {
+  @ApiStatus.Internal
+  static @NotNull List<Pair<VirtualFile, String>> getProjectRoots(GotoFileModel model) {
     Set<VirtualFile> roots = new HashSet<>(BaseProjectDirectories.getBaseDirectories(model.getProject()));
     for (Module module : ModuleManager.getInstance(model.getProject()).getModules()) {
       for (OrderEntry entry : ModuleRootManager.getInstance(module).getOrderEntries()) {

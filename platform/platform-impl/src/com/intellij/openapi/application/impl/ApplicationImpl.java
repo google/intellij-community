@@ -22,6 +22,7 @@ import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationUtil;
 import com.intellij.openapi.client.ClientAwareComponentManager;
 import com.intellij.openapi.components.impl.stores.IComponentStore;
+import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.ControlFlowException;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.Extensions;
@@ -65,6 +66,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -72,6 +74,7 @@ import java.util.function.Supplier;
 import static com.intellij.codeWithMe.ClientId.decorateCallable;
 import static com.intellij.codeWithMe.ClientId.decorateRunnable;
 import static com.intellij.ide.ShutdownKt.cancelAndJoinBlocking;
+import static com.intellij.openapi.application.CoroutinesKt.isBackgroundWriteAction;
 import static com.intellij.openapi.application.ModalityKt.asContextElement;
 import static com.intellij.openapi.application.RuntimeFlagsKt.getReportInvokeLaterWithoutModality;
 import static com.intellij.openapi.application.impl.AppImplKt.rethrowCheckedExceptions;
@@ -106,6 +109,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   private final ReadActionCacheImpl myReadActionCacheImpl = new ReadActionCacheImpl();
 
   private final ThreadLocal<Boolean> myImpatientReader = ThreadLocal.withInitial(() -> false);
+
+  private AtomicInteger backgroundWriteActionCounter = new AtomicInteger(0);
 
   private final long myStartTime = System.currentTimeMillis();
   private boolean mySaveAllowed;
@@ -373,8 +378,9 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public void dispose() {
     getThreadingSupport().removeReadActionListener(myLockDispatcherListener);
     getThreadingSupport().removeWriteActionListener(myLockDispatcherListener);
+    getThreadingSupport().removeWriteIntentReadActionListener(myLockDispatcherListener);
     getThreadingSupport().removeLockAcquisitionListener(myLockDispatcherListener);
-    getThreadingSupport().removeSuspendingWriteActionListener(myLockDispatcherListener);
+    getThreadingSupport().removeWriteLockReacquisitionListener(myLockDispatcherListener);
     getThreadingSupport().removeLegacyIndicatorProvider(myLegacyIndicatorProvider);
 
     //noinspection deprecation
@@ -473,9 +479,22 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
 
   @Override
+  public void invokeAndWaitRelaxed(@NotNull Runnable runnable, @NotNull ModalityState state) {
+    doInvokeAndWait(runnable, state, false);
+  }
+
+  @Override
   public void invokeAndWait(@NotNull Runnable runnable, @NotNull ModalityState state) {
+    doInvokeAndWait(runnable, state, true);
+  }
+
+  public void doInvokeAndWait(@NotNull Runnable runnable, @NotNull ModalityState state, boolean wrapWithLocks) {
     if (EDT.isCurrentThreadEdt()) {
-      runIntendedWriteActionOnCurrentThread(runnable);
+      if (wrapWithLocks) {
+        runIntendedWriteActionOnCurrentThread(runnable);
+      } else {
+        runnable.run();
+      }
       return;
     }
 
@@ -487,7 +506,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     // Start from inner layer: transaction guard
     final Runnable guarded = myTransactionGuard.wrapLaterInvocation(runnable, state);
     // Middle layer: lock and modality
-    final Runnable locked = wrapWithRunIntendedWriteActionAndModality(guarded, ctxAware ? null : state);
+    final Runnable locked = wrapWithLocks ? wrapWithRunIntendedWriteActionAndModality(guarded, ctxAware ? null : state) : guarded;
     // Outer layer context capture & reset
     final Runnable finalRunnable = AppImplKt.rethrowExceptions(AppScheduledExecutorService::captureContextCancellationForRunnableThatDoesNotOutliveContextScope, locked);
 
@@ -855,8 +874,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     }
 
     if (hasUnsafeBgTasks && ApplicationManager.getApplication().isHeadlessEnvironment()) {
-      getLogger().error("Headless application has been completed but background tasks are still running! Application will be terminated." +
-                        "\nThread dump:\n" + ThreadDumper.dumpThreadsToString());
+      getLogger().error("Headless application has been completed but background tasks are still running! Application will be terminated.",
+                        new Attachment("stacktrace.txt", ThreadDumper.dumpThreadsToString()));
       return true;
     }
 
@@ -986,19 +1005,65 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     });
   }
 
+  private static void checkWriteActionAllowedOnCurrentThread() {
+    if (EDT.isCurrentThreadEdt()) {
+      return;
+    }
+    if (!isBackgroundWriteAction(ThreadContext.currentThreadContext())) {
+      throw new IllegalStateException(
+        "Background write action is not permitted on this thread. Consider using `backgroundWriteAction`, or switch to EDT");
+    }
+  }
+
   @Override
   public void runWriteAction(@NotNull Runnable action) {
-    getThreadingSupport().runWriteAction(action.getClass(), runnableUnitFunction(action));
+    checkWriteActionAllowedOnCurrentThread();
+    incrementBackgroundWriteActionCounter();
+    try {
+      getThreadingSupport().runWriteAction(action.getClass(), runnableUnitFunction(action));
+    }
+    finally {
+      decrementBackgroundWriteActionCounter();
+    }
   }
 
   @Override
   public <T> T runWriteAction(@NotNull Computable<T> computation) {
-    return getThreadingSupport().runWriteAction(computation.getClass(), computation::compute);
+    checkWriteActionAllowedOnCurrentThread();
+    incrementBackgroundWriteActionCounter();
+    try {
+      return getThreadingSupport().runWriteAction(computation.getClass(), computation::compute);
+    }
+    finally {
+      decrementBackgroundWriteActionCounter();
+    }
   }
 
   @Override
   public <T, E extends Throwable> T runWriteAction(@NotNull ThrowableComputable<T, E> computation) throws E {
-    return getThreadingSupport().runWriteAction(computation.getClass(), rethrowCheckedExceptions(computation));
+    checkWriteActionAllowedOnCurrentThread();
+    incrementBackgroundWriteActionCounter();
+    try {
+      return getThreadingSupport().runWriteAction(computation.getClass(), rethrowCheckedExceptions(computation));
+    }
+    finally {
+      decrementBackgroundWriteActionCounter();
+    }
+  }
+
+  private void incrementBackgroundWriteActionCounter() {
+    if (EDT.isCurrentThreadEdt()) {
+      return;
+    }
+    backgroundWriteActionCounter.incrementAndGet();
+  }
+
+
+  private void decrementBackgroundWriteActionCounter() {
+    if (EDT.isCurrentThreadEdt()) {
+      return;
+    }
+    backgroundWriteActionCounter.decrementAndGet();
   }
 
   @Override
@@ -1095,6 +1160,11 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   @Override
   public boolean isWriteActionPending() {
     return getThreadingSupport().isWriteActionPending();
+  }
+
+  @Override
+  public boolean isBackgroundWriteActionRunningOrPending() {
+    return backgroundWriteActionCounter.get() > 0;
   }
 
   @Override
@@ -1228,7 +1298,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   protected @NotNull ContainerDescriptor getContainerDescriptor(@NotNull IdeaPluginDescriptorImpl pluginDescriptor) {
-    return pluginDescriptor.appContainerDescriptor;
+    return pluginDescriptor.getAppContainerDescriptor();
   }
 
   @Override
@@ -1272,7 +1342,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     getThreadingSupport().setWriteActionListener(app.myLockDispatcherListener);
     getThreadingSupport().setWriteIntentReadActionListener(app.myLockDispatcherListener);
     getThreadingSupport().setLockAcquisitionListener(app.myLockDispatcherListener);
-    getThreadingSupport().setSuspendingWriteActionListener(app.myLockDispatcherListener);
+    getThreadingSupport().setWriteLockReacquisitionListener(app.myLockDispatcherListener);
     getThreadingSupport().setLegacyIndicatorProvider(myLegacyIndicatorProvider);
 
     app.addApplicationListener(new ApplicationListener() {
@@ -1333,7 +1403,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   }
 
   @Override
-  public void addSuspendingWriteActionListener(@NotNull SuspendingWriteActionListener listener, @NotNull Disposable parentDisposable) {
+  public void addSuspendingWriteActionListener(@NotNull WriteLockReacquisitionListener listener, @NotNull Disposable parentDisposable) {
     myLockDispatcherListener.addSuspendingWriteActionListener(listener, parentDisposable);
   }
 
@@ -1342,7 +1412,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
    */
   private class LockDispatchListener
     implements ReadActionListener, WriteActionListener, WriteIntentReadActionListener, LockAcquisitionListener,
-               SuspendingWriteActionListener {
+               WriteLockReacquisitionListener {
 
     private final DisposableWrapperList<WriteActionListener> myWriteActionListeners = new DisposableWrapperList<>();
 
@@ -1354,7 +1424,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     private final DisposableWrapperList<LockAcquisitionListener> myLockAcquisitionListeners =
       new DisposableWrapperList<>();
 
-    private final DisposableWrapperList<SuspendingWriteActionListener> mySuspendingWriteActionListeners =
+    private final DisposableWrapperList<WriteLockReacquisitionListener> myWriteLockReacquisitionListeners =
       new DisposableWrapperList<>();
 
     public void addWriteActionListener(WriteActionListener listener, Disposable disposable) {
@@ -1369,8 +1439,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
       addListener(myWriteIntentReadActionListeners, listener, disposable);
     }
 
-    public void addSuspendingWriteActionListener(SuspendingWriteActionListener listener, Disposable disposable) {
-      addListener(mySuspendingWriteActionListeners, listener, disposable);
+    public void addSuspendingWriteActionListener(WriteLockReacquisitionListener listener, Disposable disposable) {
+      addListener(myWriteLockReacquisitionListeners, listener, disposable);
     }
 
     public void addLockAcquisitionListener(LockAcquisitionListener listener, Disposable disposable) {
@@ -1425,7 +1495,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
     @Override
     public void beforeWriteLockReacquired() {
-      invokeListeners(mySuspendingWriteActionListeners, SuspendingWriteActionListener::beforeWriteLockReacquired);
+      invokeListeners(myWriteLockReacquisitionListeners, WriteLockReacquisitionListener::beforeWriteLockReacquired);
     }
 
 

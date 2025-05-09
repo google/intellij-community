@@ -21,7 +21,7 @@ import com.intellij.ide.highlighter.JavaFileType;
 import com.intellij.java.codeserver.highlighting.JavaErrorCollector;
 import com.intellij.java.codeserver.highlighting.errors.JavaCompilationError;
 import com.intellij.java.codeserver.highlighting.errors.JavaErrorKinds;
-import com.intellij.lang.java.parser.BasicExpressionParser;
+import com.intellij.lang.java.parser.JavaBinaryOperations;
 import com.intellij.lang.jvm.JvmModifier;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -80,8 +80,10 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
     private CodeFragmentEvaluator myCurrentFragmentEvaluator;
     private final Set<JavaCodeFragment> myVisitedFragments = new HashSet<>();
     private final @Nullable PsiClass myPositionPsiClass;
+    private final @Nullable PsiElement myPositionPsiElement;
 
     private Builder(@Nullable SourcePosition position) {
+      myPositionPsiElement = position != null ? position.getElementAt() : null;
       myPositionPsiClass = JVMNameUtil.getClassAt(position);
     }
 
@@ -131,23 +133,29 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
       }
 
       IElementType assignmentType = expression.getOperationTokenType();
+      boolean compoundAssignment = assignmentType != JavaTokenType.EQ;
       PsiType rType = rExpression.getType();
-      if (!TypeConversionUtil.areTypesAssignmentCompatible(lType, rExpression) && rType != null) {
-        throw evaluateException(JavaDebuggerBundle.message("evaluation.error.incompatible.types", expression.getOperationSign().getText()));
+      if (!compoundAssignment && !TypeConversionUtil.areTypesAssignmentCompatible(lType, rExpression) && rType != null) {
+        throw evaluateException(
+          JavaDebuggerBundle.message("evaluation.error.incompatible.types", expression.getOperationSign().getText()));
       }
       lExpression.accept(this);
       Evaluator lEvaluator = myResult;
 
-      rEvaluator = handleAssignmentBoxingAndPrimitiveTypeConversions(lType, rType, rEvaluator, expression.getProject());
-
-      if (assignmentType != JavaTokenType.EQ) {
+      if (compoundAssignment) {
         IElementType opType = TypeConversionUtil.convertEQtoOperation(assignmentType);
         final PsiType typeForBinOp = TypeConversionUtil.calcTypeForBinaryExpression(lType, rType, opType, true);
         if (typeForBinOp == null || rType == null) {
           throw evaluateException(JavaDebuggerBundle.message("evaluation.error.unknown.expression.type", expression.getText()));
         }
+        if (!TypeConversionUtil.areTypesConvertible(typeForBinOp, lType)) {
+          throw evaluateException(
+            JavaDebuggerBundle.message("evaluation.error.incompatible.types", expression.getOperationSign().getText()));
+        }
         rEvaluator = createBinaryEvaluator(lEvaluator, lType, rEvaluator, rType, opType, typeForBinOp);
       }
+
+      rEvaluator = handleAssignmentBoxingAndPrimitiveTypeConversions(lType, rType, rEvaluator, expression.getProject());
       myResult = new AssignmentEvaluator(lEvaluator, rEvaluator);
     }
 
@@ -626,7 +634,7 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
         }
       }
       // unary numeric promotion if applicable
-      else if (BasicExpressionParser.SHIFT_OPS.contains(operation)) {
+      else if (JavaBinaryOperations.SHIFT_OPS.contains(operation)) {
         lResult = handleUnaryNumericPromotion(lType, lResult);
         rResult = handleUnaryNumericPromotion(rType, rResult);
       }
@@ -849,7 +857,7 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
         PsiClass variableClass = getContainingClass(psiVar);
         final PsiClass positionClass = getPositionClass();
         if (Objects.equals(positionClass, variableClass)) {
-          PsiElement method = DebuggerUtilsEx.getContainingMethod(expression);
+          PsiElement method = DebuggerUtilsEx.getContainingMethod(myPositionPsiElement != null ? myPositionPsiElement : expression);
           boolean canScanFrames = method instanceof PsiLambdaExpression || ContextUtil.isJspImplicit(element);
           myResult = new LocalVariableEvaluator(localName, canScanFrames);
           return;
@@ -1450,7 +1458,6 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
       PsiElement qualifier = expression.getQualifier();
       PsiType interfaceType = expression.getFunctionalInterfaceType();
       if (!Registry.is("debugger.compiling.evaluator.method.refs") &&
-          !Registry.is("debugger.evaluate.method.helper") &&
           interfaceType != null &&
           qualifier != null) {
         String code = null;
@@ -1493,7 +1500,7 @@ public final class EvaluatorBuilderImpl implements EvaluatorBuilder {
                 "MethodType mt = MethodType.fromMethodDescriptorString(\"" + JVMNameUtil.getJVMSignature(method) + "\", null);\n" +
                 "MethodHandle mh = MethodHandles.lookup()." + find + ";\n" +
                 bidStr +
-                "MethodHandleProxies.asInterfaceInstance(" + interfaceType.getCanonicalText() + ".class, mh);";
+                "MethodHandleProxies.asInterfaceInstance(" + interfaceType.getCanonicalText() + ".class, mh.asFixedArity());";
             }
           }
           else if (PsiUtil.isArrayClass(resolved)) {

@@ -3,7 +3,6 @@ package com.intellij.psi.impl.source.codeStyle;
 
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeInsight.ImportFilter;
-import com.intellij.codeInsight.JavaProjectCodeInsightSettings;
 import com.intellij.ide.highlighter.JavaFileType;
 import com.intellij.jsp.JspSpiUtil;
 import com.intellij.lang.ASTNode;
@@ -19,6 +18,8 @@ import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
 import com.intellij.psi.codeStyle.PackageEntry;
 import com.intellij.psi.codeStyle.PackageEntryTable;
+import com.intellij.psi.formatter.java.ImportHelperBase;
+import com.intellij.psi.impl.IncompleteModelUtil;
 import com.intellij.psi.impl.PsiFileFactoryImpl;
 import com.intellij.psi.impl.source.PsiJavaCodeReferenceElementImpl;
 import com.intellij.psi.impl.source.SourceTreeToPsiMap;
@@ -52,14 +53,13 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public final class ImportHelper {
+public final class ImportHelper extends ImportHelperBase {
   private static final Logger LOG = Logger.getInstance(ImportHelper.class);
 
-  private final JavaCodeStyleSettings mySettings;
   private static final @NonNls String JAVA_LANG_PACKAGE = "java.lang";
 
   public ImportHelper(@NotNull JavaCodeStyleSettings settings) {
-    mySettings = settings;
+    super(settings);
   }
 
   /**
@@ -68,7 +68,7 @@ public final class ImportHelper {
    */
   @Deprecated(forRemoval = true)
   public ImportHelper(@NotNull CodeStyleSettings settings) {
-    mySettings = settings.getCustomSettings(JavaCodeStyleSettings.class);
+    super(settings.getCustomSettings(JavaCodeStyleSettings.class));
   }
 
   @Nullable("null means no need to replace the import list because they are the same")
@@ -77,7 +77,7 @@ public final class ImportHelper {
   }
 
   /**
-   * @param filter pretend some references do not exist so the corresponding imports may be deleted
+   * @param filter pretend some references do not exist, so the corresponding imports may be deleted
    * @return the import list to replace with, or null when there's no need to replace the import list because they are the same
    */
   public @Nullable PsiImportList prepareOptimizeImportsResult(@NotNull PsiJavaFile file, @NotNull Predicate<? super Import> filter) {
@@ -103,8 +103,7 @@ public final class ImportHelper {
     Map<String, Boolean> classesOrPackagesToImportOnDemand = new HashMap<>();
     List<PsiImportModuleStatement> previousModuleStatements = collectModuleImports(file, mySettings);
     Map<String, PsiImportModuleStatement> moduleStatementMap = collectNamesImportedByModules(file, previousModuleStatements, resultList);
-    JavaProjectCodeInsightSettings javaProjectCodeInsightSettings = JavaProjectCodeInsightSettings.getSettings(file.getProject());
-    collectOnDemandImports(resultList, mySettings, javaProjectCodeInsightSettings, classesOrPackagesToImportOnDemand, moduleStatementMap);
+    collectOnDemandImports(resultList, mySettings, classesOrPackagesToImportOnDemand, moduleStatementMap);
 
     MultiMap<String, String> conflictingMemberNames = new MultiMap<>();
     for (Import anImport : resultList) {
@@ -161,7 +160,7 @@ public final class ImportHelper {
   }
 
   /**
-   * Collects the names of classes that are imported by modules specified implicitly in the given Java file and in import list.
+   * Collects the names of classes that are imported by modules specified implicitly in the given Java file and in the import list.
    *
    * @param file       the Java file for which imported class names are being collected.
    * @param statements a list of import module statements that specify the modules from which classes are imported.
@@ -213,7 +212,6 @@ public final class ImportHelper {
 
   public static void collectOnDemandImports(@NotNull List<Import> resultList,
                                             @NotNull JavaCodeStyleSettings javaCodeStyleSettings,
-                                            @NotNull JavaProjectCodeInsightSettings javaProjectCodeInsightSettings,
                                             @NotNull Map<String, Boolean> outClassesOrPackagesToImportOnDemand,
                                             @NotNull Map<String, PsiImportModuleStatement> moduleStatementMap) {
     Object2IntMap<String> packageToCountMap = new Object2IntOpenHashMap<>();
@@ -907,31 +905,6 @@ public final class ImportHelper {
     }
   }
 
-  public int getEmptyLinesBetween(@NotNull PsiImportStatementBase statement1, @NotNull PsiImportStatementBase statement2) {
-    int index1 = findEntryIndex(statement1);
-    int index2 = findEntryIndex(statement2);
-    if (index1 == index2) return 0;
-    if (index1 > index2) {
-      int t = index1;
-      index1 = index2;
-      index2 = t;
-    }
-    PackageEntry[] entries = mySettings.IMPORT_LAYOUT_TABLE.getEntries();
-    int maxSpace = 0;
-    for (int i = index1 + 1; i < index2; i++) {
-      if (entries[i] == PackageEntry.BLANK_LINE_ENTRY) {
-        int space = 0;
-        //noinspection AssignmentToForLoopParameter
-        do {
-          space++;
-        }
-        while (entries[++i] == PackageEntry.BLANK_LINE_ENTRY);
-        maxSpace = Math.max(maxSpace, space);
-      }
-    }
-    return maxSpace;
-  }
-
   private static boolean isToUseImportOnDemand(@NotNull String packageOrClassName,
                                                int classCount,
                                                boolean isStaticImportNeeded,
@@ -943,51 +916,6 @@ public final class ImportHelper {
     if (packageOrClassName.isEmpty()) return false;
     PackageEntryTable table = settings.PACKAGES_TO_USE_IMPORT_ON_DEMAND;
     return table.contains(packageOrClassName);
-  }
-
-  private static int findEntryIndex(@NotNull String packageName, boolean isStatic, boolean isModule, PackageEntry @NotNull [] entries) {
-    PackageEntry bestEntry = null;
-    int bestEntryIndex = -1;
-    int allOtherStaticIndex = -1;
-    int allOtherIndex = -1;
-    for (int i = 0; i < entries.length; i++) {
-      PackageEntry entry = entries[i];
-      if (entry == PackageEntry.ALL_OTHER_STATIC_IMPORTS_ENTRY) {
-        allOtherStaticIndex = i;
-      }
-      if (!isModule && entry == PackageEntry.ALL_OTHER_IMPORTS_ENTRY) {
-        allOtherIndex = i;
-      }
-      if (!isModule && entry.isBetterMatchForPackageThan(bestEntry, packageName, isStatic)) {
-        bestEntry = entry;
-        bestEntryIndex = i;
-      }
-      if (isModule && entry == PackageEntry.ALL_MODULE_IMPORTS) {
-        bestEntry = entry;
-        bestEntryIndex = i;
-      }
-    }
-    if (bestEntryIndex == -1 && isStatic && allOtherStaticIndex == -1 && allOtherIndex != -1) {
-      // if no layout for static imports specified, put them among all others
-      bestEntryIndex = allOtherIndex;
-    }
-    return bestEntryIndex;
-  }
-
-  int findEntryIndex(@NotNull PsiImportStatementBase statement) {
-    PsiJavaCodeReferenceElement ref = statement.getImportReference();
-    if (statement instanceof PsiImportModuleStatement) {
-      return findEntryIndex("",
-                            mySettings.LAYOUT_STATIC_IMPORTS_SEPARATELY && statement instanceof PsiImportStaticStatement,
-                            true,
-                            mySettings.IMPORT_LAYOUT_TABLE.getEntries());
-    }
-    if (ref == null) return -1;
-    String packageName = statement.isOnDemand() ? ref.getCanonicalText() : StringUtil.getPackageName(ref.getCanonicalText());
-    return findEntryIndex(packageName,
-                          mySettings.LAYOUT_STATIC_IMPORTS_SEPARATELY && statement instanceof PsiImportStaticStatement,
-                          false,
-                          mySettings.IMPORT_LAYOUT_TABLE.getEntries());
   }
 
   public static boolean hasConflictingOnStaticDemandImport(@NotNull PsiJavaFile file,
@@ -1188,6 +1116,9 @@ public final class ImportHelper {
         }
 
         if (refElement instanceof PsiClass psiClass) {
+          // Implicitly declared classed are not accessible outside the file, so it is not possible to have import statement on them.
+          if (refElement.getParent() instanceof PsiImplicitClass) continue;
+
           String qName = psiClass.getQualifiedName();
           if (qName == null || hasPackage(qName, thisPackageName)) continue;
           imports.add(new Import(qName, false));
@@ -1240,7 +1171,8 @@ public final class ImportHelper {
               Import unresolvedImport = unresolvedNames.get(name);
               if (reference.multiResolve(false).length == 0) {
                 hasResolveProblem[0] = true;
-                if (unresolvedImport != null) {
+                if (unresolvedImport != null &&
+                    (IncompleteModelUtil.canBeClassReference(reference) || unresolvedImport.isStatic())) {
                   namesToImport.add(unresolvedImport);
                   unresolvedNames.remove(name);
                   if (unresolvedNames.isEmpty()) return;

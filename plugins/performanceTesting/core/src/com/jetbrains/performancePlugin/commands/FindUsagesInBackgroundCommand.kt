@@ -1,3 +1,4 @@
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.performancePlugin.commands
 
 import com.intellij.find.FindManager
@@ -51,15 +52,15 @@ class FindUsagesInBackgroundCommand(text: String, line: Int) : PerformanceComman
           throw Exception("No editor is opened")
         }
 
-        val (offset, scope) = writeIntentReadAction {
-          Pair(editor.caretModel.offset, FindUsagesOptions.findScopeByName(project, null, options.scope))
+        val scope = readAction {
+          FindUsagesOptions.findScopeByName(project, null, options.scope)
         }
 
         val searchTargets = readAction {
-          PsiDocumentManager.getInstance(project).getPsiFile(editor.document)?.let { searchTargets(it, offset) }
+          PsiDocumentManager.getInstance(project).getPsiFile(editor.document)?.let { searchTargets(it, editor.caretModel.offset) }
         }
 
-        val element = getElement(project, editor, offset)
+        val element = getElement(project, editor)
 
         val firstUsageSpan = PerformanceTestSpan
           .getTracer(isWarmupMode)

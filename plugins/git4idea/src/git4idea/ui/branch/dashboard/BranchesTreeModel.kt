@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.ui.branch.dashboard
 
 import com.intellij.dvcs.DvcsUtil
@@ -9,15 +9,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.EventDispatcher
 import com.intellij.util.ThreeState
+import com.intellij.vcs.git.shared.branch.GitInOutCountersInProject
 import git4idea.*
 import git4idea.branch.GitBranchIncomingOutgoingManager
 import git4idea.branch.GitRefType
-import git4idea.branch.IncomingOutgoingState
 import git4idea.i18n.GitBundle.message
 import git4idea.repo.GitRefUtil
 import git4idea.repo.GitRemote
 import git4idea.repo.GitRepository
 import git4idea.ui.branch.GitBranchManager
+import git4idea.ui.branch.getText
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.VisibleForTesting
@@ -41,7 +42,7 @@ internal data class BranchInfo(
   val branch: GitBranch,
   override val isCurrent: Boolean,
   override var isFavorite: Boolean,
-  var incomingOutgoingState: IncomingOutgoingState = IncomingOutgoingState.EMPTY,
+  var incomingOutgoingState: GitInOutCountersInProject = GitInOutCountersInProject.EMPTY,
   override val repositories: List<GitRepository>,
 ) : RefInfo {
   var isMy: ThreeState = ThreeState.UNSURE
@@ -232,7 +233,7 @@ internal object NodeDescriptorsModel {
           is BranchInfo -> {
             val incomingOutgoingState =
               if (refInfo.ref is GitLocalBranch) incomingOutgoingManager.getIncomingOutgoingState(repository, refInfo.ref)
-              else IncomingOutgoingState.EMPTY
+              else GitInOutCountersInProject.EMPTY
             refInfo.copy(isCurrent = repository.isCurrentBranch(refInfo.branchName), isFavorite = isFavorite, incomingOutgoingState = incomingOutgoingState)
           }
           is TagInfo -> {

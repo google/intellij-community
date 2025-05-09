@@ -463,6 +463,16 @@ public final class BuildDataManager {
         mappings.flush(memoryCachesOnly);
       }
     }
+
+    GraphConfiguration graphConfig = getDependencyGraph();
+    if (graphConfig != null) {
+      try {
+        graphConfig.getGraph().flush();
+      }
+      catch (IOException e) {
+        LOG.warn(e);
+      }
+    }
   }
 
   public void close() throws IOException {
@@ -737,7 +747,7 @@ public final class BuildDataManager {
       private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
       @Override
-      public Delta createDelta(Iterable<NodeSource> sourcesToProcess, Iterable<NodeSource> deletedSources, boolean isSourceOnly) throws IOException {
+      public Delta createDelta(Iterable<NodeSource> sourcesToProcess, Iterable<NodeSource> deletedSources, boolean isSourceOnly) {
         lock.readLock().lock();
         try {
           return delegate.createDelta(sourcesToProcess, deletedSources, isSourceOnly);
@@ -748,10 +758,10 @@ public final class BuildDataManager {
       }
 
       @Override
-      public DifferentiateResult differentiate(Delta delta, DifferentiateParameters params) {
+      public DifferentiateResult differentiate(Delta delta, DifferentiateParameters params, Iterable<Graph> extParts) {
         lock.readLock().lock();
         try {
-          return delegate.differentiate(delta, params);
+          return delegate.differentiate(delta, params, extParts);
         }
         finally {
           lock.readLock().unlock();
@@ -817,6 +827,17 @@ public final class BuildDataManager {
         }
         finally {
           lock.writeLock().unlock();
+        }
+      }
+
+      @Override
+      public void flush() throws IOException {
+        lock.readLock().lock(); // flush is not supposed to mutate graph data
+        try {
+          delegate.flush();
+        }
+        finally {
+          lock.readLock().unlock();
         }
       }
     };

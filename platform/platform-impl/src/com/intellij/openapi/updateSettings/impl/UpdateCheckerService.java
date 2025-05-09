@@ -190,16 +190,6 @@ public class UpdateCheckerService {
 
     var lastShownFor = settings.getWhatsNewShownFor();
     if (lastShownFor == 0) {
-      // migration from `PropertiesComponent`; safe to drop around 2024.2
-      var fallbackProperty = "ide.updates.whats.new.shown.for";
-      var properties = PropertiesComponent.getInstance();
-      lastShownFor = properties.getInt(fallbackProperty, 0);
-      if (lastShownFor != 0) {
-        properties.unsetValue(fallbackProperty);
-        settings.setWhatsNewShownFor(lastShownFor);
-      }
-    }
-    if (lastShownFor == 0) {
       // this ensures that the "what's new" page is shown _only_ for users who have updated from a previous version
       // (to detect updates, the method relies on imported settings; users starting from scratch are out of luck)
       settings.setWhatsNewShownFor(current.getBaselineVersion());
@@ -356,14 +346,27 @@ public class UpdateCheckerService {
     }
   }
 
-  static void cleanupObsoleteCustomRepositories() {
+  static void pruneUpdateSettings() {
     var settings = UpdateSettings.getInstance();
+
     if (settings.isObsoleteCustomRepositoriesCleanNeeded()) {
       var cleaned = settings.getStoredPluginHosts().removeIf(host -> host.startsWith("https://secure.feed.toolbox.app/plugins"));
       if (cleaned) {
         LOG.info("Some obsolete TBE custom repositories have been removed");
       }
       settings.setObsoleteCustomRepositoriesCleanNeeded(false);
+    }
+
+    var ignoredBuildNumbers = settings.getIgnoredBuildNumbers();
+    if (!ignoredBuildNumbers.isEmpty()) {
+      var currentBuild = ApplicationInfo.getInstance().getBuild();
+      var cleaned = ignoredBuildNumbers.removeIf(str -> {
+        var bn = BuildNumber.fromStringOrNull(str);
+        return bn != null && currentBuild.compareTo(bn) >= 0;
+      });
+      if (cleaned) {
+        LOG.info("Some obsolete ignored versions have been removed");
+      }
     }
   }
 }

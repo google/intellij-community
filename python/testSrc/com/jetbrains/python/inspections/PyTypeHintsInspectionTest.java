@@ -1112,12 +1112,12 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                        # cls is not specified\s
                        @classmethod
                        def spam3(cls):
-                           <warning descr="The type of self 'int' is not a supertype of its class 'Type[Bar]'"># type: (int) -> None</warning>
+                           <warning descr="The type of self 'int' is not a supertype of its class 'type[Bar]'"># type: (int) -> None</warning>
                            pass
 
                        @classmethod
                        def egg3(cls, a, b):
-                           <warning descr="The type of self 'int' is not a supertype of its class 'Type[Bar]'"># type: (int, str, bool) -> None</warning>
+                           <warning descr="The type of self 'int' is not a supertype of its class 'type[Bar]'"># type: (int, str, bool) -> None</warning>
                            pass
                       \s
                        # cls is specified   \s
@@ -1236,7 +1236,7 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
   public void testEnumLiteral() {
     doTestByText("""
                    from enum import Enum, member, nonmember
-                   from typing import Literal
+                   from typing import Literal, Any
                    
                    class Color(Enum):
                        R = 1
@@ -1251,6 +1251,25 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                    class A:
                        X = Color.R
                    
+                   class SuperEnum(Enum):
+                       PINK = "PINK", "hot"
+                       FLOSS = "FLOSS", "sweet"
+                   
+                   tuple = 1, "ab"
+                   o = object()
+                   def get_object() -> object: ...
+                   def get_any() -> Any: ...
+                   
+                   class E(Enum):
+                       FOO = tuple
+                       BAR = o
+                       BUZ = get_object()
+                       QUX = get_any()
+                   
+                       def meth(self): ...
+                   
+                       meth2 = meth
+                   
                    v1: Literal[<warning descr="'Literal' may be parameterized with literal ints, byte and unicode strings, bools, Enum values, None, other literal types, or type aliases to other literal types">A.X</warning>]
                    
                    X = Color.R
@@ -1259,7 +1278,20 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                    v3: Literal[Color.G]
                    v4: Literal[Color.RED]
                    v5: Literal[<warning descr="'Literal' may be parameterized with literal ints, byte and unicode strings, bools, Enum values, None, other literal types, or type aliases to other literal types">Color.foo</warning>]
-                   v6: Literal[Color.bar]""");
+                   v6: Literal[Color.bar]
+                   
+                   v7: Literal[SuperEnum.PINK]
+                   
+                   v8: Literal[E.FOO]
+                   v9: Literal[E.BAR]
+                   v10: Literal[E.BUZ]
+                   v11: Literal[E.QUX]
+                   v12: Literal[<warning descr="'Literal' may be parameterized with literal ints, byte and unicode strings, bools, Enum values, None, other literal types, or type aliases to other literal types">E.meth2</warning>]""");
+  }
+
+  // PY-79227
+  public void testEnumLiteralMultiFile() {
+    doMultiFileTest();
   }
 
   // PY-35235
@@ -2509,6 +2541,104 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                    def changing_signature(f: Callable[P, T]) -> Callable[Concatenate[Any, P], T]:  # no warnings expected
                        ...
                    """);
+  }
+
+  public void testClassIsAlreadyParameterized() {
+    doTestByText("""
+                   from typing import Generic, TypeVar
+                   
+                   DefaultStrT = TypeVar("DefaultStrT", default=str)
+                   T = TypeVar("T")
+                   T1 = TypeVar("T1")
+                   
+                   class Base(Generic[T, T1, DefaultStrT]): ...
+                   class Foo(Base[int, float]): ...
+                   foo = Foo[<warning descr="Class 'Foo' is already parameterized">int</warning>]()
+                   
+                   class Bar(Generic[T]): ...
+                   class Baz(Bar[int]): ...
+                   baz = Baz[<warning descr="Class 'Baz' is already parameterized">int</warning>]()
+                   
+                   class NoErr(Bar[int]):
+                        def __class_getitem__(cls, item) -> str:
+                            return "str"
+                   
+                   n = NoErr[int]()
+                   """);
+  }
+
+  //PY-76894
+  public void testRawConcatenateUsage() {
+    doTestByText("""
+                   from typing import ParamSpec, Concatenate, Any, TypeVar, Callable, TypeAlias
+
+                   P = ParamSpec('P')
+                   T = TypeVar('T')
+
+                   # Raw Concatenate in function parameters is not allowed
+                   def func1(x: <warning descr="'Concatenate' can only be used as the first argument to 'Callable' in this context">Concatenate[int, P]</warning>) -> int:
+                       ...
+                   
+                   var: <warning descr="'Concatenate' can only be used as the first argument to 'Callable' in this context">Concatenate[int, <warning descr="Unbound type variable">P</warning>]</warning>
+                   
+                   def return_concat() -> <warning descr="'Concatenate' can only be used as the first argument to 'Callable' in this context">Concatenate[int, P]</warning>:
+                      ...
+
+                   # Concatenate in type alias is allowed
+                   ConcatenateAlias = Concatenate[int, P]
+                   ConcatenateAlias2: TypeAlias = Concatenate[int, P]
+                   type ConcatenateAlias3[**P] = Concatenate[int, P]
+
+                   # Concatenate in Callable is allowed
+                   def changing_signature(f: Callable[P, T]) -> Callable[Concatenate[Any, P], T]:
+                       ...
+                   """);
+  }
+
+  // PY-80248
+  public void testReferenceToTypeStatementIsValidTypeHint() {
+    doTestByText("""
+                type my_type = str
+                
+                def func1(x: my_type) -> str: ...
+                """);
+  }
+
+  // PY-80278
+  public void testReferenceToNamedTupleIsValidTypeHint() {
+    doTestByText("""
+               from collections import namedtuple
+               
+               Instruction = namedtuple("Instruction", ["register", "op", "value", "base", "check", "limit"])
+               
+               def foo() -> Instruction:  # No warning expected
+                   return Instruction(1, 2, 3, 4, 5, 6)
+               """);
+  }
+
+  public void testUnresolvedReferenceNotReportedAsInvalidTypeArgument() {
+    doTestByText("""
+               from missing_module import SomeType  # type: ignore
+               
+               def func4(some_type_tuple: tuple[SomeType, ...]):
+                   pass
+               
+               class Clazz[T, T1]: ...
+               
+               c = Clazz[RefToNoWhere, WrongRef]() # will be reported by PyUnresolvedReferencesInspection, but not here
+               """);
+  }
+
+  // PY-76862
+  public void testUnionsInTypeAnnotationsWithMultipleElements() {
+    doTestByText("""
+               bad1: <error descr="Union type annotations with forward references must be wrapped in quotes entirely">"ClassA"</error> | int
+               bad2: int | <error descr="Union type annotations with forward references must be wrapped in quotes entirely">"ClassA"</error>
+               bad3: int | str | bool | <error descr="Union type annotations with forward references must be wrapped in quotes entirely">"ClassA"</error>
+               bad4: int | <error descr="Union type annotations with forward references must be wrapped in quotes entirely">"ClassA"</error> | str | bool
+               good1: int | list["ClassA"]
+               class ClassA: ...
+               """);
   }
 
   @NotNull

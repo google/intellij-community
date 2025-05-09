@@ -80,6 +80,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
         runTest("../../completion/testData/basic/multifile/ConstructorReferenceNotImported/");
     }
 
+    @TestMetadata("CovarianceExtensionFunction")
+    public void testCovarianceExtensionFunction() throws Exception {
+        runTest("../../completion/testData/basic/multifile/CovarianceExtensionFunction/");
+    }
+
     @TestMetadata("DoNotCompleteWithConstraints")
     public void testDoNotCompleteWithConstraints() throws Exception {
         runTest("../../completion/testData/basic/multifile/DoNotCompleteWithConstraints/");
@@ -103,6 +108,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
     @TestMetadata("EnumEntry")
     public void testEnumEntry() throws Exception {
         runTest("../../completion/testData/basic/multifile/EnumEntry/");
+    }
+
+    @TestMetadata("EnumEntryExpectedPreferredJava")
+    public void testEnumEntryExpectedPreferredJava() throws Exception {
+        runTest("../../completion/testData/basic/multifile/EnumEntryExpectedPreferredJava/");
     }
 
     @TestMetadata("EnumValuesMethodJavaUsualPriorityWhenFeatureDisabled")
@@ -285,6 +295,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
         runTest("../../completion/testData/basic/multifile/JavaClassQualifierWithTypeArguments/");
     }
 
+    @TestMetadata("JavaConstructor")
+    public void testJavaConstructor() throws Exception {
+        runTest("../../completion/testData/basic/multifile/JavaConstructor/");
+    }
+
     @TestMetadata("JavaEnum")
     public void testJavaEnum() throws Exception {
         runTest("../../completion/testData/basic/multifile/JavaEnum/");
@@ -408,6 +423,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
     @TestMetadata("NotImportedFunction")
     public void testNotImportedFunction() throws Exception {
         runTest("../../completion/testData/basic/multifile/NotImportedFunction/");
+    }
+
+    @TestMetadata("NotImportedGenericReceiverExtension")
+    public void testNotImportedGenericReceiverExtension() throws Exception {
+        runTest("../../completion/testData/basic/multifile/NotImportedGenericReceiverExtension/");
     }
 
     @TestMetadata("NotImportedInfixExtension")

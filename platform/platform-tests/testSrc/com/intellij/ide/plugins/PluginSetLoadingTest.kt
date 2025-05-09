@@ -2,6 +2,7 @@
 package com.intellij.ide.plugins
 
 import com.intellij.openapi.util.BuildNumber
+import com.intellij.platform.plugins.testFramework.PluginSetTestBuilder
 import com.intellij.testFramework.rules.InMemoryFsRule
 import com.intellij.util.io.write
 import org.assertj.core.api.Assertions.assertThat
@@ -60,7 +61,7 @@ class PluginSetLoadingTest {
         <version>2.0</version>
       </idea-plugin>""")
 
-    val result = PluginSetTestBuilder(pluginsDirPath)
+    val (_, result) = PluginSetTestBuilder(pluginsDirPath)
       .withDisabledPlugins("foo")
       .buildLoadingResult()
 
@@ -89,7 +90,7 @@ class PluginSetLoadingTest {
         <idea-version until-build="4"/>
       </idea-plugin>""")
 
-    val result = PluginSetTestBuilder(pluginsDirPath)
+    val (_, result) = PluginSetTestBuilder(pluginsDirPath)
       .withProductBuildNumber(BuildNumber.fromString("4.0")!!)
       .buildLoadingResult()
 
@@ -281,6 +282,91 @@ class PluginSetLoadingTest {
       .module("bar.module", PluginBuilder.empty().separateJar(true))
       .build(pluginsDirPath.resolve("bar"))
     assertThat(buildPluginSet()).hasExactlyEnabledPlugins("foo", "bar")
+  }
+
+  @Test
+  fun `id, version, name are inherited in depends sub-descriptors`() {
+    PluginBuilder.empty().id("foo").build(pluginsDirPath.resolve("foo"))
+    PluginBuilder.empty()
+      .id("bar")
+      .name("Bar")
+      .version("1.0.0")
+      .depends("foo", PluginBuilder.empty())
+      .build(pluginsDirPath.resolve("bar"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(pluginSet).hasExactlyEnabledPlugins("bar", "foo")
+    val descriptor = pluginSet.getEnabledPlugin("bar")
+    assertThat(descriptor.pluginId.idString).isEqualTo("bar")
+    assertThat(descriptor.name).isEqualTo("Bar")
+    assertThat(descriptor.version).isEqualTo("1.0.0")
+    assertThat(descriptor.dependencies).hasSize(1)
+    val subDesc = descriptor.dependencies[0].subDescriptor!!
+    assertThat(subDesc.pluginId.idString).isEqualTo("bar")
+    assertThat(subDesc.name).isEqualTo("Bar")
+    assertThat(subDesc.version).isEqualTo("1.0.0")
+  }
+
+  @Test
+  fun `id, version, name can't overridden in depends sub-descriptors`() {
+    PluginBuilder.empty().id("foo").build(pluginsDirPath.resolve("foo"))
+    PluginBuilder.empty()
+      .id("bar")
+      .name("Bar")
+      .version("1.0.0")
+      .depends("foo", PluginBuilder.empty()
+        .id("bar 2")
+        .name("Bar Sub")
+        .version("2.0.0"))
+      .build(pluginsDirPath.resolve("bar"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(pluginSet).hasExactlyEnabledPlugins("bar", "foo")
+    val descriptor = pluginSet.getEnabledPlugin("bar")
+    assertThat(descriptor.pluginId.idString).isEqualTo("bar")
+    assertThat(descriptor.name).isEqualTo("Bar")
+    assertThat(descriptor.version).isEqualTo("1.0.0")
+    assertThat(descriptor.dependencies).hasSize(1)
+    val subDesc = descriptor.dependencies[0].subDescriptor!!
+    assertThat(subDesc.pluginId.idString).isEqualTo("bar")
+    assertThat(subDesc.name).isEqualTo("Bar")
+    assertThat(subDesc.version).isEqualTo("1.0.0")
+  }
+
+  @Test
+  fun `resource bundle is inherited in depends sub-descriptors`() {
+    PluginBuilder.empty().id("foo").build(pluginsDirPath.resolve("foo"))
+    PluginBuilder.empty()
+      .id("bar")
+      .resourceBundle("resourceBundle")
+      .depends("foo", PluginBuilder.empty())
+      .build(pluginsDirPath.resolve("bar"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(pluginSet).hasExactlyEnabledPlugins("bar", "foo")
+    val descriptor = pluginSet.getEnabledPlugin("bar")
+    assertThat(descriptor.resourceBundleBaseName).isEqualTo("resourceBundle")
+    assertThat(descriptor.dependencies).hasSize(1)
+    val subDesc = descriptor.dependencies[0].subDescriptor!!
+    assertThat(subDesc.resourceBundleBaseName).isEqualTo("resourceBundle")
+  }
+
+  @Test
+  fun `resource bundle can be overridden in depends sub-descriptors`() {
+    PluginBuilder.empty().id("foo").build(pluginsDirPath.resolve("foo"))
+    PluginBuilder.empty()
+      .id("bar")
+      .resourceBundle("resourceBundle")
+      .depends("foo", PluginBuilder.empty().resourceBundle("sub"))
+      .build(pluginsDirPath.resolve("bar"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(pluginSet).hasExactlyEnabledPlugins("bar", "foo")
+    val descriptor = pluginSet.getEnabledPlugin("bar")
+    assertThat(descriptor.resourceBundleBaseName).isEqualTo("resourceBundle")
+    assertThat(descriptor.dependencies).hasSize(1)
+    val subDesc = descriptor.dependencies[0].subDescriptor!!
+    assertThat(subDesc.resourceBundleBaseName).isEqualTo("sub")
   }
 
   private fun writeDescriptor(id: String, @Language("xml") data: String) {

@@ -12,7 +12,7 @@ common --@rules_jvm//:koltin_inc_threshold=0 --@rules_jvm//:java_inc_threshold=0
 
 # configure resources
 common --local_resources=memory=HOST_RAM*.77 --local_resources=cpu=HOST_CPUS*2
-common --jobs=HOST_CPUS*2 --worker_max_multiplex_instances=JpsCompile=HOST_CPUS*2
+common --jobs=HOST_CPUS*2 --worker_max_multiplex_instances=JvmCompile=HOST_CPUS*2
 
 # hide Java 8 deprecation warnings
 common --javacopt=-Xlint:-options
@@ -45,7 +45,7 @@ common --symlink_prefix=out/bazel-
 
 # FS Watch
 build --watchfs
-build --experimental_windows_watchfs
+#build --experimental_windows_watchfs
 build:ci --nowatchfs
 
 common --enable_platform_specific_config

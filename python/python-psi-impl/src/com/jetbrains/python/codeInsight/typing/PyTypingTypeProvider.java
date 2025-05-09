@@ -53,6 +53,7 @@ import static com.intellij.openapi.util.RecursionManager.doPreventingRecursion;
 import static com.jetbrains.python.psi.PyKnownDecorator.TYPING_FINAL;
 import static com.jetbrains.python.psi.PyKnownDecorator.TYPING_FINAL_EXT;
 import static com.jetbrains.python.psi.PyUtil.as;
+import static com.jetbrains.python.psi.types.PyNoneTypeKt.isNoneType;
 
 public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypingTypeProvider.Context> {
 
@@ -128,8 +129,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     PARAM_SPEC, PARAM_SPEC_EXT,
     TYPE_VAR_TUPLE, TYPE_VAR_TUPLE_EXT
   );
-public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager";
-  public static final String ASYNC_CONTEXT_MANAGER = "contextlib.AbstractAsyncContextManager";
+
   public static final Set<String> TYPE_DICT_QUALIFIERS = Set.of(REQUIRED, REQUIRED_EXT, NOT_REQUIRED, NOT_REQUIRED_EXT, READONLY, READONLY_EXT);
 
   public static final String UNPACK = "typing.Unpack";
@@ -201,7 +201,8 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
     .add(TUPLE)
     .add(CALLABLE)
     .add(TYPE)
-    .add("typing.no_type_check")
+    .add(PyKnownDecorator.TYPING_NO_TYPE_CHECK.getQualifiedName().toString())
+    .add(PyKnownDecorator.TYPING_NO_TYPE_CHECK_EXT.getQualifiedName().toString())
     .add(UNION)
     .add(OPTIONAL)
     .add(LIST)
@@ -302,7 +303,7 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
       return Ref.create(PyTypeUtil.toKeywordContainerType(param, type));
     }
     if (PyNames.NONE.equals(param.getDefaultValueText())) {
-      return Ref.create(PyUnionType.union(type, PyNoneType.INSTANCE));
+      return Ref.create(PyUnionType.union(type, PyBuiltinCache.getInstance(param).getNoneType()));
     }
     return Ref.create(type);
   }
@@ -536,18 +537,19 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
             return null;
           }
           // Set isDefinition=true to start searching right from the class level.
-          final PyClassTypeImpl classType = new PyClassTypeImpl(pyClass, true);
-          final List<? extends RatedResolveResult> classAttrs =
-            classType.resolveMember(name, target, AccessDirection.READ, resolveContext, true);
-          if (classAttrs == null) {
-            return null;
+          Ref<PyType> memberType = getMemberTypeForClassType(context, target, name, resolveContext, false, new PyClassTypeImpl(pyClass, true));
+          if (memberType != null) {
+            return memberType;
           }
-          return StreamEx.of(classAttrs)
-            .map(RatedResolveResult::getElement)
-            .select(PyTargetExpression.class)
-            .filter(x -> ScopeUtil.getScopeOwner(x) instanceof PyClass)
-            .map(x -> getTypeFromTargetExpressionAnnotation(x, context))
-            .collect(PyTypeUtil.toUnionFromRef());
+
+          for (PyClass ancestor : pyClass.getAncestorClasses(resolveContext.getTypeEvalContext())) {
+            Ref<PyType> ancestorMemberType = getMemberTypeForClassType(context, target, name, resolveContext, true, new PyClassTypeImpl(ancestor, false));
+            if (ancestorMemberType != null) {
+              return ancestorMemberType;
+            }
+          }
+
+          return null;
         }
       }
       else {
@@ -579,6 +581,28 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
       }
     }
     return null;
+  }
+
+  private static @Nullable Ref<PyType> getMemberTypeForClassType(@NotNull Context context,
+                                                                 PyTargetExpression target,
+                                                                 String name,
+                                                                 PyResolveContext resolveContext,
+                                                                 boolean isInherited,
+                                                                 PyClassTypeImpl classType) {
+    final List<? extends RatedResolveResult> classAttrs =
+      classType.resolveMember(name, target, AccessDirection.READ, resolveContext, isInherited);
+    if (classAttrs == null) {
+      return null;
+    }
+    return StreamEx.of(classAttrs)
+      .map(RatedResolveResult::getElement)
+      .select(PyTargetExpression.class)
+      .filter(x -> {
+        ScopeOwner owner = ScopeUtil.getScopeOwner(x);
+        return owner instanceof PyClass || owner instanceof PyFunction;
+      })
+      .map(x -> getTypeFromTargetExpressionAnnotation(x, context))
+      .collect(PyTypeUtil.toUnionFromRef());
   }
 
   private static @Nullable Ref<PyType> getTypeFromTargetExpressionAnnotation(@NotNull PyTargetExpression target, @NotNull Context context) {
@@ -1086,13 +1110,10 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
     if (element instanceof PyTypedElement) {
       final PyType type = context.getType((PyTypedElement)element);
       if (type instanceof PyClassLikeType classType) {
-        if (classType.isDefinition()) {
+        if (classType.isDefinition() || isNoneType(classType)) {
           final PyType instanceType = classType.toInstance();
           return Ref.create(instanceType);
         }
-      }
-      else if (type instanceof PyNoneType) {
-        return Ref.create(type);
       }
     }
     return null;
@@ -1107,7 +1128,7 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
         if (indexExpr != null) {
           final Ref<PyType> typeRef = getType(indexExpr, context);
           if (typeRef != null) {
-            return Ref.create(PyUnionType.union(typeRef.get(), PyNoneType.INSTANCE));
+            return Ref.create(PyUnionType.union(typeRef.get(), PyBuiltinCache.getInstance(element).getNoneType()));
           }
         }
         return Ref.create();
@@ -2051,12 +2072,14 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
       if (classType == null) return null;
 
       final String qName = classType.getClassQName();
+      if (qName == null) return null;
       if (!SYNC_TYPES.contains(qName) && !ASYNC_TYPES.contains(qName)) return null;
-      
+
       PyType yieldType = null;
-      PyType sendType = PyNoneType.INSTANCE;
-      PyType returnType = PyNoneType.INSTANCE;
-      
+      final var noneType = PyBuiltinCache.getInstance(classType.getPyClass()).getNoneType();
+      PyType sendType = noneType;
+      PyType returnType = noneType;
+
       if (genericType != null) {
         yieldType = ContainerUtil.getOrElse(genericType.getElementTypes(), 0, yieldType);
         if (GENERATOR.equals(qName) || ASYNC_GENERATOR.equals(qName)) {
@@ -2077,7 +2100,7 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
       if (async) {
         var idx = SYNC_TYPES.indexOf(className);
         if (idx == -1) return this;
-        return new GeneratorTypeDescriptor(ASYNC_TYPES.get(idx), yieldType, sendType, PyNoneType.INSTANCE);
+        return new GeneratorTypeDescriptor(ASYNC_TYPES.get(idx), yieldType, sendType, returnType);
       }
       else {
         var idx = ASYNC_TYPES.indexOf(className);
@@ -2240,7 +2263,7 @@ public static final String CONTEXT_MANAGER = "contextlib.AbstractContextManager"
     public @NotNull Stack<PyQualifiedNameOwner> getTypeAliasStack() {
       return myTypeAliasStack;
     }
-    
+
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;

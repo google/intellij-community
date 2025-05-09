@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.editorActions.moveUpDown;
 
 import com.intellij.openapi.actionSystem.DataContext;
@@ -12,6 +12,9 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * @author Dennis.Ushakov
  */
@@ -24,10 +27,26 @@ public abstract class BaseMoveHandler extends EditorWriteActionHandler.ForEachCa
   }
 
   @Override
+  public boolean reverseCaretOrder() {
+    return isDown;
+  }
+
+  @Override
   public void executeWriteAction(@NotNull Editor editor, @NotNull Caret caret, DataContext dataContext) {
+    final Document document = editor.getDocument();
+    int textLength = document.getTextLength();
+    List<Caret> adjusted = null;
+    for (Caret c : editor.getCaretModel().getAllCarets()) {
+      if (c != caret && c.getLogicalPosition().column == 0) {
+        if (adjusted == null) adjusted = new ArrayList<>();
+        int offset = c.getOffset();
+        c.moveToOffset(offset == textLength ? 0 : offset + 1);
+        adjusted.add(c);
+      }
+    }
+
     final Project project = editor.getProject();
     assert project != null;
-    final Document document = editor.getDocument();
     final PsiFile file = getPsiFile(project, editor);
 
     final MoverWrapper mover = getSuitableMover(editor, file);
@@ -35,6 +54,13 @@ public abstract class BaseMoveHandler extends EditorWriteActionHandler.ForEachCa
       LineRange range = mover.getInfo().toMove;
       if ((range.startLine > 0 || isDown) && (range.endLine < document.getLineCount() || !isDown)) {
         mover.move(editor, file);
+      }
+    }
+
+    if (adjusted != null) {
+      for (Caret c : adjusted) {
+        int offset = c.getOffset();
+        c.moveToOffset(offset == 0 ? textLength : offset - 1);
       }
     }
   }

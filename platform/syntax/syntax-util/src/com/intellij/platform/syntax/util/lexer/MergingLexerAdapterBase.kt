@@ -74,7 +74,7 @@ abstract class MergingLexerAdapterBase(original: Lexer) : DelegateLexer(original
   }
 
   override fun toString(): String {
-    return javaClass.getName() + "[" + delegate + "]"
+    return "${this::class.qualifiedName}[$delegate]"
   }
 
   override fun getCurrentPosition(): LexerPosition =

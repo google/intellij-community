@@ -5,6 +5,7 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
 import com.intellij.ide.HelpTooltip;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -39,6 +40,7 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XDropFrameHandler;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xml.util.XmlStringUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -55,7 +57,7 @@ import static com.intellij.xdebugger.impl.XDebuggerUtilImpl.wrapKeepEditorAreaFo
 
 public class XDebuggerFramesList extends DebuggerFramesList implements UiCompatibleDataProvider {
   private final Project myProject;
-  private final FileColorsCache myFileColorsCache;
+  private final XStackFramesListColorsCache myFileColorsCache;
   private static final DataKey<XDebuggerFramesList> FRAMES_LIST = DataKey.create("FRAMES_LIST");
 
   private void copyStack() {
@@ -92,9 +94,24 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     }
   }
 
+  /**
+   * Please use constructor with {@link XDebugSession} instead.
+   */
+  @ApiStatus.Obsolete
   public XDebuggerFramesList(@NotNull Project project) {
+    this(project, (XDebugSessionProxy)null);
+  }
+
+  public XDebuggerFramesList(@NotNull Project project, @NotNull XDebugSession session) {
+    this(project, XDebugSessionProxyKeeperKt.asProxy(session));
+  }
+
+  @ApiStatus.Internal
+  public XDebuggerFramesList(@NotNull Project project, @Nullable XDebugSessionProxy sessionProxy) {
     myProject = project;
-    myFileColorsCache = new FileColorsCache(project);
+    myFileColorsCache = sessionProxy == null
+                        ? new OldFileColorsCache(project)
+                        : sessionProxy.createFileColorsCache(this);
 
     doInit();
 
@@ -235,7 +252,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     if (stackFrame instanceof ItemWithCustomBackgroundColor) {
       return ((ItemWithCustomBackgroundColor)stackFrame).getBackgroundColor();
     }
-    return myFileColorsCache.get(getFile(stackFrame));
+    return myFileColorsCache.get(stackFrame);
   }
 
   private class XDebuggerGroupedFrameListRenderer extends GroupedItemsListRenderer {
@@ -416,14 +433,26 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     }
   }
 
-  private class FileColorsCache {
+  /**
+   * @deprecated Only used in old code that doesn't provide a session
+   */
+  @Deprecated
+  private class OldFileColorsCache extends XStackFramesListColorsCache {
     private static final Color NULL_COLOR = JBColor.marker("NULL_COLOR");
     private static final Color COMPUTING_COLOR = JBColor.marker("COMPUTING_COLOR");
-    private final FileColorManager myColorsManager;
     private volatile Map<VirtualFile, Color> myFileColors = new HashMap<>();
 
-    private FileColorsCache(Project project) {
-      myColorsManager = FileColorManager.getInstance(project);
+    OldFileColorsCache(Project project) {
+      super(project);
+    }
+
+    @Override
+    public @Nullable Color get(@NotNull XStackFrame stackFrame) {
+      VirtualFile file = getFile(stackFrame);
+      if (file == null) {
+        return null;
+      }
+      return get(file);
     }
 
     @RequiresEdt
@@ -439,7 +468,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
           fileColors.put(virtualFile, COMPUTING_COLOR);
           ApplicationManager.getApplication().executeOnPooledThread(() -> {
             if (fileColors == myFileColors) { // check if it is obsolete already
-              Color color = ReadAction.compute(() -> myColorsManager.getFileColor(virtualFile));
+              Color color = ReadAction.compute(() -> getColorsManager().getFileColor(virtualFile));
               EdtExecutorService.getInstance().execute(() -> {
                 if (fileColors == myFileColors) { // check if it is obsolete already
                   fileColors.put(virtualFile, color == null ? NULL_COLOR : color);
@@ -453,7 +482,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
         }
       }
       else {
-        return myColorsManager.getScopeColor(NonProjectFilesScope.NAME);
+        return getColorsManager().getScopeColor(NonProjectFilesScope.NAME);
       }
       return null;
     }
@@ -479,7 +508,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     Color getBackgroundColor();
   }
 
-  public static class CopyStackAction extends DumbAwareAction {
+  public static class CopyStackAction extends DumbAwareAction implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
     @Override
     public void update(@NotNull AnActionEvent e) {
       XDebuggerFramesList framesList = e.getData(FRAMES_LIST);
@@ -715,14 +744,14 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
   }
 
   private static @Nullable XDropFrameHandler findDropFrameHandler(XDebuggerFramesList list) {
-    var session = DataManager.getInstance().getDataContext(list).getData(XDebugSession.DATA_KEY);
+    var session = DataManager.getInstance().getDataContext(list).getData(XDebugSessionProxy.DEBUG_SESSION_PROXY_KEY);
     if (session == null) {
       return null;
     }
-    return session.getDebugProcess().getDropFrameHandler();
+    return session.getDropFrameHandler();
   }
 
-  private static class ResetFrameAction extends DumbAwareAction {
+  private static class ResetFrameAction extends DumbAwareAction implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       var inputEvent = e.getInputEvent();

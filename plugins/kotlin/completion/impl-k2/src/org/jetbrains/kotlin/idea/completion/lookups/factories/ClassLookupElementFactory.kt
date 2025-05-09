@@ -5,9 +5,11 @@ package org.jetbrains.kotlin.idea.completion.lookups.factories
 import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.util.applyIf
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassLikeSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.nameOrAnonymous
 import org.jetbrains.kotlin.idea.base.analysis.withRootPrefixIfNeeded
 import org.jetbrains.kotlin.idea.completion.lookups.*
@@ -28,10 +30,41 @@ internal object ClassLookupElementFactory {
             .withTailText(TailTextProvider.getTailText(symbol))
             .let { withClassifierSymbolInfo(symbol, it) }
     }
+
+    context(KaSession)
+    @OptIn(KaExperimentalApi::class)
+    fun createConstructorLookup(
+        containingSymbol: KaNamedClassSymbol,
+        constructorSymbols: List<KaConstructorSymbol>,
+        importingStrategy: ImportStrategy,
+    ): LookupElementBuilder {
+        val name = containingSymbol.nameOrAnonymous
+        val singleConstructor = constructorSymbols.singleOrNull()
+        val valueParameters = singleConstructor?.valueParameters?.map { it.asSignature() }
+
+        val options = CallableInsertionOptions(
+            importingStrategy = importingStrategy,
+            insertionStrategy = CallableInsertionStrategy.AsCall
+        )
+
+        val lookupObject = FunctionCallLookupObject(
+            shortName = name,
+            options = options,
+            renderedDeclaration = valueParameters?.let { CompletionShortNamesRenderer.renderFunctionParameters(it) } ?: "(...)",
+            hasReceiver = false,
+            inputValueArgumentsAreRequired = constructorSymbols.size > 1 || valueParameters?.isNotEmpty() == true,
+            inputTypeArgumentsAreRequired = false,
+        )
+        return LookupElementBuilder.create(lookupObject, name.asString())
+            .withInsertHandler(FunctionInsertionHandler)
+            .appendTailText(lookupObject.renderedDeclaration, true)
+            .appendTailText(TailTextProvider.getTailText(containingSymbol), true)
+            .let { withClassifierSymbolInfo(containingSymbol, it) }
+    }
 }
 
 
-private data class ClassifierLookupObject(
+internal data class ClassifierLookupObject(
     override val shortName: Name,
     val importingStrategy: ImportStrategy
 ) : KotlinLookupObject
@@ -53,7 +86,7 @@ private object ClassifierInsertionHandler : QuotedNamesAwareInsertionHandler() {
                 ?.takeUnless { it.isEmpty }
 
             val fqName = importingStrategy.fqName
-                .applyIf(shortenCommand == null) { withRootPrefixIfNeeded() }
+                .withRootPrefixIfNeeded()
 
             context.insertAndShortenReferencesInStringUsingTemporarySuffix(
                 string = fqName.render(),

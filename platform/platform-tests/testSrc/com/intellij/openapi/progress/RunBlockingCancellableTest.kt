@@ -3,12 +3,12 @@ package com.intellij.openapi.progress
 
 import com.intellij.concurrency.currentThreadOverriddenContextOrNull
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.application.impl.ModalityStateEx
 import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.application.impl.ModalityStateEx
+import com.intellij.openapi.application.impl.getGlobalThreadingSupport
 import com.intellij.testFramework.assertErrorLogged
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.RegistryKey
-import com.intellij.util.application
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -282,11 +282,10 @@ class RunBlockingCancellableTest : CancellationTest() {
     }
   }
 
-  @Suppress("ForbiddenInSuspectContextMethod")
   @Test
   @RegistryKey("ide.run.blocking.cancellable.assert.in.tests", "true")
   fun `runBlockingCancellable in inner explicit ra of wa`(): Unit = timeoutRunBlocking {
-    application.runWriteAction {
+    getGlobalThreadingSupport().runWriteAction(Runnable::class.java) {
       ReadAction.run<Throwable> {
         // checks that there are no assertions
         runBlockingCancellable {

@@ -64,6 +64,8 @@ import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static com.intellij.xdebugger.impl.actions.FrontendDebuggerActionsKt.areFrontendDebuggerActionsEnabled;
+
 @ApiStatus.Internal
 public final class XFramesView extends XDebugView {
   private static final Logger LOG = Logger.getInstance(XFramesView.class);
@@ -86,7 +88,7 @@ public final class XFramesView extends XDebugView {
   private boolean myRefresh;
 
   public XFramesView(@NotNull XDebugSession session) {
-    this(XDebugSessionProxyKeeper.getInstance(session.getProject()).getOrCreateProxy(session));
+    this(XDebugSessionProxyKeeperKt.asProxy(session));
   }
 
   public XFramesView(@NotNull XDebugSessionProxy sessionProxy) {
@@ -112,7 +114,7 @@ public final class XFramesView extends XDebugView {
         }
       }
     };
-    myFramesList = new XDebuggerFramesList(myProject) {
+    myFramesList = new XDebuggerFramesList(myProject, sessionProxy) {
       @Override
       protected @NotNull OccurenceInfo goOccurrence(int step) {
         OccurenceInfo info = super.goOccurrence(step);
@@ -155,7 +157,10 @@ public final class XFramesView extends XDebugView {
         int i = myFramesList.locationToIndex(new Point(x, y));
         if (i != -1) myFramesList.selectFrame(i);
         ActionManager actionManager = ActionManager.getInstance();
-        ActionGroup group = (ActionGroup)actionManager.getAction(XDebuggerActions.FRAMES_TREE_POPUP_GROUP);
+        String actionGroup = areFrontendDebuggerActionsEnabled()
+                   ? XDebuggerActions.FRAMES_TREE_POPUP_GROUP_FRONTEND
+                   : XDebuggerActions.FRAMES_TREE_POPUP_GROUP;
+        ActionGroup group = (ActionGroup)actionManager.getAction(actionGroup);
         actionManager.createActionPopupMenu("XDebuggerFramesList", group).getComponent().show(comp, x, y);
       }
     });
@@ -220,10 +225,11 @@ public final class XFramesView extends XDebugView {
         XDebugSessionProxy session = getSession();
         // TODO there's, ostensibly, a long-living bug: thread list may change over time on a breakpoint with suspend thread policy;
         //  but myThreadsCalculated doesn't address this issue
-        if (session == null || myThreadsCalculated) {
+        if (session == null || !session.hasSuspendContext() || myThreadsCalculated) {
           return;
         }
-        session.computeExecutionStacks(ThreadsBuilder::new);
+        myBuilder = new ThreadsBuilder();
+        session.computeExecutionStacks(() -> myBuilder);
       }
     });
 

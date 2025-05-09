@@ -18,7 +18,6 @@ import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.platform.util.progress.RawProgressReporter
-import com.jetbrains.python.failure
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
 import com.jetbrains.python.sdk.PythonSdkType
@@ -27,6 +26,7 @@ import com.jetbrains.python.sdk.add.v1.loadLocalPythonCondaPath
 import com.jetbrains.python.sdk.add.v1.saveLocalPythonCondaPath
 import com.jetbrains.python.sdk.flavors.PyFlavorAndData
 import com.jetbrains.python.sdk.flavors.conda.*
+import com.jetbrains.python.sdk.getOrCreateAdditionalData
 import com.jetbrains.python.target.PyTargetAwareAdditionalData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
@@ -45,6 +45,9 @@ internal val condaSupportedLanguages: List<LanguageLevel>
   get() = LanguageLevel.SUPPORTED_LEVELS
     .asReversed()
     .filter { it < LanguageLevel.PYTHON313 }
+
+val condaLatestSupportedLanguage: LanguageLevel @ApiStatus.Internal get() =
+  condaSupportedLanguages.maxWith(LanguageLevel.VERSION_COMPARATOR)
 
 /**
  * See [com.jetbrains.env.conda.PyCondaSdkTest]
@@ -125,7 +128,7 @@ suspend fun PyCondaCommand.createCondaSdkAlongWithNewEnv(
   val process = PyCondaEnv.createEnv(this, newCondaEnvInfo).getOrElse { return Result.failure(it) }
   val error = ProcessHandlerReader(process).runProcessAndGetError(uiContext, reporter)
 
-  return error?.let { failure(it) }
+  return error?.let { com.jetbrains.python.failure(it) }
          ?: Result.success(
            createCondaSdkFromExistingEnv(newCondaEnvInfo.toIdentity(), existingSdks, project)).apply {
            onSuccess {
@@ -252,3 +255,5 @@ internal class IntrospectableCommandExecutor(private val introspectable: Languag
 
   override fun execute(command: List<String>): CompletableFuture<ProcessOutput> = introspectable.promiseExecuteScript(command)
 }
+
+internal fun Sdk.isConda(): Boolean = getOrCreateAdditionalData().flavorAndData.data is PyCondaFlavorData

@@ -11,16 +11,25 @@ import com.intellij.platform.feedback.impl.state.CommonFeedbackSurveyService
 import com.intellij.platform.feedback.impl.state.DontShowAgainFeedbackService
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
 internal const val MAX_FEEDBACK_SURVEY_NUMBER_SHOWS: Int = 2
 
-internal fun FeedbackSurveyConfig.checkIsFeedbackCollectionDeadlineNotPast(): Boolean {
+private fun FeedbackSurveyConfig.checkIsFeedbackCollectionDeadlineNotPast(): Boolean {
+  return checkIsFeedbackCollectionDeadlineNotPast(this.lastDayOfFeedbackCollection)
+}
+
+internal fun checkIsFeedbackCollectionDeadlineNotPast(lastDayOfFeedbackCollection: LocalDate): Boolean {
   return Clock.System.todayIn(TimeZone.currentSystemDefault()) < lastDayOfFeedbackCollection
 }
 
-internal fun FeedbackSurveyConfig.checkIsIdeEAPIfRequired(): Boolean {
+private fun FeedbackSurveyConfig.checkIsIdeEAPIfRequired(): Boolean {
+  return checkIsIdeEAPIfRequired(this.requireIdeEAP)
+}
+
+internal fun checkIsIdeEAPIfRequired(requireIdeEAP: Boolean): Boolean {
   if (requireIdeEAP) {
     return ApplicationInfo.getInstance().isEAP
   }
@@ -77,13 +86,7 @@ internal fun isSuitableToShow(feedbackSurveyConfig: FeedbackSurveyConfig, projec
 private fun invokeRespondNotificationAction(feedbackSurveyType: FeedbackSurveyType<*>, project: Project, forTest: Boolean) {
   when (feedbackSurveyType) {
     is InIdeFeedbackSurveyType -> {
-      val inIdeFeedbackSurveyConfig = feedbackSurveyType.feedbackSurveyConfig as InIdeFeedbackSurveyConfig
-      val dialog = inIdeFeedbackSurveyConfig.createFeedbackDialog(project, forTest)
-      val isOk = dialog.showAndGet()
-      if (isOk && !forTest) {
-        inIdeFeedbackSurveyConfig.updateStateAfterDialogClosedOk(project)
-        updateCommonFeedbackSurveysStateAfterSent(inIdeFeedbackSurveyConfig)
-      }
+      feedbackSurveyType.feedbackSurveyConfig.showFeedbackDialog(project, forTest)
     }
     is ExternalFeedbackSurveyType -> {
       val externalFeedbackSurveyConfig = feedbackSurveyType.feedbackSurveyConfig as ExternalFeedbackSurveyConfig
@@ -93,6 +96,15 @@ private fun invokeRespondNotificationAction(feedbackSurveyType: FeedbackSurveyTy
         updateCommonFeedbackSurveysStateAfterSent(externalFeedbackSurveyConfig)
       }
     }
+  }
+}
+
+private fun InIdeFeedbackSurveyConfig.showFeedbackDialog(project: Project, forTest: Boolean) {
+  val dialog = createFeedbackDialog(project, forTest)
+  val isOk = dialog.showAndGet()
+  if (isOk && !forTest) {
+    updateStateAfterDialogClosedOk(project)
+    CommonFeedbackSurveyService.feedbackSurveyAnswerSent(surveyId)
   }
 }
 

@@ -1,6 +1,8 @@
 package com.intellij.cce.evaluable
 
 const val AIA_CONTEXT = "aia_context"
+const val AIA_SYSTEM_CONTEXT = "aia_system_context"
+const val AIA_CHAT_DUMP = "aia_chat_dump"
 const val AIA_CONTEXT_COLLECTION_DURATION_MS = "aia_context_collection_duration_ms"
 const val AIA_USER_PROMPT = "aia_user_prompt"
 const val AIA_RESPONSE = "aia_response"
@@ -12,6 +14,8 @@ const val AIA_FAILED_RELATED_FILE_VALIDATIONS = "aia_failed_related_file_validat
 const val AIA_HAS_SYNTAX_ERRORS = "has_syntax_errors"
 const val AIA_HAS_HIGHLIGHT_ERRORS = "has_highlight_errors"
 const val AIA_PREDICTED_API_CALLS = "predicted_api_calls"
+const val AIA_EXPECTED_FUNCTION_CALLS = "expected_function_calls"
+const val AIA_ACTUAL_FUNCTION_CALLS = "actual_function_calls"
 const val AIA_GROUND_TRUTH_INTERNAL_API_CALLS = "ground_truth_internal_api_calls"
 const val AIA_ERASED_APIS = "erased_apis"
 const val AIA_HIGHLIGHT_ERRORS = "appeared_highlights"
@@ -24,3 +28,5 @@ const val AIA_HAS_NO_EFFECT: String = "has_no_effect"
 const val AIA_EXACT_MATCH: String = "exact_match"
 const val AIA_AST_MATCH: String = "ast_match"
 const val AIA_PROBLEMS: String = "aia_problems"
+const val AIA_LLMC_LOG: String = "aia_log_llmc"
+const val AIA_HTTP_LOG: String = "aia_log_http"

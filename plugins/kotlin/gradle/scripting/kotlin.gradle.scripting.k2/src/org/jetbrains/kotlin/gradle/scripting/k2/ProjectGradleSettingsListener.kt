@@ -2,22 +2,27 @@
 package org.jetbrains.kotlin.gradle.scripting.k2
 
 import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.backend.observation.launchTracked
+import com.intellij.psi.PsiManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptModel
+import org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptRefinedConfigurationProvider
 import org.jetbrains.kotlin.gradle.scripting.shared.getGradleVersion
 import org.jetbrains.kotlin.gradle.scripting.shared.loadGradleDefinitions
+import org.jetbrains.kotlin.gradle.scripting.shared.roots.GradleBuildRootData
 import org.jetbrains.kotlin.gradle.scripting.shared.roots.GradleBuildRootsManager
 import org.jetbrains.kotlin.gradle.scripting.shared.roots.Imported
-import org.jetbrains.kotlin.idea.core.script.scriptConfigurationsSourceOfType
+import org.jetbrains.kotlin.idea.core.script.k2.DefaultScriptResolutionStrategy
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.plugins.gradle.service.GradleInstallationManager
 import org.jetbrains.plugins.gradle.settings.DistributionType
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings
 import org.jetbrains.plugins.gradle.settings.GradleSettingsListener
 import java.nio.file.Path
-import java.nio.file.Paths
 
 class ProjectGradleSettingsListener(
     private val project: Project,
@@ -46,7 +51,7 @@ class ProjectGradleSettingsListener(
                     buildRootsManager.loadLinkedRoot(it, gradleVersion)
                 }
                 if (newRoot is Imported) {
-                    loadScriptConfigurations(newRoot, it)
+                    loadScriptConfigurations(newRoot.data, it)
                 }
             }
         }
@@ -68,28 +73,31 @@ class ProjectGradleSettingsListener(
     }
 
     private suspend fun loadScriptConfigurations(
-        root: Imported,
+        data: GradleBuildRootData,
         settings: GradleProjectSettings
     ) {
-        val data = root.data
         if (data.models.isEmpty()) return
+        val javaHome = data.javaHome
+        val definitions = loadGradleDefinitions(settings.externalProjectPath, data.gradleHome, javaHome, project)
 
-        val definitions = loadGradleDefinitions(settings.externalProjectPath, data.gradleHome, data.javaHome, project)
+        val gradleScripts = data.models.mapNotNullTo(mutableSetOf()) {
+            val virtualFile = VirtualFileManager.getInstance().findFileByNioPath(Path.of(it.file)) ?: return@mapNotNullTo null
+            GradleScriptModel(
+                virtualFile,
+                it.classPath,
+                it.sourcePath,
+                it.imports,
+                javaHome
+            )
+        }
 
-        val gradleScripts = data.models.mapNotNull {
-            val path = Paths.get(it.file)
-            VirtualFileManager.getInstance().findFileByNioPath(path)?.let { virtualFile ->
-                GradleScriptModel(
-                    virtualFile,
-                    it.classPath,
-                    it.sourcePath,
-                    it.imports,
-                    data.javaHome
-                )
-            }
-        }.toSet()
+        GradleScriptDefinitionsHolder.getInstance(project).updateDefinitions(definitions)
+        GradleScriptRefinedConfigurationProvider.getInstance(project).processScripts(gradleScripts)
 
-        GradleScriptDefinitionsHolder.Companion.getInstance(project).updateDefinitions(definitions)
-        project.scriptConfigurationsSourceOfType<GradleScriptConfigurationsSource>()?.updateDependenciesAndCreateModules(gradleScripts)
+        val ktFiles = gradleScripts.mapNotNull {
+            readAction { PsiManager.getInstance(project).findFile(it.virtualFile) as? KtFile }
+        }.toTypedArray()
+
+        DefaultScriptResolutionStrategy.getInstance(project).execute(*ktFiles).join()
     }
 }

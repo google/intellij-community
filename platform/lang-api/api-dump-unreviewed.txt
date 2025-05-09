@@ -781,20 +781,24 @@ com.intellij.codeInsight.folding.CollapseBlockHandler
 - a:invoke(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):V
 com.intellij.codeInsight.generation.ClassMember
 - com.intellij.codeInsight.generation.MemberChooserObject
-- com.intellij.modcommand.MemberChooserElement
+- com.intellij.codeInspection.options.OptMultiSelector$OptElement
 - sf:EMPTY_ARRAY:com.intellij.codeInsight.generation.ClassMember[]
-- s:from(com.intellij.modcommand.MemberChooserElement):com.intellij.codeInsight.generation.ClassMember
+- s:from(com.intellij.codeInspection.options.OptMultiSelector$OptElement):com.intellij.codeInsight.generation.ClassMember
 - a:getParentNodeDelegate():com.intellij.codeInsight.generation.MemberChooserObject
 com.intellij.codeInsight.generation.MemberChooserObject
+- com.intellij.codeInspection.options.OptMultiSelector$OptElement
+- com.intellij.openapi.util.Iconable
 - a:equals(java.lang.Object):Z
-- a:getText():java.lang.String
+- getIcon(I):javax.swing.Icon
 - a:hashCode():I
 - a:renderTreeNode(com.intellij.ui.SimpleColoredComponent,javax.swing.JTree):V
 c:com.intellij.codeInsight.generation.MemberChooserObjectBase
 - com.intellij.codeInsight.generation.MemberChooserObject
 - <init>(java.lang.String):V
 - <init>(java.lang.String,javax.swing.Icon):V
+- getIcon(I):javax.swing.Icon
 - getText():java.lang.String
+- p:getTextAttributes():com.intellij.ui.SimpleTextAttributes
 - p:getTextAttributes(javax.swing.JTree):com.intellij.ui.SimpleTextAttributes
 - renderTreeNode(com.intellij.ui.SimpleColoredComponent,javax.swing.JTree):V
 com.intellij.codeInsight.generation.OverrideImplementsAnnotationsFilter
@@ -1582,10 +1586,12 @@ c:com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
 - sf:FAILED:com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
 - sf:STARTED:com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
 - sf:STOPPED:com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
-- <init>(java.lang.String,javax.swing.Icon,I):V
+- <init>(java.lang.String,java.util.function.Supplier,javax.swing.Icon,I):V
 - getIcon():javax.swing.Icon
+- getId():java.lang.String
 - getName():java.lang.String
 - s:getStatus(com.intellij.execution.dashboard.RunDashboardRunConfigurationNode):com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
+- s:getStatusById(java.lang.String):com.intellij.execution.dashboard.RunDashboardRunConfigurationStatus
 - getWeight():I
 c:com.intellij.execution.filters.CompositeFilter
 - com.intellij.execution.filters.Filter

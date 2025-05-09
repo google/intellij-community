@@ -20,6 +20,7 @@ jvm_library(
   associates = ["//xml/impl"],
   deps = [
     "@lib//:junit4",
+    "//platform/editor-ui-api:editor-ui",
     "//java/testFramework",
     "@lib//:xerces",
     "//java/idea-ui:ui",
@@ -48,7 +49,7 @@ jvm_library(
     "@lib//:jackson",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
-    "//images/backend.svg:backend-svg",
+    "//images/backend.svg",
   ],
   runtime_deps = [
     ":tests_test_resources",

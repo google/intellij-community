@@ -49,8 +49,21 @@ elements:
               different. For example, if `com.example` is set for the main plugin descriptor, `com.example` cannot be used for any
               module dependency.
             internalNote: &plugin_model_v2_internal_note |
-              This item is part of the [_Plugin Model v2_](https://youtrack.jetbrains.com/articles/IJPL-A-1037){internal},
+              This item is part of the [_Plugin Model_](https://youtrack.jetbrains.com/articles/IJPL-A-31){internal},
               which is not recommended to be used in third-party plugins in the current state.
+        - attribute:
+            name: dependent-on-core
+            renderContexts: [doc_provider]
+            requirement:
+              required: no
+            description: |
+              Determines whether the main classloader of the core plugin is used as the parent classloader for the current content module.
+              If set to `false`, the Java platform classloader is used as the parent classloader.
+  
+              The attribute is effective only for content modules in the core (`com.intellij`) plugin.
+            internalNote: This item is internal and should be used only in modules implemented by JetBrains.
+            defaultValue: |
+              `true`
       children:
         - element:
             name: id
@@ -111,7 +124,7 @@ elements:
             name: name
             references:
               - |
-                [JetBrains Marketplace: Plugin Name](https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name)
+                [JetBrains Marketplace: Plugin Name](https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name)
             description: The user-visible plugin display name (Title Case).
             requirement:
               required: yes
@@ -166,7 +179,7 @@ elements:
                   description: |
                     The plugin product code used in the JetBrains Sales System.
                     The code must be agreed with JetBrains in advance and follow
-                    [the requirements](https://plugins.jetbrains.com/docs/marketplace/obtain-a-product-code-from-jetbrains.html).
+                    [the requirements](https://plugins.jetbrains.com/docs/marketplace/add-required-parameters.html).
               - attribute:
                   name: release-date
                   requirement:
@@ -237,7 +250,7 @@ elements:
             name: vendor
             references:
               - |
-                [JetBrains Marketplace: Contacts and Resources](https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#contacts-and-resources)
+                [JetBrains Marketplace: Contacts and Resources](https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#contacts-and-resources)
             description: |
               The vendor name or organization ID (if created) in the <control>Plugins</control> settings dialog and on
               the [JetBrains Marketplace](https://plugins.jetbrains.com) plugin page.
@@ -278,7 +291,7 @@ elements:
             name: description
             references:
               - |
-                [JetBrains Marketplace: Plugin Description](https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description)
+                [JetBrains Marketplace: Plugin Description](https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description)
             description: |
               The plugin description displayed on the [JetBrains Marketplace](https://plugins.jetbrains.com) plugin page and in
               the <control>Plugins</control> settings dialog.
@@ -309,7 +322,7 @@ elements:
             name: change-notes
             references:
               - |
-                [JetBrains Marketplace: Change Notes](https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#change-notes)
+                [JetBrains Marketplace: Change Notes](https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#change-notes)
             description: |
               A short summary of new features, bugfixes, and changes provided with the latest plugin version.
               Change notes are displayed on the [JetBrains Marketplace](https://plugins.jetbrains.com) plugin page and in
@@ -550,6 +563,18 @@ elements:
                             **This option isn't implemented yet and currently behaves the same way as `optional`.**
                         defaultValue: |
                           `optional`
+                    - attribute:
+                        name: os
+                        description: |
+                          Allows restricting the loading of a module to specific operating system.
+                          Supported values:
+                          - `freebsd`
+                          - `linux`
+                          - `mac`
+                          - `unix`
+                          - `windows`
+                          
+                          For example, `os="windows"` allows the module to load only on Windows.
 
         - element:
             name: extensions
@@ -817,6 +842,56 @@ elements:
                             
                             - `com.example.MyCustomType` must be a subtype of `com.example.ParentType`
                             - `com.example.MyComparable` must be a subtype of `java.lang.Comparable`
+              - element:
+                  name: &xIncludeName xi:include
+                  namespace: &xIncludeNamespace xi="http://www.w3.org/2001/XInclude"
+                  renderContexts: [doc_provider]
+                  description: |
+                    Allows including extension points of another plugin descriptor in this descriptor with
+                    [XInclude](http://www.w3.org/2001/XInclude) standard.
+                    
+                    The inclusion of extension points is supported for internal purposes and shouldn't be used by third party plugins.
+                  requirement:
+                    required: no
+                  attributes:
+                    - attribute:
+                        name: href
+                        requirement:
+                          required: no
+                        description: Path of the plugin descriptor file to include `extensionPoints` content from.
+                    - attribute:
+                        name: xpointer
+                        requirement:
+                          required: no
+                        deprecatedSince: '2021.2'
+                        deprecationNote: |
+                          The `xpointer` attribute must be `xpointer(/idea-plugin/extensionPoints/*)` or not defined.
+                        description: Extensions points pointer to include.
+                        defaultValue: |
+                          `xpointer(/idea-plugin/extensionPoints/*)`
+                  children:
+                    - element: &xIncludeFallback
+                        name: xi:fallback
+                        namespace: *xIncludeNamespace
+                        description: |
+                          Indicates that including the specified file is optional.
+
+                          If the file referenced in [`href`](#attribute:idea-plugin__xi:include__href) is not found and the `xi:fallback`
+                          element
+                          is missing, the plugin will fail to load.
+                        requirement:
+                          required: no
+                        examples:
+                          - |
+                              ```xml
+                              <idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
+                                ...
+                                <xi:include href="/META-INF/optional-plugin.xml">
+                                  <xi:fallback/>
+                                </xi:include>
+                                ...
+                              </idea-plugin>
+                              ```
         - element:
             name: resource-bundle
             description: |
@@ -1626,6 +1701,78 @@ elements:
                           [`<project-components>`](#element:idea-plugin__project-components) element.
                         requirement:
                           required: no
+                    - element:
+                        name: skipForDefaultProject
+                        sdkDocsFixedPath: [idea-plugin, application-components, component, skipForDefaultProject]
+                        deprecatedSince: *componentsDeprecatedSince
+                        deprecationNote: *componentsDeprecationNote
+                        description: |
+                          In the past, if present, the component was not loaded for the default project.
+
+                          Currently, project components aren't loaded in the default project by default, so this element has no effect.
+                          Use [`<loadForDefaultProject>`](#element:idea-plugin__application-components__component__loadForDefaultProject)
+                          if it is required to load a component in the default project.
+                        requirement:
+                          required: no
+        - element:
+            name: *xIncludeName
+            namespace: *xIncludeNamespace
+            description: |
+              Allows including content of another plugin descriptor in this descriptor with
+              [XInclude](http://www.w3.org/2001/XInclude) standard.
+            requirement:
+              required: no
+            attributes:
+              - attribute:
+                  name: href
+                  requirement:
+                    required: no
+                  description: Path of the plugin descriptor file to include.
+              - attribute:
+                  name: xpointer
+                  requirement:
+                    required: no
+                  deprecatedSince: '2021.2'
+                  deprecationNote: |
+                    The `xpointer` attribute must be `xpointer(/idea-plugin/*)` or not defined.
+                  description: Elements pointer to include.
+                  defaultValue: |
+                    `xpointer(/idea-plugin/*)`
+            examples:
+              - |
+                Given a plugin descriptor:
+                
+                ```xml
+                <idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
+                  <id>com.example.myplugin</id>
+                  <name>Example</name>
+                  <xi:include href="/META-INF/another-plugin.xml"/>
+                  ...
+                </idea-plugin>
+                ```
+                
+                and <path>/META-INF/another-plugin.xml</path>:
+                
+                ```xml
+                <idea-plugin>
+                  <extensions>...</extensions>
+                  <actions>...</actions>
+                </idea-plugin>
+                ```
+                
+                The effective plugin descriptor loaded to memory will contain the following elements:
+                
+                ```xml
+                <idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
+                  <id>com.example.myplugin</id>
+                  <name>Example</name>
+                  <extensions>...</extensions>
+                  <actions>...</actions>
+                  ...
+                </idea-plugin>
+                ```
+            children:
+              - element: *xIncludeFallback
         - element:
             name: project-components
             deprecatedSince: *componentsDeprecatedSince

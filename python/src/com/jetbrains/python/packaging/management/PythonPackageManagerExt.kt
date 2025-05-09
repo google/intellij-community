@@ -1,10 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("PythonPackageManagerExt")
 
 package com.jetbrains.python.packaging.management
 
 import com.intellij.execution.RunCanceledByUserException
-import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.target.TargetProgressIndicator
 import com.intellij.execution.target.local.LocalTargetEnvironmentRequest
 import com.intellij.execution.target.value.targetPath
@@ -15,7 +14,6 @@ import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.net.HttpConfigurable
 import com.jetbrains.python.PyBundle
@@ -30,10 +28,10 @@ import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory
 import com.jetbrains.python.run.buildTargetedCommandLine
 import com.jetbrains.python.run.ensureProjectSdkAndModuleDirsAreOnTarget
 import com.jetbrains.python.run.prepareHelperScriptExecution
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import kotlin.math.min
+@ApiStatus.Internal
 
 @RequiresBackgroundThread
 fun PythonPackageManager.launchReload() {
@@ -43,8 +41,12 @@ fun PythonPackageManager.launchReload() {
     }
   }
 }
+@ApiStatus.Internal
 
-suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: List<String>, @Nls text: String): String {
+suspend fun PythonPackageManager.runPackagingTool(
+  operation: String, arguments: List<String>, @Nls text: String,
+  withBackgroundProgress: Boolean = true,
+): String {
   // todo[akniazev]: check for package management tools
   val helpersAwareTargetRequest = PythonInterpreterTargetEnvironmentFactory.findPythonTargetInterpreter(sdk, project)
   val targetEnvironmentRequest = helpersAwareTargetRequest.targetEnvironmentRequest
@@ -99,18 +101,8 @@ suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: 
   val commandLineString = commandLine.joinToString(" ")
 
   thisLogger().debug("Running python packaging tool. Operation: $operation")
-  val handler = blockingContext {
-    CapturingProcessHandler(process, targetedCommandLine.charset, commandLineString)
-  }
 
-  val result = withBackgroundProgress(project, text, cancellable = true) {
-    withContext(Dispatchers.IO) {
-      blockingContext {
-        handler.runProcess(10 * 60 * 1000)
-      }
-    }
-  }
-
+  val result = PythonPackageManagerRunner.runProcess(this, process, commandLineString, text, withBackgroundProgress)
   if (result.isCancelled) throw RunCanceledByUserException()
   result.checkSuccess(thisLogger())
   val exitCode = result.exitCode
@@ -124,7 +116,7 @@ suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: 
   }
 
   if (result.isTimeout) {
-    throw PyExecutionException(PySdkBundle.message("python.sdk.packaging.timed.out"), helperPath, args, result)
+    throw PyExecutionException.createForTimeout(PySdkBundle.message("python.sdk.packaging.timed.out"), helperPath, args)
   }
 
   return result.stdout
@@ -139,20 +131,27 @@ private val proxyString: String?
     }
     return null
   }
+@ApiStatus.Internal
 
 fun PythonRepositoryManager.packagesByRepository(): Sequence<Pair<PyPackageRepository, Set<String>>> {
-  return repositories.asSequence().map { it to packagesFromRepository(it) }
+  return repositories.asSequence().map { it to it.getPackages() }
 }
+@ApiStatus.Internal
 
 fun PythonPackageManager.isInstalled(name: String): Boolean {
   return installedPackages.any { it.name.lowercase() == name.lowercase() }
 }
+@ApiStatus.Internal
 
 fun PythonRepositoryManager.createSpecification(
   name: String,
   versionSpec: String? = null,
 ): PythonPackageSpecification? {
   val normalizePackageName = normalizePackageName(name)
-  val repository = packagesByRepository().firstOrNull { it.second.contains(normalizePackageName) }?.first
+  val repository = packagesByRepository().firstOrNull { repo ->
+    val packages = repo.second
+    packages.contains(normalizePackageName) ||
+    repo.second.any { normalizePackageName(it) == normalizePackageName }
+  }?.first
   return repository?.createForcedSpecPackageSpecification(name, versionSpec)
 }

@@ -789,6 +789,11 @@ public abstract class PerformanceBasicCompletionHandlerTestGenerated extends Abs
             runTest("../completion/testData/handlers/basic/override/AfterValKeywordInConstructorParameter.kt");
         }
 
+        @TestMetadata("ContextParameters.kt")
+        public void testContextParameters() throws Exception {
+            runTest("../completion/testData/handlers/basic/override/ContextParameters.kt");
+        }
+
         @TestMetadata("ContextReceiver.kt")
         public void testContextReceiver() throws Exception {
             runTest("../completion/testData/handlers/basic/override/ContextReceiver.kt");
@@ -1623,6 +1628,21 @@ public abstract class PerformanceBasicCompletionHandlerTestGenerated extends Abs
         @TestMetadata("ClassWithClassObject.kt")
         public void testClassWithClassObject() throws Exception {
             runTest("../completion/testData/handlers/basic/ClassWithClassObject.kt");
+        }
+
+        @TestMetadata("ConstructorCompletion.kt")
+        public void testConstructorCompletion() throws Exception {
+            runTest("../completion/testData/handlers/basic/ConstructorCompletion.kt");
+        }
+
+        @TestMetadata("ConstructorCompletionWithMultipleConstructors.kt")
+        public void testConstructorCompletionWithMultipleConstructors() throws Exception {
+            runTest("../completion/testData/handlers/basic/ConstructorCompletionWithMultipleConstructors.kt");
+        }
+
+        @TestMetadata("ConstructorCompletionWithSingleConstructor.kt")
+        public void testConstructorCompletionWithSingleConstructor() throws Exception {
+            runTest("../completion/testData/handlers/basic/ConstructorCompletionWithSingleConstructor.kt");
         }
 
         @TestMetadata("DoNotInsertReceiverCast.kt")

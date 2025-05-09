@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk.add.v1
 
 import com.intellij.execution.ExecutionException
@@ -25,11 +25,12 @@ import com.jetbrains.python.packaging.PyCondaPackageManagerImpl
 import com.jetbrains.python.packaging.PyCondaPackageService
 import com.jetbrains.python.sdk.*
 import com.jetbrains.python.sdk.add.PyAddNewEnvPanel
-import com.jetbrains.python.sdk.conda.condaSupportedLanguages
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMode
 import com.jetbrains.python.sdk.conda.PyCondaSdkCustomizer
+import com.jetbrains.python.sdk.conda.condaSupportedLanguages
 import com.jetbrains.python.statistics.InterpreterTarget
 import com.jetbrains.python.statistics.InterpreterType
+import com.jetbrains.python.ui.pyMayBeModalBlocking
 import org.jetbrains.annotations.SystemIndependent
 import java.awt.BorderLayout
 import javax.swing.Icon
@@ -40,7 +41,7 @@ open class PyAddNewCondaEnvPanel(
   private val project: Project?,
   private val module: Module?,
   private val existingSdks: List<Sdk>,
-  newProjectPath: String?
+  newProjectPath: String?,
 ) : PyAddNewEnvPanel(PythonInterpreterSelectionMode.BASE_CONDA) {
   override val envName: String = "Conda"
   override val panelName: String get() = PyBundle.message("python.add.sdk.panel.name.new.environment")
@@ -120,9 +121,11 @@ open class PyAddNewCondaEnvPanel(
     val associatedPath = if (!shared) projectBasePath else null
     val sdk = createSdkByGenerateTask(task, existingSdks, null, associatedPath, null)
     if (!shared) {
-      when {
-        newProjectPath != null -> sdk.setAssociationToPath(newProjectPath)
-        module != null -> sdk.setAssociationToModule(module)
+      pyMayBeModalBlocking {
+        when {
+          newProjectPath != null -> sdk.setAssociationToPath(newProjectPath)
+          module != null -> sdk.setAssociationToModule(module)
+        }
       }
     }
 
@@ -133,11 +136,11 @@ open class PyAddNewCondaEnvPanel(
   }
 
   override fun getStatisticInfo(): InterpreterStatisticsInfo? {
-      return InterpreterStatisticsInfo(InterpreterType.CONDAVENV,
-                                       InterpreterTarget.LOCAL,
-                                       false,
-                                       makeSharedField.isSelected,
-                                       false)
+    return InterpreterStatisticsInfo(InterpreterType.CONDAVENV,
+                                     InterpreterTarget.LOCAL,
+                                     false,
+                                     makeSharedField.isSelected,
+                                     false)
   }
 
   override fun addChangeListener(listener: Runnable) {

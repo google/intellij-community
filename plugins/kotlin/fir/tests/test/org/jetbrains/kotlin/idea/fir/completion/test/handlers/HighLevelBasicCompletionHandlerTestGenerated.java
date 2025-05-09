@@ -791,6 +791,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../../completion/testData/handlers/basic/override/AfterValKeywordInConstructorParameter.kt");
             }
 
+            @TestMetadata("ContextParameters.kt")
+            public void testContextParameters() throws Exception {
+                runTest("../../completion/testData/handlers/basic/override/ContextParameters.kt");
+            }
+
             @TestMetadata("ContextReceiver.kt")
             public void testContextReceiver() throws Exception {
                 runTest("../../completion/testData/handlers/basic/override/ContextReceiver.kt");
@@ -1627,6 +1632,21 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../../completion/testData/handlers/basic/ClassWithClassObject.kt");
             }
 
+            @TestMetadata("ConstructorCompletion.kt")
+            public void testConstructorCompletion() throws Exception {
+                runTest("../../completion/testData/handlers/basic/ConstructorCompletion.kt");
+            }
+
+            @TestMetadata("ConstructorCompletionWithMultipleConstructors.kt")
+            public void testConstructorCompletionWithMultipleConstructors() throws Exception {
+                runTest("../../completion/testData/handlers/basic/ConstructorCompletionWithMultipleConstructors.kt");
+            }
+
+            @TestMetadata("ConstructorCompletionWithSingleConstructor.kt")
+            public void testConstructorCompletionWithSingleConstructor() throws Exception {
+                runTest("../../completion/testData/handlers/basic/ConstructorCompletionWithSingleConstructor.kt");
+            }
+
             @TestMetadata("DoNotInsertReceiverCast.kt")
             public void testDoNotInsertReceiverCast() throws Exception {
                 runTest("../../completion/testData/handlers/basic/DoNotInsertReceiverCast.kt");
@@ -2123,9 +2143,19 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
             runTest("../../completion/testData/handlers/EnumMember1.kt");
         }
 
+        @TestMetadata("ExistingNonTypeArguments.kt")
+        public void testExistingNonTypeArguments() throws Exception {
+            runTest("../../completion/testData/handlers/ExistingNonTypeArguments.kt");
+        }
+
         @TestMetadata("ExistingSingleBrackets.kt")
         public void testExistingSingleBrackets() throws Exception {
             runTest("../../completion/testData/handlers/ExistingSingleBrackets.kt");
+        }
+
+        @TestMetadata("ExistingTypeArguments.kt")
+        public void testExistingTypeArguments() throws Exception {
+            runTest("../../completion/testData/handlers/ExistingTypeArguments.kt");
         }
 
         @TestMetadata("ExtFunction.kt")

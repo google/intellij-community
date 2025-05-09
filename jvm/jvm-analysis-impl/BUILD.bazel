@@ -17,6 +17,7 @@ jvm_library(
     "//java/openapi:java",
     "@lib//:stream_ex",
     "//platform/core-ui",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
     "//java/java-impl:impl",
     "//platform/usageView",
@@ -25,7 +26,7 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/ide-core-impl",
     "//jvm/jvm-analysis-quickFix:analysis-quickFix",
-    "//java/codeserver/core:java-codeserver-core",
+    "//java/codeserver/core",
   ],
   exports = ["//jvm/jvm-analysis-api:analysis"],
   runtime_deps = [":analysis-impl_resources"]

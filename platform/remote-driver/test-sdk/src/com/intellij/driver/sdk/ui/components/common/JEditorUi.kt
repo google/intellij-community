@@ -3,26 +3,21 @@ package com.intellij.driver.sdk.ui.components.common
 import com.intellij.driver.client.Remote
 import com.intellij.driver.client.impl.DriverCallException
 import com.intellij.driver.client.impl.RefWrapper
+import com.intellij.driver.model.LockSemantics
 import com.intellij.driver.model.OnDispatcher
 import com.intellij.driver.model.RdTarget
 import com.intellij.driver.model.RemoteMouseButton
-import com.intellij.driver.sdk.DeclarativeInlayRenderer
-import com.intellij.driver.sdk.Document
-import com.intellij.driver.sdk.Editor
-import com.intellij.driver.sdk.HighlightInfo
-import com.intellij.driver.sdk.Inlay
-import com.intellij.driver.sdk.logicalPosition
+import com.intellij.driver.sdk.*
 import com.intellij.driver.sdk.remoteDev.BeControlClass
 import com.intellij.driver.sdk.remoteDev.EditorComponentImplBeControlBuilder
-import com.intellij.driver.sdk.step
 import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.center
 import com.intellij.driver.sdk.ui.components.ComponentData
 import com.intellij.driver.sdk.ui.components.UiComponent
 import com.intellij.driver.sdk.ui.remote.Component
-import com.intellij.driver.sdk.waitFor
 import org.intellij.lang.annotations.Language
 import java.awt.Point
+import java.awt.Rectangle
 
 fun Finder.editor(@Language("xpath") xpath: String? = null): JEditorUiComponent {
   return x(xpath ?: "//div[@class='EditorComponentImpl']",
@@ -49,8 +44,8 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
   protected open val editorComponent : EditorComponentImpl
     get() = driver.cast(component, EditorComponentImpl::class)
 
-  val document: Document by lazy { editor.getDocument() }
-  val editor: Editor by lazy { editorComponent.getEditor() }
+  val editor: Editor get() = editorComponent.getEditor()
+  val document: Document get() = editor.getDocument()
 
   var text: String
     get() = document.getText()
@@ -172,7 +167,7 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
   fun getLineText(line: Int): String = text.lines().getOrElse(line - 1) { "" }
 
   fun <T> interact(block: Editor.() -> T): T {
-    return driver.withContext(OnDispatcher.EDT) {
+    return driver.withContext(OnDispatcher.EDT, semantics = LockSemantics.READ_ACTION) {
       block.invoke(editor)
     }
   }
@@ -191,9 +186,9 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
 
   fun containsText(expectedText: String) {
     step("Verify that editor contains text: $expectedText") {
-      waitFor(errorMessage = { "Editor doesn't contain text: $expectedText" }) {
-        text.trimIndent().contains(expectedText)
-      }
+      waitFor(errorMessage = { "Editor doesn't contain text: $expectedText" },
+              getter = { text.trimIndent() },
+              checker = { it.contains(expectedText) })
     }
   }
 }
@@ -240,7 +235,6 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
   val iconAreaOffset
     get() = gutter.getIconAreaOffset()
 
-
   fun getGutterIcons(): List<GutterIcon> {
     waitFor { this.icons.isNotEmpty() }
     return this.icons
@@ -255,6 +249,29 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
 
   fun rightClickOnIcon(line: Int) {
     rightClick(icons.firstOrNull { it.line == line - 1 }!!.location)
+  }
+
+  fun clickLineMarkerAtLine(lineNum: Int, accessibleName: String, lineY: Int? = null) {
+    val lineIndex = lineNum - 1
+    val rectangle = waitNotNull("No $accessibleName marker on line $lineNum") {
+      driver.withContext(OnDispatcher.EDT) {
+        gutter.getActiveGutterRendererRectangle(lineIndex, accessibleName)
+      }
+    }
+    val lineY = lineY ?: driver.withContext(OnDispatcher.EDT) {
+      val startY = gutter.getEditor().visualLineToY(lineIndex)
+      startY + (gutter.getEditor().getLineHeight() / 2)
+    }
+    click(Point(rectangle.centerX.toInt(), lineY))
+  }
+
+  fun clickVcsLineMarkerAtLine(line: Int) {
+    //to support a deleted block marker, click on the first third of the line
+    val lineY = driver.withContext(OnDispatcher.EDT) {
+      val startY = gutter.getEditor().visualLineToY(line - 1)
+      startY + (gutter.getEditor().getLineHeight() / 6)
+    }
+    clickLineMarkerAtLine(line, "VCS marker: changed line", lineY)
   }
 
   inner class GutterIcon(private val data: GutterIconWithLocation) {
@@ -277,6 +294,7 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
         .findLast { it.trim().startsWith("path") }!!.split('=')[1]
     }
   }
+
 }
 
 enum class GutterIcon(val path: String) {
@@ -296,7 +314,6 @@ data class GutterState(
   val iconPath: String = "",
 )
 
-
 class InlayHint(val offset: Int, val text: String)
 
 fun List<InlayHint>.getHint(offset: Int): InlayHint {
@@ -307,12 +324,15 @@ fun List<InlayHint>.getHint(offset: Int): InlayHint {
   return foundHint
 }
 
-
 @Remote("com.intellij.openapi.editor.impl.EditorGutterComponentImpl")
 interface EditorGutterComponentImpl : Component {
   fun getLineGutterMarks(): List<GutterIconWithLocation>
 
   fun getIconAreaOffset(): Int
+
+  fun getActiveGutterRendererRectangle(lineNum: Int, accessibleName: String): Rectangle?
+
+  fun getEditor(): Editor
 }
 
 @Remote("com.intellij.openapi.editor.impl.GutterIconWithLocation")

@@ -1,9 +1,11 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("IjentTunnelsUtil")
+@file:OptIn(IntellijInternalApi::class)
 
 package com.intellij.platform.eel.provider.utils
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
@@ -54,7 +56,7 @@ fun CoroutineScope.forwardLocalPort(tunnels: EelTunnelsApi, localPort: Int, addr
         connectionCounter++
         launch {
           socket.use {
-            tunnels.withConnectionToRemotePort(address, {
+            tunnels.getConnectionToRemotePort().hostAddress(address).withConnectionToRemotePort({
               if (it is EelConnectionError.ConnectionProblem) {
                 LOG.debug("Failed to establish connection $connectionCounter ($localPort - $address: $it); closing socket")
               }
@@ -95,7 +97,7 @@ fun CoroutineScope.forwardLocalServer(tunnels: EelTunnelsApi, localPort: Int, ad
   // todo: do not forward anything if it is local eel
   val remoteAddress = CompletableDeferred<EelTunnelsApi.ResolvedSocketAddress>()
   launch(blockingDispatcher.plus(CoroutineName("Local server on port $localPort (tunneling to $address)"))) {
-    tunnels.withAcceptorForRemotePort(address, {
+    tunnels.getAcceptorForRemotePort().hostAddress(address).withAcceptorForRemotePort({
       LOG.error("Failed to start a server on $address (was forwarding $localPort): $it")
       remoteAddress.cancel()
     }) { acceptor ->

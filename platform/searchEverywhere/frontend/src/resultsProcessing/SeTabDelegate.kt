@@ -2,64 +2,93 @@
 package com.intellij.platform.searchEverywhere.frontend.resultsProcessing
 
 import com.intellij.ide.rpc.rpcId
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.platform.project.projectId
 import com.intellij.platform.searchEverywhere.*
-import com.intellij.platform.searchEverywhere.frontend.SeItemDataFrontendProvider
-import com.intellij.platform.searchEverywhere.frontend.SeItemDataLocalProvider
+import com.intellij.platform.searchEverywhere.frontend.SeFrontendItemDataProvider
+import com.intellij.platform.searchEverywhere.frontend.SeLocalItemDataProvider
+import com.intellij.platform.searchEverywhere.frontend.utils.suspendLazy
+import com.intellij.platform.searchEverywhere.impl.SeRemoteApi
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
+import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
 import fleet.kernel.DurableRef
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.Nls
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Internal
-class SeTabDelegate private constructor(val project: Project,
-                                        private val logLabel: String,
-                                        private val providers: Map<SeProviderId, SeItemDataProvider>) {
-  private val providersAndLimits = providers.values.associate { it.id to Int.MAX_VALUE }
+class SeTabDelegate(val project: Project,
+                    private val sessionRef: DurableRef<SeSessionEntity>,
+                    private val logLabel: String,
+                    private val providerIds: List<SeProviderId>,
+                    private val dataContext: DataContext): Disposable {
+  private val providers = suspendLazy { initializeProviders(project, providerIds, dataContext, sessionRef, this) }
+  private val providersAndLimits = providerIds.associateWith { Int.MAX_VALUE }
 
-  fun getItems(params: SeParams): Flow<SeResultEvent> {
+  suspend fun getProvidersIdToName(): Map<SeProviderId, @Nls String> = providers.getValue().mapValues { it.value.displayName }
+
+  fun getItems(params: SeParams, disabledProviders: List<SeProviderId>? = null): Flow<SeResultEvent> {
     val accumulator = SeResultsAccumulator(providersAndLimits)
 
-    return providers.values.asFlow().flatMapMerge { provider ->
-      provider.getItems(params).mapNotNull {
-        SeLog.log(ITEM_EMIT) { "Tab delegate for ${logLabel} emits: ${it.presentation.text}" }
-        accumulator.add(it)
+    return flow {
+      val providers = providers.getValue()
+      val enabledProviders = (disabledProviders?.let { providers.filterKeys { it !in disabledProviders } } ?: providers).values
+
+      enabledProviders.asFlow().flatMapMerge { provider ->
+        provider.getItems(params).mapNotNull {
+          SeLog.log(ITEM_EMIT) { "Tab delegate for ${logLabel} emits: ${it.presentation.text}" }
+          accumulator.add(it)
+        }
+      }.collect {
+        emit(it)
       }
     }.buffer(0, onBufferOverflow = BufferOverflow.SUSPEND)
   }
 
+  suspend fun getSearchScopesInfos(): List<SeSearchScopesInfo> {
+    return providers.getValue().values.mapNotNull { it.getSearchScopesInfo() }
+  }
+
+  suspend fun getTypeVisibilityStates(): List<SeTypeVisibilityStatePresentation> {
+    return providers.getValue().values.flatMap { it.getTypeVisibilityStates() ?: emptyList() }
+  }
+
   suspend fun itemSelected(itemData: SeItemData, modifiers: Int, searchText: String): Boolean {
-    val provider = providers[itemData.providerId] ?: return false
+    val provider = providers.getValue()[itemData.providerId] ?: return false
     return provider.itemSelected(itemData, modifiers, searchText)
   }
+
+  override fun dispose() {}
 
   companion object {
     private val LOG = Logger.getInstance(SeTabDelegate::class.java)
 
-    suspend fun create(project: Project,
-                       sessionRef: DurableRef<SeSessionEntity>,
-                       logLabel: String,
-                       providerIds: List<SeProviderId>,
-                       dataContext: DataContext,
-                       forceRemote: Boolean): SeTabDelegate {
+    private suspend fun initializeProviders(
+      project: Project,
+      providerIds: List<SeProviderId>,
+      dataContext: DataContext,
+      sessionRef: DurableRef<SeSessionEntity>,
+      parentDisposable: Disposable,
+    ): Map<SeProviderId, SeItemDataProvider> {
       val dataContextId = readAction {
         dataContext.rpcId()
       }
 
       val allProviderIds = providerIds.toSet()
+      val hasWildcard = allProviderIds.any { it.isWildcard }
 
       val localProviders =
-        if (forceRemote) emptyMap()
-        else SeItemsProviderFactory.EP_NAME.extensionList.asFlow().filter {
-          allProviderIds.contains(SeProviderId(it.id))
+        SeItemsProviderFactory.EP_NAME.extensionList.asFlow().filter {
+          hasWildcard || allProviderIds.contains(SeProviderId(it.id))
         }.mapNotNull {
           try {
             it.getItemsProvider(project, dataContext)
@@ -69,18 +98,24 @@ class SeTabDelegate private constructor(val project: Project,
             null
           }
         }.toList().associate { provider ->
-          SeProviderId(provider.id) to SeItemDataLocalProvider(provider, sessionRef)
+          SeProviderId(provider.id) to SeLocalItemDataProvider(provider, sessionRef)
         }
 
-      val remoteProviderIds = allProviderIds - localProviders.keys.toSet()
+      val remoteProviderIds =
+        if (hasWildcard) SeRemoteApi.getInstance().getAvailableProviderIds()
+        else allProviderIds - localProviders.keys.toSet()
 
-      val frontendProviders = remoteProviderIds.associateWith { providerId ->
-        SeItemDataFrontendProvider(project.projectId(), providerId, sessionRef, dataContextId)
-      }
+      val remoteProviderIdToName =
+        SeRemoteApi.getInstance().getDisplayNameForProviders(project.projectId(), sessionRef, dataContextId, remoteProviderIds.toList())
+
+      val frontendProviders = remoteProviderIdToName.map { (providerId, name) ->
+        SeFrontendItemDataProvider(project.projectId(), providerId, name, sessionRef, dataContextId)
+      }.associateBy { it.id }
 
       val providers = frontendProviders + localProviders
+      providers.values.forEach { Disposer.register(parentDisposable, it) }
 
-      return SeTabDelegate(project, logLabel, providers)
+      return providers
     }
   }
 }

@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-api:lang",
     "//platform/util:util-ui",
     "//platform/lang-impl",
@@ -25,9 +26,10 @@ jvm_library(
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
     "//xml/xml-parser:parser",
-    "//platform/ui.jcef:ui-jcef",
+    "//platform/ui.jcef",
     "@lib//:kotlin-stdlib",
     "//platform/statistics",
+    "//platform/util/coroutines",
   ],
   runtime_deps = [":images_resources"]
 )
@@ -38,6 +40,7 @@ jvm_library(
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
   associates = [":images"],
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-api:lang",
     "//platform/util:util-ui",
     "//platform/lang-impl",
@@ -54,10 +57,11 @@ jvm_library(
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
     "//xml/xml-parser:parser",
-    "//platform/ui.jcef:ui-jcef",
+    "//platform/ui.jcef",
     "@lib//:kotlin-stdlib",
     "//platform/statistics",
     "//platform/statistics:statistics_test_lib",
+    "//platform/util/coroutines",
   ],
   runtime_deps = [":images_resources"]
 )

@@ -150,8 +150,8 @@ public class ExtensionsImplTest {
     String moduleXml = "<idea-plugin><extensions>" + extensionElement + "</extensions></idea-plugin>";
     PluginId id = PluginId.getId(pluginName);
     IdeaPluginDescriptorImpl pluginDescriptor =
-      PluginDescriptorLoadUtilsKt.readDescriptorForTest(Path.of(""), true, moduleXml.getBytes(StandardCharsets.UTF_8), id);
-    pluginDescriptor.registerExtensions(area.getNameToPointMap(), pluginDescriptor.appContainerDescriptor, null);
+      PluginDescriptorLoadUtilsKt.readAndInitDescriptorFromBytesForTest(Path.of(""), true, moduleXml.getBytes(StandardCharsets.UTF_8), id);
+    pluginDescriptor.registerExtensions(area.getNameToPointMap(), null);
   }
 
   private static final class TestExtensionClassOne {

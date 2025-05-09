@@ -1,14 +1,16 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.searchEverywhere.frontend.vm
 
-import com.intellij.openapi.options.ObservableOptionEditor
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.platform.searchEverywhere.SeFilterState
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
+import com.intellij.platform.searchEverywhere.frontend.SeFilterEditor
 import com.intellij.platform.searchEverywhere.frontend.SeTab
-import com.intellij.platform.searchEverywhere.frontend.resultsProcessing.SeResultsSorter
+import com.intellij.platform.searchEverywhere.frontend.utils.SuspendLazyProperty
+import com.intellij.platform.searchEverywhere.frontend.utils.suspendLazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -25,7 +27,10 @@ class SeTabVm(
 ) {
   val searchResults: StateFlow<Flow<SeResultListEvent>> get() = _searchResults.asStateFlow()
   val name: String get() = tab.name
-  val filterEditor: ObservableOptionEditor<SeFilterState>? = tab.getFilterEditor()
+  val filterEditor: SuspendLazyProperty<SeFilterEditor?> = suspendLazy { tab.getFilterEditor() }
+  val tabId: String get() = tab.id
+
+  fun filterEditorOrNull(): SeFilterEditor? = filterEditor.getValueOrNull()
 
   private val shouldLoadMoreFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   var shouldLoadMore: Boolean
@@ -41,7 +46,6 @@ class SeTabVm(
     })
   }
 
-  private val resultsSorter = SeResultsSorter(tab)
 
   init {
     coroutineScope.launch {
@@ -50,13 +54,13 @@ class SeTabVm(
       }.collectLatest { isActive ->
         if (!isActive) return@collectLatest
 
-        combine(searchPattern, filterEditor?.resultFlow ?: flowOf(null)) { searchPattern, filterData ->
+        combine(searchPattern, filterEditor.getValue()?.resultFlow ?: flowOf(null)) { searchPattern, filterData ->
           Pair(searchPattern, filterData ?: SeFilterState.Empty)
         }.mapLatest { (searchPattern, filterData) ->
           val params = SeParams(searchPattern, filterData)
 
           flow {
-            resultsSorter.getItems(params).map { item ->
+            tab.getItems(params).map { item ->
               shouldLoadMoreFlow.first { it }
               item
             }.onCompletion {
@@ -69,6 +73,8 @@ class SeTabVm(
           _searchResults.value = it
         }
       }
+    }.invokeOnCompletion {
+      Disposer.dispose(tab)
     }
   }
 

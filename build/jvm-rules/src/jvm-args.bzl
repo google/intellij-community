@@ -1,10 +1,17 @@
 def get_jvm_flags(flags):
     return [
+        # Memory
         # "-XX:+UseZGC",
         # "-XX:+ZGenerational",
         "-Xms4g",
         "-Xmx16g",
-        "-XX:ReservedCodeCacheSize=512m",
+        # IJ PSI cache
+        "-XX:SoftRefLRUPolicyMSPerMB=50",
+        # Code Cache
+        "-XX:NonProfiledCodeHeapSize=512m",
+        "-XX:ProfiledCodeHeapSize=512m",
+        "-XX:ReservedCodeCacheSize=2048m",
+        # Headless
         "-Djava.awt.headless=true",
         "-Dapple.awt.UIElement=true",
         # IJ PHM
@@ -19,8 +26,6 @@ def get_jvm_flags(flags):
         "-Didea.io.use.nio2=true",
         # https://github.com/netty/netty/issues/11532
         "-Dio.netty.tryReflectionSetAccessible=true",
-        "-Dio.netty.allocator.type=pooled",
-        "-Dio.netty.allocator.useCacheForAllThreads=true",
         # see TargetConfigurationDigestProperty.KOTLIN_VERSION - we invalidate cache if kotlinc version changed
         "-Dkotlin.jps.skip.cache.version.check=true",
     ] + flags

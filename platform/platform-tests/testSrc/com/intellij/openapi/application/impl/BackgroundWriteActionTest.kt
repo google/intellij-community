@@ -4,22 +4,27 @@ package com.intellij.openapi.application.impl
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.openapi.application.*
 import com.intellij.openapi.progress.Cancellation
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.runBlockingCancellable
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.util.application
 import com.intellij.util.ui.EDT
+import io.kotest.assertions.withClue
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.asCompletableFuture
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Assumptions
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 
 @TestApplication
 class BackgroundWriteActionTest {
@@ -423,8 +428,8 @@ class BackgroundWriteActionTest {
     edtWriteAction {
       runBlockingCancellable {
         assertRead()
-        assertNoWrite()
-        assertNoWil()
+        assertWrite() // since it is invoked on a thread with permission to write
+        assertWil()
       }
     }
   }
@@ -453,4 +458,213 @@ class BackgroundWriteActionTest {
     }
     checkpoint(8)
   }
+
+  @RepeatedTest(100)
+  fun `write access allowed inside explicit WA`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    repeat(1000) {
+      launch {
+        edtWriteAction {
+          ApplicationManager.getApplication().assertWriteAccessAllowed()
+        }
+      }
+      launch {
+        backgroundWriteAction {
+          ApplicationManager.getApplication().assertWriteAccessAllowed()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `prevention of WA is thread-local`(): Unit = concurrencyTest {
+    launch {
+      getGlobalThreadingSupport().prohibitWriteActionsInside().use {
+        checkpoint(1)
+        checkpoint(4)
+        assertThrows<IllegalStateException> {
+          application.runWriteAction { }
+        }
+        checkpoint(5)
+      }
+    }
+    launch {
+      checkpoint(2)
+      backgroundWriteAction { // can safely start
+      }
+      checkpoint(3)
+    }
+  }
+
+  @OptIn(ExperimentalTime::class)
+  @RepeatedTest(100)
+  fun `cancellation of read action with pending background WA when modality happens`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    launch(Dispatchers.EDT) {
+      delay(Random.nextInt(1, 10).milliseconds)
+      modalProgress {
+      }
+    }
+    coroutineScope {
+      val writeActionRun = AtomicBoolean(false)
+      repeat(1) {
+        launch {
+          delay(Random.nextInt(1, 10).milliseconds)
+          readAction {
+            while (!writeActionRun.get()) {
+              ProgressIndicatorUtils.checkCancelledEvenWithPCEDisabled(ProgressManager.getInstance().progressIndicator)
+            }
+          }
+        }
+      }
+
+      launch {
+        delay(Random.nextInt(1, 10).milliseconds)
+        backgroundWriteAction {
+          writeActionRun.set(true)
+        }
+      }
+
+    }
+  }
+
+  /**
+   * This test is not set in stone; if you feel that the platform is ready to block same-level read actions, the feel free to adjust the test.
+   */
+  @Test
+  fun `same-level pending WA does not prevent same-level RA`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val job1 = Job()
+    launch {
+      modalProgress {
+        job1.join()
+        delay(100)
+      }
+    }
+    launch {
+      delay(10)
+      backgroundWriteAction {  // pending
+        Assertions.assertTrue { job1.isCompleted }
+      }
+    }
+    delay(50)
+    readAction { // must start regardless of the pending WA, because WA is free
+      job1.complete()
+    }
+  }
+
+  @Test
+  fun `same-level ra gets canceled when modal progress exists and there is a pending WA`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    launch {
+      modalProgress {
+        delay(100)
+      }
+    }
+    val counter = AtomicInteger()
+    val bgWaCompleted = AtomicBoolean(false)
+
+    launch {
+      delay(10)
+      backgroundWriteAction {  // pending
+        Assertions.assertTrue { counter.get() == 1 }
+        bgWaCompleted.set(true)
+      }
+    }
+    delay(50)
+    readAction { // must start regardless of the pending WA, because WA is free
+      if (counter.get() == 0) {
+        assertFalse(bgWaCompleted.get())
+        while (true) {
+          try {
+            Cancellation.checkCancelled()
+          } catch (e : Throwable) {
+            counter.incrementAndGet()
+            throw e
+          }
+        }
+      } else {
+        assertTrue(bgWaCompleted.get())
+      }
+    }
+    Assertions.assertEquals(1, counter.get())
+  }
+
+  @Test
+  fun `prompt cancellation of pending wa does not break subsequent ra`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val future = Job(coroutineContext.job)
+    launch {
+      readAction {
+        future.asCompletableFuture().join()
+      }
+    }
+    val pendingWa = launch {
+      Thread.sleep(50)
+      backgroundWriteAction {
+        Assertions.fail<Nothing>("Should not start")
+      }
+    }
+    delay(10)
+    pendingWa.cancelAndJoin()
+    future.cancel()
+    readAction {
+    }
+  }
+
+
+  @Test
+  fun `runWhenWriteActionIsCompleted executes immediately when no write action`() {
+    val executed = AtomicBoolean(false)
+
+    getGlobalThreadingSupport().runWhenWriteActionIsCompleted {
+      executed.set(true)
+    }
+
+    withClue("Action should execute immediately") {
+      assertThat(executed.get()).isTrue
+    }
+  }
+
+  @Test
+  fun `runWhenWriteActionIsCompleted is not executed when write action is running`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val executed = AtomicBoolean(false)
+
+    val job = Job(coroutineContext.job)
+    val waJob = launch {
+      backgroundWriteAction {
+        job.asCompletableFuture().join()
+      }
+    }
+    delay(100)
+    getGlobalThreadingSupport().runWhenWriteActionIsCompleted {
+      executed.set(true)
+    }
+    assertThat(executed.get()).isFalse
+    job.complete()
+    waJob.join()
+    assertThat(executed.get()).isTrue
+  }
+
+
+  @Test
+  fun `runWhenWriteActionIsCompleted is not executed when write action is pending`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val executed = AtomicBoolean(false)
+    val job = Job(coroutineContext.job)
+    launch {
+      readAction {
+        job.asCompletableFuture().join()
+      }
+    }
+    delay(50)
+    val waJob = launch {
+      backgroundWriteAction {
+      }
+    }
+    delay(50)
+    getGlobalThreadingSupport().runWhenWriteActionIsCompleted {
+      executed.set(true)
+    }
+    assertThat(executed.get()).isFalse
+    job.complete()
+    waJob.join()
+    assertThat(executed.get()).isTrue
+  }
+
+
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("ApplicationLoader")
 @file:Internal
 @file:Suppress("RAW_RUN_BLOCKING", "ReplaceJavaStaticMethodWithKotlinAnalog")
@@ -9,11 +9,11 @@ import com.intellij.diagnostic.logs.LogLevelConfigurationManager
 import com.intellij.ide.*
 import com.intellij.ide.bootstrap.InitAppContext
 import com.intellij.ide.gdpr.EndUserAgreement
+import com.intellij.ide.plugins.BundledPluginsState
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginSet
 import com.intellij.ide.plugins.marketplace.statistics.PluginManagerUsageCollector
 import com.intellij.ide.plugins.marketplace.statistics.enums.DialogAcceptanceResultEnum
-import com.intellij.ide.plugins.saveBundledPluginsState
 import com.intellij.ide.ui.IconMapLoader
 import com.intellij.ide.ui.LafManager
 import com.intellij.ide.ui.NotRoamableUiSettings
@@ -110,7 +110,9 @@ internal suspend fun loadApp(
     }
     else {
       async(CoroutineName("language and region")) {
-        getLanguageAndRegionDialogIfNeeded(euaDocumentDeferred.await())
+        euaDocumentDeferred.await()?.let {
+          getLanguageAndRegionDialogIfNeeded(it)
+        }
       }
     }
     
@@ -218,6 +220,12 @@ internal suspend fun loadApp(
     }
 
     launch {
+      if (AppMode.isRemoteDevHost()) {
+        span("telemetry waiting") {
+          initTelemetryJob.join()
+        }
+      }
+
       val appInitializedListeners = appInitListeners.await()
       span("app initialized callback") {
         // An async scope here is intended for FLOW. FLOW!!! DO NOT USE the surrounding main scope.
@@ -248,7 +256,7 @@ internal suspend fun loadApp(
         delay(1.minutes)
         if (!ApplicationManagerEx.getApplicationEx().isExitInProgress) {
           span("save bundled plugin state") {
-            saveBundledPluginsState()
+            BundledPluginsState.saveBundledPluginsState()
           }
         }
       }
@@ -319,7 +327,7 @@ private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob:
 
     // https://youtrack.jetbrains.com/issue/IDEA-341318
     if (SystemInfoRt.isLinux && System.getProperty("idea.linux.scale.workaround", "false").toBoolean()) {
-      // ActionManager can use UISettings (KeymapManager doesn't use it, but just to be sure)
+      // ActionManager can use UISettings (KeymapManager doesn't use it but just to be sure)
       initLafJob.join()
     }
 
@@ -464,9 +472,15 @@ internal suspend fun executeApplicationStarter(starter: ApplicationStarter, args
 fun getAppInitializedListeners(app: Application): List<ApplicationInitializedListener> {
   val extensionArea = app.extensionArea as ExtensionsAreaImpl
   val point = extensionArea.getExtensionPoint<ApplicationInitializedListener>("com.intellij.applicationInitializedListener")
-  val result = point.asSequence().toList()
+  val dynamicPoint = extensionArea.getExtensionPoint<ApplicationInitializedListener>("com.intellij.dynamicApplicationInitializedListener")
+
+  val extensions = mutableListOf<ApplicationInitializedListener>()
+  extensions.addAll(point.extensionList)
+  extensions.addAll(dynamicPoint.extensionList)
+
   point.reset()
-  return result
+  dynamicPoint.reset()
+  return extensions
 }
 
 private fun CoroutineScope.runPostAppInitTasks() {
@@ -514,8 +528,9 @@ private suspend fun createAppStarter(args: List<String>, asyncScope: CoroutineSc
   }
 }
 
-private fun createDefaultAppStarter(): ApplicationStarter =
-  if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
+private fun createDefaultAppStarter(): ApplicationStarter {
+  return if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
+}
 
 @VisibleForTesting
 internal fun createAppLocatorFile() {
@@ -578,7 +593,7 @@ fun CoroutineScope.callAppInitialized(listeners: List<ApplicationInitializedList
 }
 
 private suspend fun checkThirdPartyPluginsAllowed() {
-  val noteAccepted = PluginManagerCore.isThirdPartyPluginsNoteAccepted() ?: return
+  val noteAccepted = PluginManagerCore.consumeThirdPartyPluginsNoteAcceptedFlag() ?: return
   if (noteAccepted) {
     serviceAsync<UpdateSettings>().isThirdPartyPluginsAllowed = true
     PluginManagerUsageCollector.thirdPartyAcceptanceCheck(DialogAcceptanceResultEnum.ACCEPTED)

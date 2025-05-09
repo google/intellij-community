@@ -603,7 +603,15 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
 
   private static @Nullable Field getField(@NotNull FileTypeBean bean, Class<Object> aClass) throws NoSuchFieldException {
     if (bean.fieldName != null) {
-      return aClass.getDeclaredField(bean.fieldName);
+      try {
+        return aClass.getDeclaredField(bean.fieldName);
+      }
+      catch (NoSuchFieldException e) {
+        PluginException ex =
+          PluginException.createByClass("File type " + aClass.getName() + " has no field " + bean.fieldName, e, aClass);
+        LOG.error(ex);
+        throw e;
+      }
     }
 
     Field field = null;
@@ -1108,7 +1116,7 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
 
   @ApiStatus.Internal
   public static @NotNull FileTypeWithDescriptor detectPluginDescriptor(@NotNull FileType type) {
-    PluginDescriptor pluginDescriptor = PluginManagerCore.getPluginDescriptorOrPlatformByClassName(type.getClass().getName());
+    PluginDescriptor pluginDescriptor = PluginUtils.getPluginDescriptorOrPlatformByClassName(type.getClass().getName());
     if (pluginDescriptor == null) pluginDescriptor = coreIdeaPluginDescriptor();
     return new FileTypeWithDescriptor(type, pluginDescriptor);
   }

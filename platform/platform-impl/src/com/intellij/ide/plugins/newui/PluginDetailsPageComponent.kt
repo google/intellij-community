@@ -12,9 +12,9 @@ import com.intellij.ide.impl.ProjectUtil.getProjectForComponent
 import com.intellij.ide.plugins.*
 import com.intellij.ide.plugins.PluginManagerCore.buildPluginIdMap
 import com.intellij.ide.plugins.PluginManagerCore.findPlugin
-import com.intellij.ide.plugins.PluginManagerCore.getIncompatibleOs
 import com.intellij.ide.plugins.PluginManagerCore.getPlugin
-import com.intellij.ide.plugins.PluginManagerCore.isModuleDependency
+import com.intellij.ide.plugins.PluginManagerCore.getUnfulfilledOsRequirement
+import com.intellij.ide.plugins.PluginManagerCore.looksLikePlatformPluginAlias
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests.Companion.getLastCompatiblePluginUpdate
 import com.intellij.ide.plugins.marketplace.PluginReviewComment
@@ -129,6 +129,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   private var disableFeedbackNotification: BorderLayoutPanel? = null
   private val sentFeedbackPlugins = HashSet<PluginId>()
   private val licensePanel = LicensePanel(false)
+  private val customLicensePanel = JPanel(BorderLayout()).apply {
+    isOpaque = false
+    isVisible = false
+  }
   private val unavailableWithoutSubscriptionBanner: InlineBannerBase? = UnavailableWithoutSubscriptionComponent.getBanner()
   private val partiallyAvailableBanner: InlineBannerBase? = PartiallyAvailableComponent.getBanner()
   private var homePage: LinkPanel? = null
@@ -343,6 +347,8 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     topPanel.add(ErrorComponent().also { errorComponent = it }, VerticalLayout.FILL_HORIZONTAL)
     topPanel.add(licensePanel)
     licensePanel.border = JBUI.Borders.emptyBottom(5)
+    topPanel.add(customLicensePanel)
+    customLicensePanel.border = JBUI.Borders.emptyBottom(5)
 
     if (unavailableWithoutSubscriptionBanner != null) {
       topPanel.add(unavailableWithoutSubscriptionBanner, VerticalLayout.FILL_HORIZONTAL)
@@ -425,11 +431,11 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
   private fun createEnableDisableAction(action: PluginEnableDisableAction): SelectionBasedPluginModelAction.EnableDisableAction<PluginDetailsPageComponent> {
     return SelectionBasedPluginModelAction.EnableDisableAction(
-      pluginModel,
+      PluginModelFacade(pluginModel),
       action,
       false,
       java.util.List.of(this),
-      { it.descriptorForActions },
+      { it.descriptorForActions?.let { PluginUiModelAdapter(it) } },
       { updateNotifications() },
     )
   }
@@ -840,7 +846,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   private fun showPlugin(component: ListPluginComponent?, multiSelection: Boolean) {
-    if (showComponent == component && (component == null || updateDescriptor === component.myUpdateDescriptor)) {
+    if (showComponent == component && (component == null || updateDescriptor === component.getUpdatePluginDescriptor())) {
       return
     }
     showComponent = component
@@ -927,7 +933,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       }
 
       if (syncLoading) {
-        showPluginImpl(component.pluginDescriptor, component.myUpdateDescriptor)
+        showPluginImpl(component.pluginDescriptor, component.getUpdatePluginDescriptor())
         pluginCardOpened(component.pluginDescriptor, component.group)
       }
     }
@@ -941,7 +947,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       coroutineScope.launch(Dispatchers.EDT + ModalityState.stateForComponent(component).asContextElement()) {
         if (showComponent == component) {
           stopLoading()
-          showPluginImpl(component.pluginDescriptor, component.myUpdateDescriptor)
+          showPluginImpl(component.pluginDescriptor, component.getUpdatePluginDescriptor())
           pluginCardOpened(component.pluginDescriptor, component.group)
         }
       }
@@ -952,7 +958,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     plugin = pluginDescriptor
     val policy = PluginManagementPolicy.getInstance()
     this.updateDescriptor = if (updateDescriptor != null && policy.canEnablePlugin(updateDescriptor)) updateDescriptor else null
-    isPluginCompatible = getIncompatibleOs(pluginDescriptor) == null
+    isPluginCompatible = getUnfulfilledOsRequirement(pluginDescriptor) == null
     isPluginAvailable = isPluginCompatible && policy.canEnablePlugin(updateDescriptor)
     if (isMarketplace && isMultiTabs) {
       installedDescriptorForMarketplace = findPlugin(plugin!!.pluginId)
@@ -1043,7 +1049,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       myVersion2!!.isVisible = isVersion
     }
 
-    tagPanel!!.setTags(PluginManagerConfigurable.getTags(plugin))
+    tagPanel!!.setTags(getTags(plugin))
 
     if (isMarketplace) {
       showMarketplaceData(plugin)
@@ -1226,8 +1232,8 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
   private fun createUninstallAction(): SelectionBasedPluginModelAction.UninstallAction<PluginDetailsPageComponent> {
     return SelectionBasedPluginModelAction.UninstallAction(
-      pluginModel, false, this, java.util.List.of(this),
-      { obj: PluginDetailsPageComponent -> obj.descriptorForActions },
+      PluginModelFacade(pluginModel), false, this, java.util.List.of(this),
+      { obj: PluginDetailsPageComponent -> obj.descriptorForActions?.let { PluginUiModelAdapter(it) } },
       {
         updateNotifications()
       })
@@ -1251,6 +1257,21 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   private fun showLicensePanel() {
     val descriptor = descriptorForActions
     val productCode = descriptor!!.productCode
+    val customization = PluginInstallationCustomization.findPluginInstallationCustomization(descriptor.pluginId)
+    val customLicense = customization?.createLicensePanel(isMarketplace, updateDescriptor != null)
+
+    customLicensePanel.removeAll()
+
+    if (customLicense != null) {
+      customLicensePanel.add(customLicense, BorderLayout.CENTER)
+      customLicensePanel.isVisible = true
+      licensePanel.isVisible = false
+      return
+    }
+
+    customLicensePanel.isVisible = false
+    licensePanel.isVisible = true
+
     if (descriptor.isBundled || LicensePanel.isEA2Product(productCode)) {
       licensePanel.hideWithChildren()
       return
@@ -1288,7 +1309,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       licensePanel.showBuyPluginWithText(
         message, false, false,
         { descriptor }, false,
-        !requiresCommercialIde // if the descriptor requires a commercial IDE, we do not show trial/price message
+        !requiresCommercialIde // if the descriptor requires a commercial IDE, we do not show the trial/price message
       )
     }
     else {
@@ -1300,11 +1321,17 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
       val stamp = instance.getConfirmationStamp(productCode)
       if (stamp == null) {
-        if (ApplicationManager.getApplication().isEAP) {
+        if (ApplicationManager.getApplication().isEAP && !java.lang.Boolean.getBoolean("eap.require.license")) {
           tagPanel!!.setFirstTagTooltip(IdeBundle.message("tooltip.license.not.required.for.eap.version"))
           licensePanel.hideWithChildren()
           return
         }
+
+        if (descriptor.isLicenseOptional()) {
+          licensePanel.hideWithChildren()
+          return; // do not show "No License" for Freemium plugins
+        }
+
         licensePanel.setText(IdeBundle.message("label.text.plugin.no.license"), true, false)
       }
       else {
@@ -1649,7 +1676,7 @@ private fun loadDependencyNames(marketplace: MarketplaceRequests, resultNode: Pl
   resultNode.dependencyNames = resultNode.dependencies.asSequence()
     .filter { !it.isOptional }
     .map(IdeaPluginDependency::pluginId)
-    .filter { isNotPlatformModule(it) }
+    .filter { isNotPlatformAlias(it) }
     .map { pluginId ->
       findPlugin(pluginId)?.let {
         return@map it.name
@@ -1660,8 +1687,8 @@ private fun loadDependencyNames(marketplace: MarketplaceRequests, resultNode: Pl
     .toList()
 }
 
-private fun isNotPlatformModule(pluginId: PluginId): Boolean {
-  return if ("com.intellij" == pluginId.idString) false else !isModuleDependency(pluginId)
+private fun isNotPlatformAlias(pluginId: PluginId): Boolean {
+  return if ("com.intellij" == pluginId.idString) false else !looksLikePlatformPluginAlias(pluginId)
 }
 
 private fun updateUrlComponent(panel: LinkPanel?, messageKey: String, url: String?) {

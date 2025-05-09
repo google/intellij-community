@@ -52,6 +52,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.impl.PsiDocumentManagerBase;
+import com.intellij.psi.impl.PsiManagerEx;
 import com.intellij.psi.impl.PsiManagerImpl;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageManagerImpl;
 import com.intellij.testFramework.common.TestApplicationKt;
@@ -240,7 +241,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
       CodeStyle.setTemporarySettings(myProject, CodeStyle.createTestSettings());
       InjectedLanguageManagerImpl.pushInjectors(myProject);
       ((PsiDocumentManagerBase)PsiDocumentManager.getInstance(myProject)).clearUncommittedDocuments();
-      IndexingTestUtil.waitUntilIndexesAreReady(myProject, getIndexingTimeout().toMillis());
+      IndexingTestUtil.waitUntilIndexesAreReady(myProject, getIndexingTimeout());
     }
 
     if (ApplicationManager.getApplication().isDispatchThread()) {
@@ -275,7 +276,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
     LightPlatformTestCase.clearUncommittedDocuments(getProject());
 
     ((FileTypeManagerImpl)FileTypeManager.getInstance()).drainReDetectQueue();
-    IndexingTestUtil.waitUntilIndexesAreReady(myProject, getIndexingTimeout().toMillis());
+    IndexingTestUtil.waitUntilIndexesAreReady(myProject, getIndexingTimeout());
   }
 
   protected @NotNull Duration getIndexingTimeout() {
@@ -334,7 +335,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
   protected static @NotNull Module doCreateRealModuleIn(@NotNull String moduleName,
                                                         @NotNull Project project,
                                                         @NotNull ModuleType<?> moduleType) {
-    return doCreateRealModuleIn(moduleName, project, moduleType, Duration.ofMillis(IndexingTestUtil.DEFAULT_TIMEOUT_MS));
+    return doCreateRealModuleIn(moduleName, project, moduleType, IndexingTestUtil.DEFAULT_TIMEOUT);
   }
 
   protected static @NotNull Module doCreateRealModuleIn(@NotNull String moduleName,
@@ -348,7 +349,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
                                                   @NotNull Project project,
                                                   @NotNull ModuleType<?> moduleType,
                                                   @NotNull Path path) {
-    return createModuleAt(moduleName, project, moduleType, path, Duration.ofMillis(IndexingTestUtil.DEFAULT_TIMEOUT_MS));
+    return createModuleAt(moduleName, project, moduleType, path, IndexingTestUtil.DEFAULT_TIMEOUT);
   }
 
   protected static @NotNull Module createModuleAt(@NotNull String moduleName,
@@ -358,7 +359,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
                                                   @NotNull Duration timeout) {
     Path moduleFile = path.resolve(moduleName + ModuleFileType.DOT_DEFAULT_EXTENSION);
     Module module = WriteAction.computeAndWait(() -> ModuleManager.getInstance(project).newModule(moduleFile, moduleType.getId()));
-    IndexingTestUtil.waitUntilIndexesAreReady(project, timeout.toMillis());
+    IndexingTestUtil.waitUntilIndexesAreReady(project, timeout);
     return module;
   }
 
@@ -399,7 +400,7 @@ public abstract class HeavyPlatformTestCase extends UsefulTestCase implements Da
 
     if (project != null && !project.isDisposed()) {
       ((UndoManagerImpl)UndoManager.getInstance(project)).dropHistoryInTests();
-      ((PsiManagerImpl)PsiManager.getInstance(project)).cleanupForNextTest();
+      PsiManagerEx.getInstanceEx(project).cleanupForNextTest();
     }
   }
 

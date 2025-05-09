@@ -40,6 +40,10 @@ class WorkspaceFileIndexImpl(private val project: Project) : WorkspaceFileIndexE
 
   private val indexDataReference = AtomicReference<WorkspaceFileIndexData>(EmptyWorkspaceFileIndexData.NOT_INITIALIZED)
   private val throttledLogger = ThrottledLogger(thisLogger(), MINUTES.toMillis(1))
+  
+  constructor(project: Project, indexData: WorkspaceFileIndexData) : this(project) {
+    indexDataReference.set(indexData)
+  }
 
   override var indexData: WorkspaceFileIndexData
     get() = indexDataReference.get()
@@ -341,6 +345,10 @@ class WorkspaceFileIndexImpl(private val project: Project) : WorkspaceFileIndexE
 
   override fun getDirectoriesByPackageName(packageName: String, scope: GlobalSearchScope): Query<VirtualFile> {
     return getDirectoriesByPackageName(packageName, true).filtering { scope.contains(it) }
+  }
+
+  override fun getFilesByPackageName(packageName: String): Query<VirtualFile> {
+    return getMainIndexData().getFilesByPackageName(packageName)
   }
 
   private fun getMainIndexData(): WorkspaceFileIndexData {

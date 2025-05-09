@@ -18,9 +18,13 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/test/kotlin/**/*.kt", "src/test/kotlin/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/editor-ui-api:editor-ui",
     "//plugins/toml",
     "//plugins/toml/core",
+    "//plugins/toml/backend",
+    "//plugins/toml/frontend",
     "//plugins/toml/json",
+    "//plugins/toml/grazie",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//java/testFramework",

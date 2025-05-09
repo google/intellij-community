@@ -212,6 +212,17 @@ public final class ObjectTree {
     }
   }
 
+
+  @TestOnly
+  public void assertNoReferenceKeptInTree(@NotNull Class<Disposable> disposableClass) {
+    synchronized (getTreeLock()) {
+      for (ObjectNode node : myObject2ParentNode.values()) {
+        node.assertNoReferencesKept(disposableClass);
+      }
+    }
+  }
+
+
   @ApiStatus.Internal
   void assertIsEmpty(boolean throwError) {
     synchronized (getTreeLock()) {
@@ -244,15 +255,6 @@ public final class ObjectTree {
       for (ObjectNode value : myObject2ParentNode.values()) {
         value.clearTrace();
       }
-    }
-  }
-
-  @TestOnly
-  void cleanUpAfterTest() {
-    synchronized (getTreeLock()) {
-      myObject2ParentNode.clear();
-      myDisposedObjects.clear();
-      myRootNode.clean();
     }
   }
 }

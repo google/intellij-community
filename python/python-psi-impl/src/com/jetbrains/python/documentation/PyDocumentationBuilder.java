@@ -372,7 +372,8 @@ public final class PyDocumentationBuilder {
     final PyStringLiteralExpression effectiveDocstring = modifyDocStringByOwnerType(ownDocstring, elementDefinition, isProperty);
 
     if (PyUtil.isTopLevel(elementDefinition)) {
-      final PsiFile containing = elementDefinition.getContainingFile();
+      final PsiFile containing = ObjectUtils.chooseNotNull(PyiUtil.getOriginalElement(elementDefinition), 
+                                                           elementDefinition).getContainingFile();
       if (containing instanceof PyFile) {
         final HtmlChunk linkToModule = getLinkToModule((PyFile)containing);
         if (linkToModule != null) {
@@ -569,7 +570,7 @@ public final class PyDocumentationBuilder {
     if (myElement instanceof PyTargetExpression && ((PyTargetExpression)myElement).getDocStringValue() == null) {
       final PyExpression assignedValue = ((PyTargetExpression)myElement).findAssignedValue();
       if (assignedValue instanceof PyReferenceExpression) {
-        final PsiElement resolved = resolveWithoutImplicits((PyReferenceExpression)assignedValue);
+        final PsiElement resolved = resolve((PyReferenceExpression)assignedValue);
         if (resolved instanceof PyDocStringOwner) {
           String name = ((PyTargetExpression)myElement).getName();
           if (name != null) {
@@ -581,7 +582,7 @@ public final class PyDocumentationBuilder {
     }
     // Reference expression can be passed as the target element in Python console
     if (myElement instanceof PyReferenceExpression) {
-      final PsiElement resolved = resolveWithoutImplicits((PyReferenceExpression)myElement);
+      final PsiElement resolved = resolve((PyReferenceExpression)myElement);
       if (resolved != null) {
         return resolved;
       }
@@ -599,10 +600,10 @@ public final class PyDocumentationBuilder {
     return myElement;
   }
 
-  private @Nullable PsiElement resolveWithoutImplicits(@NotNull PyReferenceExpression element) {
-    final PyResolveContext resolveContext = PyResolveContext.defaultContext(myContext);
+  private @Nullable PsiElement resolve(@NotNull PyReferenceExpression element) {
+    final PyResolveContext resolveContext = PyResolveContext.implicitContext(myContext);
     final QualifiedResolveResult resolveResult = element.followAssignmentsChain(resolveContext);
-    return resolveResult.isImplicit() ? null : resolveResult.getElement();
+    return resolveResult.getElement();
   }
 
   private @Nullable PyStringLiteralExpression addFunctionInheritedDocString(@NotNull PyFunction pyFunction, @NotNull PyClass pyClass) {
@@ -812,7 +813,8 @@ public final class PyDocumentationBuilder {
       fragments = Collections.emptyList();
     }
 
-    DocstringFormatterRequest(@NotNull String body) {
+    @ApiStatus.Internal
+    public DocstringFormatterRequest(@NotNull String body) {
       this.body = body;
       fragments = Collections.emptyList();
     }

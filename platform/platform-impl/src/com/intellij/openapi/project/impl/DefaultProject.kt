@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package com.intellij.openapi.project.impl
@@ -6,13 +6,17 @@ package com.intellij.openapi.project.impl
 import com.intellij.configurationStore.StoreUtil.saveSettings
 import com.intellij.diagnostic.ActivityCategory
 import com.intellij.ide.plugins.ContainerDescriptor
+import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.client.ClientAwareComponentManager
+import com.intellij.openapi.client.ClientKind
 import com.intellij.openapi.components.ComponentConfig
 import com.intellij.openapi.components.ComponentManager
 import com.intellij.openapi.components.ComponentManagerEx
+import com.intellij.openapi.components.ServiceDescriptor
 import com.intellij.openapi.components.impl.stores.IComponentStore
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
@@ -25,16 +29,20 @@ import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.project.PROJECT_ID
+import com.intellij.platform.project.ProjectId
 import com.intellij.serviceContainer.ComponentManagerImpl
 import com.intellij.serviceContainer.coroutineScopeMethodType
 import com.intellij.serviceContainer.emptyConstructorMethodType
 import com.intellij.serviceContainer.findConstructorOrNull
+import com.intellij.serviceContainer.getComponentManagerImpl
 import com.intellij.util.application
 import com.intellij.util.messages.MessageBus
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.SystemIndependent
 import org.jetbrains.annotations.TestOnly
+import org.picocontainer.ComponentAdapter
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 
@@ -62,7 +70,10 @@ internal class DefaultProject : UserDataHolderBase(), Project, ComponentManagerE
     }
   }
 
-  override fun getActualComponentManager(): ComponentManager = delegate
+  init {
+    @Suppress("LeakingThis")
+    putUserData(PROJECT_ID, ProjectId.create())
+  }
 
   override fun <T> instantiateClass(aClass: Class<T>, pluginId: PluginId): T = delegate.instantiateClass(aClass, pluginId)
 
@@ -110,6 +121,9 @@ internal class DefaultProject : UserDataHolderBase(), Project, ComponentManagerE
     }
     Disposer.dispose(timedProject)
   }
+  
+  override fun getMutableComponentContainer(): ComponentManager = 
+    delegate.getComponentManagerImpl()
 
   @TestOnly
   fun disposeDefaultProjectAndCleanupComponentsForDynamicPluginTests() {
@@ -150,6 +164,70 @@ internal class DefaultProject : UserDataHolderBase(), Project, ComponentManagerE
   override fun isDefault(): Boolean = true
 
   override fun getCoroutineScope(): CoroutineScope = (ApplicationManager.getApplication() as ComponentManagerEx).getCoroutineScope()
+  
+  override fun instanceCoroutineScope(pluginClass: Class<*>): CoroutineScope = 
+    (delegate as ComponentManagerEx).getCoroutineScope()
+
+  override fun unregisterComponent(componentKey: Class<*>): ComponentAdapter? =
+    (delegate as ComponentManagerEx).unregisterComponent(componentKey)
+
+  override fun <T : Any> replaceServiceInstance(serviceInterface: Class<T>, instance: T, parentDisposable: Disposable) =
+    (delegate as ComponentManagerEx).replaceServiceInstance(serviceInterface, instance, parentDisposable)
+
+  override fun instances(createIfNeeded: Boolean, filter: ((Class<*>) -> Boolean)?): Sequence<Any> =
+    (delegate as ComponentManagerEx).instances(createIfNeeded, filter)
+
+  override fun processAllImplementationClasses(processor: (Class<*>, PluginDescriptor?) -> Unit) =
+    (delegate as ComponentManagerEx).processAllImplementationClasses(processor)
+
+  override fun registerService(serviceInterface: Class<*>, implementation: Class<*>, pluginDescriptor: PluginDescriptor, override: Boolean, clientKind: ClientKind?) =
+    (delegate as ComponentManagerEx).registerService(serviceInterface, implementation, pluginDescriptor, override, clientKind)
+
+  override fun <T : Any> getServiceByClassName(serviceClassName: String): T? =
+    (delegate as ComponentManagerEx).getServiceByClassName(serviceClassName)
+
+  override fun unloadServices(module: IdeaPluginDescriptor, services: List<ServiceDescriptor>) =
+    (delegate as ComponentManagerEx).unloadServices(module, services)
+
+  override fun processAllHolders(processor: (String, Class<*>, PluginDescriptor?) -> Unit) =
+    (delegate as ComponentManagerEx).processAllHolders(processor)
+
+  override fun pluginCoroutineScope(pluginClassloader: ClassLoader): CoroutineScope =
+    (delegate as ComponentManagerEx).pluginCoroutineScope(pluginClassloader)
+
+  override fun stopServicePreloading() =
+    (delegate as ComponentManagerEx).stopServicePreloading()
+
+  override fun <T : Any> collectInitializedComponents(aClass: Class<T>): List<T> =
+    (delegate as ComponentManagerEx).collectInitializedComponents(aClass)
+
+  override fun debugString(): String =
+    (delegate as ComponentManagerEx).debugString()
+
+  override fun isServiceSuitable(descriptor: ServiceDescriptor): Boolean =
+    (delegate as ComponentManagerEx).isServiceSuitable(descriptor)
+
+  override fun <T : Any> registerServiceInstance(serviceInterface: Class<T>, instance: T, pluginDescriptor: PluginDescriptor) =
+    (delegate as ComponentManagerEx).registerServiceInstance(serviceInterface, instance, pluginDescriptor)
+
+  override fun getServiceImplementation(key: Class<*>): Class<*>? =
+    (delegate as ComponentManagerEx).getServiceImplementation(key)
+
+  override fun <T : Any> replaceComponentInstance(componentKey: Class<T>, componentImplementation: T, parentDisposable: Disposable?) {
+    (delegate as ComponentManagerEx).replaceComponentInstance(componentKey, componentImplementation, parentDisposable)
+  }
+
+  override fun registerComponentInstance(key: Class<*>, instance: Any) {
+    (delegate as ComponentManagerEx).registerComponentInstance(key, instance)
+  }
+
+  override fun unregisterService(serviceInterface: Class<*>) {
+    (delegate as ComponentManagerEx).unregisterService(serviceInterface)
+  }
+
+  override fun <T : Any> replaceRegularServiceInstance(serviceInterface: Class<T>, instance: T) {
+    (delegate as ComponentManagerEx).replaceRegularServiceInstance(serviceInterface, instance)
+  }
 
   @Suppress("DEPRECATION")
   @Deprecated("")
@@ -190,7 +268,12 @@ private const val DEFAULT_HASH_CODE = 4
 
 private class DefaultProjectImpl(
   private val actualContainerInstance: Project
-) : ClientAwareComponentManager(ApplicationManager.getApplication() as ComponentManagerImpl), Project {
+) : ClientAwareComponentManager(ApplicationManager.getApplication().getComponentManagerImpl()), Project {
+  init {
+    @Suppress("LeakingThis")
+    putUserData(PROJECT_ID, ProjectId.create())
+  }
+
   override fun <T : Any> findConstructorAndInstantiateClass(lookup: MethodHandles.Lookup, aClass: Class<T>): T {
     @Suppress("UNCHECKED_CAST")
     // see ConfigurableEP - prefer constructor that accepts our instance

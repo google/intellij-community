@@ -5,8 +5,7 @@
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.*
-import com.intellij.platform.eel.EelExecApi.ExecuteProcessOptions
-import com.intellij.platform.eel.EelExecApi.PtyOrStdErrSettings
+import com.intellij.platform.eel.EelExecApi.*
 import com.intellij.platform.eel.path.EelPath
 import org.jetbrains.annotations.CheckReturnValue
 
@@ -43,7 +42,7 @@ object EelExecApiHelpers {
   class Execute(
     private val owner: EelExecApi,
     private var exe: String,
-  ) : OwnedBuilder<EelResult<EelProcess, EelExecApi.ExecuteProcessError>> {
+  ) : OwnedBuilder<EelResult<EelProcess, ExecuteProcessError>> {
     private var args: List<String> = listOf()
 
     private var env: Map<String, String> = mapOf()
@@ -104,7 +103,7 @@ object EelExecApiHelpers {
      * with an instance of [com.intellij.platform.eel.EelExecApi.ExecuteProcessOptions].
      */
     @org.jetbrains.annotations.CheckReturnValue
-    override suspend fun eelIt(): EelResult<EelProcess, EelExecApi.ExecuteProcessError> =
+    override suspend fun eelIt(): EelResult<EelProcess, ExecuteProcessError> =
       owner.execute(
         ExecuteProcessOptionsImpl(
           args = args,

@@ -37,19 +37,12 @@ internal abstract class AbstractImportCandidatesProvider(): ImportCandidatesProv
 
     protected fun PsiElement.isImported(): Boolean {
         val fqName = kotlinFqName ?: return false
-
-        if (fqName.parent() == file.packageFqName) {
-            // the declaration is already imported via default package import
-            // TODO Consider getting rid of this check after KTIJ-33214 is fixed
-            return true
-        }
-
         return ImportPath(fqName, isAllUnder = false).isImported(fileImports, excludedFqNames = emptyList())
     }
 
     protected fun PsiMember.canBeImported(): Boolean {
         return when (this) {
-            is PsiClass -> qualifiedName != null && (containingClass == null || hasModifier(JvmModifier.STATIC) || importContext.positionTypeAndReceiver.acceptsInnerClasses())
+            is PsiClass -> qualifiedName != null && (containingClass == null || hasModifier(JvmModifier.STATIC) || importContext.positionType.acceptsInnerClasses())
             is PsiField, is PsiMethod -> hasModifier(JvmModifier.STATIC) && containingClass?.qualifiedName != null
             else -> false
         }
@@ -60,7 +53,7 @@ internal abstract class AbstractImportCandidatesProvider(): ImportCandidatesProv
             is KtProperty -> isTopLevel || containingClassOrObject is KtObjectDeclaration
             is KtNamedFunction -> isTopLevel || containingClassOrObject is KtObjectDeclaration
             is KtTypeAlias -> true
-            is KtClassOrObject -> !isLocal && (!isInner || importContext.positionTypeAndReceiver.acceptsInnerClasses())
+            is KtClassOrObject -> !isLocal && (!isInner || importContext.positionType.acceptsInnerClasses())
 
             else -> false
         }
@@ -71,6 +64,6 @@ internal abstract class AbstractImportCandidatesProvider(): ImportCandidatesProv
 
     private val KtClassLikeDeclaration.isInner: Boolean get() = hasModifier(KtTokens.INNER_KEYWORD)
 
-    private fun ImportPositionTypeAndReceiver<*>.acceptsInnerClasses(): Boolean =
-        this is ImportPositionTypeAndReceiver.TypeReference || this is ImportPositionTypeAndReceiver.KDocNameReference
+    private fun ImportPositionType.acceptsInnerClasses(): Boolean =
+        this is ImportPositionType.TypeReference || this is ImportPositionType.KDocNameReference
 }

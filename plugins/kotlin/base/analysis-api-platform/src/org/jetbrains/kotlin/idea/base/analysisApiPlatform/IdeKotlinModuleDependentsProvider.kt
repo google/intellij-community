@@ -29,15 +29,23 @@ abstract class IdeKotlinModuleDependentsProvider(protected val project: Project)
     override fun getDirectDependents(module: KaModule): Set<KaModule> {
         return when (module) {
             is KaSourceModule -> getDirectDependentsForSourceModule(module)
+
             is KaLibraryModule -> {
                 if (module.isSdk) {
-                    // No dependents need to be provided for SDK modules and `KaBuiltinsModule` (see `KotlinModuleDependentsProvider`).
+                    // No dependents need to be provided for SDK modules (see `KotlinModuleDependentsProvider`).
                     return emptySet()
                 }
-                getDirectDependentsForLibraryNonSdkModule(module)
+                return buildSet { getDirectDependentsForLibraryNonSdkModule(module, this) }
             }
+
             is KaLibrarySourceModule -> getDirectDependents(module.binaryLibrary)
 
+            is KaLibraryFallbackDependenciesModule -> buildSet {
+                add(module.dependentLibrary)
+                addIfNotNull(module.dependentLibrary.librarySources)
+            }
+
+            // No dependents need to be provided for builtins modules (see `KotlinModuleDependentsProvider`).
             is KaBuiltinsModule -> emptySet()
 
             // There is no way to find dependents of danging file modules, as such modules are created on-site.
@@ -68,9 +76,9 @@ abstract class IdeKotlinModuleDependentsProvider(protected val project: Project)
 
     protected abstract fun addAnchorModuleDependents(module: KaSourceModule, to: MutableSet<KaModule>)
 
-    protected abstract fun getDirectDependentsForLibraryNonSdkModule(module: KaLibraryModule): Set<KaModule>
+    protected abstract fun getDirectDependentsForLibraryNonSdkModule(module: KaLibraryModule, to: MutableSet<KaModule>)
 
-    private fun MutableSet<KaModule>.addWorkspaceModelDependents(symbolicId: SymbolicEntityId<WorkspaceEntityWithSymbolicId>) {
+    protected fun MutableSet<KaModule>.addWorkspaceModelDependents(symbolicId: SymbolicEntityId<WorkspaceEntityWithSymbolicId>) {
         val snapshot = WorkspaceModel.getInstance(project).currentSnapshot
         snapshot
             .referrers(symbolicId, ModuleEntity::class.java)

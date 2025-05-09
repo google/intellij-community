@@ -1,23 +1,23 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk
 
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.RunCanceledByUserException
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
-import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.fileLogger
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.util.NlsContexts
 import com.jetbrains.python.packaging.PyExecutionException
+import com.jetbrains.python.packaging.conda.PyPackageProcessHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 
-internal object Logger {
-  val LOG = logger<Logger>()
-}
+private val logger = fileLogger()
 
 /**
  * Runs a command line operation in a background thread.
@@ -26,13 +26,20 @@ internal object Logger {
  * @return A [Result] object containing the output of the command execution.
  */
 internal suspend fun runCommandLine(commandLine: GeneralCommandLine): Result<String> {
-  Logger.LOG.info("Running command: ${commandLine.commandLineString}")
+  logger.info("Running command: ${commandLine.commandLineString}")
   try {
+    val capturingProcessHandler = PyPackageProcessHandler(commandLine)
 
-
-    val commandOutput = with(CapturingProcessHandler(commandLine)) {
+    val commandOutput = with(capturingProcessHandler) {
       withContext(Dispatchers.IO) {
-        runProcess()
+        coroutineToIndicator {
+          val progressIndicator = ProgressManager.getInstance().progressIndicator
+          capturingProcessHandler.lastLineNotifier = { line ->
+            @Suppress("HardCodedStringLiteral")
+            progressIndicator.text = line
+          }
+          runProcessWithProgressIndicator(progressIndicator)
+        }
       }
     }
 
@@ -43,7 +50,12 @@ internal suspend fun runCommandLine(commandLine: GeneralCommandLine): Result<Str
     )
   }
   catch (e: ExecutionException) {
-    return Result.failure(PyExecutionException(e.localizedMessage, commandLine.exePath, commandLine.parametersList.array.toList()))
+    return Result.failure(PyExecutionException(
+      startException = e.toIOException(),
+      additionalMessage = null,
+      command = commandLine.exePath,
+      args = commandLine.parametersList.list
+    ))
   }
 }
 
@@ -61,19 +73,6 @@ suspend fun runExecutable(executable: Path, projectPath: Path?, vararg args: Str
   return runCommandLine(commandLine)
 }
 
-/**
- * Executes a specified [command] within the given project path with optional arguments.
- *
- * @param [projectPath] the path to the project directory where the command should be executed
- * @param [command] the command to be executed
- * @param [args] optional arguments for the command
- * @return a [Result] object containing the output of the command execution
- */
-@Internal
-suspend fun runCommand(projectPath: Path, command: String, vararg args: String): Result<String> {
-  val commandLine = GeneralCommandLine(listOf(command) + args).withWorkingDirectory(projectPath)
-  return runCommandLine(commandLine)
-}
 
 /**
  * Processes the output of a command execution.

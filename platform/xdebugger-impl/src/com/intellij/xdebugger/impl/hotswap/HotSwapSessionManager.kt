@@ -45,10 +45,15 @@ class HotSwapSessionManager private constructor(private val project: Project, pr
   }
 
   internal fun onSessionDispose(session: HotSwapSession<*>) {
+    val currentStatus = _currentStatusFlow.value
     if (session === currentSession) {
       selectedSession = null
     }
     sessions.remove(session)
+    if (currentStatus?.session === session) {
+      // Do not leak session via status
+      _currentStatusFlow.compareAndSet(currentStatus, null)
+    }
     val newCurrent = currentSession
     if (newCurrent != null) {
       fireStatusChanged(newCurrent)
@@ -60,14 +65,11 @@ class HotSwapSessionManager private constructor(private val project: Project, pr
    */
   fun onSessionSelected(session: HotSwapSession<*>) {
     if (session !in sessions) return
-    val current = currentSession
     val selected = selectedSession?.get()
     if (selected !== session) {
       selectedSession = WeakReference(session)
     }
-    if (session !== current) {
-      fireStatusChanged(session)
-    }
+    fireStatusChanged(session)
   }
 
   /**
@@ -108,7 +110,12 @@ enum class HotSwapVisibleStatus {
 private val logger = logger<HotSwapSession<*>>()
 
 @ApiStatus.Internal
-class HotSwapSession<T> internal constructor(val project: Project, val provider: HotSwapProvider<T>, parentScope: CoroutineScope) : Disposable {
+class HotSwapSession<T> internal constructor(
+  val project: Project,
+  private val provider: HotSwapProvider<T>,
+  parentScope: CoroutineScope,
+) : Disposable {
+
   private val coroutineScope = parentScope.childScope("HotSwapSession $this")
   private lateinit var changesCollector: SourceFileChangesCollector<T>
 
@@ -141,6 +148,8 @@ class HotSwapSession<T> internal constructor(val project: Project, val provider:
     coroutineScope.cancel()
     HotSwapSessionManager.getInstance(project).onSessionDispose(this)
   }
+
+  fun performHotSwap(): Unit = provider.performHotSwap(this)
 
   /**
    * Get elements modified since the last hot swap.

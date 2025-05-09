@@ -12,18 +12,20 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.impl.DebuggerSupport;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
+@ApiStatus.Internal
 public class EditBreakpointAction extends XDebuggerActionBase implements DumbAware {
   @ApiStatus.Internal
   public static final EditBreakpointActionHandler HANDLER = new XDebuggerEditBreakpointActionHandler();
 
   public static class ContextAction extends DumbAwareAction {
     private final GutterIconRenderer myRenderer;
-    private final Object myBreakpoint;
+    private final XBreakpointProxy myBreakpoint;
 
-    public ContextAction(GutterIconRenderer breakpointRenderer, Object breakpoint) {
+    public ContextAction(GutterIconRenderer breakpointRenderer, XBreakpointProxy breakpoint) {
       super(ActionsBundle.actionText("EditBreakpoint"));
       myRenderer = breakpointRenderer;
       myBreakpoint = breakpoint;

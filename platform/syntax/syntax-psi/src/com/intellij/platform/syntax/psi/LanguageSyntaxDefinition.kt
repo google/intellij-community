@@ -6,8 +6,9 @@ import com.intellij.platform.syntax.SyntaxElementTypeSet
 import com.intellij.platform.syntax.element.SyntaxTokenTypes
 import com.intellij.platform.syntax.lexer.Lexer
 import com.intellij.platform.syntax.syntaxElementTypeSetOf
+import com.intellij.platform.syntax.util.runtime.SyntaxGeneratedParserRuntime
 import org.jetbrains.annotations.ApiStatus
-
+import kotlin.jvm.JvmStatic
 
 /**
  * Extension point providing syntax implementation for a given [com.intellij.lang.Language]
@@ -33,6 +34,7 @@ interface LanguageSyntaxDefinition {
   fun getCommentTokens(): SyntaxElementTypeSet
 
   // todo add necessary methods when required
+  fun getPairedBraces(): Collection<SyntaxGeneratedParserRuntime.BracePair> = emptyList()
 }
 
 /**

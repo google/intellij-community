@@ -523,7 +523,7 @@ private class JUnitMalformedSignatureVisitor(
         JUnitBundle.message("jvm.inspections.junit.malformed.param.no.sources.are.provided.descriptor")
       }
       else if (hasMultipleParameters(method.javaPsi)) {
-        JUnitBundle.message("jvm.inspections.junit.malformed.param.multiple.parameters.descriptor", firstSingleParameterProvider?.shortName)
+        JUnitBundle.message("jvm.inspections.junit.malformed.param.multiple.parameters.descriptor", firstSingleParameterProvider.shortName)
       }
       else return
       holder.registerUProblem(method, message)
@@ -562,13 +562,12 @@ private class JUnitMalformedSignatureVisitor(
       annotationMemberValue.forEach { attributeValue ->
         for (reference in attributeValue.references) {
           if (reference is MethodSourceReference) {
-            val resolve = reference.resolve()
-            if (resolve !is PsiMethod) {
+            val parametrizedMethod = reference.fastResolveFor(method)
+            if (parametrizedMethod !is PsiMethod) {
               return checkAbsentSourceProvider(containingClass, attributeValue, reference.value, method)
             }
             else {
-              val sourceProvider: PsiMethod = resolve
-              val uSourceProvider = sourceProvider.toUElementOfType<UMethod>() ?: return
+              val uSourceProvider = parametrizedMethod.toUElementOfType<UMethod>() ?: return
               return checkSourceProvider(uSourceProvider, containingClass, attributeValue, method)
             }
           }
@@ -664,7 +663,7 @@ private class JUnitMalformedSignatureVisitor(
   }
 
   private fun implementationsTestInstanceAnnotated(containingClass: PsiClass): Boolean =
-    ClassInheritorsSearch.search(containingClass, containingClass.resolveScope, true).asIterable().any { TestUtils.testInstancePerClass(it) }
+    ClassInheritorsSearch.search(containingClass, containingClass.resolveScope, true).any { TestUtils.testInstancePerClass(it) }
 
   private fun getComponentType(returnType: PsiType?, method: PsiMethod): PsiType? {
     val collectionItemType = JavaGenericsUtil.getCollectionItemType(returnType, method.resolveScope)

@@ -1183,7 +1183,7 @@ public final class PyUtil {
         return builtinCache.getBoolType();
       }
       case NONE -> {
-        return PyNoneType.INSTANCE;
+        return builtinCache.getNoneType();
       }
       default -> throw new IllegalArgumentException();
     }
@@ -1456,7 +1456,7 @@ public final class PyUtil {
   public static boolean isInitOrNewMethod(@Nullable PsiElement element) {
     return PyUtilCore.isInitOrNewMethod(element);
   }
-  
+
   /**
    * @return true if passed {@code element} is a method (this means a function inside a class) named {@code __init__},
    * {@code __init_subclass__}, or {@code __new__}.
@@ -1745,6 +1745,13 @@ public final class PyUtil {
      */
     public boolean isFormatted() {
       return PyStringLiteralUtil.isFormattedPrefix(myPrefix);
+    }
+
+    /**
+     * @return true if given string node contains "t" or "T" prefix
+     */
+    public boolean isTemplate() {
+      return PyStringLiteralUtil.isTemplatePrefix(myPrefix);
     }
 
     /**

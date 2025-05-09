@@ -97,7 +97,7 @@ internal class ExtendedInfoComponent(private val project: Project?, private val 
     private fun context(project: Project?) = project?.let { SimpleDataContext.getProjectContext(it) } ?: SimpleDataContext.EMPTY_CONTEXT
     private fun AnAction.updateIt(event: AnActionEvent) {
       let {
-        ActionUtil.performDumbAwareUpdate(it, event, false)
+        ActionUtil.updateAction(it, event)
       }
     }
 
@@ -105,7 +105,9 @@ internal class ExtendedInfoComponent(private val project: Project?, private val 
       text = event.presentation.text ?: DEFAULT_TEXT
       toolTipText = event.presentation.description
       actionListeners.forEach { removeActionListener(it) }
-      addActionListener { _ -> ActionUtil.performActionDumbAwareWithCallbacks(action, event) }
+      addActionListener {
+        ActionUtil.performAction(action, event)
+      }
     }
 
     private fun JBLabel.updateIt(action: AnAction) {
@@ -194,6 +196,6 @@ private class ExtendedInfoOpenInRightSplitAction(private val dataContext: DataCo
     val event = AnActionEvent.createEvent(split, dataContext, null, ActionPlaces.ACTION_SEARCH, ActionUiKind.SEARCH_POPUP, null)
     ActionUtil.invokeAction(split, event, null)
     val seManager = SearchEverywhereManager.getInstance(dataContext.getData(CommonDataKeys.PROJECT))
-    if (seManager.isShown) seManager.currentlyShownUI.closePopup()
+    if (seManager.isShown) seManager.currentlyShownPopupInstance?.closePopup()
   }
 }

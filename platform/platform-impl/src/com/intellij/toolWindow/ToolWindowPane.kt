@@ -8,9 +8,9 @@ import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.impl.InternalUICustomization
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.application.impl.InternalUICustomization
 import com.intellij.openapi.ui.Divider
 import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.ui.ThreeComponentsSplitter
@@ -40,6 +40,7 @@ import com.intellij.ui.scale.ScaleContext
 import com.intellij.ui.scale.ScaleContextCache
 import com.intellij.util.IJSwingUtilities
 import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.ImageUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -48,13 +49,11 @@ import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.VisibleForTesting
 import java.awt.*
 import java.awt.geom.Point2D
+import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 import java.lang.ref.SoftReference
 import java.util.concurrent.Future
-import javax.swing.JComponent
-import javax.swing.JFrame
-import javax.swing.JLayeredPane
-import javax.swing.LayoutFocusTraversalPolicy
+import javax.swing.*
 import kotlin.math.max
 import kotlin.math.min
 
@@ -617,7 +616,8 @@ class ToolWindowPane private constructor(
       }
 
       override fun createDivider(): Divider {
-        return InternalUICustomization.getInstance()?.createCustomDivider(isVisible, this) ?: super.createDivider()
+        return InternalUICustomization.getInstance()?.createCustomDivider(isVisible, this)
+               ?: super.createDivider().also { it.background = JBUI.CurrentTheme.ToolWindow.mainBorderColor() }
       }
 
       override fun toString() = "[$firstComponent|$secondComponent]"
@@ -924,6 +924,44 @@ private class FrameLayeredPane(splitter: JComponent, frame: JFrame) : JLayeredPa
         LOG.error("unknown anchor $anchor")
       }
     }
+  }
+
+  override fun paintChildren(g: Graphics) {
+    val cornerRadius = getIslandArc()
+
+    if (cornerRadius == 0) {
+      super.paintChildren(g)
+      return
+    }
+
+    val clip = g.clip
+    g.clip = null
+    val cornerRadiusF = cornerRadius.toFloat()
+    g.clip = RoundRectangle2D.Float(x.toFloat(), y.toFloat(), width.toFloat(), height.toFloat(), cornerRadiusF, cornerRadiusF)
+
+    super.paintChildren(g)
+
+    g.clip = null
+    g.clip = clip
+
+    val color = UIManager.get("Island.borderColor")
+
+    if (color is Color) {
+      val config = GraphicsUtil.setupRoundedBorderAntialiasing(g)
+      g.color = color
+      g.drawRoundRect(0, 0, width - 1, height - 1, cornerRadius, cornerRadius)
+      config.restore()
+    }
+  }
+
+  override fun isPaintingOrigin(): Boolean = getIslandArc() > 0
+
+  private fun getIslandArc(): Int {
+    val customization = InternalUICustomization.getInstance()
+    if (customization == null || customization.isDefaultCustomization) {
+      return JBUI.getInt("Island.arc", 0)
+    }
+    return 0
   }
 }
 

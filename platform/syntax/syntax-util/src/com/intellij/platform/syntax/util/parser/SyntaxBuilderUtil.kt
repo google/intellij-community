@@ -9,6 +9,7 @@ import com.intellij.platform.syntax.parser.SyntaxTreeBuilder
 import com.intellij.platform.syntax.parser.WhitespacesBinders
 import com.intellij.util.text.CharSequenceSubSequence
 import org.jetbrains.annotations.ApiStatus
+import kotlin.jvm.JvmStatic
 
 @ApiStatus.Experimental
 object SyntaxBuilderUtil {
@@ -106,7 +107,7 @@ object SyntaxBuilderUtil {
     marker.collapse(codeBlock)
 
     if (braceCount > 0) {
-      marker.setCustomEdgeTokenBinders(null, WhitespacesBinders.defaultRightBinder())
+      marker.setCustomEdgeTokenBinders(null, WhitespacesBinders.greedyRightBinder())
     }
 
     return marker

@@ -13,7 +13,7 @@ load(
 )
 load(
     "//:rules/impl/kotlinc-options.bzl",
-     "KotlincOptions",
+    "KotlincOptions",
 )
 
 visibility("private")
@@ -30,29 +30,8 @@ def add_dicts(*dictionaries):
     return result
 
 _implicit_deps = {
-    "_singlejar": attr.label(
-        executable = True,
-        cfg = "exec",
-        default = Label("@bazel_tools//tools/jdk:singlejar"),
-        allow_files = True,
-    ),
-    "_zipper": attr.label(
-        executable = True,
-        cfg = "exec",
-        default = Label("@bazel_tools//tools/zip:zipper"),
-        allow_files = True,
-    ),
-    "_java_stub_template": attr.label(
-        cfg = "exec",
-        default = Label("@bazel_tools//tools/java:java_stub_template.txt"),
-        allow_single_file = True,
-    ),
     "_java_toolchain": attr.label(
         default = Label("@bazel_tools//tools/jdk:current_java_toolchain"),
-    ),
-    "_host_javabase": attr.label(
-        default = Label("@bazel_tools//tools/jdk:current_java_runtime"),
-        cfg = "exec",
     ),
 }
 
@@ -113,15 +92,15 @@ common_attr = add_dicts(
             providers = [_JavacOptions],
         ),
         "_jvm_builder": attr.label(
-            default = "//src/jps-builder:jvm-builder",
+            default = "//src/jvm-builder:jvm-builder",
             executable = True,
             allow_files = True,
             cfg = "exec",
         ),
         "_reduced_classpath": attr.bool(default = False),
-         "_trace": attr.label(default = "//:kt_trace"),
-         "_kotlin_inc_threshold": attr.label(default = "//:koltin_inc_threshold"),
-         "_java_inc_threshold": attr.label(default = "//:java_inc_threshold"),
+        "_trace": attr.label(default = "//:trace"),
+        "_kotlin_inc_threshold": attr.label(default = "//:koltin_inc_threshold"),
+        "_java_inc_threshold": attr.label(default = "//:java_inc_threshold"),
     },
 )
 
