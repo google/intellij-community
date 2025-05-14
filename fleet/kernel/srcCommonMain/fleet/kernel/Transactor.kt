@@ -110,16 +110,14 @@ suspend fun <T> change(f: ChangeScope.() -> T): T {
   val kernel = currentCoroutineContext.transactor
   val interceptor = currentCoroutineContext[ChangeInterceptor] ?: ChangeInterceptor.Identity
   var res: T? = null
-  var timestamp = -1L
-  interceptor.change(
+  val change = interceptor.change(
     {
       res = f()
-      timestamp = currentTimestamp()
     }
   ) { changeFn ->
     kernel.changeSuspend(changeFn)
   }
-  waitForDbSourceToCatchUpWithTimestamp(timestamp + 1)
+  waitForDbSourceToCatchUpWithTimestamp(change.dbAfter.timestamp)
   return res as T
 }
 
@@ -258,13 +256,7 @@ class ChangeInterceptor(
 ) : CoroutineContext.Element {
   companion object : CoroutineContext.Key<ChangeInterceptor> {
     val Identity: ChangeInterceptor = ChangeInterceptor("identity") { changeFn, next ->
-      next(changeFn).also {
-        /**
-         * because [fleet.kernel.rete.ReteSpinChangeInterceptor] wants to be in control of the threadBound context
-         * setting the database becomes a responsibility of the interceptor
-         * */
-        DbContext.threadBound.set(it.dbAfter)
-      }
+      next(changeFn)
     }
   }
 
@@ -335,7 +327,6 @@ suspend fun <T> withTransactor(
               context.run {
                 registerMixin(Durable)
                 registerRetractionRelations()
-                register(SagaScopeEntity)
                 register(OfferContributorEntity)
                 register(RemoteKernelConnectionEntity)
                 register(WorkspaceClockEntity)

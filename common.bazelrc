@@ -7,7 +7,7 @@
 ### --- ###
 
 common --@rules_jvm//:default-kotlinc-opts=@community//:k17
-common --@rules_jvm//:worker-impl=@rules_jvm//src/misc:worker-jvm
+common --@rules_jvm//:resource-packager=@rules_jvm//src/misc:worker-jvm
 common --@rules_jvm//:koltin_inc_threshold=0 --@rules_jvm//:java_inc_threshold=0
 
 # configure resources
@@ -25,6 +25,7 @@ common --java_runtime_version=remotejdk_21
 # see https://bazel.build/external/lockfile
 # use `bazel mod deps --lockfile_mode=refresh` to update lock file
 common --lockfile_mode=error
+common:windows --lockfile_mode=off  # todo: https://youtrack.jetbrains.com/issue/DPE-59
 
 common --noenable_workspace
 
@@ -50,6 +51,9 @@ build:ci --nowatchfs
 
 common --enable_platform_specific_config
 common --incompatible_strict_action_env=true
+
+# Do not depend on external environment
+build --action_env BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 # Generally good remote cache tweaks
 # on CI, set remote_cache_async to false! set to false for local runs also, to investigate https://github.com/bazelbuild/bazel/issues/19273

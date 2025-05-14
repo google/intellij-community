@@ -57,7 +57,7 @@ jvm_library(
     "//platform/ide-core-impl",
     "//java/openapi:java",
     "//java/java-indexing-impl:indexing-impl",
-    "//platform/collaboration-tools:collaborationTools",
+    "//platform/collaboration-tools",
     "//java/java-impl:impl",
     "//platform/backend/workspace",
     "//plugins/kotlin/code-insight/utils",
@@ -67,8 +67,12 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-dependencies",
     "//plugins/kotlin/scripting",
     "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
+    "@lib//:slf4j-api",
   ],
-  exports = ["@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting"],
+  exports = [
+    "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
+    "@lib//:slf4j-api",
+  ],
   runtime_deps = [":scripting_resources"]
 )
 
@@ -117,8 +121,8 @@ jvm_library(
     "//platform/ide-core-impl",
     "//java/openapi:java",
     "//java/java-indexing-impl:indexing-impl",
-    "//platform/collaboration-tools:collaborationTools",
-    "//platform/collaboration-tools:collaborationTools_test_lib",
+    "//platform/collaboration-tools",
+    "//platform/collaboration-tools:collaboration-tools_test_lib",
     "//java/java-impl:impl",
     "//platform/backend/workspace",
     "//plugins/kotlin/code-insight/utils",
@@ -128,6 +132,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-dependencies",
     "//plugins/kotlin/scripting",
     "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
+    "@lib//:slf4j-api",
   ],
   runtime_deps = [":scripting_resources"]
 )

@@ -55,7 +55,7 @@ jvm_library(
     "@lib//:jna",
     "@lib//:lz4-java",
     "//platform/util",
-    "//platform/service-container:serviceContainer",
+    "//platform/service-container",
     "//platform/execution-impl",
     "@lib//:jackson",
     "@lib//:jackson-databind",
@@ -116,11 +116,8 @@ jvm_library(
   ],
   exports = [
     "//platform/lang-api:lang",
-    "//platform/refactoring",
     "//platform/analysis-impl",
-    "//platform/structure-view-impl:structureView-impl",
     "//platform/util",
-    "//platform/foldings",
   ],
   runtime_deps = [":lang-impl_resources"]
 )

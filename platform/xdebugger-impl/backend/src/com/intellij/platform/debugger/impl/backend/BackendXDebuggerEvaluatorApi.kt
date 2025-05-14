@@ -5,10 +5,14 @@ import com.intellij.ide.rpc.DocumentId
 import com.intellij.ide.rpc.document
 import com.intellij.ide.ui.icons.rpcId
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.platform.debugger.impl.rpc.XDebuggerEvaluatorApi
+import com.intellij.platform.debugger.impl.rpc.XEvaluationResult
+import com.intellij.platform.debugger.impl.rpc.XFullValueEvaluatorDto
 import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator.XEvaluationCallback
@@ -16,12 +20,19 @@ import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.evaluate.quick.XDebuggerDocumentOffsetEvaluator
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueHintType
-import com.intellij.xdebugger.impl.rpc.*
-import com.intellij.xdebugger.impl.rpc.XFullValueEvaluatorDto.FullValueEvaluatorLinkAttributes
+import com.intellij.platform.debugger.impl.rpc.XFullValueEvaluatorDto.FullValueEvaluatorLinkAttributes
+import com.intellij.platform.debugger.impl.rpc.XValueDto
+import com.intellij.xdebugger.evaluation.ExpressionInfo
+import com.intellij.xdebugger.impl.rpc.XExpressionDto
+import com.intellij.xdebugger.impl.rpc.XSourcePositionDto
+import com.intellij.xdebugger.impl.rpc.XStackFrameId
+import com.intellij.xdebugger.impl.rpc.XValueMarkerDto
 import com.intellij.xdebugger.impl.rpc.models.BackendXValueModel
 import com.intellij.xdebugger.impl.rpc.models.BackendXValueModelsManager
 import com.intellij.xdebugger.impl.rpc.models.XStackFrameModel
 import com.intellij.xdebugger.impl.rpc.models.findValue
+import com.intellij.xdebugger.impl.rpc.sourcePosition
+import com.intellij.xdebugger.impl.rpc.xExpression
 import fleet.rpc.core.RpcFlow
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.*
@@ -54,6 +65,17 @@ internal class BackendXDebuggerEvaluatorApi : XDebuggerEvaluatorApi {
         callback.errorOccurred(XDebuggerBundle.message("xdebugger.evaluate.stack.frame.has.not.evaluator"))
       }
     }
+  }
+
+  override suspend fun expressionInfoAtOffset(frameId: XStackFrameId, documentId: DocumentId, offset: Int, sideEffectsAllowed: Boolean): Deferred<ExpressionInfo?> {
+    val stackFrameModel = frameId.findValue() ?: return CompletableDeferred(value = null)
+    val project = stackFrameModel.session.project
+    val evaluator = stackFrameModel.stackFrame.evaluator ?: return CompletableDeferred(value = null)
+    val document = documentId.document() ?: return CompletableDeferred(value = null)
+
+    return readAction {
+      evaluator.getExpressionInfoAtOffsetAsync(project, document, offset, sideEffectsAllowed)
+    }.asDeferred()
   }
 
   private suspend fun evaluate(

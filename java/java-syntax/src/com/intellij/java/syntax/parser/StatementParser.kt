@@ -5,12 +5,10 @@ import com.intellij.java.syntax.JavaSyntaxBundle.message
 import com.intellij.java.syntax.element.JavaSyntaxElementType
 import com.intellij.java.syntax.element.JavaSyntaxTokenType
 import com.intellij.java.syntax.element.SyntaxElementTypes
-import com.intellij.java.syntax.element.WhiteSpaceAndCommentSetHolder
 import com.intellij.java.syntax.parser.JavaParserUtil.done
 import com.intellij.java.syntax.parser.JavaParserUtil.error
 import com.intellij.java.syntax.parser.JavaParserUtil.expectOrError
 import com.intellij.java.syntax.parser.JavaParserUtil.exprType
-import com.intellij.java.syntax.parser.JavaParserUtil.isParseStatementCodeBlocksDeep
 import com.intellij.java.syntax.parser.JavaParserUtil.semicolon
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.platform.syntax.SyntaxElementTypeSet
@@ -28,18 +26,23 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Contract
 import kotlin.jvm.JvmOverloads
 
-class StatementParser(private val myParser: JavaParser) {
+open class StatementParser(
+  private val myParser: JavaParser,
+  private val parseCodeBlockDeep: Boolean = false,
+) {
   private enum class BraceMode {
     TILL_FIRST, TILL_LAST
   }
 
-  private val myWhiteSpaceAndCommentSetHolder = WhiteSpaceAndCommentSetHolder
-
   @JvmOverloads
   fun parseCodeBlock(builder: SyntaxTreeBuilder, isStatement: Boolean = false): SyntaxTreeBuilder.Marker? {
     if (builder.tokenType !== JavaSyntaxTokenType.LBRACE) return null
-    if (isStatement && isParseStatementCodeBlocksDeep(builder)) return parseCodeBlockDeep(builder, false)
-    return builder.parseBlockLazy(JavaSyntaxTokenType.LBRACE, JavaSyntaxTokenType.RBRACE, JavaSyntaxElementType.CODE_BLOCK)
+    return if (isStatement && parseCodeBlockDeep) {
+      parseCodeBlockDeep(builder, false)
+    }
+    else {
+      builder.parseBlockLazy(JavaSyntaxTokenType.LBRACE, JavaSyntaxTokenType.RBRACE, JavaSyntaxElementType.CODE_BLOCK)
+    }
   }
 
   fun parseCodeBlockDeep(builder: SyntaxTreeBuilder, parseUntilEof: Boolean): SyntaxTreeBuilder.Marker? {
@@ -53,7 +56,7 @@ class StatementParser(private val myParser: JavaParser) {
     val greedyBlock = !expectOrError(builder, JavaSyntaxTokenType.RBRACE, "expected.rbrace")
     builder.tokenType // eat spaces
 
-    done(codeBlock, JavaSyntaxElementType.CODE_BLOCK, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(codeBlock, JavaSyntaxElementType.CODE_BLOCK, myParser.languageLevel)
     if (greedyBlock) {
       codeBlock.setCustomEdgeTokenBinders(null, greedyRightBinder())
     }
@@ -87,7 +90,7 @@ class StatementParser(private val myParser: JavaParser) {
     }
   }
 
-  fun parseStatement(builder: SyntaxTreeBuilder): SyntaxTreeBuilder.Marker? {
+  open fun parseStatement(builder: SyntaxTreeBuilder): SyntaxTreeBuilder.Marker? {
     val tokenType = builder.tokenType
     if (tokenType === JavaSyntaxTokenType.IF_KEYWORD) {
       return parseIfStatement(builder)
@@ -137,7 +140,7 @@ class StatementParser(private val myParser: JavaParser) {
     else if (tokenType === JavaSyntaxTokenType.SEMICOLON) {
       val empty = builder.mark()
       builder.advanceLexer()
-      done(empty, JavaSyntaxElementType.EMPTY_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(empty, JavaSyntaxElementType.EMPTY_STATEMENT, myParser.languageLevel)
       return empty
     }
     else if (tokenType === JavaSyntaxTokenType.IDENTIFIER || tokenType === JavaSyntaxTokenType.AT) {
@@ -153,7 +156,7 @@ class StatementParser(private val myParser: JavaParser) {
         val declStatement = builder.mark()
 
         if (myParser.declarationParser.parse(builder, DeclarationParser.Context.CODE_BLOCK) != null) {
-          done(declStatement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+          done(declStatement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel)
           return declStatement
         }
 
@@ -164,7 +167,7 @@ class StatementParser(private val myParser: JavaParser) {
         else if (type == null || builder.tokenType !== JavaSyntaxTokenType.DOUBLE_COLON) {
           error(builder, message("expected.identifier"))
           if (type == null) builder.advanceLexer()
-          done(declStatement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+          done(declStatement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel)
           return declStatement
         }
         else {
@@ -194,15 +197,15 @@ class StatementParser(private val myParser: JavaParser) {
       }
       if (count > 1) {
         pos.drop()
-        done(list, JavaSyntaxElementType.EXPRESSION_LIST, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+        done(list, JavaSyntaxElementType.EXPRESSION_LIST, myParser.languageLevel)
         semicolon(builder)
-        done(statement, JavaSyntaxElementType.EXPRESSION_LIST_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+        done(statement, JavaSyntaxElementType.EXPRESSION_LIST_STATEMENT, myParser.languageLevel)
         return statement
       }
       if (exprType(expr) !== JavaSyntaxElementType.REFERENCE_EXPRESSION) {
         SyntaxBuilderUtil.drop(list, pos)
         semicolon(builder)
-        done(statement, JavaSyntaxElementType.EXPRESSION_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+        done(statement, JavaSyntaxElementType.EXPRESSION_STATEMENT, myParser.languageLevel)
         return statement
       }
       val singleToken = expr.getEndTokenIndex() - expr.getStartTokenIndex() == 1
@@ -228,7 +231,7 @@ class StatementParser(private val myParser: JavaParser) {
     val decl = myParser.declarationParser.parse(builder, DeclarationParser.Context.CODE_BLOCK)
     if (decl != null) {
       val statement = decl.precede()
-      done(statement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, JavaSyntaxElementType.DECLARATION_STATEMENT, myParser.languageLevel)
       return statement
     }
 
@@ -236,7 +239,7 @@ class StatementParser(private val myParser: JavaParser) {
       val statement = builder.mark()
       builder.advance(2)
       parseStatement(builder)
-      done(statement, JavaSyntaxElementType.LABELED_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, JavaSyntaxElementType.LABELED_STATEMENT, myParser.languageLevel)
       return statement
     }
 
@@ -254,7 +257,7 @@ class StatementParser(private val myParser: JavaParser) {
         statementType = JavaSyntaxElementType.EXPRESSION_STATEMENT
         semicolon(builder)
       }
-      done(statement, statementType, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, statementType, myParser.languageLevel)
       return statement
     }
 
@@ -314,11 +317,11 @@ class StatementParser(private val myParser: JavaParser) {
       }
       break
     }
-    done(statement, JavaSyntaxElementType.IF_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.IF_STATEMENT, myParser.languageLevel)
     if (stack != null) {
       for (i in stack.indices.reversed()) {
         statement = stack[i]
-        done(statement, JavaSyntaxElementType.IF_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+        done(statement, JavaSyntaxElementType.IF_STATEMENT, myParser.languageLevel)
       }
     }
     return statement
@@ -369,7 +372,7 @@ class StatementParser(private val myParser: JavaParser) {
 
     if (!builder.expect(JavaSyntaxTokenType.LPARENTH)) {
       error(builder, message("expected.lparen"))
-      done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel)
       return statement
     }
 
@@ -383,7 +386,7 @@ class StatementParser(private val myParser: JavaParser) {
       while (true) {
         val tokenType = builder.tokenType
         if (tokenType == null) {
-          done(statement, JavaSyntaxElementType.FOREACH_PATTERN_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+          done(statement, JavaSyntaxElementType.FOREACH_PATTERN_STATEMENT, myParser.languageLevel)
           return statement
         }
         if (tokenType === JavaSyntaxTokenType.RPARENTH) {
@@ -409,7 +412,7 @@ class StatementParser(private val myParser: JavaParser) {
     if (parseStatement(builder) == null) {
       error(builder, message("expected.statement"))
       if (!builder.expect(JavaSyntaxTokenType.RPARENTH)) {
-        done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+        done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel)
         return statement
       }
     }
@@ -427,7 +430,7 @@ class StatementParser(private val myParser: JavaParser) {
           error(builder, message("expected.semicolon"))
         }
         if (!builder.expect(JavaSyntaxTokenType.RPARENTH)) {
-          done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+          done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel)
           return statement
         }
       }
@@ -435,7 +438,7 @@ class StatementParser(private val myParser: JavaParser) {
         parseForUpdateExpressions(builder)
         if (!builder.expect(JavaSyntaxTokenType.RPARENTH)) {
           error(builder, message("expected.rparen"))
-          done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+          done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel)
           return statement
         }
       }
@@ -446,7 +449,7 @@ class StatementParser(private val myParser: JavaParser) {
       error(builder, message("expected.statement"))
     }
 
-    done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.FOR_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -457,7 +460,7 @@ class StatementParser(private val myParser: JavaParser) {
     val expressionStatement: SyntaxTreeBuilder.Marker?
     if (builder.tokenType !== JavaSyntaxTokenType.COMMA) {
       expressionStatement = expr.precede()
-      done(expressionStatement, JavaSyntaxElementType.EXPRESSION_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(expressionStatement, JavaSyntaxElementType.EXPRESSION_STATEMENT, myParser.languageLevel)
     }
     else {
       val expressionList = expr.precede()
@@ -472,8 +475,8 @@ class StatementParser(private val myParser: JavaParser) {
       }
       while (builder.tokenType === JavaSyntaxTokenType.COMMA)
 
-      done(expressionList, JavaSyntaxElementType.EXPRESSION_LIST, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
-      done(expressionStatement, JavaSyntaxElementType.EXPRESSION_LIST_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(expressionList, JavaSyntaxElementType.EXPRESSION_LIST, myParser.languageLevel)
+      done(expressionStatement, JavaSyntaxElementType.EXPRESSION_LIST_STATEMENT, myParser.languageLevel)
     }
 
     expressionStatement.setCustomEdgeTokenBinders(null, defaultRightBinder())
@@ -502,7 +505,7 @@ class StatementParser(private val myParser: JavaParser) {
       error(builder, message("expected.statement"))
     }
 
-    done(statement, forEachType, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, forEachType, myParser.languageLevel)
     return statement
   }
 
@@ -521,7 +524,7 @@ class StatementParser(private val myParser: JavaParser) {
       semicolon(builder)
     }
 
-    done(statement, JavaSyntaxElementType.DO_WHILE_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.DO_WHILE_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -537,7 +540,7 @@ class StatementParser(private val myParser: JavaParser) {
     if (builder.tokenType === JavaSyntaxTokenType.DEFAULT_KEYWORD) {
       val defaultElement = builder.mark()
       builder.advanceLexer()
-      done(defaultElement, JavaSyntaxElementType.DEFAULT_CASE_LABEL_ELEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(defaultElement, JavaSyntaxElementType.DEFAULT_CASE_LABEL_ELEMENT, myParser.languageLevel)
       return Pair<SyntaxTreeBuilder.Marker?, Boolean?>(defaultElement, false)
     }
     if (myParser.patternParser.isPattern(builder)) {
@@ -563,7 +566,7 @@ class StatementParser(private val myParser: JavaParser) {
         }
       }
       while (builder.expect(JavaSyntaxTokenType.COMMA))
-      done(list, JavaSyntaxElementType.CASE_LABEL_ELEMENT_LIST, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(list, JavaSyntaxElementType.CASE_LABEL_ELEMENT_LIST, myParser.languageLevel)
       parseGuard(builder)
     }
 
@@ -591,11 +594,11 @@ class StatementParser(private val myParser: JavaParser) {
         error(builder, message("expected.switch.rule"))
         builder.expect(JavaSyntaxTokenType.SEMICOLON)
       }
-      done(statement, JavaSyntaxElementType.SWITCH_LABELED_RULE, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, JavaSyntaxElementType.SWITCH_LABELED_RULE, myParser.languageLevel)
     }
     else {
       expectOrError(builder, JavaSyntaxTokenType.COLON, "expected.colon.or.arrow")
-      done(statement, JavaSyntaxElementType.SWITCH_LABEL_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(statement, JavaSyntaxElementType.SWITCH_LABEL_STATEMENT, myParser.languageLevel)
     }
 
     return statement
@@ -617,7 +620,7 @@ class StatementParser(private val myParser: JavaParser) {
     builder.advanceLexer()
     builder.expect(JavaSyntaxTokenType.IDENTIFIER)
     semicolon(builder)
-    done(statement, JavaSyntaxElementType.BREAK_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.BREAK_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -633,7 +636,7 @@ class StatementParser(private val myParser: JavaParser) {
       semicolon(builder)
     }
 
-    done(statement, JavaSyntaxElementType.YIELD_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.YIELD_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -642,7 +645,7 @@ class StatementParser(private val myParser: JavaParser) {
     builder.advanceLexer()
     builder.expect(JavaSyntaxTokenType.IDENTIFIER)
     semicolon(builder)
-    done(statement, JavaSyntaxElementType.CONTINUE_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.CONTINUE_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -651,7 +654,7 @@ class StatementParser(private val myParser: JavaParser) {
     builder.advanceLexer()
     myParser.expressionParser.parse(builder)
     semicolon(builder)
-    done(statement, JavaSyntaxElementType.RETURN_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.RETURN_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -666,7 +669,7 @@ class StatementParser(private val myParser: JavaParser) {
       semicolon(builder)
     }
 
-    done(statement, JavaSyntaxElementType.THROW_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.THROW_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -703,7 +706,7 @@ class StatementParser(private val myParser: JavaParser) {
       }
     }
 
-    done(statement, JavaSyntaxElementType.TRY_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.TRY_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -714,7 +717,7 @@ class StatementParser(private val myParser: JavaParser) {
 
     if (!builder.expect(JavaSyntaxTokenType.LPARENTH)) {
       error(builder, message("expected.lparen"))
-      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel)
       return false
     }
 
@@ -725,18 +728,18 @@ class StatementParser(private val myParser: JavaParser) {
 
     if (!builder.expect(JavaSyntaxTokenType.RPARENTH)) {
       error(builder, message("expected.rparen"))
-      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel)
       return false
     }
 
     val body = parseCodeBlock(builder, true)
     if (body == null) {
       error(builder, message("expected.lbrace"))
-      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+      done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel)
       return false
     }
 
-    done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(section, JavaSyntaxElementType.CATCH_SECTION, myParser.languageLevel)
     return true
   }
 
@@ -754,14 +757,14 @@ class StatementParser(private val myParser: JavaParser) {
       semicolon(builder)
     }
 
-    done(statement, JavaSyntaxElementType.ASSERT_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.ASSERT_STATEMENT, myParser.languageLevel)
     return statement
   }
 
   private fun parseBlockStatement(builder: SyntaxTreeBuilder): SyntaxTreeBuilder.Marker {
     val statement = builder.mark()
     parseCodeBlock(builder, true)
-    done(statement, JavaSyntaxElementType.BLOCK_STATEMENT, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, JavaSyntaxElementType.BLOCK_STATEMENT, myParser.languageLevel)
     return statement
   }
 
@@ -776,7 +779,7 @@ class StatementParser(private val myParser: JavaParser) {
       }
     }
 
-    done(statement, type, myParser.languageLevel, myWhiteSpaceAndCommentSetHolder)
+    done(statement, type, myParser.languageLevel)
     return statement
   }
 

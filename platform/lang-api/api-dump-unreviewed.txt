@@ -614,6 +614,7 @@ a:com.intellij.codeInsight.daemon.MergeableLineMarkerInfo
 - getCommonTooltip(java.util.List):com.intellij.util.Function
 - getElementPresentation(com.intellij.psi.PsiElement):java.lang.String
 - s:getMergedMarkers(com.intellij.codeInsight.daemon.LineMarkerInfo):java.util.List
+- p:getNavigateAction():com.intellij.openapi.actionSystem.AnAction
 - getWeight():I
 - s:merge(java.util.List,I):java.util.List
 c:com.intellij.codeInsight.daemon.NavigateAction
@@ -1317,6 +1318,7 @@ com.intellij.codeInspection.RefactoringQuickFix
 - applyFix(com.intellij.openapi.project.Project,com.intellij.codeInspection.ProblemDescriptor):V
 - doFix(com.intellij.psi.PsiElement):V
 - enhanceDataContext(com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.DataContext
+- generatePreview(com.intellij.openapi.project.Project,com.intellij.codeInspection.ProblemDescriptor):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 - getElementToRefactor(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
 - a:getHandler():com.intellij.refactoring.RefactoringActionHandler
 - getHandler(com.intellij.openapi.actionSystem.DataContext):com.intellij.refactoring.RefactoringActionHandler
@@ -1604,7 +1606,6 @@ c:com.intellij.execution.filters.CompositeFilter
 - applyHeavyFilter(com.intellij.openapi.editor.Document,I,I,com.intellij.util.Consumer):V
 - getFilters():java.util.List
 - getUpdateMessage():java.lang.String
-- ps:intersects(java.util.List,com.intellij.execution.filters.Filter$ResultItem):Z
 - isAnyHeavy():Z
 - isEmpty():Z
 - setForceUseAllFilters(Z):V

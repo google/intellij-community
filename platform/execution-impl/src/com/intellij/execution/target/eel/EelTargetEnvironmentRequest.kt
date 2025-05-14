@@ -257,31 +257,24 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
       }
 
       fun createFor(eel: EelApi, downloadRoot: DownloadRoot): EelVolume {
-        val target = downloadRoot.targetRootPath as TargetPath.Persistent // how could it be temp?
+        val localRootPath =
+          downloadRoot.localRootPath
+          ?: FileUtil.createTempDirectory("intellij-eel-target.", "").toPath()
 
-        if (downloadRoot.localRootPath == null) {
-          return EelVolume(
-            eel = eel,
-            localRoot = FileUtil.createTempDirectory("intellij-eel-target.", "").toPath(),
-            targetRoot = target.absolutePath,
-          )
-        }
-        else {
-          return createFor(eel, { downloadRoot.localRootPath!! }, { downloadRoot.targetRootPath })
-        }
+        return createFor(eel, { localRootPath }, { downloadRoot.targetRootPath })
       }
     }
   }
 
   override fun createProcess(commandLine: TargetedCommandLine, indicator: ProgressIndicator): Process {
     val command = commandLine.collectCommandsSynchronously()
-    val builder = eel.exec.execute(command.first())
+    val builder = eel.exec.spawnProcess(command.first())
 
     builder.args(command.drop(1))
     builder.env(commandLine.environmentVariables)
     builder.workingDirectory(commandLine.workingDirectory?.let { EelPath.parse(it, eel.descriptor) })
 
-    return runBlockingCancellable { builder.getOrThrow().convertToJavaProcess() }
+    return runBlockingCancellable { builder.eelIt().convertToJavaProcess() }
   }
 
   override val targetPlatform: TargetPlatform = request.targetPlatform

@@ -10,6 +10,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.project.projectId
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.platform.debugger.impl.rpc.XBreakpointApi
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.XLineBreakpointInstallationInfo
 import com.intellij.xdebugger.impl.breakpoints.*
@@ -19,11 +20,13 @@ import com.intellij.xdebugger.impl.rpc.*
 import com.intellij.xdebugger.impl.toRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 import java.util.concurrent.ConcurrentMap
 
-internal class FrontendXBreakpointManager(private val project: Project, private val cs: CoroutineScope) : XBreakpointManagerProxy {
+@ApiStatus.Internal
+@VisibleForTesting
+class FrontendXBreakpointManager(private val project: Project, private val cs: CoroutineScope) : XBreakpointManagerProxy {
   private val breakpointsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
   private val breakpoints: ConcurrentMap<XBreakpointId, XBreakpointProxy> = ConcurrentCollectionFactory.createConcurrentMap()
@@ -49,17 +52,20 @@ internal class FrontendXBreakpointManager(private val project: Project, private 
 
   init {
     cs.launch {
-      val typesChangedFlow = FrontendXBreakpointTypesManager.getInstance(project).typesChangedFlow()
-      XDebuggerManagerApi.getInstance().getBreakpoints(project.projectId()).combine(typesChangedFlow) { breakpointDtos, _ ->
-        // this way we subscribe on breakpoint types updates
-        breakpointDtos
-      }.collectLatest { breakpointDtos ->
-        val breakpointsToRemove = breakpoints.keys - breakpointDtos.map { it.id }.toSet()
-        removeBreakpointsLocally(breakpointsToRemove)
+      FrontendXBreakpointTypesManager.getInstance(project).typesInitialized().await()
+      val (initialBreakpoints, breakpointEvents) = XDebuggerManagerApi.getInstance().getBreakpoints(project.projectId())
+      for (breakpointDto in initialBreakpoints) {
+        addBreakpoint(breakpointDto)
+      }
 
-        val newBreakpoints = breakpointDtos.filter { it.id !in breakpoints }
-        for (breakpointDto in newBreakpoints) {
-          addBreakpoint(breakpointDto)
+      breakpointEvents.toFlow().collect { event ->
+        when (event) {
+          is XBreakpointEvent.BreakpointAdded -> {
+            addBreakpoint(event.breakpointDto)
+          }
+          is XBreakpointEvent.BreakpointRemoved -> {
+            removeBreakpointsLocally(setOf(event.breakpointId))
+          }
         }
       }
     }
@@ -80,11 +86,14 @@ internal class FrontendXBreakpointManager(private val project: Project, private 
         lineBreakpointManager.breakpointChanged(it)
       }
     })
-    val previousBreakpoint = breakpoints.put(breakpointDto.id, newBreakpoint)
+    val previousBreakpoint = breakpoints.putIfAbsent(breakpointDto.id, newBreakpoint)
+    if (previousBreakpoint != null) {
+      newBreakpoint.dispose()
+      return previousBreakpoint
+    }
     if (newBreakpoint is XLineBreakpointProxy) {
       lineBreakpointManager.registerBreakpoint(newBreakpoint, true)
     }
-    previousBreakpoint?.dispose()
     breakpointsChanged.tryEmit(Unit)
     return newBreakpoint
   }
@@ -106,36 +115,42 @@ internal class FrontendXBreakpointManager(private val project: Project, private 
       val lightBreakpointPosition = LightBreakpointPosition(installationInfo.position.file, installationInfo.position.line)
       val type = installationInfo.types.firstOrNull() ?: return@async null
       val lightBreakpoint = FrontendXLightLineBreakpoint(project, this@async, type, installationInfo, this@FrontendXBreakpointManager)
-      val oldBreakpoint = lightBreakpoints.putIfAbsent(lightBreakpointPosition, lightBreakpoint)
-      if (oldBreakpoint != null) {
-        lightBreakpoint.dispose()
-      }
-      val response = XBreakpointTypeApi.getInstance().toggleLineBreakpoint(project.projectId(), installationInfo.toRequest(oldBreakpoint != null))
+      try {
+        val oldBreakpoint = lightBreakpoints.putIfAbsent(lightBreakpointPosition, lightBreakpoint)
+        if (oldBreakpoint != null) {
+          lightBreakpoint.dispose()
+        }
+        val response = XBreakpointTypeApi.getInstance().toggleLineBreakpoint(project.projectId(), installationInfo.toRequest(oldBreakpoint != null))
 
-      withContext(Dispatchers.EDT + NonCancellable) {
-        lightBreakpoints.remove(lightBreakpointPosition, lightBreakpoint)
-        lightBreakpoint.dispose()
-        when (response) {
-          is XLineBreakpointInstalledResponse -> {
-            val breakpointDto = response.breakpoint
-            if (breakpointDto != null) {
-              addBreakpoint(breakpointDto) as? XLineBreakpointProxy
+        withContext(Dispatchers.EDT + NonCancellable) {
+          lightBreakpoints.remove(lightBreakpointPosition, lightBreakpoint)
+          lightBreakpoint.dispose()
+          when (response) {
+            is XLineBreakpointInstalledResponse -> {
+              val breakpointDto = response.breakpoint
+              if (breakpointDto != null) {
+                addBreakpoint(breakpointDto) as? XLineBreakpointProxy
+              }
+              else {
+                null
+              }
             }
-            else {
+            XRemoveBreakpointResponse -> {
+              val breakpoint = XDebuggerUtilImpl.findBreakpointsAtLine(project, installationInfo).singleOrNull()
+              if (breakpoint != null) {
+                XDebuggerUtilImpl.removeBreakpointIfPossible(project, installationInfo, breakpoint)
+              }
+              null
+            }
+            else -> {
               null
             }
           }
-          XRemoveBreakpointResponse -> {
-            val breakpoint = XDebuggerUtilImpl.findBreakpointsAtLine(project, installationInfo).singleOrNull()
-            if (breakpoint != null) {
-              XDebuggerUtilImpl.removeBreakpointIfPossible(project, installationInfo, breakpoint)
-            }
-            null
-          }
-          else -> {
-            null
-          }
         }
+      }
+      finally {
+        lightBreakpoints.remove(lightBreakpointPosition, lightBreakpoint)
+        lightBreakpoint.dispose()
       }
     }
   }
@@ -148,6 +163,7 @@ internal class FrontendXBreakpointManager(private val project: Project, private 
         lineBreakpointManager.unregisterBreakpoint(removedBreakpoint)
       }
     }
+    breakpointsChanged.tryEmit(Unit)
   }
 
   fun getBreakpointById(breakpointId: XBreakpointId): XBreakpointProxy? {
@@ -189,6 +205,11 @@ internal class FrontendXBreakpointManager(private val project: Project, private 
         listener()
       }
     }
+  }
+
+  @VisibleForTesting
+  fun getBreakpointsSet(): Set<XBreakpointProxy> {
+    return breakpoints.values.toSet()
   }
 
   override fun getLastRemovedBreakpoint(): XBreakpointProxy? {

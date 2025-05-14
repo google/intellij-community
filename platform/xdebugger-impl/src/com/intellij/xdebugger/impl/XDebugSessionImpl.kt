@@ -25,7 +25,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.project.Project
@@ -860,9 +859,7 @@ class XDebugSessionImpl @JvmOverloads constructor(
     val debuggerManager = myDebuggerManager.breakpointManager
     if (useFeLineBreakpointProxy() && breakpoint is XLineBreakpointImpl<*>) {
       // for useFeLineBreakpointProxy we call update directly since visual presentation is disabled on the backend
-      debuggerManager.lineBreakpointManager.queueBreakpointUpdateCallback(breakpoint, Runnable {
-        breakpoint.fireBreakpointPresentationUpdated(this)
-      })
+      breakpoint.fireBreakpointPresentationUpdated(this)
     }
     else {
       debuggerManager.lineBreakpointManager.queueBreakpointUpdate(breakpoint, Runnable {

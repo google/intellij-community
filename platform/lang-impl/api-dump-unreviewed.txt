@@ -1479,13 +1479,6 @@ a:com.intellij.codeInsight.actions.MultiCaretCodeInsightActionHandler
 - <init>():V
 - a:invoke(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.openapi.editor.Caret,com.intellij.psi.PsiFile):V
 - postInvoke():V
-f:com.intellij.codeInsight.actions.OptimizeImportsAction
-- com.intellij.openapi.actionSystem.AnAction
-- <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- s:actionPerformedImpl(com.intellij.openapi.actionSystem.DataContext):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 c:com.intellij.codeInsight.actions.OptimizeImportsProcessor
 - com.intellij.codeInsight.actions.AbstractLayoutCodeProcessor
 - <init>(com.intellij.codeInsight.actions.AbstractLayoutCodeProcessor):V
@@ -2266,14 +2259,10 @@ f:com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
 - setRunAnnotators(Z):com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
 - setRunVisitors(Z):com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
 f:com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPass
-- s:clearMyHighlights(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project):V
-- doAdditionalCodeBlockHighlighting():V
-- doCollectInformation(com.intellij.codeInsight.daemon.impl.HighlightingSession):V
 - s:getHighlightUsages(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement,Z,java.util.Collection,java.util.Collection):V
 - s:getUsages(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement,Z):java.util.Collection
 f:com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPassFactory
 - <init>():V
-- createHighlightingPass(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor,com.intellij.openapi.util.TextRange):com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPass
 - s:isEnabled():Z
 c:com.intellij.codeInsight.daemon.impl.IndentGuideRenderer
 - com.intellij.openapi.editor.markup.CustomHighlighterRenderer
@@ -2975,6 +2964,7 @@ f:com.intellij.codeInsight.editorActions.FixDocCommentAction
 - com.intellij.openapi.editor.actionSystem.EditorAction
 - sf:ACTION_ID:java.lang.String
 - <init>():V
+- s:generateComment(com.intellij.psi.PsiElement,com.intellij.openapi.project.Project,com.intellij.modcommand.ModPsiNavigator):V
 - s:generateOrFixComment(com.intellij.psi.PsiElement,com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor):V
 f:com.intellij.codeInsight.editorActions.IndentTransferableData
 - com.intellij.codeInsight.editorActions.TextBlockTransferableData
@@ -3299,7 +3289,6 @@ a:com.intellij.codeInsight.highlighting.AbstractCodeBlockSupportHandler
 f:com.intellij.codeInsight.highlighting.BraceHighlightingHandler
 - sf:Companion:com.intellij.codeInsight.highlighting.BraceHighlightingHandler$Companion
 - sf:LAYER:I
-- f:clearBraceHighlighters():V
 - sf:getLazyParsableHighlighterIfAny(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.openapi.editor.highlighter.EditorHighlighter
 - f:highlightBraces(com.intellij.openapi.util.TextRange,com.intellij.openapi.util.TextRange,Z,Z,com.intellij.openapi.fileTypes.FileType):V
 - sf:lineMarkFragment(com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.editor.Document,I,I,Z):V
@@ -12613,17 +12602,6 @@ f:com.intellij.lexer.LexerUtil
 - s:getRootLexer(com.intellij.lexer.Lexer):com.intellij.lexer.Lexer
 - s:getTokenText(com.intellij.lexer.Lexer):java.lang.CharSequence
 - s:internToken(com.intellij.lexer.Lexer,com.intellij.util.CharTable):java.lang.CharSequence
-f:com.intellij.lexer.PrefixSuffixStripperLexer
-- com.intellij.lexer.LexerBase
-- <init>(java.lang.String,com.intellij.psi.tree.IElementType,java.lang.String,com.intellij.psi.tree.IElementType,com.intellij.psi.tree.IElementType):V
-- advance():V
-- getBufferEnd():I
-- getBufferSequence():java.lang.CharSequence
-- getState():I
-- getTokenEnd():I
-- getTokenStart():I
-- getTokenType():com.intellij.psi.tree.IElementType
-- start(java.lang.CharSequence,I,I,I):V
 f:com.intellij.microservices.url.inlay.UrlPathInlayHintsPresentationsKt
 - sf:urlInlayPresentation(com.intellij.codeInsight.hints.presentation.ScaleAwarePresentationFactory):com.intellij.codeInsight.hints.presentation.InlayPresentation
 f:com.intellij.microservices.url.inlay.UrlPathInlayHintsProviderFactoryKt
@@ -13094,45 +13072,6 @@ c:com.intellij.openapi.module.impl.ModuleConfigurationStateImpl
 - getModifiableRootModel():com.intellij.openapi.roots.ModifiableRootModel
 - getModulesProvider():com.intellij.openapi.roots.ui.configuration.ModulesProvider
 - getProject():com.intellij.openapi.project.Project
-c:com.intellij.openapi.module.impl.ModuleImpl
-- com.intellij.openapi.Disposable
-- com.intellij.openapi.components.ComponentManager
-- com.intellij.openapi.module.Module
-- com.intellij.openapi.ui.Queryable
-- canStoreSettings():Z
-- clearScopesCache():V
-- dispose():V
-- f:getComponentManager():com.intellij.openapi.components.ComponentManager
-- pf:getImlFilePointer():com.intellij.openapi.vfs.pointers.VirtualFilePointer
-- getMessageBus():com.intellij.util.messages.MessageBus
-- getModuleContentScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleContentWithDependenciesScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleFile():com.intellij.openapi.vfs.VirtualFile
-- getModuleNioFile():java.nio.file.Path
-- getModuleProductionSourceScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleRuntimeScope(Z):com.intellij.psi.search.GlobalSearchScope
-- getModuleScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleScope(Z):com.intellij.psi.search.GlobalSearchScope
-- getModuleTestSourceScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleTestsWithDependentsScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleWithDependenciesAndLibrariesScope(Z):com.intellij.psi.search.GlobalSearchScope
-- getModuleWithDependenciesScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleWithDependentsScope():com.intellij.psi.search.GlobalSearchScope
-- getModuleWithLibrariesScope():com.intellij.psi.search.GlobalSearchScope
-- getName():java.lang.String
-- getOptionValue(java.lang.String):java.lang.String
-- getProject():com.intellij.openapi.project.Project
-- pf:getStore():com.intellij.openapi.components.impl.stores.IComponentStore
-- getUserData(com.intellij.openapi.util.Key):java.lang.Object
-- init():V
-- isDisposed():Z
-- isLoaded():Z
-- markAsLoaded():V
-- putInfo(java.util.Map):V
-- putUserData(com.intellij.openapi.util.Key,java.lang.Object):V
-- rename(java.lang.String,Z):V
-- pf:setImlFilePointer(com.intellij.openapi.vfs.pointers.VirtualFilePointer):V
-- setOption(java.lang.String,java.lang.String):V
 c:com.intellij.openapi.module.impl.ModuleTypeManagerImpl
 - com.intellij.openapi.module.ModuleTypeManager
 - <init>():V

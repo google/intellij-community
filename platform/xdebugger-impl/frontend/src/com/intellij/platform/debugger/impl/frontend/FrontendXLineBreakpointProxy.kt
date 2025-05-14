@@ -5,15 +5,16 @@ import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.RangeMarker
 import com.intellij.openapi.editor.markup.GutterDraggableObject
+import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.debugger.impl.rpc.XBreakpointApi
 import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.impl.breakpoints.*
 import com.intellij.xdebugger.impl.frame.XDebugSessionProxy.Companion.useFeLineBreakpointProxy
-import com.intellij.xdebugger.impl.rpc.XBreakpointApi
 import com.intellij.xdebugger.impl.rpc.XBreakpointDto
 import com.intellij.xdebugger.impl.rpc.XLineBreakpointInfo
 import com.intellij.xdebugger.impl.rpc.toTextRange
@@ -141,6 +142,10 @@ internal class FrontendXLineBreakpointProxy(
     if (useFeLineBreakpointProxy()) {
       visualRepresentation.doUpdateUI(callOnUpdate)
     }
+  }
+
+  override fun getGutterIconRenderer(): GutterIconRenderer? {
+    return visualRepresentation.highlighter?.gutterIconRenderer
   }
 
   private fun updateLineBreakpointState(update: (XLineBreakpointInfo) -> XLineBreakpointInfo) {

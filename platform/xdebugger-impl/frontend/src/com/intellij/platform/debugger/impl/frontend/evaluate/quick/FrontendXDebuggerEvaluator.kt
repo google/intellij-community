@@ -6,18 +6,26 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.project.Project
+import com.intellij.platform.debugger.impl.rpc.XDebuggerEvaluatorApi
+import com.intellij.platform.debugger.impl.rpc.XDebuggerEvaluatorDto
+import com.intellij.platform.debugger.impl.rpc.XEvaluationResult
 import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.XExpression
 import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.evaluation.ExpressionInfo
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.impl.evaluate.quick.XDebuggerDocumentOffsetEvaluator
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueHintType
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.XStackFrameId
+import com.intellij.xdebugger.impl.rpc.toRpc
 import fleet.util.logging.logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
+import org.jetbrains.concurrency.Promise
+import org.jetbrains.concurrency.asPromise
 import kotlin.coroutines.cancellation.CancellationException
 
 private val LOG = logger<FrontendXDebuggerEvaluator>()
@@ -70,6 +78,12 @@ internal open class FrontendXDebuggerEvaluator(
         LOG.error(e)
       }
     }
+  }
+
+  override fun getExpressionInfoAtOffsetAsync(project: Project, document: Document, offset: Int, sideEffectsAllowed: Boolean): Promise<ExpressionInfo?> {
+    return evaluatorScope.future {
+      XDebuggerEvaluatorApi.getInstance().expressionInfoAtOffset(frameId, document.rpcId(), offset, sideEffectsAllowed).await()
+    }.asPromise()
   }
 }
 

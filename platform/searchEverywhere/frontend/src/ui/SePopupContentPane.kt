@@ -20,10 +20,8 @@ import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionItem
 import com.intellij.platform.searchEverywhere.frontend.tabs.files.SeTargetItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.text.SeTextSearchItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.vm.SePopupVm
-import com.intellij.platform.searchEverywhere.frontend.vm.SeResultListStopEvent
-import com.intellij.platform.searchEverywhere.frontend.vm.SeResultListUpdateEvent
+import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.ui.ExperimentalUI.Companion.isNewUI
-import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.ScrollingUtil
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.WindowMoveListener
@@ -35,7 +33,6 @@ import com.intellij.ui.dsl.gridLayout.GridLayout
 import com.intellij.ui.dsl.gridLayout.HorizontalAlign
 import com.intellij.ui.dsl.gridLayout.VerticalAlign
 import com.intellij.ui.dsl.gridLayout.builders.RowsGridBuilder
-import com.intellij.ui.dsl.listCellRenderer.listCellRenderer
 import com.intellij.ui.popup.list.GroupedItemsListRenderer
 import com.intellij.ui.scale.JBUIScale.scale
 import com.intellij.util.bindTextIn
@@ -44,18 +41,17 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.StartupUiUtil.isWaylandToolkit
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.launchOnShow
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.Point
 import java.awt.event.*
 import java.util.function.Supplier
 import javax.swing.*
 import javax.swing.text.Document
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
+@OptIn(ExperimentalAtomicApi::class, ExperimentalCoroutinesApi::class)
 @Internal
 class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
   val preferableFocusedComponent: JComponent get() = textField
@@ -72,7 +68,7 @@ class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
     layout = GridLayout()
 
     val actionListCellRenderer = SeActionItemPresentationRenderer(resultList).get { textField.text ?: "" }
-    val targetListCellRenderer = SeTargetItemPresentationRenderer().get()
+    val targetListCellRenderer = SeTargetItemPresentationRenderer(resultList).get()
     val textSearchItemListCellRenderer = SeTextSearchItemPresentationRenderer().get()
     val defaultRenderer = SeDefaultListItemRenderer().get()
 
@@ -109,31 +105,48 @@ class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
     addHistoryExtensionToTextField()
 
     vm.coroutineScope.launch {
-      vm.searchResults.collectLatest { listEventFlow ->
+      vm.currentTabFlow.flatMapLatest {
         withContext(Dispatchers.EDT) {
           resultListModel.reset()
-          if (vm.searchPattern.value.isNotEmpty()) {
-            textField.setSearchInProgress(true)
-          }
         }
-
-        launch {
-          delay(SeResultListModel.DEFAULT_FREEZING_DELAY_MS)
+        it.searchResults
+      }.collectLatest { throttledResultEventFlow ->
+        coroutineScope {
           withContext(Dispatchers.EDT) {
-            resultListModel.ignoreFreezing = false
+            resultListModel.invalidate()
+
+            if (vm.searchPattern.value.isNotEmpty()) {
+              textField.setSearchInProgress(true)
+            }
           }
-        }
 
-        listEventFlow.collect { listEvent ->
-          withContext(Dispatchers.EDT) {
-            textField.setSearchInProgress(false)
-            when (listEvent) {
-              is SeResultListUpdateEvent -> {
-                resultListModel.freeze(indexToFreezeFromListOffset())
-                resultListModel.addFromEvent(listEvent.event)
-              }
-              is SeResultListStopEvent -> {
-                resultListModel.removeLoadingItem()
+          launch {
+            delay(DEFAULT_FREEZING_DELAY_MS)
+            withContext(Dispatchers.EDT) {
+              resultListModel.freezer.enable()
+            }
+          }
+
+          throttledResultEventFlow.onCompletion {
+            withContext(Dispatchers.EDT) {
+              SeLog.log(SeLog.THROTTLING) { "Throttled flow completed" }
+              resultListModel.removeLoadingItem()
+              if (!resultListModel.isValid) resultListModel.reset()
+            }
+          }.collect { event ->
+            withContext(Dispatchers.EDT) {
+              textField.setSearchInProgress(false)
+              val wasFrozen = resultListModel.freezer.isEnabled
+
+              resultListModel.addFromThrottledEvent(event)
+
+              // Freeze back if it was frozen before
+              if (wasFrozen) resultListModel.freezer.enable()
+              resultListModel.freezer.freezeIfEnabled(indexToFreezeFromListOffset())
+
+              // Autoselect the first element if there were no selection preserved during the update
+              if (resultListModel.size > 0 && resultList.selectedIndices.isEmpty()) {
+                resultList.selectedIndex = 0
               }
             }
           }
@@ -150,16 +163,29 @@ class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
       }
     }
 
+    val isScrolledAlmostToAnEnd = MutableStateFlow(false)
     val verticalScrollBar = resultsScrollPane.verticalScrollBar
     verticalScrollBar.addAdjustmentListener { adjustmentEvent ->
       val yetToScrollHeight = verticalScrollBar.maximum - verticalScrollBar.model.extent - adjustmentEvent.value
 
       if (verticalScrollBar.model.extent > 0 && yetToScrollHeight < 50) {
-        resultListModel.freezeAll()
-        vm.shouldLoadMore = true
+        resultListModel.freezer.freezeAllIfEnabled()
+        isScrolledAlmostToAnEnd.value = true
       }
       else if (yetToScrollHeight > resultsScrollPane.height / 2) {
-        vm.shouldLoadMore = false
+        isScrolledAlmostToAnEnd.value = false
+      }
+    }
+
+    vm.coroutineScope.launch {
+      vm.currentTabFlow.collectLatest {  tabVm ->
+        coroutineScope {
+          combine(isScrolledAlmostToAnEnd, resultListModel.isValidState) {
+            it[0] to it[1]
+          }.collect {  (isScrolledAlmostToAnEnd, isValidList) ->
+            tabVm.shouldLoadMore = isScrolledAlmostToAnEnd || !isValidList
+          }
+        }
       }
     }
 
@@ -172,7 +198,7 @@ class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
   }
 
   private fun indexToFreezeFromListOffset(): Int =
-    resultList.locationToIndex(Point(0, resultList.visibleRect.y)) + SeResultListModel.DEFAULT_FROZEN_COUNT
+    resultList.locationToIndex(Point(0, resultList.visibleRect.y)) + DEFAULT_FROZEN_COUNT
 
   private fun createListPane(resultList: JBList<*>): JScrollPane {
     val resultsScroll: JScrollPane = object : JBScrollPane(resultList) {
@@ -457,6 +483,11 @@ class SePopupContentPane(private val vm: SePopupVm) : JPanel(), Disposable {
   override fun dispose() {}
 
   companion object {
+    const val DEFAULT_FROZEN_COUNT: Int = 10
+    const val DEFAULT_FREEZING_DELAY_MS: Long = 800
+    const val DEFAULT_RESULT_THROTTLING_MS: Long = 2000
+    const val DEFAULT_RESULT_COUNT_TO_STOP_THROTTLING: Int = 15
+
     @JvmStatic
     fun isExtendedInfoEnabled(): Boolean {
       return Registry.`is`("search.everywhere.footer.extended.info") || ApplicationManager.getApplication().isInternal()

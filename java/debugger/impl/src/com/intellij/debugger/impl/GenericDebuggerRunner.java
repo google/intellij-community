@@ -126,8 +126,7 @@ public class GenericDebuggerRunner implements JvmPatchableProgramRunner<GenericD
     }
 
     if (state instanceof PatchedRunnableState) {
-      RemoteConnection connection =
-        doPatch(new JavaParameters(), environment.getRunnerSettings(), true, environment.getProject());
+      RemoteConnection connection = createPatchedConnection(environment);
       return attachVirtualMachine(state, environment, connection, true);
     }
 
@@ -214,6 +213,10 @@ public class GenericDebuggerRunner implements JvmPatchableProgramRunner<GenericD
             runProfile instanceof RunConfiguration ? ((RunConfiguration)runProfile).getProject() : null);
     JavaProgramPatcher
       .runCustomPatchers(javaParameters, Executor.EXECUTOR_EXTENSION_NAME.findExtensionOrFail(DefaultDebugExecutor.class), runProfile);
+  }
+
+  public static RemoteConnection createPatchedConnection(@NotNull ExecutionEnvironment environment) throws ExecutionException {
+    return doPatch(new JavaParameters(), environment.getRunnerSettings(), true, environment.getProject());
   }
 
   private static RemoteConnection doPatch(@NotNull JavaParameters javaParameters,

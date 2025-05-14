@@ -62,8 +62,6 @@ private val javaHome = Path.of(System.getProperty("java.home")).normalize() ?: e
 
 private val KOTLINC_VERSION_HASH = Hashing.xxh3_64().hashBytesToLong((KotlinCompilerVersion.getVersion() ?: "@snapshot@").toByteArray())
 
-private const val TOOL_VERSION: Long = 58
-
 internal fun loadJpsModel(
   sources: List<Path>,
   args: ArgMap<JvmBuilderFlags>,
@@ -74,7 +72,6 @@ internal fun loadJpsModel(
 
   val digests = TargetConfigurationDigestContainer()
   digests.set(TargetConfigurationDigestProperty.KOTLIN_VERSION, KOTLINC_VERSION_HASH)
-  digests.set(TargetConfigurationDigestProperty.TOOL_VERSION, TOOL_VERSION)
 
   // properties not needed for us (not implemented for java)
   // extension.loadModuleOptions not needed for us (not implemented for java)
@@ -174,20 +171,14 @@ private fun configureKotlinCompiler(
 ): K2JVMCompilerArguments {
   val kotlinFacetSettings = KotlinFacetSettings()
   kotlinFacetSettings.useProjectSettings = false
-  val kotlinArgs = K2JVMCompilerArguments()
-  val moduleName = args.mandatorySingle(JvmBuilderFlags.KOTLIN_MODULE_NAME)
-  kotlinArgs.moduleName = moduleName
-  kotlinFacetSettings.compilerArguments = kotlinArgs
-  configureCommonCompilerArgs(kotlinArgs = kotlinArgs, args = args, workingDir = classPathRootDir)
 
-  configHash.putString(kotlinArgs.apiVersion ?: "")
-  configHash.putString(kotlinArgs.languageVersion ?: "")
-  configHash.putString(kotlinArgs.jvmTarget ?: "")
-  configHash.putString(kotlinArgs.lambdas ?: "")
-  configHash.putString(kotlinArgs.jvmDefault)
-  configHash.putBoolean(kotlinArgs.inlineClasses)
-  configHash.putBoolean(kotlinArgs.allowKotlinPackage)
-  configHash.putString(moduleName)
+  val kotlinArgs = K2JVMCompilerArguments()
+
+  kotlinArgs.moduleName = args.mandatorySingle(JvmBuilderFlags.KOTLIN_MODULE_NAME)
+  configHash.putString(kotlinArgs.moduleName)
+
+  kotlinFacetSettings.compilerArguments = kotlinArgs
+  configureCommonCompilerArgs(kotlinArgs = kotlinArgs, args = args, workingDir = classPathRootDir, configHash = configHash)
 
   val plugins = args.optionalList(JvmBuilderFlags.PLUGIN_ID).zip(args.optionalList(JvmBuilderFlags.PLUGIN_CLASSPATH))
   configHash.putInt(plugins.size)

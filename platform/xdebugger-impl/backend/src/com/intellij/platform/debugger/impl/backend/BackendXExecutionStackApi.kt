@@ -2,9 +2,14 @@
 package com.intellij.platform.debugger.impl.backend
 
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackApi
+import com.intellij.platform.debugger.impl.rpc.XStackFrameDto
+import com.intellij.platform.debugger.impl.rpc.XStackFramesEvent
+import com.intellij.platform.debugger.impl.rpc.XValueComputeChildrenEvent
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.XExecutionStackId
+import com.intellij.xdebugger.impl.rpc.XStackFrameId
 import com.intellij.xdebugger.impl.rpc.models.findValue
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async

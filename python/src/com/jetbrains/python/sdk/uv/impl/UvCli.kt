@@ -7,6 +7,8 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.util.SystemProperties
 import com.jetbrains.python.PyBundle
+import com.jetbrains.python.errorProcessing.PyResult
+import com.jetbrains.python.errorProcessing.asPythonResult
 import com.jetbrains.python.pathValidation.PlatformAndRoot
 import com.jetbrains.python.pathValidation.ValidationRequest
 import com.jetbrains.python.pathValidation.validateExecutableFile
@@ -38,8 +40,8 @@ private fun validateUvExecutable(uvPath: Path?): ValidationInfo? {
   ))
 }
 
-private suspend fun runUv(uv: Path, workingDir: Path, vararg args: String): Result<String> {
-  return runExecutable(uv, workingDir, *args)
+private suspend fun runUv(uv: Path, workingDir: Path, vararg args: String): PyResult<String> {
+  return runExecutable(uv, workingDir, *args).asPythonResult()
 }
 
 private class UvCliImpl(val dispatcher: CoroutineDispatcher, uvPath: Path?) : UvCli {
@@ -55,7 +57,7 @@ private class UvCliImpl(val dispatcher: CoroutineDispatcher, uvPath: Path?) : Uv
     uv = path!!
   }
 
-  override suspend fun runUv(workingDir: Path, vararg args: String): Result<String> {
+  override suspend fun runUv(workingDir: Path, vararg args: String): PyResult<String> {
     return withContext(dispatcher) {
       runUv(uv, workingDir, *args)
     }

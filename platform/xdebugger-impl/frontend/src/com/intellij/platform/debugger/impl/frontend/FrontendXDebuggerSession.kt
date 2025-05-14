@@ -20,6 +20,7 @@ import com.intellij.platform.debugger.impl.frontend.frame.FrontendXStackFrame
 import com.intellij.platform.debugger.impl.frontend.frame.FrontendXSuspendContext
 import com.intellij.platform.debugger.impl.frontend.storage.FrontendXStackFramesStorage
 import com.intellij.platform.debugger.impl.frontend.storage.getOrCreateStackFrame
+import com.intellij.platform.debugger.impl.rpc.XValueMarkerId
 import com.intellij.platform.execution.impl.frontend.createFrontendProcessHandler
 import com.intellij.platform.execution.impl.frontend.executionEnvironment
 import com.intellij.platform.util.coroutines.childScope
@@ -39,7 +40,19 @@ import com.intellij.xdebugger.impl.XSourceKind
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy
 import com.intellij.xdebugger.impl.frame.*
 import com.intellij.xdebugger.impl.inline.DebuggerInlayListener
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.SuspendData
+import com.intellij.xdebugger.impl.rpc.XDebugSessionApi
+import com.intellij.xdebugger.impl.rpc.XDebugSessionDataDto
+import com.intellij.xdebugger.impl.rpc.XDebugSessionDto
+import com.intellij.xdebugger.impl.rpc.XDebugSessionId
+import com.intellij.xdebugger.impl.rpc.XDebugSessionState
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionEvent
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabDto
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabInfo
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabInfoCallback
+import com.intellij.xdebugger.impl.rpc.XSourcePositionDto
+import com.intellij.xdebugger.impl.rpc.consoleView
+import com.intellij.xdebugger.impl.rpc.sourcePosition
 import com.intellij.xdebugger.impl.ui.XDebugSessionData
 import com.intellij.xdebugger.impl.ui.XDebugSessionTab
 import com.intellij.xdebugger.ui.XDebugTabLayouter
@@ -55,6 +68,7 @@ import javax.swing.event.HyperlinkListener
 class FrontendXDebuggerSession private constructor(
   override val project: Project,
   scope: CoroutineScope,
+  private val manager: FrontendXDebuggerManager,
   sessionDto: XDebugSessionDto,
   override val processHandler: ProcessHandler,
   override val consoleView: ConsoleView?,
@@ -371,6 +385,7 @@ class FrontendXDebuggerSession private constructor(
   override fun muteBreakpoints(value: Boolean) {
     // Optimistic update
     sessionData.isBreakpointsMuted = value
+    manager.breakpointsManager.getLineBreakpointManager().queueAllBreakpointsUpdate()
   }
 
   override fun isInactiveSlaveBreakpoint(breakpoint: XBreakpointProxy): Boolean {
@@ -390,12 +405,13 @@ class FrontendXDebuggerSession private constructor(
     suspend fun create(
       project: Project,
       scope: CoroutineScope,
+      manager: FrontendXDebuggerManager,
       sessionDto: XDebugSessionDto,
     ): FrontendXDebuggerSession {
       val processHandler = createFrontendProcessHandler(project, sessionDto.processHandlerDto)
       val consoleView = sessionDto.consoleViewData?.consoleView(processHandler)
 
-      return FrontendXDebuggerSession(project, scope, sessionDto, processHandler, consoleView)
+      return FrontendXDebuggerSession(project, scope, manager, sessionDto, processHandler, consoleView)
     }
   }
 }

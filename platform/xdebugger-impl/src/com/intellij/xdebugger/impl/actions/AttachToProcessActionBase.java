@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.actions;
 
 import com.intellij.execution.ExecutionException;
@@ -232,7 +232,9 @@ public abstract class AttachToProcessActionBase extends AnAction implements Dumb
     return doCollectAttachProcessItems(project, host, getProcessInfos(host), indicator, getProvidersApplicableForHost(host));
   }
 
-  static @NotNull List<AttachToProcessItem> doCollectAttachProcessItems(final @NotNull Project project,
+  @VisibleForTesting
+  @ApiStatus.Internal
+  public static @NotNull List<AttachToProcessItem> doCollectAttachProcessItems(final @NotNull Project project,
                                                                         @NotNull XAttachHost host,
                                                                         @NotNull List<? extends ProcessInfo> processInfos,
                                                                         @NotNull ProgressIndicator indicator,
@@ -408,10 +410,13 @@ public abstract class AttachToProcessActionBase extends AnAction implements Dumb
     }
 
     @Nullable @NlsContexts.Separator
-    String getSeparatorTitle() {
+    @VisibleForTesting
+    @ApiStatus.Internal
+    public String getSeparatorTitle() {
       return myIsFirstInGroup ? myGroupName : null;
     }
 
+    @ApiStatus.Internal
     public @NotNull UserDataHolder getDataHolder() {
       return myDataHolder;
     }

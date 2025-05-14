@@ -44,7 +44,7 @@ class FrontendXDebuggerManager(private val project: Project, private val cs: Cor
         }
     }.stateIn(cs, SharingStarted.Eagerly, null)
 
-  internal val breakpointsManager = FrontendXBreakpointManager(project, cs)
+  val breakpointsManager: FrontendXBreakpointManager = FrontendXBreakpointManager(project, cs)
   internal val sessions get() = sessionsFlow.value
 
   init {
@@ -118,7 +118,7 @@ class FrontendXDebuggerManager(private val project: Project, private val cs: Cor
   }
 
   private suspend fun createDebuggerSession(sessionDto: XDebugSessionDto): XDebugSessionProxy {
-    val newSession = FrontendXDebuggerSession.create(project, cs, sessionDto)
+    val newSession = FrontendXDebuggerSession.create(project, cs, this, sessionDto)
     val old = sessionsFlow.getAndUpdate {
       it + newSession
     }

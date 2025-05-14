@@ -1,7 +1,6 @@
 <idea-plugin package="org.jetbrains.kotlin.gradle.scripting.shared">
   <dependencies>
     <plugin id="org.jetbrains.plugins.gradle"/>
-<!--    <module name="kotlin.gradle.gradle"/>-->
     <module name="kotlin.gradle.gradle-tooling"/>
   </dependencies>
   <projectListeners>
@@ -14,10 +13,6 @@
     <projectResolve implementation="org.jetbrains.kotlin.gradle.scripting.shared.importing.KotlinDslScriptModelResolver" order="first"/>
   </extensions>
 
-  <extensions defaultExtensionNs="com.intellij">
-    <externalSystemTaskNotificationListener implementation="org.jetbrains.kotlin.gradle.scripting.shared.importing.KotlinDslSyncListener"/>
-  </extensions>
-
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <scriptDiagnosticFixProvider implementation="org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptDiagnosticFixProvider"/>
     <scriptAdditionalIdeaDependenciesProvider
@@ -26,11 +21,14 @@
     <experimentalFeature implementation="org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptConfigurationsImportingFeature"/>
   </extensions>
 
+  <extensions defaultExtensionNs="com.intellij">
+    <internalFileTemplate name="Kotlin Script Gradle"/>
+  </extensions>
+
   <extensions defaultExtensionNs="org.jetbrains.kotlin.scripting.idea">
     <listener order="first" implementation="org.jetbrains.kotlin.gradle.scripting.shared.GradleScriptListener"/>
     <loader order="first" implementation="org.jetbrains.kotlin.gradle.scripting.shared.legacy.GradleLegacyScriptConfigurationLoader"/>
     <scriptingSupport implementation="org.jetbrains.kotlin.gradle.scripting.shared.roots.GradleBuildRootsManager"/>
-    <settings.provider implementation="org.jetbrains.kotlin.gradle.scripting.shared.settings.GradleSettingsProvider"/>
   </extensions>
 
   <actions resource-bundle="messages.KotlinGradleScriptingBundle">

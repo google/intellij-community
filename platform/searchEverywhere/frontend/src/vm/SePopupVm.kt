@@ -15,15 +15,17 @@ import com.intellij.util.SystemProperties
 import fleet.kernel.DurableRef
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import org.jetbrains.annotations.ApiStatus
-import kotlin.text.isNotEmpty
 
 @ApiStatus.Internal
 @OptIn(ExperimentalCoroutinesApi::class)
 class SePopupVm(
   val coroutineScope: CoroutineScope,
-  private val project: Project,
+  private val project: Project?,
   private val sessionRef: DurableRef<SeSessionEntity>,
   tabs: List<SeTab>,
   initialSearchPattern: String?,
@@ -31,20 +33,15 @@ class SePopupVm(
   private val historyList: SearchHistoryList,
   private val closePopupHandler: () -> Unit,
 ) {
-
-  val currentTabFlow: Flow<SeTabVm>
-  val searchResults: Flow<Flow<SeResultListEvent>>
-
   val searchPattern: MutableStateFlow<String> = MutableStateFlow("")
 
   val tabVms: List<SeTabVm> = tabs.map {
     SeTabVm(project, coroutineScope, it, searchPattern)
   }
 
-  //val tabVmsFlow: StateFlow<List<SeTabVm>>
-
   val currentTabIndex: MutableStateFlow<Int> = MutableStateFlow(tabVms.indexOfFirst { it.tabId == initialTabIndex }.takeIf { it >= 0 } ?: 0)
   val currentTab: SeTabVm get() = tabVms[currentTabIndex.value.coerceIn(tabVms.indices)]
+  val currentTabFlow: Flow<SeTabVm>
 
   private var historyIterator: HistoryIterator = historyList.getIterator(currentTab.tabId)
     get() {
@@ -74,7 +71,6 @@ class SePopupVm(
       next.setActive(true)
       next
     }
-    searchResults = currentTabFlow.flatMapLatest { it.searchResults }
     activeTab.setActive(true)
 
     searchPattern.value = initialSearchPattern ?: run {

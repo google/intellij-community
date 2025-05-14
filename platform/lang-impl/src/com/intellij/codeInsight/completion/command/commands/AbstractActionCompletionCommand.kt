@@ -3,6 +3,7 @@ package com.intellij.codeInsight.completion.command.commands
 
 import com.intellij.codeInsight.completion.command.*
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
+import com.intellij.ide.ActivityTracker
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil
@@ -162,6 +163,8 @@ open class ActionCompletionCommand(
   override fun execute(offset: Int, psiFile: PsiFile, editor: Editor?) {
     val action = action ?: return
     if (editor == null) return
+    //drop data context caches because it can be cached before psi was changed and it is necessary to refresh
+    ActivityTracker.getInstance().inc()
     val dataContext = DataManager.getInstance().getDataContext(editor.getComponent())
     val presentation: Presentation = action.templatePresentation.clone()
     val event = AnActionEvent.createEvent(action, dataContext, presentation, ActionPlaces.ACTION_PLACE_QUICK_LIST_POPUP_ACTION,

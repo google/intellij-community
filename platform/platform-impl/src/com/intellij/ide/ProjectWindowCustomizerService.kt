@@ -369,11 +369,16 @@ class ProjectWindowCustomizerService : Disposable {
     listeners.forEach { it(isActive()) }
   }
 
+  private fun doPaint(): Boolean {
+    val customization = InternalUICustomization.getInstance()
+    return customization == null || customization.isProjectCustomDecorationGradientPaint
+  }
+
   /**
    * @return true if method painted something
    */
   fun paint(window: Window, parent: JComponent, g: Graphics2D): Boolean {
-    if (!isActive()) return false
+    if (!isActive() || !doPaint()) return false
 
     val frameHelper = ProjectFrameHelper.getFrameHelper(window) ?: return false
     val project = frameHelper.project ?: return false
@@ -403,8 +408,8 @@ class ProjectWindowCustomizerService : Disposable {
     val rightX = leftX + leftWidth
     val rightWidth = alignIntToInt(length, ctx, PaintUtil.RoundingMode.CEIL, null)
 
-    val leftGradientTexture = leftGradientCache.getTexture(g, leftWidth, parent.background, blendedColor, leftX)
-    val rightGradientTexture = rightGradientCache.getTexture(g, rightWidth, blendedColor, parent.background, rightX)
+    val leftGradientTexture = leftGradientCache.getHorizontalTexture(g, leftWidth, parent.background, blendedColor, leftX)
+    val rightGradientTexture = rightGradientCache.getHorizontalTexture(g, rightWidth, blendedColor, parent.background, rightX)
 
     g.paint = leftGradientTexture
     g.fillRect(leftX, 0, leftWidth, height)

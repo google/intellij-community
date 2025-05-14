@@ -33,6 +33,7 @@ import com.intellij.ui.dsl.listCellRenderer.listCellRenderer
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.ComponentPredicate
 import com.intellij.ui.layout.selectedValueIs
+import com.intellij.ui.layout.selectedValueMatches
 import com.intellij.util.execution.ParametersListUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.TerminalBundle.message
@@ -148,6 +149,16 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
                 setter = { fontSettings = fontSettings.copy(fontFamily = it) },
               ).toNullableProperty()
             )
+          cell(fontComboBox())
+            .label(message("settings.fallback.font.name"))
+            .bind(
+              componentGet = { comboBox -> comboBox.fontName },
+              componentSet = {comboBox, value -> comboBox.fontName = value },
+              MutableProperty(
+                getter = { fontSettings.fallbackFontFamily },
+                setter = { fontSettings = fontSettings.copy(fallbackFontFamily = it) },
+              ).toNullableProperty()
+            )
         }
 
         row {
@@ -178,11 +189,19 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
           cell(ActionLink(message("settings.colors")) { actionEvent ->
             ColorAndFontOptions.selectOrEditColor(
               DataManager.getInstance().getDataContext(actionEvent.source as? Component?),
-              ANSIColoredConsoleColorsPage.getSearchableReworkedTerminalName(),
+              if (terminalEngineComboBox.selectedItem == TerminalEngine.REWORKED) {
+                ANSIColoredConsoleColorsPage.getSearchableReworkedTerminalName()
+              }
+              else {
+                ANSIColoredConsoleColorsPage.getSearchableClassicTerminalName()
+              },
               ANSIColoredConsoleColorsPage.getSearchableName(),
             )
           })
-        }.visibleIf(terminalEngineComboBox.selectedValueIs(TerminalEngine.REWORKED))
+        }.visibleIf(terminalEngineComboBox.selectedValueMatches {
+          it == TerminalEngine.REWORKED ||
+          it == TerminalEngine.CLASSIC
+        })
 
         onApply {
           TerminalFontSettingsService.getInstance().setSettings(fontSettings)

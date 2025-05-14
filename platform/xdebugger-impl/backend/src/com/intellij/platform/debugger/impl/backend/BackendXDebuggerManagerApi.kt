@@ -11,15 +11,32 @@ import com.intellij.platform.project.findProject
 import com.intellij.platform.project.findProjectOrNull
 import com.intellij.util.asDisposable
 import com.intellij.xdebugger.*
+import com.intellij.xdebugger.breakpoints.XBreakpoint
+import com.intellij.xdebugger.breakpoints.XBreakpointListener
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl.reshowInlayRunToCursor
 import com.intellij.xdebugger.impl.XSteppingSuspendContext
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase
 import com.intellij.xdebugger.impl.frame.XDebugSessionProxy.Companion.useFeProxy
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.SuspendData
+import com.intellij.xdebugger.impl.rpc.XBreakpointEvent
+import com.intellij.xdebugger.impl.rpc.XBreakpointsSetDto
+import com.intellij.xdebugger.impl.rpc.XDebugSessionDataDto
+import com.intellij.xdebugger.impl.rpc.XDebugSessionDto
+import com.intellij.xdebugger.impl.rpc.XDebugSessionId
+import com.intellij.xdebugger.impl.rpc.XDebugSessionState
+import com.intellij.xdebugger.impl.rpc.XDebugSessionsList
+import com.intellij.xdebugger.impl.rpc.XDebuggerEditorsProviderDto
+import com.intellij.xdebugger.impl.rpc.XDebuggerManagerApi
+import com.intellij.xdebugger.impl.rpc.XDebuggerManagerSessionEvent
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionEvent
+import com.intellij.xdebugger.impl.rpc.XExecutionStackDto
+import com.intellij.xdebugger.impl.rpc.XSmartStepIntoHandlerDto
+import com.intellij.xdebugger.impl.rpc.XSuspendContextDto
 import com.intellij.xdebugger.impl.rpc.models.findValue
 import com.intellij.xdebugger.impl.rpc.models.getOrStoreGlobally
+import com.intellij.xdebugger.impl.rpc.toRpc
 import com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.*
@@ -196,14 +213,54 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  override suspend fun getBreakpoints(projectId: ProjectId): Flow<Set<XBreakpointDto>> {
+  override suspend fun getBreakpoints(projectId: ProjectId): XBreakpointsSetDto {
     val project = projectId.findProject()
-    val breakpointManager = XDebuggerManager.getInstance(project) as XDebuggerManagerImpl
+    val breakpointManager = (XDebuggerManager.getInstance(project) as XDebuggerManagerImpl).breakpointManager
 
-    return breakpointManager.breakpointManager.allBreakpointsFlow.mapLatest { breakpoints ->
-      breakpoints.mapTo(LinkedHashSet()) { breakpoint ->
-        breakpoint.toRpc()
+    val initialBreakpoints = breakpointManager.allBreakpoints.mapTo(LinkedHashSet()) {
+      it.toRpc()
+    }
+
+    val initialBreakpointIds = initialBreakpoints.map { it.id }
+
+    val eventsFlow = channelFlow {
+      val events = Channel<suspend () -> XBreakpointEvent>(Channel.UNLIMITED)
+      project.messageBus.connect(this@channelFlow).subscribe(XBreakpointListener.TOPIC, object : XBreakpointListener<XBreakpoint<*>> {
+        override fun breakpointAdded(breakpoint: XBreakpoint<*>) {
+          events.trySend {
+            XBreakpointEvent.BreakpointAdded((breakpoint as XBreakpointBase<*, *, *>).toRpc())
+          }
+        }
+
+        override fun breakpointRemoved(breakpoint: XBreakpoint<*>) {
+          events.trySend {
+            XBreakpointEvent.BreakpointRemoved((breakpoint as XBreakpointBase<*, *, *>).breakpointId)
+          }
+        }
+      })
+
+      val currentBreakpoints = breakpointManager.allBreakpoints.filterIsInstance<XBreakpointBase<*, *, *>>()
+      val currentBreakpointIds = currentBreakpoints.map { it.breakpointId }.toSet()
+
+      // some breakpoints were added during subscription
+      for (breakpoint in currentBreakpoints.filter { it.breakpointId !in initialBreakpointIds }) {
+        events.trySend {
+          XBreakpointEvent.BreakpointAdded(breakpoint.toRpc())
+        }
+      }
+
+      // some breakpoints were removed during subscription
+      for (breakpointIdToRemove in initialBreakpointIds - currentBreakpointIds) {
+        events.trySend {
+          XBreakpointEvent.BreakpointRemoved(breakpointIdToRemove)
+        }
+      }
+
+      for (event in events) {
+        send(event())
       }
     }
+
+    return XBreakpointsSetDto(initialBreakpoints, eventsFlow.toRpc())
   }
 }

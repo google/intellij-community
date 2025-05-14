@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.terminal.backend
 
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.terminal.session.*
 import com.intellij.terminal.session.dto.toDto
 import com.intellij.util.asDisposable
@@ -103,7 +104,8 @@ internal fun createTerminalOutputFlow(
     isAltSendsEscape = controller.altSendsEscape,
     isBracketedPasteMode = terminalDisplay.isBracketedPasteMode,
     windowTitle = terminalDisplay.windowTitleText,
-    isShellIntegrationEnabled = false
+    isShellIntegrationEnabled = false,
+    currentDirectory = services.startupOptions.workingDirectory ?: error("Working directory not set"),
   )
 
   controller.addListener(object : JediTerminalListener {
@@ -210,8 +212,8 @@ internal fun createTerminalOutputFlow(
       collectAndSendEvents(contentUpdate = null, otherEvent = TerminalCommandStartedEvent(command))
     }
 
-    override fun commandFinished(command: String, exitCode: Int) {
-      collectAndSendEvents(contentUpdate = null, otherEvent = TerminalCommandFinishedEvent(command, exitCode))
+    override fun commandFinished(command: String, exitCode: Int, currentDirectory: String) {
+      collectAndSendEvents(contentUpdate = null, otherEvent = TerminalCommandFinishedEvent(command, exitCode, currentDirectory))
     }
 
     override fun promptStarted() {
@@ -222,6 +224,18 @@ internal fun createTerminalOutputFlow(
       collectAndSendEvents(contentUpdate = null, otherEvent = TerminalPromptFinishedEvent)
     }
   })
+
+  val workingDirectoryTrackingScope = coroutineScope.childScope("Working directory tracking")
+  addWorkingDirectoryListener(
+    services.ttyConnector,
+    shellIntegrationController,
+    workingDirectoryTrackingScope
+  ) { directory ->
+    textBuffer.withLock {
+      curState = curState.copy(currentDirectory = directory)
+      collectAndSendEvents(contentUpdate = null, otherEvent = TerminalStateChangedEvent(curState.toDto()))
+    }
+  }
 
   return outputFlow
 }

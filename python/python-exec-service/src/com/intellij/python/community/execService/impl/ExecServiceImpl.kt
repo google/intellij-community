@@ -4,13 +4,12 @@ package com.intellij.python.community.execService.impl
 import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.EelProcess
-import com.intellij.platform.eel.execute
 import com.intellij.platform.eel.getOr
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.EelPathUtils
-import com.intellij.platform.eel.provider.utils.awaitProcessResult
+import com.intellij.platform.eel.spawnProcess
 import com.intellij.python.community.execService.*
 import com.jetbrains.python.PythonHelpersLocator
 import com.jetbrains.python.Result
@@ -37,7 +36,7 @@ internal object ExecServiceImpl : ExecService {
 
     val result = try {
       withTimeout(options.timeout) {
-        val interactiveResult = processInteractiveHandler.getResultFromProcess(eelProcess)
+        val interactiveResult = processInteractiveHandler.getResultFromProcess(whatToExec, args, eelProcess)
 
         val successResult = interactiveResult.getOr { failure ->
           val (output, customErrorMessage) = failure.error
@@ -57,19 +56,22 @@ internal object ExecServiceImpl : ExecService {
     whatToExec: WhatToExec,
     args: List<String>,
     options: ExecOptions,
+    procListener: PyProcessListener?,
     processOutputTransformer: ProcessOutputTransformer<T>,
   ): Result<T, ExecError> {
     val executableProcess = whatToExec.buildExecutableProcess(args, options)
     val eelProcess = executableProcess.run().getOr { return it }
 
+    procListener?.emit(ProcessEvent.ProcessStarted(whatToExec, args))
     val eelProcessExecutionResult = try {
-      withTimeout(options.timeout) { eelProcess.awaitProcessResult() }
+      withTimeout(options.timeout) { eelProcess.awaitWithReporting(procListener) }
     }
     catch (_: TimeoutCancellationException) {
       return executableProcess.killProcessAndFailAsTimeout(eelProcess, options.timeout)
     }
 
     val processOutput = eelProcessExecutionResult
+    procListener?.emit(ProcessEvent.ProcessEnded(eelProcessExecutionResult.exitCode))
     val transformerSuccess = processOutputTransformer.invoke(processOutput).getOr { failure ->
       return executableProcess.failAsExecutionFailed(ExecErrorReason.UnexpectedProcessTermination(processOutput), failure.error)
     }
@@ -111,18 +113,19 @@ private suspend fun WhatToExec.buildExecutableProcess(args: List<String>, option
 @CheckReturnValue
 private suspend fun EelExecutableProcess.run(): Result<EelProcess, ExecError> {
   val workingDirectory = if (workingDirectory != null && !workingDirectory.isAbsolute) workingDirectory.toRealPath() else workingDirectory
-  val executionResult = exe.descriptor.upgrade().exec.execute(exe.toString())
-    .args(args)
-    .env(env)
-    .workingDirectory(workingDirectory?.asEelPath()).eelIt()
+  try {
+    val executionResult = exe.descriptor.upgrade().exec.spawnProcess(exe.toString())
+      .args(args)
+      .env(env)
+      .workingDirectory(workingDirectory?.asEelPath()).eelIt()
 
-  val process = executionResult.getOr { err ->
-    return failAsCantStart(err.error)
+    return Result.success(executionResult)
+  } catch (e: EelExecApi.ExecuteProcessException) {
+    return failAsCantStart(e)
   }
-  return Result.success(process)
 }
 
-private fun EelExecutableProcess.failAsCantStart(executeProcessError: EelExecApi.ExecuteProcessError): Result.Failure<ExecError> {
+private fun EelExecutableProcess.failAsCantStart(executeProcessError: EelExecApi.ExecuteProcessException): Result.Failure<ExecError> {
   return ExecError(
     exe = exe,
     args = args.toTypedArray(),

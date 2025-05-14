@@ -7,10 +7,7 @@ import com.intellij.history.LocalHistoryAction;
 import com.intellij.ide.IdeBundle;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
-import com.intellij.openapi.command.undo.AdjustableUndoableAction;
-import com.intellij.openapi.command.undo.DocumentReference;
-import com.intellij.openapi.command.undo.UndoableAction;
-import com.intellij.openapi.command.undo.UnexpectedUndoException;
+import com.intellij.openapi.command.undo.*;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.project.Project;
@@ -395,6 +392,22 @@ final class UndoableGroup implements Dumpable {
     if (multiline) result.append("\n");
     result.append("]");
     return result.toString();
+  }
+
+  @NotNull String dumpState0() {
+    return UndoUnit.fromGroup(this).toString();
+  }
+
+  boolean isSpeculativeUndoPossible() {
+    if (!isGlobal() && isValid() && !isTransparent() && !isTemporary() && getConfirmationPolicy() == UndoConfirmationPolicy.DEFAULT) {
+      if (UndoUtil.isSpeculativeUndoableCommand(getCommandName()) && !getActions().isEmpty()) {
+        return ContainerUtil.and(
+          getActions(),
+          a -> a instanceof EditorChangeAction
+        );
+      }
+    }
+    return false;
   }
 
   static final class UndoableGroupOriginalContext {

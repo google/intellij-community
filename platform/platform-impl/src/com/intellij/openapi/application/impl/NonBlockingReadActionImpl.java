@@ -18,10 +18,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditor;
-import com.intellij.openapi.progress.EmptyProgressIndicator;
-import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressIndicatorProvider;
+import com.intellij.openapi.progress.*;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ex.ProjectEx;
@@ -42,9 +39,9 @@ import io.opentelemetry.api.metrics.Meter;
 import kotlin.Result;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
 import kotlin.reflect.KClass;
 import kotlinx.coroutines.Job;
-import kotlinx.coroutines.JobKt;
 import org.jetbrains.annotations.*;
 import org.jetbrains.concurrency.AsyncPromise;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -63,6 +60,7 @@ import static com.intellij.util.SystemProperties.getBooleanProperty;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 @VisibleForTesting
+@ApiStatus.Internal
 public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction<T> {
   private static final Logger LOG = Logger.getInstance(NonBlockingReadActionImpl.class);
   private static final Executor SYNC_DUMMY_EXECUTOR = __ -> {
@@ -510,8 +508,17 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
       try {
         while (true) {
           // here we override the context job in case when this code is running under non-cancellable section
-          Job tempJob = myChildContext.getJob() != null ? myChildContext.getJob() : JobKt.Job(null);
-          try (AccessToken ignored = ThreadContext.installThreadContext(ThreadContext.currentThreadContext().plus(tempJob), true)) {
+          CoroutineContext context;
+          if (myChildContext.getJob() != null) {
+            context = myChildContext.getContext();
+          }
+          else if (Cancellation.isInNonCancelableSection()) {
+            context = ThreadContext.currentThreadContext().minusKey(Job.Key);
+          }
+          else {
+            context = ThreadContext.currentThreadContext();
+          }
+          try (AccessToken ignored = ThreadContext.installThreadContext(context, true)) {
             attemptComputation();
           }
 
@@ -807,7 +814,8 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
   }
 
   @TestOnly
-  static @NotNull Map<List<?>, Submission<?>> getTasksByEquality() {
+  @VisibleForTesting
+  public static @NotNull Map<List<?>, Submission<?>> getTasksByEquality() {
     return ourTasksByEquality;
   }
 

@@ -4,6 +4,7 @@ package com.intellij.xdebugger.impl.rpc
 import com.intellij.openapi.editor.impl.EditorId
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
+import com.intellij.platform.debugger.impl.rpc.XStackFrameDto
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.core.DeferredSerializer
@@ -23,7 +24,7 @@ interface XDebuggerManagerApi : RemoteApi<Unit> {
 
   suspend fun reshowInlays(projectId: ProjectId, editorId: EditorId?)
 
-  suspend fun getBreakpoints(projectId: ProjectId): Flow<Set<XBreakpointDto>>
+  suspend fun getBreakpoints(projectId: ProjectId): XBreakpointsSetDto
 
   suspend fun sessionTabSelected(projectId: ProjectId, sessionId: XDebugSessionId?)
 
@@ -37,6 +38,23 @@ interface XDebuggerManagerApi : RemoteApi<Unit> {
       return RemoteApiProviderService.resolve(remoteApiDescriptor<XDebuggerManagerApi>())
     }
   }
+}
+
+@ApiStatus.Internal
+@Serializable
+data class XBreakpointsSetDto(
+  val initialBreakpoints: Set<XBreakpointDto>,
+  val breakpointEvents: RpcFlow<XBreakpointEvent>,
+)
+
+@ApiStatus.Internal
+@Serializable
+sealed interface XBreakpointEvent {
+  @Serializable
+  data class BreakpointAdded(val breakpointDto: XBreakpointDto) : XBreakpointEvent
+
+  @Serializable
+  data class BreakpointRemoved(val breakpointId: XBreakpointId) : XBreakpointEvent
 }
 
 @ApiStatus.Internal

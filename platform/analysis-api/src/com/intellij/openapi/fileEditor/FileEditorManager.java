@@ -7,6 +7,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.ui.UIUtil;
+import kotlinx.coroutines.flow.StateFlow;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +31,9 @@ public abstract class FileEditorManager {
   }
 
   public abstract @Nullable FileEditorComposite getComposite(@NotNull VirtualFile file);
+
+  @ApiStatus.Experimental
+  public abstract boolean canOpenFile(@NotNull VirtualFile file);
 
   /**
    * @param file file to open. The file should be valid.
@@ -138,6 +142,13 @@ public abstract class FileEditorManager {
   }
 
   /**
+   * Get a file currently being edited
+   * Can depend on the current focus location and selection
+   */
+  @ApiStatus.Experimental
+  public abstract @Nullable VirtualFile getCurrentFile();
+
+  /**
    * @return files currently selected. The method returns an empty array if there are no selected files.
    * If more than one file is selected (split), the file with the most recent focused editor is returned first.
    */
@@ -164,6 +175,9 @@ public abstract class FileEditorManager {
     VirtualFile[] files = getSelectedFiles();
     return files.length == 0 ? null : getSelectedEditor(files[0]);
   }
+
+  @ApiStatus.Experimental
+  public abstract @NotNull StateFlow<@Nullable FileEditor> getSelectedEditorFlow();
 
   /**
    * @return editor which is currently selected for a given file.

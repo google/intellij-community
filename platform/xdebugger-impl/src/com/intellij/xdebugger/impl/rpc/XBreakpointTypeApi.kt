@@ -77,10 +77,6 @@ fun XBreakpointTypeSerializableStandardPanels.standardPanel(): XBreakpointType.S
 
 @ApiStatus.Internal
 @Serializable
-data class XBreakpointTypeId(val id: String)
-
-@ApiStatus.Internal
-@Serializable
 sealed interface XToggleLineBreakpointResponse
 
 @ApiStatus.Internal
@@ -92,6 +88,10 @@ data class XLineBreakpointInstalledResponse(
 @ApiStatus.Internal
 @Serializable
 object XRemoveBreakpointResponse : XToggleLineBreakpointResponse
+
+@ApiStatus.Internal
+@Serializable
+object XLineBreakpointIgnoreResponse : XToggleLineBreakpointResponse
 
 @ApiStatus.Internal
 @Serializable
@@ -108,7 +108,8 @@ data class XLineBreakpointInstallationRequest(
   val isTemporary: Boolean,
   val isConditional: Boolean,
   val condition: String?,
-  val willRemoveBreakpointIfSingleVariant: Boolean,
+  val canRemoveBreakpoint: Boolean,
+  val hasOneBreakpoint: Boolean,
 )
 
 

@@ -40,7 +40,6 @@ import kotlinx.coroutines.flow.channelFlow
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.await
 import org.jetbrains.concurrency.resolvedPromise
-import kotlin.collections.map
 
 internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
   override suspend fun getBreakpointTypeList(project: ProjectId): XBreakpointTypeList {
@@ -119,8 +118,11 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     if (variants.isEmpty()) return XLineBreakpointInstalledResponse(null)
     val singleVariant = variants.singleOrNull()
     if (singleVariant != null) {
-      if (request.willRemoveBreakpointIfSingleVariant) {
+      if (request.hasOneBreakpoint && request.canRemoveBreakpoint) {
         return XRemoveBreakpointResponse
+      }
+      if (request.hasOneBreakpoint) {
+        return XLineBreakpointIgnoreResponse
       }
       val breakpoint = createBreakpointByVariant(project, singleVariant, position, request)
       return XLineBreakpointInstalledResponse(breakpoint?.toRpc())

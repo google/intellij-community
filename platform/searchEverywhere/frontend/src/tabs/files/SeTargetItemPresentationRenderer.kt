@@ -1,23 +1,27 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.searchEverywhere.frontend.tabs.files
 
+import com.intellij.ide.actions.SETextShortener
 import com.intellij.platform.searchEverywhere.SeTargetItemPresentation
 import com.intellij.platform.searchEverywhere.frontend.ui.SeResultListItemRow
 import com.intellij.platform.searchEverywhere.frontend.ui.SeResultListRow
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.dsl.listCellRenderer.LcrInitParams
 import com.intellij.ui.dsl.listCellRenderer.listCellRenderer
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.ApiStatus.Internal
+import javax.swing.JList
 import javax.swing.ListCellRenderer
 
 @Internal
-class SeTargetItemPresentationRenderer {
+class SeTargetItemPresentationRenderer(private val resultList: JList<SeResultListRow>) {
   fun get(): ListCellRenderer<SeResultListRow> = listCellRenderer {
     val presentation = (value as SeResultListItemRow).item.presentation as SeTargetItemPresentation
     val selected = selected
     selectionColor = UIUtil.getListBackground(selected, selected)
+    presentation.backgroundColor?.let { background = it }
 
     presentation.icon?.let { icon(it) }
 
@@ -31,8 +35,12 @@ class SeTargetItemPresentationRenderer {
     }
 
     presentation.containerText?.let { containerText ->
-      @Suppress("HardCodedStringLiteral")
-      text(containerText) {
+      val fontMetrics = resultList.getFontMetrics(resultList.font)
+      val presentableTextWidth = fontMetrics.stringWidth(presentation.presentableText)
+      val locationTextWidth = presentation.locationText?.let { fontMetrics.stringWidth(it) } ?: 0
+      val width = resultList.width
+
+      text(SETextShortener.getShortenContainerText(containerText, width - presentableTextWidth - JBUI.scale(16) - locationTextWidth - JBUI.scale(20), { fontMetrics.stringWidth(it) })) {
         attributes = SimpleTextAttributes.GRAYED_ATTRIBUTES
 
         if (selected) {

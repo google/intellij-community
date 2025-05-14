@@ -257,7 +257,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
   }
 
   @VisibleForTesting
-  void doClearIndices(@NotNull Predicate<? super ID<?, ?>> filter) {
+  public void doClearIndices(@NotNull Predicate<? super ID<?, ?>> filter) {
     try {
       waitUntilIndicesAreInitialized();
     }
@@ -1674,6 +1674,8 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
           indexId,
           e
         );
+        var projects = getContainingProjects(file);
+        myDirtyFiles.addFile(projects, inputId); // so `inputId` will be rescanned on restart
         return null;
       }
       finally {

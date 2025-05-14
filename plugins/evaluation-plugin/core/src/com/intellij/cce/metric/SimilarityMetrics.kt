@@ -7,7 +7,6 @@ import com.intellij.cce.evaluable.AIA_RESPONSE
 import com.intellij.cce.evaluable.AIA_USER_PROMPT
 import com.intellij.cce.evaluable.LLM_JUDGE_RESPONSE
 import com.intellij.cce.evaluable.REFERENCE_PROPERTY
-import com.intellij.cce.metric.util.Bootstrap
 import com.intellij.cce.metric.util.LLMJudge
 import com.intellij.cce.metric.util.computeBleuScore
 import com.intellij.cce.workspace.info.SessionIndividualScore
@@ -16,11 +15,10 @@ import org.apache.commons.text.similarity.LevenshteinDistance
 import kotlin.math.max
 import kotlin.math.min
 
-abstract class SimilarityMetric(override val showByDefault: Boolean) : Metric {
+abstract class SimilarityMetric(override val showByDefault: Boolean) : ConfidenceIntervalMetric<Pair<Double, Double>>() {
   override val supportsIndividualScores: Boolean = true
   private var totalMatched: Double = 0.0
   private var totalExpected: Double = 0.0
-  private var sample: MutableList<Pair<Double, Double>> = mutableListOf()
 
   override val valueType = MetricValueType.DOUBLE
   override val value: Double
@@ -29,9 +27,7 @@ abstract class SimilarityMetric(override val showByDefault: Boolean) : Metric {
   override val maximumSessions: Int
     get() = 10000
 
-  override fun confidenceInterval(): Pair<Double, Double> = Bootstrap.computeInterval(sample) { values ->
-    values.sumOf { it.first } / values.sumOf { it.second }
-  }
+  override fun compute(sample: List<Pair<Double, Double>>): Double = if(sample.isNotEmpty()) sample.sumOf { it.first } / sample.sumOf { it.second } else 0.0
 
   override fun evaluateWithIndividualScores(sessions: List<Session>): MetricEvaluationResult {
     val sessionIndividualScores = mutableMapOf<String, SessionIndividualScore>()
@@ -50,7 +46,7 @@ abstract class SimilarityMetric(override val showByDefault: Boolean) : Metric {
         metricScores.computeIfAbsent(name) { mutableListOf() }.add(similarity)
         postCompute(lookup, similarity, additionalInfo)
         matched += similarity
-        sample.add(Pair(similarity, currentExpected))
+        coreSample.add(Pair(similarity, currentExpected))
       }
 
       sessionIndividualScores[session.id] = SessionIndividualScore(
@@ -77,7 +73,7 @@ abstract class SimilarityMetric(override val showByDefault: Boolean) : Metric {
         expected += currentExpected
         val similarity = computeSimilarity(lookup, expectedText) ?: 0.0
         matched += similarity
-        sample.add(Pair(similarity, currentExpected))
+        coreSample.add(Pair(similarity, currentExpected))
       }
     }
     totalMatched += matched

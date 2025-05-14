@@ -183,7 +183,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   }
 
   @TestOnly
-  ThreadingSupport getRwLock() {
+  @ApiStatus.Internal
+  public ThreadingSupport getRwLock() {
     return getThreadingSupport();
   }
 
@@ -694,6 +695,13 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
       }
 
       stopServicePreloading();
+
+      try {
+        lifecycleListener.beforeAppWillBeClosed(restart);
+      }
+      catch (Throwable t) {
+        logErrorDuringExit("Failed to invoke lifecycle listeners", t);
+      }
 
       if (BitUtil.isSet(flags, SAVE)) {
         try {
@@ -1319,7 +1327,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   }
 
   @TestOnly
-  void disableEventsUntil(@NotNull Disposable disposable) {
+  @ApiStatus.Internal
+  public void disableEventsUntil(@NotNull Disposable disposable) {
     myDispatcher.neuterMultiCasterWhilePerformanceTestIsRunningUntil(disposable);
   }
 

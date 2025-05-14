@@ -14,6 +14,9 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//platform/editor-ui-api:editor-ui",
+    "//platform/foldings",
+    "//platform/refactoring",
+    "//platform/structure-view-impl:structureView-impl",
     "//platform/usageView-impl",
     "//platform/util",
     "//java/openapi:java",

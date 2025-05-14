@@ -14,8 +14,10 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/editor-ui-api:editor-ui",
+    "//platform/foldings",
     "//platform/lang-api:lang",
     "//java/openapi:java",
+    "//platform/refactoring",
     "//platform/usageView-impl",
     "//plugins/properties:properties-backend",
     "//platform/platform-impl:ide-impl",
@@ -51,8 +53,10 @@ jvm_library(
   associates = [":java-i18n"],
   deps = [
     "//platform/editor-ui-api:editor-ui",
+    "//platform/foldings",
     "//platform/lang-api:lang",
     "//java/openapi:java",
+    "//platform/refactoring",
     "//platform/usageView-impl",
     "//plugins/properties:properties-backend",
     "//platform/platform-impl:ide-impl",
