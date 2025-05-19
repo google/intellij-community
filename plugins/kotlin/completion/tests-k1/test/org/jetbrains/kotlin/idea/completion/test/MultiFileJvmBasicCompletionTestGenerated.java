@@ -385,6 +385,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
         runTest("../testData/basic/multifile/NotImportedClass/");
     }
 
+    @TestMetadata("NotImportedExtensionForDefinitelyNotNullableType")
+    public void testNotImportedExtensionForDefinitelyNotNullableType() throws Exception {
+        runTest("../testData/basic/multifile/NotImportedExtensionForDefinitelyNotNullableType/");
+    }
+
     @TestMetadata("NotImportedExtensionForFlexibleType")
     public void testNotImportedExtensionForFlexibleType() throws Exception {
         runTest("../testData/basic/multifile/NotImportedExtensionForFlexibleType/");
@@ -583,6 +588,11 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("SyntheticPrimitiveJavaProperty")
     public void testSyntheticPrimitiveJavaProperty() throws Exception {
         runTest("../testData/basic/multifile/SyntheticPrimitiveJavaProperty/");
+    }
+
+    @TestMetadata("SyntheticPropertyWithoutJavaOrigin")
+    public void testSyntheticPropertyWithoutJavaOrigin() throws Exception {
+        runTest("../testData/basic/multifile/SyntheticPropertyWithoutJavaOrigin/");
     }
 
     @TestMetadata("TopLevelFunction")

@@ -16,23 +16,25 @@ import com.intellij.platform.util.progress.reportSequentialProgress
 import com.intellij.util.messages.Topic
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.packaging.PyPackageManager
-import com.jetbrains.python.packaging.common.PythonPackage
-import com.jetbrains.python.packaging.common.PythonPackageManagementListener
-import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
-import com.jetbrains.python.packaging.common.runPackagingOperationOrShowErrorDialog
+import com.jetbrains.python.packaging.common.*
 import com.jetbrains.python.packaging.requirement.PyRequirementRelation
 import com.jetbrains.python.packaging.requirement.PyRequirementVersionSpec
+import com.jetbrains.python.sdk.PythonSdkCoroutineService
 import com.jetbrains.python.sdk.PythonSdkUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import java.net.URI
 
+@ApiStatus.Internal
+
 sealed class PythonPackageInstallRequest(val title: String) {
   data object AllRequirements : PythonPackageInstallRequest("All Requirements")
   data class ByLocation(val location: URI) : PythonPackageInstallRequest(location.toString())
   data class ByRepositoryPythonPackageSpecification(val specification: PythonRepositoryPackageSpecification) : PythonPackageInstallRequest(specification.nameWithVersionSpec)
 }
+
+@ApiStatus.Internal
 
 fun PythonRepositoryPackageSpecification.toInstallRequest(): PythonPackageInstallRequest.ByRepositoryPythonPackageSpecification {
   return PythonPackageInstallRequest.ByRepositoryPythonPackageSpecification(this)
@@ -41,6 +43,11 @@ fun PythonRepositoryPackageSpecification.toInstallRequest(): PythonPackageInstal
 @ApiStatus.Experimental
 abstract class PythonPackageManager(val project: Project, val sdk: Sdk) {
   abstract var installedPackages: List<PythonPackage>
+
+  @ApiStatus.Internal
+  @Volatile
+  var outdatedPackages: Map<String, PythonOutdatedPackage> = emptyMap()
+    private set
 
   abstract val repositoryManager: PythonRepositoryManager
 
@@ -61,12 +68,29 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) {
       installPackagesSilently(installRequests, options)
   }
 
-  suspend fun updatePackage(specification: PythonRepositoryPackageSpecification): Result<List<PythonPackage>> {
-    updatePackageCommand(specification).onFailure {
-      return Result.failure(it)
+  @ApiStatus.Internal
+  suspend fun updatePackages(vararg packages: PythonRepositoryPackageSpecification): Result<List<PythonPackage>> {
+    val progressTitle = if (packages.size > 1) {
+      PyBundle.message("python.packaging.updating.packages")
     }
-    refreshPaths()
-    return reloadPackages()
+    else {
+      PyBundle.message("python.packaging.updating.package", packages.first().name)
+    }
+
+    return withBackgroundProgress(project = project, progressTitle, cancellable = true) {
+      reportSequentialProgress(packages.size) { reporter ->
+        packages.forEach { specification ->
+          reporter.itemStep(PyBundle.message("python.packaging.updating.package", specification.name))
+          runCatching {
+            updatePackageCommand(specification)
+          }.onFailure {
+            return@withBackgroundProgress Result.failure(it)
+          }
+        }
+      }
+
+      reloadPackages()
+    }
   }
 
   suspend fun uninstallPackage(pkg: PythonPackage): Result<List<PythonPackage>> {
@@ -80,6 +104,8 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) {
   open suspend fun reloadPackages(): Result<List<PythonPackage>> {
     thisLogger().info("Reload packages: start")
     val packages = reloadPackagesCommand().getOrElse {
+      outdatedPackages = emptyMap()
+      installedPackages = emptyList()
       return Result.failure(it)
     }
     thisLogger().info("Reload packages: finish")
@@ -89,16 +115,29 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) {
       syncPublisher(PACKAGE_MANAGEMENT_TOPIC).packagesChanged(sdk)
       syncPublisher(PyPackageManager.PACKAGE_MANAGER_TOPIC).packagesRefreshed(sdk)
     }
+    if (!ApplicationManager.getApplication().isUnitTestMode) {
+      service<PythonSdkCoroutineService>().cs.launch {
+        reloadOutdatedPackages()
+      }
+    }
 
     return Result.success(packages)
   }
 
   fun packageExists(pkg: PythonPackage): Boolean = installedPackages.any { it.name.equals(pkg.name, ignoreCase = true) }
 
+  @ApiStatus.Internal
   abstract suspend fun installPackageCommand(installRequest: PythonPackageInstallRequest, options: List<String>): Result<Unit>
-  protected abstract suspend fun updatePackageCommand(specification: PythonRepositoryPackageSpecification): Result<Unit>
-  protected abstract suspend fun uninstallPackageCommand(pkg: PythonPackage): Result<Unit>
-  protected abstract suspend fun reloadPackagesCommand(): Result<List<PythonPackage>>
+  @ApiStatus.Internal
+  abstract suspend fun updatePackageCommand(specification: PythonRepositoryPackageSpecification): Result<Unit>
+
+  @ApiStatus.Internal
+  abstract suspend fun uninstallPackageCommand(pkg: PythonPackage): Result<Unit>
+
+  @ApiStatus.Internal
+  abstract suspend fun reloadPackagesCommand(): Result<List<PythonPackage>>
+  @ApiStatus.Internal
+  abstract suspend fun loadOutdatedPackagesCommand(): Result<List<PythonOutdatedPackage>>
 
   internal suspend fun refreshPaths() {
     edtWriteAction {
@@ -165,6 +204,23 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) {
       return Result.success(Unit)
     }
     return result
+  }
+
+  @ApiStatus.Internal
+  suspend fun reloadOutdatedPackages() {
+    if (installedPackages.isEmpty()) {
+      outdatedPackages = emptyMap()
+      return
+    }
+    val loadedPackages = loadOutdatedPackagesCommand().getOrElse {
+      thisLogger().warn("Failed to load outdated packages", it)
+      emptyList()
+    }
+    val packageMap = loadedPackages.associateBy { it.name }
+    outdatedPackages = packageMap
+    ApplicationManager.getApplication().messageBus.apply {
+      syncPublisher(PACKAGE_MANAGEMENT_TOPIC).outdatedPackagesChanged(sdk)
+    }
   }
 
   fun createPackageSpecificationWithSpec(packageName: String, versionSpec: PyRequirementVersionSpec? = null): PythonRepositoryPackageSpecification? {

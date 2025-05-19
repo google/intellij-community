@@ -11,7 +11,7 @@ jvm_library(
   name = "ui",
   module_name = "intellij.java.ui",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//java/openapi:java",
     "//java/compiler/openapi:java-compiler",
@@ -21,6 +21,7 @@ jvm_library(
     "//java/java-impl:impl",
     "//platform/ide-core-impl",
     "//java/java-impl-refactorings:impl-refactorings",
+    "//jps/model-api:model",
     "//platform/refactoring",
     "//platform/util/progress",
     "//aether-dependency-resolver",
@@ -42,6 +43,7 @@ jvm_library(
     "//platform/feedback",
     "//platform/util/jdom",
     "//platform/backend/workspace",
+    "//platform/workspace/storage",
     "//xml/dom-openapi:dom",
     "//platform/util/coroutines",
     "//platform/backend/observation",
@@ -76,6 +78,7 @@ jvm_library(
     "//java/execution/impl",
     "@lib//:assert_j",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/platform-tests:tests_test_lib",
     "//platform/core-ui",
     "//java/compiler/openapi:java-compiler",
@@ -95,6 +98,8 @@ jvm_library(
     "//platform/testFramework/junit5/eel",
     "//platform/testFramework/junit5/eel:eel_test_lib",
     "//platform/eel-provider",
+    "//platform/workspace/storage",
+    "//libraries/io",
   ]
 )
 

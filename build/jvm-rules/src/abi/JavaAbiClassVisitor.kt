@@ -12,6 +12,7 @@ import org.jetbrains.org.objectweb.asm.tree.MethodNode
 internal class JavaAbiClassVisitor(
   classVisitor: ClassVisitor,
   private val classesToBeDeleted: MutableScatterSet<String>,
+  private val abiErrorConsumer: (String) -> Unit,
 ) : ClassVisitor(Opcodes.API_VERSION, classVisitor) {
   private var stripNonPublicMethods = true
 
@@ -25,6 +26,20 @@ internal class JavaAbiClassVisitor(
     isApiClass = (access and (Opcodes.ACC_PUBLIC or Opcodes.ACC_PROTECTED)) != 0
     if (isApiClass) {
       stripNonPublicMethods = !name.contains("android")
+      if (superName != null && superName != "java/lang/Object" && classesToBeDeleted.contains(superName)) {
+        val subClass = formatClassName(name)
+        val parentClass = formatClassName(superName)
+        abiErrorConsumer("""
+          Class $subClass is public, 
+          but it extends $parentClass, which is not public.
+          
+          A public class must only extend classes that are accessible at the same visibility level.
+          
+          To fix this, consider either:
+            * Reducing the visibility of $subClass, or
+            * Making $parentClass public (and annotate it with @ApiStatus.Internal if applicable).
+        """.trimIndent())
+      }
       super.visit(version, access, name, signature, superName, interfaces)
     }
     else {
@@ -100,3 +115,5 @@ internal class JavaAbiClassVisitor(
     }
   }
 }
+
+private fun formatClassName(s: String): String = s.replace('/', '.')

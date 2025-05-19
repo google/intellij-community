@@ -12,6 +12,7 @@
     <orderEntry type="module" module-name="intellij.java.indexing.impl" exported="" />
     <orderEntry type="module" module-name="intellij.java.psi.impl" exported="" />
     <orderEntry type="module" module-name="intellij.platform.editor.ui" />
+    <orderEntry type="module" module-name="intellij.platform.jps.model" />
     <orderEntry type="module" module-name="intellij.platform.projectModel.impl" exported="" />
     <orderEntry type="module" module-name="intellij.java.analysis" exported="" />
     <orderEntry type="module" module-name="intellij.java.resources.en" />
@@ -32,5 +33,6 @@
     <orderEntry type="module" module-name="intellij.platform.editor.ex" />
     <orderEntry type="module" module-name="intellij.java.codeserver.highlighting" />
     <orderEntry type="module" module-name="intellij.java.codeserver.core" />
+    <orderEntry type="module" module-name="intellij.platform.refactoring" />
   </component>
 </module>

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplacePutWithAssignment", "ReplaceGetOrSet")
 
 package com.intellij.configurationStore
@@ -24,6 +24,7 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.WorkspaceModelCache
 import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.jps.JpsProjectConfigLocation
@@ -60,12 +61,13 @@ import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.nameWithoutExtension
 
 private fun shouldWriteExternalFilesImmediately(): Boolean = Registry.`is`("ide.workspace.model.write.external.files.immediately", false)
-private fun shouldWriteExternalFilesDirectly(): Boolean = shouldWriteExternalFilesImmediately() ||
-                                                          Registry.`is`("ide.workspace.model.write.external.files.directly", false)
+
+private fun shouldWriteExternalFilesDirectly(): Boolean {
+  return shouldWriteExternalFilesImmediately() || Registry.`is`("ide.workspace.model.write.external.files.directly", false)
+}
 
 @ApiStatus.Internal
 open class ProjectWithModuleStoreImpl(project: Project) : ProjectStoreImpl(project), ProjectStoreWithJpsContentReader {
-
   final override suspend fun saveModules(
     saveSessions: MutableList<SaveSession>,
     saveResult: SaveResult,
@@ -73,17 +75,24 @@ open class ProjectWithModuleStoreImpl(project: Project) : ProjectStoreImpl(proje
     projectSessionManager: ProjectSaveSessionProducerManager
   ) {
     projectSessionManager as ProjectWithModulesSaveSessionProducerManager
+    val workspaceModel = project.serviceAsync<WorkspaceModel>()
 
     val moduleManager = project.serviceAsync<ModuleManager>()
-    val writer = if (shouldWriteExternalFilesDirectly())
+    val writer = if (shouldWriteExternalFilesDirectly()) {
       HalfDirectJpsStorageContentWriter(session = projectSessionManager, store = this, project = project, moduleManager)
-    else
+    }
+    else {
       DelegatingJpsStorageContentWriter(session = projectSessionManager, store = this, project = project)
+    }
 
-    project.serviceAsync<JpsProjectModelSynchronizer>().saveChangedProjectEntities(writer)
+    project.serviceAsync<JpsProjectModelSynchronizer>().saveChangedProjectEntities(writer, workspaceModel)
     (project.serviceAsync<WorkspaceModelCache>() as WorkspaceModelCacheImpl).doCacheSavingOnProjectClose()
 
     for (module in moduleManager.modules) {
+      if (!module.canStoreSettings()) {
+        continue
+      }
+
       val moduleStore = module.serviceAsync<IComponentStore>() as? ComponentStoreImpl ?: continue
       val moduleSessionManager = moduleStore.createSaveSessionProducerManager()
       moduleStore.commitComponents(isForce = forceSavingAllSettings, sessionManager = moduleSessionManager, saveResult = saveResult)
@@ -105,7 +114,6 @@ open class ProjectWithModuleStoreImpl(project: Project) : ProjectStoreImpl(proje
 
 private class DelegatingJpsStorageContentWriter(session: ProjectWithModulesSaveSessionProducerManager, store: IProjectStore, project: Project)
   : JpsStorageContentWriter(session, store, project) {
-
   override fun saveInternalFileModuleComponent(filePath: @NlsSafe String, componentName: String, componentTag: Element?) {
     session.setModuleComponentState(imlFilePath = filePath, componentName = componentName, componentTag = componentTag)
   }
@@ -119,7 +127,8 @@ private class DelegatingJpsStorageContentWriter(session: ProjectWithModulesSaveS
   }
 
   // This writer has nothing to write. All the components will be committed to component stores, and files will be updated from these stores later
-  override suspend fun writeFilesToDisk() = Unit
+  override suspend fun writeFilesToDisk() {
+  }
 }
 
 private class DirectJpsStorageContentWriter(
@@ -127,15 +136,14 @@ private class DirectJpsStorageContentWriter(
   store: IProjectStore,
   project: Project,
   private val moduleManager: ModuleManager,
-) : JpsStorageContentWriter(session, store, project) {
-
+) : JpsStorageContentWriter(session = session, store = store, project = project) {
   // we expect that externalFileComponents might be accessed concurrently from different threads, but each file (=value)
-  // is only accessed from a single thread (i.e. one file is populated from one thread, but several different files
+  // is only accessed from a single thread (i.e., one file is populated from one thread, but several different files
   // might be populated from different threads).
   private val filesWithComponents: MutableMap</*filePath*/String, WritableImlFileContent> = ConcurrentHashMap()
 
   override fun saveInternalFileModuleComponent(filePath: @NlsSafe String, componentName: String, componentTag: Element?) {
-    // componentTag == null is to remove component from iml/xml. We don't care about removing, because we always start with an empty file
+    // componentTag == null is to remove the component from iml/xml. We don't care about removing, because we always start with an empty file
     if (componentTag != null) {
       val fileComponents = filesWithComponents.getOrPut(filePath) { WritableImlFileContent(filePath) }
       fileComponents.saveComponent(componentName, componentTag)
@@ -143,7 +151,7 @@ private class DirectJpsStorageContentWriter(
   }
 
   override fun saveExternalFileModuleComponent(filePath: @NlsSafe String, componentName: String, componentTag: Element?) {
-    // componentTag == null is to remove component from iml/xml. We don't care about removing, because we always start with an empty file
+    // componentTag == null is to remove the component from iml/xml. We don't care about removing, because we always start with an empty file
     if (componentTag != null) {
       val fileComponents = filesWithComponents.getOrPut(filePath) { WritableImlFileContent(filePath) }
       fileComponents.saveComponent(componentName, componentTag)
@@ -166,7 +174,7 @@ private class DirectJpsStorageContentWriter(
     val exceptions = CopyOnWriteArrayList<IOException>()
 
     // todo (IJPL-157852): we can use several threads
-    filesWithComponents.forEach { (_, components) ->
+    for ((_, components) in filesWithComponents) {
       try {
         components.flush(moduleManager)
       }
@@ -182,7 +190,7 @@ private class DirectJpsStorageContentWriter(
     }
   }
 
-  // This class is not thread-safe. Same file should not be populated from different threads.
+  // This class is not thread-safe. The same file should not be populated from different threads.
   private class WritableImlFileContent(
     private val filePath: String,
   ) {
@@ -194,7 +202,7 @@ private class DirectJpsStorageContentWriter(
           componentTag.attributes.add(0, Attribute("name", componentTag.name))
           componentTag.name = "component"
         }
-        components[componentName] = componentTag
+        components.put(componentName, componentTag)
       }
     }
 
@@ -243,11 +251,10 @@ private class ComponentStoreContentWriter(
   }
 
   override suspend fun writeFilesToDisk() {}
-
 }
 
-// Half- because we store external xml files directly, and internal iml files via stores
-// (because we want the store to generate  VFS events in order to keep iml files up-to-date)
+// Half- because we store external XML files directly, and internal iml files via stores
+// (because we want the store to generate VFS events to keep iml files up to date)
 private class HalfDirectJpsStorageContentWriter(
   session: ProjectWithModulesSaveSessionProducerManager,
   store: IProjectStore,
@@ -397,8 +404,8 @@ internal class StorageJpsConfigurationReader(private val project: Project, priva
     if (ProjectUtil.isRemotePath(FileUtilRt.toSystemDependentName(filePath)) && !TrustedProjects.isProjectTrusted(project)) {
       throw IOException(ConfigurationStoreBundle.message("error.message.details.configuration.files.from.remote.locations.in.safe.mode"))
     }
-    if (componentName == "") {
-      //this is currently used for loading Eclipse project configuration from .classpath file
+    if (componentName.isEmpty()) {
+      //this is currently used for loading Eclipse project configuration from the.classpath file
       val file = VirtualFileManager.getInstance().findFileByUrl(fileUrl)
       val component = file?.inputStream?.use { JDOMUtil.load(it) }
       return@addMeasuredTime component
@@ -409,7 +416,7 @@ internal class StorageJpsConfigurationReader(private val project: Project, priva
       val component = getCachingReader().loadComponent(fileUrl, componentName, customModuleFilePath)
       return@addMeasuredTime component
     }
-    if (FileUtilRt.extensionEquals(filePath, "iml") || isExternalModuleFile(filePath)) {
+    if (filePath.endsWith(".iml") || isExternalModuleFile(filePath)) {
       //todo fetch data from ModuleStore (https://jetbrains.team/p/wm/issues/51)
       val component = getCachingReader().loadComponent(fileUrl, componentName, customModuleFilePath)
       return@addMeasuredTime component
@@ -419,11 +426,11 @@ internal class StorageJpsConfigurationReader(private val project: Project, priva
       val stateMap = storage.getStorageData()
       val component = if (storage is DirectoryBasedStorage) {
         val elementContent = stateMap.getElement(PathUtilRt.getFileName(filePath))
-        if (elementContent != null) {
-          Element(ComponentStorageUtil.COMPONENT).setAttribute(ComponentStorageUtil.NAME, componentName).addContent(elementContent)
+        if (elementContent == null) {
+          null
         }
         else {
-          null
+          Element(ComponentStorageUtil.COMPONENT).setAttribute(ComponentStorageUtil.NAME, componentName).addContent(elementContent)
         }
       }
       else {
@@ -448,7 +455,7 @@ internal class StorageJpsConfigurationReader(private val project: Project, priva
 
   override fun getExpandMacroMap(fileUrl: String): ExpandMacroToPathMap {
     val filePath = JpsPathUtil.urlToPath(fileUrl)
-    if (FileUtil.extensionEquals(filePath, "iml") || isExternalModuleFile(filePath)) {
+    if (filePath.endsWith(".iml") || isExternalModuleFile(filePath)) {
       return getCachingReader().getExpandMacroMap(fileUrl)
     }
     else {
@@ -486,7 +493,7 @@ private fun getStorageSpec(filePath: String, project: Project): Storage {
   val fileName = PathUtil.getFileName(filePath)
   val parentPath = PathUtil.getParentPath(filePath)
   val parentFileName = PathUtil.getFileName(parentPath)
-  if (FileUtil.extensionEquals(filePath, "ipr") || fileName == "misc.xml" && parentFileName == Project.DIRECTORY_STORE_FOLDER) {
+  if (filePath.endsWith(".ipr") || fileName == "misc.xml" && parentFileName == Project.DIRECTORY_STORE_FOLDER) {
     collapsedPath = "\$PROJECT_FILE$"
     splitterClass = StateSplitterEx::class.java
   }

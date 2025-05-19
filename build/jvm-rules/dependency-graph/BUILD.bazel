@@ -1,10 +1,19 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-jvm_library(
+kt_jvm_library(
   name = "dependency-graph",
-  module_name = "intellij.platform.jps.build.dependencyGraph",
+  srcs = glob(
+      [
+          "src/**/*.kt",
+          "src/**/*.java",
+      ],
+      allow_empty = True,
+  ),
+  kotlinc_opts = "//:rules_jvm_bootstrap_kotlinc_options",
+  #module_name = "intellij.platform.jps.build.dependencyGraph",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  # buildifier: leave-alone
   deps = [
     "//:annotations",
     "//:hash4j",
@@ -13,9 +22,8 @@ jvm_library(
     "//:kotlin-stdlib",
     "//:caffeine",
     "//:intellij-deps-fastutil",
-    "@rules_jvm//jps-builders-6:build-javac-rt",  # for Iterator utils
-    "//:jps", # for platform/util_rt
-  ]
+    "//jps-builders-6:build-javac-rt",  # for Iterator utils and utility data structures
+  ],
 )
 
 ### skip generation section `build intellij.platform.jps.build.dependencyGraph`

@@ -1441,11 +1441,6 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
                 runTest("../testData/basic/common/getOperator/NotForSafeCall.kt");
             }
 
-            @TestMetadata("PreferOperator.kt")
-            public void testPreferOperator() throws Exception {
-                runTest("../testData/basic/common/getOperator/PreferOperator.kt");
-            }
-
             @TestMetadata("Simple.kt")
             public void testSimple() throws Exception {
                 runTest("../testData/basic/common/getOperator/Simple.kt");
@@ -3557,6 +3552,16 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
                 runTest("../testData/basic/common/InnerClass.kt");
             }
 
+            @TestMetadata("InnerClassWithParameters.kt")
+            public void testInnerClassWithParameters() throws Exception {
+                runTest("../testData/basic/common/InnerClassWithParameters.kt");
+            }
+
+            @TestMetadata("InnerClassWithParameters2.kt")
+            public void testInnerClassWithParameters2() throws Exception {
+                runTest("../testData/basic/common/InnerClassWithParameters2.kt");
+            }
+
             @TestMetadata("InnerInBaseClass.kt")
             public void testInnerInBaseClass() throws Exception {
                 runTest("../testData/basic/common/InnerInBaseClass.kt");
@@ -3955,6 +3960,11 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
             @TestMetadata("TypeArgOfOwnerClass.kt")
             public void testTypeArgOfOwnerClass() throws Exception {
                 runTest("../testData/basic/common/TypeArgOfOwnerClass.kt");
+            }
+
+            @TestMetadata("TypeArgumentPriority.kt")
+            public void testTypeArgumentPriority() throws Exception {
+                runTest("../testData/basic/common/TypeArgumentPriority.kt");
             }
 
             @TestMetadata("TypeParamAsTypeArg.kt")
@@ -4480,6 +4490,11 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
             @TestMetadata("SafeCall.kt")
             public void testSafeCall() throws Exception {
                 runTest("../testData/basic/java/syntheticExtensions/SafeCall.kt");
+            }
+
+            @TestMetadata("ShowAccessorsForAtomicOperations.kt")
+            public void testShowAccessorsForAtomicOperations() throws Exception {
+                runTest("../testData/basic/java/syntheticExtensions/ShowAccessorsForAtomicOperations.kt");
             }
 
             @TestMetadata("ShowGetSetOnSecondCompletion.kt")

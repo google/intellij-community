@@ -22,11 +22,12 @@ jvm_library(
   name = "lang-impl",
   module_name = "intellij.platform.lang.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   javac_opts = ":custom-javac-options",
   deps = [
     "//platform/boot",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/lang-api:lang",
     "@lib//:oro_matcher",
     "@lib//:velocity",
@@ -112,6 +113,7 @@ jvm_library(
     "//platform/syntax/syntax-api:syntax",
     "//platform/syntax/syntax-util:util",
     "//platform/syntax/syntax-psi:psi",
+    "//platform/workspace/storage",
     "//platform/experiment",
   ],
   exports = [
@@ -140,6 +142,7 @@ jvm_library(
   deps = [
     "//platform/boot",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/lang-api:lang",
     "//platform/usageView-impl",
     "//platform/vcs-api:vcs",
@@ -189,6 +192,7 @@ jvm_library(
     "@lib//:hamcrest",
     "//platform/backend/workspace",
     "@lib//:objenesis",
+    "//platform/workspace/storage",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "@lib//:kotlinx-collections-immutable",

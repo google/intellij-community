@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.options.advanced.AdvancedSettingsChangeListener
 import com.intellij.openapi.project.Project
@@ -24,6 +25,7 @@ import com.intellij.util.ObjectUtils.tryCast
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.vcs.commit.CommitMode
 import com.intellij.vcs.commit.CommitModeManager
+import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.NonNls
 import java.util.function.Predicate
 
@@ -40,7 +42,7 @@ internal fun ContentManager.selectFirstContent() {
 
 private val LOG = logger<ChangesViewContentManager>()
 
-class ChangesViewContentManager(private val project: Project) : ChangesViewContentI, Disposable {
+class ChangesViewContentManager private constructor(private val project: Project, coroutineScope: CoroutineScope) : ChangesViewContentI, Disposable {
   private val addedContents = mutableListOf<Content>()
   private var selectedAddedContent: Content? = null
 
@@ -62,7 +64,7 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
   private var isCommitToolWindowShown: Boolean = shouldUseCommitToolWindow()
 
   init {
-    ApplicationManager.getApplication().messageBus.connect(project)
+    ApplicationManager.getApplication().messageBus.connect(coroutineScope)
       .subscribe(AdvancedSettingsChangeListener.TOPIC, object : AdvancedSettingsChangeListener {
         override fun advancedSettingChanged(id: String, oldValue: Any, newValue: Any) {
           if (id == CommitMode.NonModalCommitMode.COMMIT_TOOL_WINDOW_SETTINGS_KEY) {
@@ -70,7 +72,7 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
           }
         }
       })
-    val projectBusConnection = project.messageBus.connect()
+    val projectBusConnection = project.messageBus.connect(coroutineScope)
     CommitModeManager.subscribeOnCommitModeChange(projectBusConnection, object : CommitModeManager.CommitModeListener {
       override fun commitModeChanged() {
         updateToolWindowMappings()
@@ -109,9 +111,9 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
     project.messageBus.connect(this).subscribe(ToolWindowManagerListener.TOPIC, listener)
 
     val contents = addedContents.filter { it.resolveContentManager() === contentManager }
-    contents.forEach {
-      addIntoCorrectPlace(contentManager, it)
-      IJSwingUtilities.updateComponentTreeUI(it.component)
+    for (content in contents) {
+      addIntoCorrectPlace(contentManager, content)
+      IJSwingUtilities.updateComponentTreeUI(content.component)
     }
     addedContents.removeAll(contents)
 
@@ -120,7 +122,7 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
       contentManager.setSelectedContent(toSelect)
     }
     else {
-      // Ensure that first tab is selected after tabs reordering
+      // ensure that the first tab is selected after tab reordering
       contentManager.selectFirstContent()
     }
     selectedAddedContent = null
@@ -144,7 +146,9 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
     }
   }
 
-  override fun removeContent(content: Content) = removeContent(content, true)
+  override fun removeContent(content: Content) {
+    removeContent(content, true)
+  }
 
   private fun removeContent(content: Content, dispose: Boolean) {
     val contentManager = content.manager
@@ -163,7 +167,7 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
   }
 
   override fun setSelectedContent(content: Content, requestFocus: Boolean) {
-    LOG.debug("select content: ${content.tabName}")
+    LOG.debug { "select content: ${content.tabName}" }
     val contentManager = content.manager
     if (contentManager != null) {
       contentManager.setSelectedContent(content, requestFocus)
@@ -257,7 +261,7 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
   }
 
   companion object {
-    const val TOOLWINDOW_ID = ToolWindowId.VCS
+    const val TOOLWINDOW_ID: String = ToolWindowId.VCS
     internal const val COMMIT_TOOLWINDOW_ID = ToolWindowId.COMMIT
 
     @JvmField
@@ -267,13 +271,13 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
      * Whether [Content] should be shown in [ToolWindowId.COMMIT] toolwindow.
      */
     @JvmField
-    val IS_IN_COMMIT_TOOLWINDOW_KEY = Key.create<Boolean>("ChangesViewContentManager.IS_IN_COMMIT_TOOLWINDOW_KEY")
+    val IS_IN_COMMIT_TOOLWINDOW_KEY: Key<Boolean> = Key.create<Boolean>("ChangesViewContentManager.IS_IN_COMMIT_TOOLWINDOW_KEY")
 
     @JvmField
-    val CONTENT_TAB_NAME_KEY = DataKey.create<@NonNls String>("ChangesViewContentManager.CONTENT_TAB_KEY")
+    val CONTENT_TAB_NAME_KEY: DataKey<@NonNls String> = DataKey.create<@NonNls String>("ChangesViewContentManager.CONTENT_TAB_KEY")
 
     @JvmStatic
-    fun getInstance(project: Project) = project.service<ChangesViewContentI>()
+    fun getInstance(project: Project): ChangesViewContentI = project.service<ChangesViewContentI>()
 
     fun getInstanceImpl(project: Project): ChangesViewContentManager? =
       getInstance(project) as? ChangesViewContentManager
@@ -322,12 +326,12 @@ class ChangesViewContentManager(private val project: Project) : ChangesViewConte
     }
 
     /**
-     * Specified tab order in toolwindow.
+     * Specified tab order in the toolwindow.
      *
      * @see ChangesViewContentManager.TabOrderWeight
      */
     @JvmField
-    val ORDER_WEIGHT_KEY = Key.create<Int>("ChangesView.ContentOrderWeight")
+    val ORDER_WEIGHT_KEY: Key<Int> = Key.create<Int>("ChangesView.ContentOrderWeight")
 
     const val LOCAL_CHANGES: @NonNls String = "Local Changes"
     const val CONSOLE: @NonNls String = "Console"
@@ -344,7 +348,7 @@ private fun getContentWeight(content: Content): Int {
   if (userData != null) return userData
 
   val tabName: @NonNls String = content.tabName
-  for (value in ChangesViewContentManager.TabOrderWeight.values()) {
+  for (value in ChangesViewContentManager.TabOrderWeight.entries) {
     if (value.tabName != null && value.tabName == tabName) {
       return value.weight
     }

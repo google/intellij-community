@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.ui.branch.tree
 
-import com.intellij.dvcs.DvcsUtil
 import com.intellij.dvcs.branch.GroupingKey.GROUPING_BY_DIRECTORY
 import com.intellij.ide.util.treeView.PathElementIdProvider
 import com.intellij.navigation.ItemPresentation
@@ -12,9 +11,9 @@ import com.intellij.util.ui.tree.AbstractTreeModel
 import com.intellij.vcs.git.shared.repo.GitRepositoriesFrontendHolder
 import com.intellij.vcs.git.shared.repo.GitRepositoryFrontendModel
 import com.intellij.vcsUtil.Delegates.equalVetoingObservable
-import git4idea.GitLocalBranch
 import git4idea.GitReference
 import git4idea.GitRemoteBranch
+import git4idea.GitStandardLocalBranch
 import git4idea.GitTag
 import git4idea.branch.GitBranchType
 import git4idea.branch.GitRefType
@@ -30,10 +29,10 @@ internal abstract class GitBranchesTreeModel(
   protected val repositories: List<GitRepository>,
 ) : AbstractTreeModel() {
   protected var actionsTree: LazyActionsHolder = LazyActionsHolder(project, emptyList(), null)
-  protected var localBranchesTree: LazyRefsSubtreeHolder<GitLocalBranch> = LazyRefsSubtreeHolder.emptyHolder()
+  protected var localBranchesTree: LazyRefsSubtreeHolder<GitStandardLocalBranch> = LazyRefsSubtreeHolder.emptyHolder()
   protected var remoteBranchesTree: LazyRefsSubtreeHolder<GitRemoteBranch> = LazyRefsSubtreeHolder.emptyHolder()
   protected var tagsTree: LazyRefsSubtreeHolder<GitTag> = LazyRefsSubtreeHolder.emptyHolder()
-  protected var recentCheckoutBranchesTree: LazyRefsSubtreeHolder<GitLocalBranch> = LazyRefsSubtreeHolder.emptyHolder()
+  protected var recentCheckoutBranchesTree: LazyRefsSubtreeHolder<GitStandardLocalBranch> = LazyRefsSubtreeHolder.emptyHolder()
 
   protected val branchesTreeCache = mutableMapOf<Any, List<Any>>()
 
@@ -101,14 +100,14 @@ internal abstract class GitBranchesTreeModel(
     treeStructureChanged(pathChanged, null, null)
   }
 
-  protected abstract fun getLocalBranches(): Collection<GitLocalBranch>
+  protected abstract fun getLocalBranches(): Collection<GitStandardLocalBranch>
 
   protected abstract fun getRemoteBranches(): Collection<GitRemoteBranch>
 
   /**
    * @return null if recent branches are not displayed
    */
-  protected open fun getRecentBranches(): Collection<GitLocalBranch>? = null
+  protected open fun getRecentBranches(): Collection<GitStandardLocalBranch>? = null
 
   protected abstract fun getTags(): Collection<GitTag>
 
@@ -122,7 +121,10 @@ internal abstract class GitBranchesTreeModel(
   }
 
   private fun rebuildTags(matcher: MinusculeMatcher?) {
-    tagsTree = LazyRefsSubtreeHolder(getTags(), matcher, ::isPrefixGrouping, refComparatorGetter = ::getRefComparator)
+    tagsTree =
+      if (GitVcsSettings.getInstance(project).showTags())
+        LazyRefsSubtreeHolder(getTags(), matcher, ::isPrefixGrouping, refComparatorGetter = ::getRefComparator)
+      else LazyRefsSubtreeHolder.emptyHolder()
   }
 
   protected fun getRefComparator(affectedRepositories: List<GitRepositoryFrontendModel> = repositoriesFrontendModel): Comparator<GitReference> {
@@ -147,7 +149,7 @@ internal abstract class GitBranchesTreeModel(
    * @return true if there is at least one repository where the reference is not the current branch.
    */
   private fun GitReference.isCurrentRefInAny(repositories: List<GitRepositoryFrontendModel>): Boolean {
-    return repositories.any { it.state.currentRef?.matches(this) ?: false }
+    return repositories.any { it.state.isCurrentRef(this) }
   }
 
   private fun GitReference.isFavoriteInAll(repositories: List<GitRepositoryFrontendModel>): Boolean {
@@ -160,22 +162,22 @@ internal abstract class GitBranchesTreeModel(
   }
   data class BranchesPrefixGroup(val type: GitRefType,
                                  val prefix: List<String>,
-                                 val repository: GitRepository? = null) : PathElementIdProvider {
+                                 val repository: GitRepositoryFrontendModel? = null) : PathElementIdProvider {
     override fun getPathElementId(): String = type.name + "/" + prefix.toString()
   }
-  data class RefTypeUnderRepository(val repository: GitRepository, val type: GitRefType)
+  data class RefTypeUnderRepository(val repository: GitRepositoryFrontendModel, val type: GitRefType)
 
   data class RepositoryNode(
-    val repository: GitRepository,
+    val repository: GitRepositoryFrontendModel,
     /**
      * Set to true if this repository node doesn't contain children (e.g., used to navigate to the next level pop-up).
      */
     val isLeaf: Boolean,
   ) : PresentableNode {
-    override fun getPresentableText(): String = DvcsUtil.getShortRepositoryName(repository)
+    override fun getPresentableText(): String = repository.shortName
   }
 
-  data class RefUnderRepository(val repository: GitRepository, val ref: GitReference): PresentableNode {
+  data class RefUnderRepository(val repository: GitRepositoryFrontendModel, val ref: GitReference): PresentableNode {
     override fun getPresentableText(): String = ref.name
   }
 
@@ -193,7 +195,7 @@ internal abstract class GitBranchesTreeModel(
    */
   fun isSelectable(node: Any?): Boolean {
     val userValue = node ?: return false
-    return (userValue is RepositoryNode && (userValue.isLeaf || this !is GitBranchesTreeMultiRepoFilteringModel)) ||
+    return (userValue is RepositoryNode && userValue.isLeaf) ||
            userValue is GitReference ||
            userValue is RefUnderRepository ||
            (userValue is PopupFactoryImpl.ActionItem && userValue.isEnabled)

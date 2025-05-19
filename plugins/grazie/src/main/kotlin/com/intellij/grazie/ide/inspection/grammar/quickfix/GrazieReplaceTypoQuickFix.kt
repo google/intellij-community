@@ -92,18 +92,18 @@ object GrazieReplaceTypoQuickFix {
 
     override fun getFamilyName(): String = family
 
-    override fun isAvailable(project: Project, editor: Editor?, file: PsiFile): Boolean = replacements.all { it.first.range != null }
+    override fun isAvailable(project: Project, editor: Editor?, psiFile: PsiFile): Boolean = replacements.all { it.first.range != null }
 
     override fun getFileModifierForPreview(target: PsiFile): FileModifier {
       return ForPreview(rule, index, family, suggestion, replacements, underlineRanges, toHighlight, detectedLanguage)
     }
 
-    override fun applyFix(project: Project, file: PsiFile, editor: Editor?) {
-      performFix(project, file)
+    override fun applyFix(project: Project, psiFile: PsiFile, editor: Editor?) {
+      GrazieFUSCounter.quickFixInvoked(rule, project, "accept.suggestion")
+      performFix(project, psiFile)
     }
 
     protected fun performFix(project: Project, file: PsiFile) {
-      GrazieFUSCounter.quickFixInvoked(rule, project, "accept.suggestion")
       val document = file.viewProvider.document ?: return
       underlineRanges.forEach { underline ->
         underline.range?.let { removeHighlightersWithExactRange(document, project, it) }
@@ -136,8 +136,8 @@ object GrazieReplaceTypoQuickFix {
       toHighlight: List<SmartPsiFileRange>,
       detectedLanguage: Language?
     ): ChangeToVariantAction(rule, index, family, suggestion, replacements, underlineRanges, toHighlight, detectedLanguage, null) {
-      override fun applyFix(project: Project, file: PsiFile, editor: Editor?) {
-        performFix(project, file)
+      override fun applyFix(project: Project, psiFile: PsiFile, editor: Editor?) {
+        performFix(project, psiFile)
       }
     }
   }

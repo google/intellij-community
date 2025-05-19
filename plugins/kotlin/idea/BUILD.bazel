@@ -34,7 +34,7 @@ jvm_library(
   name = "idea",
   module_name = "kotlin.idea",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -45,6 +45,7 @@ jvm_library(
     "@lib//:kotlinx-coroutines-core",
     "@lib//:guava",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/refactoring",
     "//platform/structure-view-impl:structureView-impl",
     "//platform/usageView-impl",

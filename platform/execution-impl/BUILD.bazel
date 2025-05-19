@@ -11,13 +11,14 @@ jvm_library(
   name = "execution-impl",
   module_name = "intellij.platform.execution.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-impl",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
+    "//jps/model-api:model",
     "//platform/lang-api:lang",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/statistics",
@@ -82,6 +83,7 @@ jvm_library(
   associates = ["//platform/execution-impl"],
   deps = [
     "//platform/platform-util-io:ide-util-io",
+    "//jps/model-api:model",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/execution",

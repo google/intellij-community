@@ -30,9 +30,8 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
-import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.EelPlatform
-import com.intellij.platform.eel.EelResult
+import com.intellij.platform.eel.ExecuteProcessException
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
@@ -74,7 +73,10 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       val env = getEnv(eelApi.exec.fetchLoginShellEnvVariables(), debug)
       val args = getArgs(eelApi)
 
-      return@runWithModalProgressBlocking runProcessInEel(eelApi, exe, env, args)
+      val processHandler = runProcessInEel(eelApi, exe, env, args)
+      JavaRunConfigurationExtensionManager.instance
+        .attachExtensionsToProcess(myConfiguration, processHandler, environment.runnerSettings)
+      return@runWithModalProgressBlocking processHandler
     }
   }
 
@@ -159,7 +161,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
             }
           })
         }
-    } catch (e: EelExecApi.ExecuteProcessException) {
+    } catch (e: ExecuteProcessException) {
       MavenLog.LOG.warn("Cannot execute maven goal: errcode: ${e.errno}, message:  ${e.message}")
       throw ExecutionException(e.message)
     }

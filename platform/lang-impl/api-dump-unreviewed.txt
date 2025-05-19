@@ -2242,22 +2242,6 @@ com.intellij.codeInsight.daemon.impl.HectorComponent
 - a:showComponent(java.awt.Component,kotlin.jvm.functions.Function1):V
 com.intellij.codeInsight.daemon.impl.HectorComponentFactory
 - a:create(com.intellij.psi.PsiFile):com.intellij.codeInsight.daemon.impl.HectorComponent
-f:com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
-- com.intellij.codeInspection.GlobalSimpleInspectionTool
-- sf:SHORT_NAME:java.lang.String
-- highlightErrorElements:Z
-- runAnnotators:Z
-- runVisitors:Z
-- <init>():V
-- checkFile(com.intellij.psi.PsiFile,com.intellij.codeInspection.InspectionManager,com.intellij.codeInspection.ProblemsHolder,com.intellij.codeInspection.GlobalInspectionContext,com.intellij.codeInspection.ProblemDescriptionsProcessor):V
-- getDefaultLevel():com.intellij.codeHighlighting.HighlightDisplayLevel
-- getGroupDisplayName():java.lang.String
-- getOptionsPane():com.intellij.codeInspection.options.OptPane
-- getShortName():java.lang.String
-- s:runAnnotatorsInGeneralHighlighting(com.intellij.psi.PsiFile,Z,Z,Z):java.util.List
-- setHighlightErrorElements(Z):com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
-- setRunAnnotators(Z):com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
-- setRunVisitors(Z):com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
 f:com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPass
 - s:getHighlightUsages(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement,Z,java.util.Collection,java.util.Collection):V
 - s:getUsages(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement,Z):java.util.Collection
@@ -2447,20 +2431,6 @@ c:com.intellij.codeInsight.daemon.impl.actions.GotoNextErrorAction
 - com.intellij.codeInsight.actions.BaseCodeInsightAction
 - com.intellij.openapi.project.DumbAware
 - <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- p:getHandler():com.intellij.codeInsight.CodeInsightActionHandler
-- p:getHandler(com.intellij.openapi.actionSystem.DataContext):com.intellij.codeInsight.CodeInsightActionHandler
-- p:isValidForFile(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):Z
-- p:isValidForLookup():Z
-c:com.intellij.codeInsight.daemon.impl.actions.GotoPreviousErrorAction
-- com.intellij.codeInsight.actions.BaseCodeInsightAction
-- com.intellij.openapi.project.DumbAware
-- <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- p:getHandler():com.intellij.codeInsight.CodeInsightActionHandler
-- p:getHandler(com.intellij.openapi.actionSystem.DataContext):com.intellij.codeInsight.CodeInsightActionHandler
-- p:isValidForFile(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):Z
-- p:isValidForLookup():Z
 f:com.intellij.codeInsight.daemon.impl.analysis.HighlightLevelUtil
 - s:forceRootHighlighting(com.intellij.psi.PsiElement,com.intellij.codeInsight.daemon.impl.analysis.FileHighlightingSetting):V
 f:com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile
@@ -2789,6 +2759,9 @@ pf:com.intellij.codeInsight.documentation.DocumentationComponent$ShowToolbarActi
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - isSelected(com.intellij.openapi.actionSystem.AnActionEvent):Z
 - setSelected(com.intellij.openapi.actionSystem.AnActionEvent,Z):V
+com.intellij.codeInsight.documentation.DocumentationCssProvider
+- sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
+- a:generateCss(java.util.function.Function,Z):java.lang.String
 c:com.intellij.codeInsight.documentation.DocumentationManager
 - com.intellij.codeInsight.documentation.DockablePopupManager
 - sf:IS_FROM_LOOKUP:com.intellij.openapi.util.Key
@@ -5106,7 +5079,6 @@ a:com.intellij.codeInsight.navigation.TargetUpdaterTask
 - p:createUsage(com.intellij.codeInsight.navigation.ItemWithPresentation):com.intellij.usages.Usage
 - f:updateComponent(com.intellij.psi.PsiElement):Z
 f:com.intellij.codeInsight.navigation.UtilKt
-- sf:getLOG():com.intellij.openapi.diagnostic.Logger
 c:com.intellij.codeInsight.navigation.actions.GotoDeclarationAction
 - com.intellij.codeInsight.actions.BaseCodeInsightAction
 - com.intellij.openapi.project.DumbAware
@@ -6382,13 +6354,6 @@ a:com.intellij.codeInspection.ui.actions.InspectionResultsExportActionProvider
 - a:writeResults(com.intellij.codeInspection.ui.InspectionTree,com.intellij.codeInspection.ex.InspectionProfileImpl,com.intellij.codeInspection.ex.GlobalInspectionContextImpl,com.intellij.openapi.project.Project,java.nio.file.Path):V
 f:com.intellij.codeInspection.ui.actions.InspectionResultsExportActionProvider$Companion
 - f:getEP_NAME():com.intellij.openapi.extensions.ExtensionPointName
-f:com.intellij.codeInspection.ui.actions.InspectionResultsExportActionProvider$ExportDialog
-- com.intellij.openapi.ui.DialogWrapper
-- <init>(com.intellij.codeInspection.ui.actions.InspectionResultsExportActionProvider,com.intellij.codeInspection.ui.InspectionResultsView):V
-- f:getLocation():java.lang.String
-- f:getPath():java.nio.file.Path
-- f:getView():com.intellij.codeInspection.ui.InspectionResultsView
-- f:setLocation(java.lang.String):V
 a:com.intellij.codeInspection.ui.actions.InspectionViewActionBase
 - com.intellij.openapi.actionSystem.AnAction
 - <init>(java.util.function.Supplier):V
@@ -8975,6 +8940,7 @@ c:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor
 - com.intellij.ide.actions.searcheverywhere.SearchEverywherePreviewProvider
 - sf:Companion:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor$Companion
 - <init>(com.intellij.openapi.actionSystem.AnActionEvent):V
+- <init>(com.intellij.openapi.actionSystem.AnActionEvent,java.util.List):V
 - createExtendedInfo():com.intellij.ide.actions.searcheverywhere.ExtendedInfo
 - sf:createFileTypeFilter(com.intellij.openapi.project.Project):com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter
 - p:createModel(com.intellij.openapi.project.Project):com.intellij.ide.util.gotoByName.FilteringGotoByModel
@@ -9047,6 +9013,7 @@ f:com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributo
 - getSelectedElements():java.util.List
 - isSelected(java.lang.Object):Z
 - setSelected(java.lang.Object,Z):V
+- setSelectedToAllElements(Z):V
 f:com.intellij.ide.actions.searcheverywhere.PsiElementsEqualityProvider
 - com.intellij.ide.actions.searcheverywhere.AbstractEqualityProvider
 - <init>():V
@@ -9138,7 +9105,7 @@ c:com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersAction
 - p:createChooser():com.intellij.ide.util.ElementsChooser
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - getFilter():com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter
-- p:isActive():Z
+- isActive():Z
 - isEnabled():Z
 c:com.intellij.ide.actions.searcheverywhere.SearchEverywhereFoundElementInfo
 - sf:COMPARATOR:java.util.Comparator
@@ -9984,7 +9951,6 @@ a:com.intellij.ide.projectView.ProjectView
 - a:setSortKey(java.lang.String,com.intellij.ide.projectView.NodeSortKey):V
 - setUseFileNestingRules(Z):V
 com.intellij.ide.projectView.ProjectViewNodeDecorator
-- sf:EP:com.intellij.openapi.extensions.ProjectExtensionPointName
 - a:decorate(com.intellij.ide.projectView.ProjectViewNode,com.intellij.ide.projectView.PresentationData):V
 - decorate(com.intellij.packageDependencies.ui.PackageDependenciesNode,com.intellij.ui.ColoredTreeCellRenderer):V
 a:com.intellij.ide.projectView.ProjectViewPsiTreeChangeListener
@@ -10167,6 +10133,7 @@ a:com.intellij.ide.projectView.impl.AbstractProjectViewPane
 - a:select(java.lang.Object,com.intellij.openapi.vfs.VirtualFile,Z):V
 - selectModule(com.intellij.openapi.module.Module,Z):V
 - selectModuleGroup(com.intellij.ide.projectView.impl.ModuleGroup,Z):V
+- f:selectWithCallback(java.lang.Object,com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.openapi.util.ActionCallback
 - f:setSubId(java.lang.String):V
 - supportsManualOrder():Z
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
@@ -10205,10 +10172,6 @@ f:com.intellij.ide.projectView.impl.CompoundIconProvider
 - <init>():V
 - s:findIcon(com.intellij.psi.PsiElement,I):javax.swing.Icon
 - getIcon(com.intellij.psi.PsiElement,I):javax.swing.Icon
-f:com.intellij.ide.projectView.impl.CompoundProjectViewNodeDecorator
-- com.intellij.ide.projectView.ProjectViewNodeDecorator
-- decorate(com.intellij.ide.projectView.ProjectViewNode,com.intellij.ide.projectView.PresentationData):V
-- s:get(com.intellij.openapi.project.Project):com.intellij.ide.projectView.ProjectViewNodeDecorator
 f:com.intellij.ide.projectView.impl.CompoundTreeStructureProvider
 - com.intellij.ide.projectView.TreeStructureProvider
 - s:get(com.intellij.openapi.project.Project):com.intellij.ide.projectView.TreeStructureProvider
@@ -12939,15 +12902,7 @@ f:com.intellij.openapi.editor.richcopy.view.RtfTransferableData
 - sf:FLAVOR:java.awt.datatransfer.DataFlavor
 - sf:PRIORITY:I
 - <init>(com.intellij.openapi.editor.richcopy.model.SyntaxInfo):V
-- close():V
-- getFlavor():java.awt.datatransfer.DataFlavor
 - getPriority():I
-- mark(I):V
-- markSupported():Z
-- read():I
-- read(B[],I,I):I
-- reset():V
-- setRawText(java.lang.String):V
 f:com.intellij.openapi.file.exclude.OverrideFileTypeManager
 - com.intellij.openapi.components.PersistentStateComponent
 - <init>():V

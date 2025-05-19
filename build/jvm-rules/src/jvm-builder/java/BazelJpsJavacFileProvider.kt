@@ -1,16 +1,17 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("UnstableApiUsage", "HardCodedStringLiteral")
+@file:Suppress("UnstableApiUsage", "HardCodedStringLiteral", "ReplaceGetOrSet")
 
 package org.jetbrains.bazel.jvm.worker.java
 
 import com.intellij.compiler.instrumentation.FailSafeClassReader
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
+import org.jetbrains.bazel.jvm.worker.core.BazelCompileContext
 import org.jetbrains.bazel.jvm.worker.core.BazelTargetBuildOutputConsumer
 import org.jetbrains.bazel.jvm.worker.core.output.InMemoryJavaOutputFileObject
 import org.jetbrains.bazel.jvm.worker.core.output.OutputSink
 import org.jetbrains.jps.builders.java.JavaBuilderUtil
 import org.jetbrains.jps.builders.java.dependencyView.Callbacks.Backend
-import org.jetbrains.jps.incremental.CompileContext
+import org.jetbrains.jps.incremental.messages.BuildMessage.Kind
 import org.jetbrains.jps.javac.InputFileObject
 import org.jetbrains.jps.javac.JpsJavacFileProvider
 import java.io.ByteArrayInputStream
@@ -20,6 +21,7 @@ import java.io.OutputStream
 import java.io.Reader
 import java.io.Writer
 import java.net.URI
+import java.nio.file.Path
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.NestingKind
 import javax.tools.FileObject
@@ -32,11 +34,11 @@ internal class BazelJpsJavacFileProvider(
   private val outputConsumer: BazelTargetBuildOutputConsumer,
   private val mappingsCallback: Backend?,
   private val outputSink: OutputSink,
-  expectedOutputFileCount: Int
+  expectedOutputFileCount: Int,
 ) : JpsJavacFileProvider {
   private val outputs = ArrayList<InMemoryJavaOutputFileObject>(expectedOutputFileCount)
 
-  fun registerOutputs(context: CompileContext) {
+  fun registerOutputs(context: BazelCompileContext, classpath: Array<Path>): Boolean {
     val successfullyCompiled = ObjectLinkedOpenHashSet<File>(outputs.size)
     for (fileObject in outputs) {
       val content = fileObject.content
@@ -50,10 +52,9 @@ internal class BazelJpsJavacFileProvider(
         successfullyCompiled.add(sourceIoFile)
       }
 
-      // first, handle [src->output] mapping and register paths for files_generated event
+      // first, handle [src->output] mapping and register paths for `files_generated` event
       outputConsumer.registerJavacCompiledClass(
         relativeOutputPath = fileObject.path,
-        compiled = null,
         sourceFile = sourceIoFile.toPath(),
       )
 
@@ -63,10 +64,23 @@ internal class BazelJpsJavacFileProvider(
         mappingsCallback.associate(fileObject.path, listOf(sourceIoFile.invariantSeparatorsPath), reader, false)
       }
     }
-    outputSink.registerJavacOutput(outputs)
 
-    outputConsumer.addRegisteredSourceCount(successfullyCompiled.size)
-    JavaBuilderUtil.registerSuccessfullyCompiled(context, successfullyCompiled)
+    instrumentClasses(classpath, outputs, outputSink)
+
+    var hasErrors = false
+    outputSink.registerJavacOutput(outputs) { file, message ->
+      context.compilerMessage(kind = Kind.ERROR, message = message)
+      successfullyCompiled.remove(file)
+      JavaBuilderUtil.registerFilesWithErrors(context, listOf(file))
+      hasErrors = true
+    }
+
+    if (successfullyCompiled.isNotEmpty()) {
+      outputConsumer.addRegisteredSourceCount(successfullyCompiled.size)
+      JavaBuilderUtil.registerSuccessfullyCompiled(context, successfullyCompiled)
+    }
+
+    return hasErrors
   }
 
   override fun list(
@@ -93,7 +107,7 @@ internal class BazelJpsJavacFileProvider(
     return null
   }
 
-  override fun getFileForOutput(fileName: String, className: String, sibling: FileObject): JavaFileObject? {
+  override fun getFileForOutput(fileName: String, className: String, sibling: FileObject): JavaFileObject {
     val result = InMemoryJavaOutputFileObject(
       path = fileName.replace(File.separatorChar, '/'),
       source = (sibling as InputFileObject).file!!,
@@ -119,7 +133,7 @@ private class InMemoryJavaInputFileObject(
 
   override fun getAccessLevel(): Modifier? = null
 
-  override fun toUri(): URI? = throw UnsupportedOperationException()
+  override fun toUri(): URI = throw UnsupportedOperationException()
 
   override fun getName(): String = path
 
@@ -139,5 +153,3 @@ private class InMemoryJavaInputFileObject(
 
   override fun delete(): Boolean = throw IllegalStateException()
 }
-
-

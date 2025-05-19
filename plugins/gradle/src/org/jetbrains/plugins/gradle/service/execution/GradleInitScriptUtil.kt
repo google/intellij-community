@@ -6,19 +6,21 @@ package org.jetbrains.plugins.gradle.service.execution
 import com.google.gson.GsonBuilder
 import com.intellij.gradle.toolingExtension.GradleToolingExtensionClass
 import com.intellij.gradle.toolingExtension.impl.GradleToolingExtensionImplClass
+import com.intellij.gradle.toolingExtension.util.GradleVersionUtil
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
-import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.externalSystem.rt.ExternalSystemRtClass
 import groovy.lang.MissingMethodException
 import org.gradle.api.invocation.Gradle
 import org.gradle.util.GradleVersion
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.plugins.gradle.service.task.LazyVersionSpecificInitScript
+import org.jetbrains.plugins.gradle.service.task.VersionSpecificInitScript
 import org.jetbrains.plugins.gradle.tooling.internal.init.Init
 import org.jetbrains.plugins.gradle.tooling.proxy.Main
 import org.jetbrains.plugins.gradle.util.GradleConstants
@@ -52,6 +54,9 @@ const val TEST_INIT_SCRIPT_NAME: String = "ijTestInit"
 
 @ApiStatus.Internal
 const val IDEA_PLUGIN_CONFIGURATOR_SCRIPT_NAME: String = "ijIdeaPluginConfigurator"
+
+@ApiStatus.Internal
+const val ARTIFACT_DOWNLOADER_SCRIPT_NAME: String = "ijArtifactDownloader"
 
 @JvmField
 val GRADLE_TOOLING_EXTENSION_CLASSES: Set<Class<*>> = setOf(
@@ -97,30 +102,35 @@ fun createIdeaPluginConfiguratorInitScript(): Path {
 fun loadDownloadArtifactInitScript(
   dependencyNotation: String,
   taskName: String,
-  downloadTarget: Path,
-  externalProjectPath: String,
-): String {
-  return loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/downloadArtifact.gradle", mapOf(
-    "DEPENDENCY_NOTATION" to dependencyNotation.toGroovyStringLiteral(),
-    "TARGET_PATH" to downloadTarget.toCanonicalPath().toGroovyStringLiteral(),
-    "GRADLE_TASK_NAME" to taskName.toGroovyStringLiteral(),
-    "GRADLE_PROJECT_PATH" to externalProjectPath.toGroovyStringLiteral(),
-  ))
-}
-
-@ApiStatus.Internal
-fun loadLegacyDownloadArtifactInitScript(
-  dependencyNotation: String,
-  taskName: String,
-  downloadTarget: Path,
-  externalProjectPath: String,
-): String {
-  return loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/legacyDownloadArtifact.gradle", mapOf(
-    "DEPENDENCY_NOTATION" to dependencyNotation.toGroovyStringLiteral(),
-    "TARGET_PATH" to downloadTarget.toCanonicalPath().toGroovyStringLiteral(),
-    "GRADLE_TASK_NAME" to taskName.toGroovyStringLiteral(),
-    "GRADLE_PROJECT_PATH" to externalProjectPath.toGroovyStringLiteral(),
-  ))
+  downloadTarget: EelPath,
+  projectPath: EelPath,
+): List<VersionSpecificInitScript> {
+  return listOf(
+    LazyVersionSpecificInitScript(
+      filePrefix = ARTIFACT_DOWNLOADER_SCRIPT_NAME,
+      isApplicable = { GradleVersionUtil.isGradleAtLeast(it, "5.6") },
+      scriptSupplier = {
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/downloadArtifact.gradle", mapOf(
+          "DEPENDENCY_NOTATION" to dependencyNotation.toGroovyStringLiteral(),
+          "TARGET_PATH" to downloadTarget.toString().toGroovyStringLiteral(),
+          "GRADLE_TASK_NAME" to taskName.toGroovyStringLiteral(),
+          "GRADLE_PROJECT_PATH" to projectPath.toString().toGroovyStringLiteral(),
+        ))
+      }
+    ),
+    LazyVersionSpecificInitScript(
+      filePrefix = ARTIFACT_DOWNLOADER_SCRIPT_NAME,
+      isApplicable = { GradleVersionUtil.isGradleOlderThan(it, "5.6") },
+      scriptSupplier = {
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/legacyDownloadArtifact.gradle", mapOf(
+          "DEPENDENCY_NOTATION" to dependencyNotation.toGroovyStringLiteral(),
+          "TARGET_PATH" to downloadTarget.toString().toGroovyStringLiteral(),
+          "GRADLE_TASK_NAME" to taskName.toGroovyStringLiteral(),
+          "GRADLE_PROJECT_PATH" to projectPath.toString().toGroovyStringLiteral(),
+        ))
+      }
+    )
+  )
 }
 
 @ApiStatus.Internal

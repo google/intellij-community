@@ -11,6 +11,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.backend.impl.SeBackendItemDataProvidersHolderEntity.Companion.Providers
 import com.intellij.platform.searchEverywhere.backend.impl.SeBackendItemDataProvidersHolderEntity.Companion.Session
+import com.intellij.platform.searchEverywhere.providers.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
 import com.jetbrains.rhizomedb.entities
@@ -33,12 +34,11 @@ import org.jetbrains.annotations.Nls
 @Service(Service.Level.PROJECT)
 class SeBackendService(val project: Project, private val coroutineScope: CoroutineScope) {
 
-  suspend fun getItems(
-    sessionRef: DurableRef<SeSessionEntity>,
-    providerId: SeProviderId,
-    params: SeParams,
-    dataContextId: DataContextId?,
-    requestedCountChannel: ReceiveChannel<Int>,
+  suspend fun getItems(sessionRef: DurableRef<SeSessionEntity>,
+                       providerId: SeProviderId,
+                       params: SeParams,
+                       dataContextId: DataContextId?,
+                       requestedCountChannel: ReceiveChannel<Int>
   ): Flow<SeItemData> {
     val provider = getProviders(sessionRef, dataContextId)[providerId] ?: return emptyFlow()
 
@@ -63,21 +63,8 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     }
   }
 
-  suspend fun getItems(
-    sessionRef: DurableRef<SeSessionEntity>,
-    providerId: SeProviderId,
-    params: SeParams,
-    dataContextId: DataContextId?,
-  ): Flow<SeItemData> {
-    val provider = getProviders(sessionRef, dataContextId)[providerId]
-
-    return provider?.getItems(params) ?: emptyFlow()
-  }
-
-  private suspend fun getProviders(
-    sessionRef: DurableRef<SeSessionEntity>,
-    dataContextId: DataContextId?,
-  ): Map<SeProviderId, SeItemDataProvider> {
+  private suspend fun getProviders(sessionRef: DurableRef<SeSessionEntity>,
+                                   dataContextId: DataContextId?): Map<SeProviderId, SeItemDataProvider> {
 
     val session = sessionRef.derefOrNull() ?: return emptyMap()
     var existingHolderEntities = entities(Session, session)
@@ -92,15 +79,15 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
       } ?: throw IllegalStateException("Cannot create providers on the backend: couldn't deserialize data context")
 
       // We may create providers several times, but only one set of providers will be saved as a property to a session entity
-      val providers = SeItemsProviderFactory.EP_NAME.extensionList.asFlow().mapNotNull {
+      val providers = SeItemsProviderFactory.EP_NAME.extensionList.mapNotNull {
         val provider = it.getItemsProvider(project, dataContext) ?: return@mapNotNull null
         if (provider.id != it.id) {
           SeLog.log { "Backend provider ID mismatch: ${provider.id} != ${it.id}" }
         }
         provider
-      }.toList().associate { provider ->
+      }.associate { provider ->
         val id = SeProviderId(provider.id)
-        id to SeBackendItemDataProvider(id, provider, sessionRef)
+        id to SeLocalItemDataProvider(provider, sessionRef, "Backend")
       }
 
       existingHolderEntities = change {
@@ -162,7 +149,16 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     providerIds: List<SeProviderId>,
   ): Map<SeProviderId, @Nls String> {
     val allProviders = getProviders(sessionRef, dataContextId)
-    return allProviders.filter { providerIds.contains(it.key) }.mapValues { it.value.displayName}
+    return allProviders.filter { providerIds.contains(it.key) }.mapValues { it.value.displayName }
+  }
+
+  suspend fun canBeShownInFindResults(
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId,
+    providerId: SeProviderId,
+  ): Boolean {
+    val provider = getProviders(sessionRef, dataContextId)[providerId] ?: return false
+    return provider.canBeShownInFindResults()
   }
 
   companion object {

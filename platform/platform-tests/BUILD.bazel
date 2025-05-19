@@ -16,10 +16,11 @@ java_library(
 jvm_library(
   name = "tests_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
+  srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
   deps = [
     "//platform/editor-ui-api:editor-ui",
     "//platform/foldings",
+    "//jps/model-api:model",
     "//platform/lang-impl",
     "@lib//:junit4",
     "@lib//:jmock",
@@ -130,6 +131,7 @@ jvm_library(
     "@lib//:kotlinx-collections-immutable",
     "//platform/buildData",
     "@lib//:ktor-server-cio",
+    "//libraries/io",
     "//platform/ui.jcef",
     "@lib//:rhino",
     "//platform/eel-impl",

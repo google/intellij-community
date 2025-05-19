@@ -40,6 +40,7 @@ import com.intellij.util.indexing.diagnostic.IndexStatisticGroup
 import com.intellij.util.indexing.diagnostic.IndexingFileSetStatistics
 import com.intellij.util.indexing.diagnostic.ProjectDumbIndexingHistoryImpl
 import com.intellij.util.indexing.events.FileIndexingRequest
+import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import org.jetbrains.annotations.ApiStatus
@@ -296,7 +297,16 @@ class IndexUpdateRunner(
         //  indexing contributors (See com.intellij.flex.completion.ActionScriptCompletionTest.testSOE which indexes file
         //  out/classes/production/intellij.flex/com/intellij/lang/javascript/flex/library/ECMAScript.js2)
         // ProjectRootManager.isExcluded looks safe enough, but not exactly the same check as done by scanning.
-        val excluded = readAction { ProjectRootManager.getInstance(project).fileIndex.isExcluded(file) }
+        // upd: also, files, registered as non indexable (see WorkspaceFileKind.CONTENT_NON_INDEXABLE) should be skipped during indexing.
+        val workspaceFileIndex = WorkspaceFileIndex.getInstance(project)
+        val excluded = readAction {
+          val isIndexable = workspaceFileIndex.isIndexable(file)
+          val belongsToContentNonIndexable = workspaceFileIndex.findFileSet(file, true, false, includeContentNonIndexableSets = true, false, false, false) != null
+          // We don't want to just exclude all !isIndexable,
+          // because they may be contributed by an indexing contributor while WorkspaceFileIndex is not aware about it.
+          // We only want to exclude the files that are explicitly registered as non indexable.
+          ProjectRootManager.getInstance(project).fileIndex.isExcluded(file) || (!isIndexable && belongsToContentNonIndexable)
+        }
         if (excluded) {
           // respect user: only log file names in debug level
           val fileDebugDetails = if (LOG.isDebugEnabled) file.name else ""
@@ -437,7 +447,7 @@ class IndexUpdateRunner(
      * @see UsedMemorySoftLimiter
      */
     private val SOFT_MAX_TOTAL_BYTES_LOADED_INTO_MEMORY: Long = SystemProperties.getLongProperty(
-      "idea.indexing.total-loaded-file-content-soft-limit-bytes",        
+      "idea.indexing.total-loaded-file-content-soft-limit-bytes",
       INDEXING_PARALLELIZATION * 4L * FileUtilRt.MEGABYTE
     )
 

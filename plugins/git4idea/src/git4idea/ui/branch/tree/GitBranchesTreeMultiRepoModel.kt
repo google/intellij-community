@@ -16,7 +16,7 @@ internal class GitBranchesTreeMultiRepoModel(
   repositories: List<GitRepository>,
   topLevelActions: List<Any>
 ) : GitBranchesTreeModel(project, topLevelActions, repositories) {
-  private val repositoriesNodes = repositories.map { RepositoryNode(it, isLeaf = true) }
+  private val repositoriesNodes = repositoriesFrontendModel.map { RepositoryNode(it, isLeaf = true) }
 
   private val branchesSubtreeSeparator = GitBranchesTreePopupBase.createTreeSeparator()
 
@@ -63,5 +63,5 @@ internal class GitBranchesTreeMultiRepoModel(
   override fun getPreferredSelection(): TreePath? = getPreferredBranch()?.let { createTreePathFor(this, it) }
 
   private fun getPreferredBranch(): GitReference? =
-    getPreferredBranch(project, repositories, null, localBranchesTree, remoteBranchesTree, tagsTree)
+    getPreferredBranch(project, repositoriesFrontendModel, null, localBranchesTree, remoteBranchesTree, tagsTree)
 }

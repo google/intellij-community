@@ -15,10 +15,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
-import kotlin.io.path.extension
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.listDirectoryEntries
-import kotlin.io.path.name
+import kotlin.io.path.*
+import kotlin.streams.asSequence
 
 class HelpIndexer
 @Throws(IOException::class)
@@ -27,64 +25,68 @@ internal constructor(indexDir: String) {
   private val writer: IndexWriter
 
   init {
-    val dir = FSDirectory.open(Paths.get(indexDir))
+    val targetPath = Paths.get(indexDir)
+    //Make sure it's empty
+    targetPath.toFile().deleteRecursively()
+    targetPath.createDirectories()
+
+    val dir = FSDirectory.open(targetPath)
     val config = IndexWriterConfig(analyzer)
     writer = IndexWriter(dir, config)
   }
 
   @Throws(IOException::class)
-  fun indexFileOrDirectory(fileName: String) {
-    val file = Path.of(fileName)
-    val queue = if (Files.isRegularFile(file)) {
-      if (file.extension.lowercase(Locale.getDefault()) in setOf("htm", "html")) listOf(file)
-      else return
-    }
-    else if (Files.isDirectory(file)) {
-      Files.walk(file).use { stream ->
-        stream
-          .filter { it.isRegularFile() }
-          .filter { it.extension.lowercase(Locale.getDefault()) in setOf("htm", "html") }
-          .toList()
-      }
-    }
-    else return
+  fun indexDirectory(dirName: String) {
+    //It's always a directory, there is no chance that the method is called on a file
+    val lineSeparator = System.lineSeparator()
+    val acceptedFiles = setOf("htm", "html")
 
-    for (f in queue) {
-      try {
-        val doc = Document()
-        val parsedDocument = Jsoup.parse(f, "UTF-8")
-
-        val content = StringBuilder()
-        val lineSeparator = System.lineSeparator()
-        val articles = parsedDocument.body().getElementsByClass("article")
-        val title = parsedDocument.title()
-        if (articles.isEmpty()) {
-          if (title.contains("You will be redirected shortly")) {
-            println("Skipping redirect page: $f ")
-          }
-          else if (parsedDocument.body().attr("data-template") == "section-page") {
-            println("Skipping section page: $f")
-          }
-          else {
-            System.err.println("Could not add: $f because no `<article>` found. Title is '$title'")
-          }
-          continue
+    Files.walk(Path.of(dirName)).use { stream ->
+      stream
+        .filter {
+          it.isRegularFile() &&
+          it.extension.lowercase(Locale.getDefault()) in acceptedFiles
         }
-        @Suppress("SpellCheckingInspection")
-        articles[0].children()
-          .filterNot { it.hasAttr("data-swiftype-index") }
-          .forEach { content.append(it.text()).append(lineSeparator) }
+        .asSequence()
+        .forEach { file ->
+          try {
+            val docIndex = Document()
+            val parsedDocument = Jsoup.parse(file, "UTF-8")
 
-        doc.add(TextField("contents", content.toString(), Field.Store.YES))
-        doc.add(StringField("filename", f.name, Field.Store.YES))
-        doc.add(StringField("title", title, Field.Store.YES))
+            if (parsedDocument.select("meta[http-equiv=refresh]").isNotEmpty()) {
+              println("Skipping redirect page: $file")
+              return@forEach
+            }
 
-        writer.addDocument(doc)
-        println("Added: $f")
-      }
-      catch (e: Throwable) {
-        System.err.println("Could not add: $f because ${e.message}")
-      }
+            if (parsedDocument.body().attr("data-template") == "section-page") {
+              println("Skipping section page: $file")
+              return@forEach
+            }
+
+            val article = parsedDocument.body().getElementsByClass("article").first()
+
+            if (article == null) {
+              println("Skipping: $file because no `<article>` elements are found.")
+              return@forEach
+            }
+
+            docIndex.add(TextField("contents",
+                                   article.children().joinToString(lineSeparator) { it.text() },
+                                   Field.Store.YES))
+            docIndex.add(StringField("filename",
+                                     file.name,
+                                     Field.Store.YES))
+            docIndex.add(StringField("title",
+                                     parsedDocument.title(),
+                                     Field.Store.YES))
+
+            writer.addDocument(docIndex)
+            println("Added: $file")
+          }
+          catch (e: Throwable) {
+            System.err.println("Could not add: $file because ${e.message}")
+          }
+        }
     }
   }
 
@@ -98,40 +100,16 @@ internal constructor(indexDir: String) {
 
     private fun doIndex(dirToStore: String, dirToIndex: String) {
       val indexer = HelpIndexer(dirToStore)
-      indexer.indexFileOrDirectory(dirToIndex)
+      indexer.indexDirectory(dirToIndex)
       indexer.closeIndex()
+      //Store the list of generated files for the search to work
+      Path.of(dirToStore, "rlist")
+        .writeLines(Path.of(dirToStore).walk().map { it.name })
     }
 
     @Throws(IOException::class)
     @JvmStatic
     fun main(args: Array<String>) {
-      @Suppress("SpellCheckingInspection")
-      val tokens = listOf(
-        "<noscript><iframe src=\"//www.googletagmanager.com/ns.html?id=GTM-5P98\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>",
-        "</script><script src=\"/help/app/v2/analytics.js\"></script>",
-        "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':",
-        "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],",
-        "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=",
-        "'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);",
-        "})(window,document,'script','dataLayer','GTM-5P98');")
-
-      val files = Paths.get(args[1]).listDirectoryEntries("*.html")
-      files.forEach {
-        val original = Files.readString(it, Charsets.UTF_8)
-        var contents = original
-        for (token in tokens) {
-          contents = contents.replace(token, "")
-        }
-        contents = contents.replace("//resources.jetbrains.com/storage/help-app/", "/help/")
-        if (contents != original) {
-          println("Removed analytics code from ${it.name}")
-          Files.writeString(it, contents, Charsets.UTF_8)
-        }
-        else {
-          println("No analytics code to remove from ${it.name}")
-        }
-      }
-
       doIndex(args[0], args[1])
     }
   }

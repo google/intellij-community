@@ -713,6 +713,11 @@
         <separator/>
         <reference ref="SearchEverywhere"/>
         <separator/>
+        <group id="GoToTargetEx">
+          <action id="GotoFile" class="com.intellij.ide.actions.GotoFileAction">
+            <override-text place="MainMenu"/>
+          </action>
+        </group>
         <action id="GotoLine" class="com.intellij.ide.actions.GotoLineAction">
           <override-text place="MainMenu"/>
           <override-text place="EditorPopup" use-text-of-place="MainMenu"/>
@@ -943,6 +948,7 @@
     <group id="EditorTabsEntryPoint" popup="true" icon="AllIcons.Actions.More">
       <reference ref="RecentFilesFallback"/>
       <reference ref="RecentLocations"/>
+      <reference ref="GotoFile"/>
       <separator/>
       <reference ref="CloseAllEditors"/>
       <reference ref="ReopenClosedTab"/>
@@ -1403,6 +1409,7 @@
                 class="com.intellij.openapi.wm.impl.status.AddRandomNamesTestProcessAction"/>
         <action id="AddManyTestProcesses" internal="true" class="com.intellij.openapi.wm.impl.status.AddManyTestProcesses"/>
         <action id="WriteActionUnderProgress" internal="true" class="com.intellij.internal.TestWriteActionUnderProgress"/>
+        <action id="LongBackgroundWriteAction" internal="true" class="com.intellij.internal.LongBackgroundWriteAction"/>
         <action id="TestProgressWindow" internal="true" class="com.intellij.internal.TestProgressWindow"/>
         <action id="TestCoroutineProgress" internal="true" class="com.intellij.internal.TestCoroutineProgressAction"/>
         <separator/>
@@ -1773,9 +1780,13 @@
     </group>
     <action internal="true" id="ShowUsageFeatures" class="com.intellij.usages.similarity.internal.ShowUsageFeaturesInternalAction"/>
 
+    <action text="Show Workspace File State" id="ShowWorkspaceFileState" class="com.intellij.workspaceModel.ide.ShowWorkspaceFileStateAction" internal="true"/>
+
     <!-- copy of CheckVfsSanityInMenu: !internal so could be invoked via 'search everywhere' -->
     <action id="CheckVfsSanity" class="com.intellij.openapi.vfs.newvfs.persistent.CheckVFSHealthAction"/>
     <action id="PaintEditorLineStripeComponentAction" class="com.intellij.codeInsight.editorLineStripeHint.PaintEditorLineStripeHintComponentAction" internal="true"/>
+    <action id="ShowInlineCompletionStatistics" internal="true"
+            class="com.intellij.codeInsight.inline.completion.statistics.ShowCompletionLocalStatisticsAction"/>
     
     <group id="CustomizeMainToolbarGroup" popup="true" searchable="false">
       <action id="CustomizeMainToolbarAction" class="com.intellij.ide.actions.CustomizeMainToolbarAction"/>

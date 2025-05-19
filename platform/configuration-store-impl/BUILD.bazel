@@ -15,6 +15,7 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/util",
     "//platform/core-api:core",
     "//platform/platform-api:ide",
@@ -42,6 +43,7 @@ jvm_library(
     "//platform/backend/workspace",
     "//platform/settings",
     "@lib//:kotlinx-serialization-core",
+    "//platform/workspace/storage",
     "@lib//:kotlinx-serialization-json",
   ],
   runtime_deps = [":configurationStore-impl_resources"]
@@ -72,6 +74,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//platform/ide-core/plugins",
     "@lib//:assert_j",
+    "//jps/model-api:model",
     "//platform/testFramework/extensions:testExtensions",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",

@@ -21,6 +21,7 @@ jvm_library(
   deps = [
     "@lib//:junit4",
     "//platform/editor-ui-api:editor-ui",
+    "//jps/model-api:model",
     "//platform/refactoring",
     "//platform/structure-view-impl:structureView-impl",
     "//java/testFramework",
@@ -52,6 +53,7 @@ jvm_library(
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//images/backend.svg",
+    "//platform/webSymbols:webSymbols-testFramework",
   ],
   runtime_deps = [
     ":tests_test_resources",

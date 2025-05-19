@@ -1,9 +1,8 @@
 package com.jetbrains.python
 
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.EelPlatform
-import com.intellij.platform.eel.getOr
+import com.intellij.platform.eel.ExecuteProcessException
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.EelProcessExecutionResult
 import com.intellij.platform.eel.provider.utils.exec
@@ -59,18 +58,20 @@ private suspend fun PythonBinary.executeWithResult(vararg args: String): Result<
     else {
       Result.success(output)
     }
-  } catch (e : EelExecApi.ExecuteProcessException) {
+  } catch (e : ExecuteProcessException) {
     return failure(e.message)
   }
 }
 
 @RequiresBackgroundThread
+@ApiStatus.Internal
 fun PythonBinary.resolvePythonHome(): PythonHomePath = when (getEelDescriptor().platform) {
   is EelPlatform.Windows -> parent.takeIf { it.name.lowercase() != "scripts" } ?: parent.parent
   is EelPlatform.Posix -> parent.takeIf { it.name != "bin" } ?: parent.parent
 }
 
 @RequiresBackgroundThread
+@ApiStatus.Internal
 fun PythonHomePath.resolvePythonBinary(): PythonBinary? {
   return VirtualEnvReader(isWindows = getEelDescriptor().platform is EelPlatform.Windows).findPythonInPythonRoot(this)
 }

@@ -37,10 +37,7 @@ import com.intellij.openapi.extensions.impl.createExtensionPoints
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.*
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Condition
-import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.IntellijInternalApi
-import com.intellij.openapi.util.UserDataHolderBase
+import com.intellij.openapi.util.*
 import com.intellij.platform.instanceContainer.internal.*
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.concurrency.ThreadingAssertions
@@ -53,7 +50,6 @@ import com.intellij.util.messages.impl.*
 import com.intellij.util.runSuppressing
 import kotlinx.coroutines.*
 import kotlinx.coroutines.internal.intellij.IntellijCoroutines
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import org.picocontainer.ComponentAdapter
@@ -125,7 +121,7 @@ abstract class ComponentManagerImpl(
   companion object {
     @Internal
     @JvmField
-    val fakeCorePluginDescriptor = DefaultPluginDescriptor(PluginManagerCore.CORE_ID, null)
+    val fakeCorePluginDescriptor: DefaultPluginDescriptor = DefaultPluginDescriptor(PluginManagerCore.CORE_ID, null)
 
     @Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
     @Internal
@@ -157,12 +153,13 @@ abstract class ComponentManagerImpl(
             else -> holder.getInstanceInCallerContext(keyClass = null)
           }
         }
-        catch (ce: CancellationException) {
+        catch (@Suppress("IncorrectCancellationExceptionHandling") ce: CancellationException) {
           currentCoroutineContext().ensureActive()
-          LOG.error("Cannot create ${holder}", ce)
+          @Suppress("IncorrectCancellationExceptionHandling")
+          LOG.error("Cannot create $holder", ce)
         }
         catch (t: Throwable) {
-          LOG.error("Cannot create ${holder}", t)
+          LOG.error("Cannot create $holder", t)
         }
       }
     }
@@ -216,9 +213,11 @@ abstract class ComponentManagerImpl(
   }
 
   @Suppress("LeakingThis")
+  @JvmField
   internal val dependencyResolver = ComponentManagerResolver(this)
 
-  protected val containerState = AtomicReference(ContainerState.PRE_INIT)
+  @JvmField
+  protected val containerState: AtomicReference<ContainerState> = AtomicReference(ContainerState.PRE_INIT)
 
   protected val containerStateName: String
     get() = containerState.get().name
@@ -230,14 +229,13 @@ abstract class ComponentManagerImpl(
   @Volatile
   private var isServicePreloadingCancelled = false
 
-  override fun debugString(): String {
-    return debugString(short = true)
-  }
+  override fun debugString(): String = debugString(short = true)
 
   protected open fun debugString(short: Boolean = false): String {
     return "${if (short) javaClass.simpleName else javaClass.name}@${System.identityHashCode(this)}"
   }
 
+  @JvmField
   internal val serviceParentDisposable: Disposable = Disposer.newDisposable("services of ${debugString()}")
 
   protected open val isLightServiceSupported: Boolean
@@ -251,6 +249,7 @@ abstract class ComponentManagerImpl(
   @JvmField
   internal var componentContainerIsReadonly: String? = null
 
+  @Suppress("UsagesOfObsoleteApi")
   final override fun getCoroutineScope(): CoroutineScope {
     if (parent?.parent == null) {
       return scopeHolder.containerScope
@@ -261,11 +260,9 @@ abstract class ComponentManagerImpl(
   }
 
   override val componentStore: IComponentStore
-    get() = getService(IComponentStore::class.java)
-            ?: error("Cannot get service: ${IComponentStore::class.java.name}")
-
-  @Suppress("FunctionName")
-  open suspend fun _getComponentStore(): IComponentStore = getServiceAsync(IComponentStore::class.java)
+    get() {
+      return getService(IComponentStore::class.java) ?: error("Cannot get service: ${IComponentStore::class.java.name}")
+    }
 
   internal fun getComponentInstance(componentKey: Any): Any? {
     assertComponentsSupported()
@@ -438,7 +435,7 @@ abstract class ComponentManagerImpl(
                                        containerDescriptor: ContainerDescriptor,
                                        headless: Boolean) {
     val components = containerDescriptor.components
-    if (components.isNullOrEmpty()) {
+    if (components.isEmpty()) {
       return
     }
 
@@ -523,20 +520,6 @@ abstract class ComponentManagerImpl(
     activity?.end()
 
     LOG.assertTrue(containerState.compareAndSet(ContainerState.PRE_INIT, ContainerState.COMPONENT_CREATED))
-  }
-
-  @TestOnly
-  fun registerComponentImplementation(key: Class<*>, implementation: Class<*>, shouldBeRegistered: Boolean) {
-    val oldHolder = checkState {
-      componentContainer.getInstanceHolder(keyClass = key)
-    }
-    val oldClassLoader = oldHolder?.instanceClass()?.classLoader as? PluginAwareClassLoader
-    val pluginId = oldClassLoader?.pluginId ?: PluginId.getId("test registerComponentImplementation")
-    componentContainer.registerInitializer(
-      keyClass = key,
-      initializer = ComponentClassInstanceInitializer(this, pluginId, key, implementation),
-      override = shouldBeRegistered,
-    )
   }
 
   @TestOnly
@@ -649,7 +632,7 @@ abstract class ComponentManagerImpl(
     if ((serviceDescriptor == null || !isPreInitialized(component)) &&
         (component is PersistentStateComponent<*> ||
          component is SettingsSavingComponent ||
-         component is com.intellij.openapi.util.JDOMExternalizable)) {
+         component is JDOMExternalizable)) {
       check(canBeInitOutOfOrder(component) || componentStore.isStoreInitialized || getApplication()!!.isUnitTestMode) {
         "You cannot get $component before component store is initialized"
       }
@@ -990,7 +973,7 @@ abstract class ComponentManagerImpl(
     }
   }
 
-  final override fun createError(message: String, pluginId: PluginId) = PluginException(message, pluginId)
+  final override fun createError(message: String, pluginId: PluginId): PluginException = PluginException(message, pluginId)
 
   final override fun createError(message: String,
                                  error: Throwable?,
@@ -1332,8 +1315,8 @@ abstract class ComponentManagerImpl(
     }
   }
 
-  // project level extension requires Project as constructor argument, so, for now, constructor injection is disabled only for app level
-  final override fun isInjectionForExtensionSupported() = parent != null
+  // project level extension requires Project as a constructor argument, so, for now, constructor injection is disabled only for app level
+  final override fun isInjectionForExtensionSupported(): Boolean = parent != null
 
   private fun getHolderOfType(componentType: Class<*>): InstanceHolder? {
     for (holder in componentContainer.instanceHolders()) {
@@ -1710,6 +1693,7 @@ private class NestedBlockingEventLoop(override val thread: Thread) : EventLoopIm
   override fun shouldBeProcessedFromContext(): Boolean = true
 }
 
-@ApiStatus.Internal
-fun ComponentManager.getComponentManagerImpl(): ComponentManagerImpl =
-  (this as ComponentManagerEx).getMutableComponentContainer() as ComponentManagerImpl
+@Internal
+fun ComponentManager.getComponentManagerImpl(): ComponentManagerImpl {
+  return (this as ComponentManagerEx).getMutableComponentContainer() as ComponentManagerImpl
+}

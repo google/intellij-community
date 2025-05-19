@@ -1,9 +1,11 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.vcs.git.shared.repo
 
+import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.project.projectId
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.platform.vcs.impl.shared.rpc.RepositoryId
@@ -60,13 +62,7 @@ class GitRepositoriesFrontendHolder(
     initLock.withLock {
       if (initialized) return
 
-      val syncScope = cs.childScope("Git repository state synchronization")
-
-      GitRepositoryApi.getInstance().getRepositories(project.projectId()).forEach {
-        repositories[it.repositoryId] = convertToRepositoryInfo(it)
-      }
-
-      syncScope.launch {
+      cs.childScope("Git repository state synchronization").launch {
         GitRepositoryApi.getInstance().getRepositoriesEvents(project.projectId()).collect { event ->
           LOG.debug("Received repository event: $event")
 
@@ -89,11 +85,23 @@ class GitRepositoriesFrontendHolder(
                 info
               }
             }
+            is GitRepositoryEvent.TagsLoaded -> {
+              repositories.computeIfPresent(event.repositoryId) { k, info ->
+                info.state = event.newState
+                info
+              }
+            }
           }
 
+          // TODO better more granular update
           widgetUpdateFlow.tryEmit(Unit)
         }
       }
+
+      val initialRecord = GitRepositoryApi.getInstance().getRepositories(project.projectId()).map { repositoryDto ->
+        repositoryDto.repositoryId to convertToRepositoryInfo(repositoryDto)
+      }
+      repositories.putAll(initialRecord)
 
       initialized = true
     }
@@ -119,4 +127,9 @@ private class GitRepositoryFrontendModelImpl(
   override val shortName: String,
   override var state: GitRepositoryState,
   override var favoriteRefs: GitFavoriteRefs,
-): GitRepositoryFrontendModel
+): GitRepositoryFrontendModel {
+  override val root: VirtualFile by lazy {
+    repositoryId.rootPath.virtualFile()
+    ?: error("Cannot deserialize virtual file for repository root $repositoryId")
+  }
+}

@@ -57,7 +57,9 @@ internal class FrontendEditorLinesBreakpointsInfoManager(private val project: Pr
     cs.launch {
       readAction {
         for (editor in EditorFactory.getInstance().allEditors) {
-          putNewLinesInfoMap(editor)
+          if (editor.project == project) {
+            putNewLinesInfoMap(editor)
+          }
         }
       }
       // dispose editors that were disposed during map initialization to prevent races with the listener
@@ -168,6 +170,9 @@ private class EditorBreakpointLinesInfoMap(
 
   private suspend fun Editor.viewportIndicesInclusive(): Pair<Int, Int> {
     return withContext(Dispatchers.EDT) {
+      if (isDisposed) {
+        cancel()
+      }
       val visibleRange = calculateVisibleRange()
       readAction {
         val firstVisibleLine = document.getLineNumber(visibleRange.startOffset)

@@ -6955,6 +6955,21 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
         public void testAfterThrow() throws Exception {
             runTest("testData/inspectionsLocal/kotlinUnreachableCode/afterThrow.kt");
         }
+
+        @TestMetadata("returnReturn.kt")
+        public void testReturnReturn() throws Exception {
+            runTest("testData/inspectionsLocal/kotlinUnreachableCode/returnReturn.kt");
+        }
+
+        @TestMetadata("returnTryReturn.kt")
+        public void testReturnTryReturn() throws Exception {
+            runTest("testData/inspectionsLocal/kotlinUnreachableCode/returnTryReturn.kt");
+        }
+
+        @TestMetadata("throwThrowThrow.kt")
+        public void testThrowThrowThrow() throws Exception {
+            runTest("testData/inspectionsLocal/kotlinUnreachableCode/throwThrowThrow.kt");
+        }
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
@@ -17720,6 +17735,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             public void testSecondaryConstructorUnused() throws Exception {
                 runTest("testData/inspectionsLocal/unusedSymbol/multifile/secondaryConstructorUnused.kt");
             }
+
+            @TestMetadata("textUsagesClass.kt")
+            public void testTextUsagesClass() throws Exception {
+                runTest("testData/inspectionsLocal/unusedSymbol/multifile/textUsagesClass.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
@@ -18215,6 +18235,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/unusedSymbol/suppressedClass.kt");
             }
 
+            @TestMetadata("textUsages.kt")
+            public void testTextUsages() throws Exception {
+                runTest("testData/inspectionsLocal/unusedSymbol/textUsages.kt");
+            }
+
             @TestMetadata("typeAlias.kt")
             public void testTypeAlias() throws Exception {
                 runTest("testData/inspectionsLocal/unusedSymbol/typeAlias.kt");
@@ -18491,6 +18516,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             @TestMetadata("intAndDouble.kt")
             public void testIntAndDouble() throws Exception {
                 runTest("testData/inspectionsLocal/unusedUnaryOperator/moveToPrevLine/intAndDouble.kt");
+            }
+
+            @TestMetadata("outOfApplicabilityRange.kt")
+            public void testOutOfApplicabilityRange() throws Exception {
+                runTest("testData/inspectionsLocal/unusedUnaryOperator/moveToPrevLine/outOfApplicabilityRange.kt");
             }
         }
 

@@ -34,6 +34,8 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-jvm",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "@lib//:kotlinx-coroutines-core",
+    "//jps/model-api:model",
+    "//platform/workspace/storage",
     "//plugins/kotlin/base/compiler-configuration",
     "//platform/util/progress",
     "//plugins/kotlin/base/frontend-agnostic",
@@ -66,12 +68,6 @@ jvm_library(
     "//java/idea-ui:ui",
     "@lib//:kotlinc-kotlin-scripting-dependencies",
     "//plugins/kotlin/scripting",
-    "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
-    "@lib//:slf4j-api",
-  ],
-  exports = [
-    "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
-    "@lib//:slf4j-api",
   ],
   runtime_deps = [":scripting_resources"]
 )
@@ -94,6 +90,8 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:junit5",
+    "//jps/model-api:model",
+    "//platform/workspace/storage",
     "//plugins/kotlin/base/compiler-configuration",
     "//platform/util/progress",
     "//plugins/kotlin/base/frontend-agnostic",
@@ -131,8 +129,6 @@ jvm_library(
     "//java/idea-ui:ui",
     "@lib//:kotlinc-kotlin-scripting-dependencies",
     "//plugins/kotlin/scripting",
-    "@lib//:kotlin-base-scripting-amper-dependency-resolution-kotlin-base-scripting",
-    "@lib//:slf4j-api",
   ],
   runtime_deps = [":scripting_resources"]
 )

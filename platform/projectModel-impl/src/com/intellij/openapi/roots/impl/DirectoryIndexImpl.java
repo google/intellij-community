@@ -122,16 +122,16 @@ public final class DirectoryIndexImpl extends DirectoryIndex implements Disposab
   }
 
   @Override
-  public String getPackageName(@NotNull VirtualFile dir) {
+  public String getPackageName(@NotNull VirtualFile fileOrDir) {
     checkAvailability();
-    return myWorkspaceFileIndex.getPackageName(dir);
+    return myWorkspaceFileIndex.getPackageName(fileOrDir);
   }
 
   @Override
   public @NotNull List<OrderEntry> getOrderEntries(@NotNull VirtualFile fileOrDir) {
     checkAvailability();
     if (myProject.isDefault()) return Collections.emptyList();
-    WorkspaceFileInternalInfo fileInfo = myWorkspaceFileIndex.getFileInfo(fileOrDir, true, true, true, true, false);
+    WorkspaceFileInternalInfo fileInfo = myWorkspaceFileIndex.getFileInfo(fileOrDir, true, true, true, true, true, false);
     WorkspaceFileSetWithCustomData<?> fileSet = fileInfo.findFileSet(data -> true);
     if (fileSet == null) return Collections.emptyList();
     return getRootIndex().getOrderEntries(fileSet.getRoot());

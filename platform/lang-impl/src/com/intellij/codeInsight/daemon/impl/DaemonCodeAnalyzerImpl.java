@@ -24,10 +24,7 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.notebook.editor.BackedVirtualFile;
 import com.intellij.notebook.editor.BackedVirtualFileProvider;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.AccessToken;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.components.PersistentStateComponent;
@@ -215,10 +212,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   }
 
   @TestOnly
-  public @NotNull List<HighlightInfo> getFileLevelHighlights(@NotNull Project project, @NotNull PsiFile file) {
-    assertMyFile(file.getProject(), file);
-    assertMyFile(project, file);
-    VirtualFile vFile = file.getViewProvider().getVirtualFile();
+  public @NotNull List<HighlightInfo> getFileLevelHighlights(@NotNull Project project, @NotNull PsiFile psiFile) {
+    assertMyFile(psiFile.getProject(), psiFile);
+    assertMyFile(project, psiFile);
+    VirtualFile vFile = psiFile.getViewProvider().getVirtualFile();
     List<HighlightInfo> list = new ArrayList<>();
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       List<HighlightInfo> data = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
@@ -229,12 +226,12 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     return list;
   }
 
-  private void assertMyFile(@NotNull Project project, @NotNull PsiFile file) {
+  private void assertMyFile(@NotNull Project project, @NotNull PsiFile psiFile) {
     if (project != myProject) {
       throw new IllegalStateException("my project is " + myProject + " but I was called with " + project);
     }
-    if (file.getProject() != myProject) {
-      throw new IllegalStateException("my project is " + myProject + " but I was called with file " + file + " from " + file.getProject());
+    if (psiFile.getProject() != myProject) {
+      throw new IllegalStateException("my project is " + myProject + " but I was called with file " + psiFile + " from " + psiFile.getProject());
     }
   }
 
@@ -452,11 +449,11 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     }
   }
 
-  static void repaintErrorStripeAndIcon(@NotNull Editor editor, @NotNull Project project, @Nullable PsiFile file) {
+  static void repaintErrorStripeAndIcon(@NotNull Editor editor, @NotNull Project project, @Nullable PsiFile psiFile) {
     MarkupModel markup = editor.getMarkupModel();
     if (markup instanceof EditorMarkupModelImpl editorMarkup) {
       editorMarkup.repaintTrafficLightIcon();
-      ErrorStripeUpdateManager.getInstance(project).launchRepaintErrorStripePanel(editor, file);
+      ErrorStripeUpdateManager.getInstance(project).launchRepaintErrorStripePanel(editor, psiFile);
     }
   }
 
@@ -518,7 +515,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
    */
   @TestOnly
   @ApiStatus.Internal
-  public void runPasses(@NotNull PsiFile file,
+  public void runPasses(@NotNull PsiFile psiFile,
                         @NotNull Document document,
                         @NotNull TextEditor textEditor,
                         int @NotNull [] passesToIgnore,
@@ -526,10 +523,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
                         @Nullable Runnable callbackWhileWaiting) throws Exception {
     ThreadingAssertions.assertEventDispatchThread();
     assert !myDisposed;
-    PsiUtilCore.ensureValid(file);
-    assertMyFile(file.getProject(), file);
+    PsiUtilCore.ensureValid(psiFile);
+    assertMyFile(psiFile.getProject(), psiFile);
     assert textEditor.getEditor().getDocument() == document : "Expected document "+document+" but one of the passed TextEditors points to a different document: "+textEditor.getEditor().getDocument();
-    Document associatedDocument = PsiDocumentManager.getInstance(myProject).getDocument(file);
+    Document associatedDocument = PsiDocumentManager.getInstance(myProject).getDocument(psiFile);
     assert associatedDocument == document : "Expected document " + document + " but the passed PsiFile points to a different document: " + associatedDocument;
     if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
       throw new IllegalStateException("Must not start highlighting from within write action, or deadlock is imminent");
@@ -559,7 +556,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     // previous passes can be canceled but still in flight. wait for them to avoid interference
     myPassExecutorService.cancelAll(false, "DaemonCodeAnalyzerImpl.runPasses");
 
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(file); // todo IJPL-339 ???
+    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile); // todo IJPL-339 ???
 
     waitForUpdateFileStatusBackgroundQueueInTests(); // update the file status map before prohibiting its modifications
     FileStatusMap fileStatusMap = getFileStatusMap();
@@ -768,9 +765,9 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   }
 
   @Override
-  public void setImportHintsEnabled(@NotNull PsiFile file, boolean value) {
-    assertMyFile(file.getProject(), file);
-    VirtualFile vFile = file.getVirtualFile();
+  public void setImportHintsEnabled(@NotNull PsiFile psiFile, boolean value) {
+    assertMyFile(psiFile.getProject(), psiFile);
+    VirtualFile vFile = psiFile.getVirtualFile();
     if (value) {
       myDisabledHintsFiles.remove(vFile);
       stopProcess(true, "Import hints change");
@@ -993,6 +990,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     if (LOG.isTraceEnabled()) {
       LOG.trace("scheduleUpdateRunnable("+TimeUnit.NANOSECONDS.toMillis(delayNanos)+"ms); oldFuture="+oldFuture+"; isDone="+oldFuture.isDone());
     }
+    Application application = ApplicationManager.getApplication();
+    if (application == null || application.isDisposed()) {
+      return;
+    }
     if (oldFuture.isDone()) {
       // schedule `manifest` into a separate call to avoid breaking the current stack with an exception from the previous execution
       ApplicationManager.getApplication().invokeLater(() -> ConcurrencyUtil.manifestExceptionsIn(oldFuture));
@@ -1119,11 +1120,11 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @ApiStatus.Internal
   @ApiStatus.Experimental
-  public static void waitForLazyQuickFixesUnderCaret(@NotNull PsiFile file, @NotNull Editor editor) {
+  public static void waitForLazyQuickFixesUnderCaret(@NotNull PsiFile psiFile, @NotNull Editor editor) {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
     ThreadingAssertions.assertNoOwnReadAccess();
     List<HighlightInfo> relevantInfos = new ArrayList<>();
-    Project project = file.getProject();
+    Project project = psiFile.getProject();
     ReadAction.run(() -> {
       PsiUtilBase.assertEditorAndProjectConsistent(project, editor);
       CaretModel caretModel = editor.getCaretModel();
@@ -1147,7 +1148,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
       });
     });
     for (HighlightInfo info : relevantInfos) {
-      LazyQuickFixUpdater.getInstance(project).waitQuickFixesSynchronously(file, editor, info);
+      LazyQuickFixUpdater.getInstance(project).waitQuickFixesSynchronously(psiFile, editor, info);
     }
   }
 

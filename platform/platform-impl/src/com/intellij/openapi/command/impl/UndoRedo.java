@@ -21,13 +21,13 @@ import java.util.function.Predicate;
 
 abstract class UndoRedo {
   protected final UndoManagerImpl myManager;
-  protected final UndoManagerImpl.ClientState myState;
+  protected final UndoClientState myState;
   protected final FileEditor myEditor;
   protected final UndoableGroup myUndoableGroup;
 
-  protected UndoRedo(UndoManagerImpl.ClientState state, FileEditor editor) {
+  protected UndoRedo(UndoClientState state, FileEditor editor) {
     myState = state;
-    myManager = state.myManager;
+    myManager = state.getUndoManager();
     myEditor = editor;
     myUndoableGroup = getLastAction();
   }
@@ -49,7 +49,7 @@ abstract class UndoRedo {
   }
 
   Collection<DocumentReference> getDocRefs() {
-    return myEditor == null ? Collections.emptySet() : UndoManagerImpl.getDocumentReferences(myEditor);
+    return myEditor == null ? Collections.emptySet() : UndoDocumentUtil.getDocumentReferences(myEditor);
   }
 
   protected abstract UndoRedoStacksHolder getStacksHolder();
@@ -98,7 +98,7 @@ abstract class UndoRedo {
       }
     }
 
-    if (!disableConfirmation && myUndoableGroup.shouldAskConfirmation(isRedo()) && !UndoManagerImpl.ourNeverAskUser) {
+    if (!disableConfirmation && myUndoableGroup.shouldAskConfirmation(isRedo()) && !isNeverAskUser()) {
       if (!askUser()) return false;
     }
     else {
@@ -293,5 +293,10 @@ abstract class UndoRedo {
   public boolean isBlockedByOtherChanges() {
     return myUndoableGroup.isGlobal() && myUndoableGroup.isUndoable() &&
            !getStacksHolder().collectClashingActions(myUndoableGroup).isEmpty();
+  }
+
+  private static boolean isNeverAskUser() {
+    //noinspection TestOnlyProblems
+    return UndoManagerImpl.ourNeverAskUser;
   }
 }

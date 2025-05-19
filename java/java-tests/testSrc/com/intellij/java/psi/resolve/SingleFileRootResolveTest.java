@@ -2,6 +2,7 @@
 package com.intellij.java.psi.resolve;
 
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ResourceFileUtil;
 import com.intellij.openapi.roots.ContentEntry;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.PackageIndex;
@@ -18,6 +19,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.List;
+import java.util.stream.Stream;
 
 public final class SingleFileRootResolveTest extends LightJavaCodeInsightFixtureTestCase {
   private final @NotNull LightProjectDescriptor MY_DESCRIPTOR = new LightProjectDescriptor() {
@@ -68,7 +71,7 @@ public final class SingleFileRootResolveTest extends LightJavaCodeInsightFixture
     PsiClass aClass = JavaPsiFacade.getInstance(getProject()).findClass("com.example.A", GlobalSearchScope.projectScope(getProject()));
     assertNotNull(aClass);
     // Works for single-file roots as well
-    String pkg = PackageIndex.getInstance(getProject()).getPackageNameByDirectory(aClass.getContainingFile().getVirtualFile());
+    String pkg = PackageIndex.getInstance(getProject()).getPackageName(aClass.getContainingFile().getVirtualFile());
     assertEquals("com.example", pkg);
   }
   
@@ -85,5 +88,21 @@ public final class SingleFileRootResolveTest extends LightJavaCodeInsightFixture
     PsiJavaCodeReferenceElement ref = assertInstanceOf(element, PsiJavaCodeReferenceElement.class);
     PsiTypeElement typeElement = assertInstanceOf(ref.getParent(), PsiTypeElement.class);
     assertInstanceOf(typeElement.getParent(), PsiField.class);
+  }
+  
+  public void testFindResource() throws IOException {
+    VirtualFile cFile = ResourceFileUtil.findResourceFileInProject(getProject(), "com/example/C.java");
+    assertNotNull(cFile);
+    assertEquals("package com.example;\nclass C {}\n", new String(cFile.contentsToByteArray(), StandardCharsets.UTF_8));
+    VirtualFile bFile = ResourceFileUtil.findResourceFileInProject(getProject(), "com/example/B.java");
+    assertNull(bFile);
+  }
+  
+  public void testGetFiles() {
+    PsiPackage psiPackage = JavaPsiFacade.getInstance(getProject()).findPackage("com.example");
+    assertNotNull(psiPackage);
+    List<String> fileNames = Stream.of(psiPackage.getFiles(GlobalSearchScope.projectScope(getProject())))
+      .map(f -> f.getName()).sorted().toList();
+    assertEquals(List.of("A.java", "C.java"), fileNames);
   }
 }

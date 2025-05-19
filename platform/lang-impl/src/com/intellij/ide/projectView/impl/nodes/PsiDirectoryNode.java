@@ -90,6 +90,7 @@ public class PsiDirectoryNode extends BasePsiNode<PsiDirectory> implements Navig
     assert psiDirectory != null : this;
     VirtualFile directoryFile = psiDirectory.getVirtualFile();
     Object parentValue = getParentValue();
+    data.setTooltip(null);
     synchronized (chain) {
       if (chain.isEmpty()) {
         VirtualFile ancestor = getVirtualFile(parentValue);
@@ -149,16 +150,9 @@ public class PsiDirectoryNode extends BasePsiNode<PsiDirectory> implements Navig
       }
     }
 
-    String name = parentValue instanceof Project
-                  ? psiDirectory.getVirtualFile().getPresentableUrl()
-                  : ProjectViewDirectoryHelper.getInstance(psiDirectory.getProject()).getNodeName(getSettings(), parentValue, psiDirectory);
-    if (name == null) {
-      setValue(null);
-      return;
-    }
-
+    String name = ProjectViewDirectoryHelper.getInstance(psiDirectory.getProject()).getNodeName(getSettings(), parentValue, psiDirectory);
     data.setPresentableText(name);
-    data.setLocationString(ProjectViewDirectoryHelper.getInstance(project).getLocationString(psiDirectory, false, false));
+    data.setLocationString(ProjectViewDirectoryHelper.getInstance(project).getLocationString(psiDirectory, parentValue instanceof Project, false));
 
     setupIcon(data, psiDirectory);
   }

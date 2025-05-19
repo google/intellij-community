@@ -18,9 +18,8 @@ import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 
-
-abstract class BaseGotoNextErrorAction extends BaseCodeInsightAction implements ActionRemoteBehaviorSpecification, DumbAware {
-
+@Internal
+public abstract class BaseGotoNextErrorAction extends BaseCodeInsightAction implements ActionRemoteBehaviorSpecification, DumbAware {
   private final boolean goForward;
 
   BaseGotoNextErrorAction(boolean goForward) {
@@ -50,8 +49,8 @@ abstract class BaseGotoNextErrorAction extends BaseCodeInsightAction implements 
   }
 
   @Override
-  protected boolean isValidForFile(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile file) {
-    return DaemonCodeAnalyzer.getInstance(project).isHighlightingAvailable(file);
+  protected boolean isValidForFile(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
+    return DaemonCodeAnalyzer.getInstance(project).isHighlightingAvailable(psiFile);
   }
 
   @Internal

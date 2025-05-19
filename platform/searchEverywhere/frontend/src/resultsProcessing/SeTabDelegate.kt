@@ -11,9 +11,9 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.platform.project.projectId
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.frontend.SeFrontendItemDataProvider
-import com.intellij.platform.searchEverywhere.frontend.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.frontend.utils.suspendLazy
 import com.intellij.platform.searchEverywhere.impl.SeRemoteApi
+import com.intellij.platform.searchEverywhere.providers.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
@@ -65,6 +65,15 @@ class SeTabDelegate(val project: Project?,
   suspend fun itemSelected(itemData: SeItemData, modifiers: Int, searchText: String): Boolean {
     val provider = providers.getValue()[itemData.providerId] ?: return false
     return provider.itemSelected(itemData, modifiers, searchText)
+  }
+
+  fun getProvidersIds() : List<SeProviderId> = providerIds
+
+  /**
+   * Defines if results can be shown in <i>Find</i> toolwindow.
+   */
+  suspend fun canBeShownInFindResults(): Boolean {
+    return providers.getValue().values.any { it.canBeShownInFindResults() }
   }
 
   override fun dispose() {}

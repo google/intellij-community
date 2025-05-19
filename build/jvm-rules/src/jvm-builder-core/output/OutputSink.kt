@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.backend.common.output.OutputFile
 import org.jetbrains.kotlin.build.GeneratedFile
 import java.io.File
 import java.nio.file.Path
-import java.util.TreeMap
+import java.util.*
 
 const val ABI_IC_NODE_FORMAT_VERSION: Int = 1
 
@@ -49,7 +49,7 @@ class OutputSink internal constructor(
   @Synchronized
   fun registerKotlincOutput(outputFiles: List<OutputFile>) {
     for (file in outputFiles) {
-      // not clear - is path system-independent or not?
+      // not clear - is the path system-independent or not?
       fileToData.put(file.relativePath.replace(File.separatorChar, '/'), file.asByteArray())
     }
     isChanged = true
@@ -102,7 +102,7 @@ class OutputSink internal constructor(
   }
 
   @Synchronized
-  fun registerJavacOutput(outputs: List<InMemoryJavaOutputFileObject>) {
+  fun registerJavacOutput(outputs: List<InMemoryJavaOutputFileObject>, abiErrorConsumer: (File, String) -> Unit) {
     var isChanged = isChanged
     val abiHelper = abiHelper
     for (output in outputs) {
@@ -114,11 +114,24 @@ class OutputSink internal constructor(
         isChanged = true
       }
 
-      abiHelper?.createAbiForJava(path, newContent)
+      val source = output.source
+      abiHelper?.createAbiForJava(path, newContent, abiErrorConsumer = {
+        abiErrorConsumer(source, it)
+      })
     }
 
     if (isChanged) {
       this.isChanged = true
+    }
+  }
+
+  fun findByJavaInternalClassName(className: String): ByteArray? {
+    val data = fileToData.get("$className.class") ?: return null
+    if (data is ImmutableZipEntry) {
+      return data.getData(oldZipFile!!)
+    }
+    else {
+      return data as ByteArray
     }
   }
 
@@ -183,7 +196,7 @@ class OutputSink internal constructor(
       )
 
       fileToData.clear()
-      // now, close the old file, before writing to it
+      // now, close the old file before writing to it
       oldZipFile?.close()
     }
   }

@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.dependency.DependencyGraph;
 import org.jetbrains.jps.dependency.GraphConfiguration;
 import org.jetbrains.jps.dependency.impl.DependencyGraphImpl;
-import org.jetbrains.jps.javac.Iterators;
+import org.jetbrains.jps.util.Iterators;
 
 import java.io.ByteArrayInputStream;
 import java.io.Closeable;
@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-import static org.jetbrains.jps.javac.Iterators.collect;
-import static org.jetbrains.jps.javac.Iterators.isEmpty;
+import static org.jetbrains.jps.util.Iterators.collect;
+import static org.jetbrains.jps.util.Iterators.isEmpty;
 
-public class StorageManager implements Closeable {
+public class StorageManager implements CloseableExt {
   private final BuildContext myContext;
   private GraphConfiguration myGraphConfig;
   private ZipOutputBuilderImpl myOutputBuilder;
@@ -41,7 +41,7 @@ public class StorageManager implements Closeable {
   }
 
   public void cleanBuildState() throws IOException {
-    close();
+    close(false);
     Path output = myContext.getOutputZip();
     Path abiOutput = myContext.getAbiOutputZip();
     Path srcSnapshotStore = DataPaths.getConfigStateStoreFile(myContext);
@@ -50,7 +50,8 @@ public class StorageManager implements Closeable {
     if (logger.isEnabled() && !myContext.isRebuild()) {
       // need this for tests
       Set<String> deleted = new HashSet<>();
-      try (var out = new ZipOutputBuilderImpl(output)) {
+      Path outBackup = DataPaths.getJarBackupStoreFile(myContext, output);
+      try (var out = new ZipOutputBuilderImpl(Files.exists(outBackup)? outBackup : output)) {
         collect(out.getEntryNames(), deleted);
       }
       if (!isEmpty(deleted)) {
@@ -96,7 +97,8 @@ public class StorageManager implements Closeable {
   public ZipOutputBuilderImpl getOutputBuilder() throws IOException {
     ZipOutputBuilderImpl builder = myOutputBuilder;
     if (builder == null) {
-      myOutputBuilder = builder = new ZipOutputBuilderImpl(myContext.getOutputZip());
+      Path previousOutput = DataPaths.getJarBackupStoreFile(myContext, myContext.getOutputZip());
+      myOutputBuilder = builder = new ZipOutputBuilderImpl(previousOutput, myContext.getOutputZip());
     }
     return builder;
   }
@@ -107,7 +109,8 @@ public class StorageManager implements Closeable {
     if (builder == null) {
       Path abiOutputPath = myContext.getAbiOutputZip();
       if (abiOutputPath != null) {
-        myAbiOutputBuilder = builder = new AbiJarBuilder(abiOutputPath, getInstrumentationClassFinder());
+        Path previousAbiOutput = DataPaths.getJarBackupStoreFile(myContext, abiOutputPath);
+        myAbiOutputBuilder = builder = new AbiJarBuilder(previousAbiOutput, abiOutputPath, getInstrumentationClassFinder());
       }
     }
     return builder;
@@ -134,22 +137,30 @@ public class StorageManager implements Closeable {
 
   @Override
   public void close() {
+    close(true);
+  }
+
+  @Override
+  public void close(boolean saveChanges) {
     GraphConfiguration config = myGraphConfig;
     if (config != null) {
       myGraphConfig = null;
-      safeClose(config.getGraph());
+      safeClose(config.getGraph(), saveChanges);
     }
 
-    safeClose(myOutputBuilder);
+    safeClose(myOutputBuilder, saveChanges);
     myOutputBuilder = null;
 
-    safeClose(myAbiOutputBuilder);
+    safeClose(myAbiOutputBuilder, saveChanges);
     myAbiOutputBuilder = null;
   }
 
-  private void safeClose(Closeable cl) {
+  private void safeClose(Closeable cl, boolean saveChanges) {
     try {
-      if (cl != null) {
+      if (cl instanceof CloseableExt) {
+        ((CloseableExt) cl).close(saveChanges);
+      }
+      else if (cl != null) {
         cl.close();
       }
     }

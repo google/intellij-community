@@ -13,6 +13,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
    * mentioned actions will never be enabled in the same context. Otherwise, users may get unexpected behavior when they try to use that
    * shortcut.
    */
+  // @formatter:off
   private static final Map<String, String[][]> DEFAULT_DUPLICATES = Map.ofEntries(
     Map.entry("$default", new String[][]{
       {"ADD",                      "ExpandTreeNode", "Graph.ZoomIn"},
@@ -38,7 +39,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
       {"SUBTRACT",                 "CollapseTreeNode", "Graph.ZoomOut"},
       {"TAB",                      "EditorChooseLookupItemReplace", "NextTemplateVariable", "NextParameter", "EditorIndentSelection",
                                    "EditorTab", "ExpandLiveTemplateByTab", "BraceOrQuoteOut", "SplitChooser.NextWindow", "InsertInlineCompletionAction",
-                                   "Terminal.CommandCompletion", "CodeFloatingToolbar.GotoNextMenu", "AIAssistant.Editor.AcceptOneLineCompletion", 
+                                   "Terminal.CommandCompletion", "CodeFloatingToolbar.GotoNextMenu", "AIAssistant.Editor.AcceptOneLineCompletion",
                                    "InlinePromptGenerateCodeAction", "InsertNextEditAction"},
       {"UP",                       "EditorUp", "Terminal.SelectBlockAbove", "Terminal.UpCommandCompletion"},
       {"alt DOWN",                 "MethodDown", "ShowContent", "ShowSearchHistory", "JupyterNotebookMoveCellDownCommandModeAction", "NotebookMoveCellDownAction"},
@@ -80,6 +81,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
       {"control N",                "FileChooser.NewFolder", "GotoClass"},
       {"control P",                "FileChooser.TogglePathBar", "ParameterInfo"},
       {"control PERIOD",           "EditorChooseLookupItemDot", "CollapseSelection"},
+      {"control O",                "ChangesView.ShowCommitOptions", "OverrideMethods"},
       {"control R",                "Replace", "Terminal.SearchInCommandHistory", "org.jetbrains.plugins.ruby.rails.console.ReloadSources"},
       {"control SLASH",            "CommentByLineComment", "Graph.ActualSize"},
       {"control SPACE",            "CodeCompletion", "ChangesView.SetDefault"},
@@ -180,7 +182,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
       {"control E",                "EditorLineEnd", "Terminal.MoveCaretToLineEnd"},
       {"control ENTER",            "Generate", "NotebookRunCellAction", "NewElement", "PyExecuteCellAction"},
       {"control M",                "EditorMatchBrace", "Vcs.ShowMessageHistory"},
-      {"control O",                "ExportToTextFile", "OverrideMethods"},
+      {"control O",                "ChangesView.ShowCommitOptions", "ExportToTextFile", "OverrideMethods"},
       {"control R",                "Run", "Terminal.SearchInCommandHistory"},
       {"control SPACE",            "CodeCompletion", "ChangesView.SetDefault"},
       {"control shift LEFT",       "Diff.PrevChange", "PreviousEditorTab"},
@@ -227,6 +229,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
       {"control F5",               "Refresh", "Rerun"},
       {"control N",                "Generate", "NewElement"},
       {"control UP",               "EditorLookupUp", "NotebookSelectCellAboveAction", "MethodUp"},
+      {"control O",                "ChangesView.ShowCommitOptions", "ExportToTextFile"},
       {"control shift LEFT",       "Diff.PrevChange", "PreviousEditorTab"},
       {"control shift RIGHT",      "Diff.NextChange", "NextEditorTab"},
       {"ctrl SPACE",               "ChangesView.SetDefault", "CodeCompletion"},
@@ -585,7 +588,7 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
     Map.entry("macOS System Shortcuts", new String[][]{
       {"ctrl C",                   "Terminal.ClearPrompt", "Vcs.QuickListPopupAction", "org.jetbrains.r.console.RConsoleView.RInterruptAction"},
       {"ctrl ENTER",               "EditorSplitLine", "NotebookRunCellAction", "PyExecuteCellAction"},
-      {"ctrl O",                   "EditorSplitLine", "ExportToTextFile"},
+      {"ctrl O",                   "ChangesView.ShowCommitOptions", "EditorSplitLine", "ExportToTextFile"},
       {"ctrl alt DOWN",            "MethodDown", "ResizeToolWindowDown"},
       {"ctrl alt UP",              "MethodUp", "ResizeToolWindowUp"},
       {"ctrl meta M",              "ChangesView.Move", "Vcs.MoveChangedLinesToChangelist"},
@@ -608,10 +611,12 @@ public abstract class KeymapsTestCase extends KeymapsTestCaseBase {
   private static final Set<String> DEFAULT_UNKNOWN_ACTION_IDS = Set.of(
     "ActivateVersionControlToolWindow", "ActivateFavoritesToolWindow", "ActivateBookmarksToolWindow", "ActivateCommanderToolWindow",
     "ActivateServicesToolWindow", "ActivateMessagesToolWindow", "ActivateProjectToolWindow", "ActivateStructureToolWindow",
-    "ActivateProblemsViewToolWindow", "ActivateTODOToolWindow", "ActivateWebToolWindow", "ActivatePaletteToolWindow", "ActivateTerminalToolWindow",
+    "ActivateProblemsViewToolWindow", "ActivateTODOToolWindow", "ActivateWebToolWindow", "ActivatePaletteToolWindow",
+    "ActivateTerminalToolWindow",
     "IDEtalk.SearchUserHistory", "IDEtalk.Rename", "CIDR.Lang.Cpp.GenerateDefinitions", "ActivateErrorsInSolutionToolWindow",
     "ActivateUnitTestsToolWindow", "ActivateDatabaseToolWindow", "ActivateBuildToolWindow", "ActivateNuGetToolWindow",
-    "RiderBackendAction-EncapsulateField", "SwitchHeaderSource", "BuildProject", "RebuildProject", "BuildSolutionAction", "RebuildSolutionAction",
+    "RiderBackendAction-EncapsulateField", "SwitchHeaderSource", "BuildProject", "RebuildProject", "BuildSolutionAction",
+    "RebuildSolutionAction",
     "ActivateInspectionResultsToolWindow", "", "ValidateXml"
   );
 

@@ -11,18 +11,18 @@ import com.intellij.openapi.util.text.StringUtil;
  * @author lesya
  */
 final class Undo extends UndoRedo {
-  Undo(UndoManagerImpl.ClientState state, FileEditor editor) {
+  Undo(UndoClientState state, FileEditor editor) {
     super(state, editor);
   }
 
   @Override
   protected UndoRedoStacksHolder getStacksHolder() {
-    return myState.myUndoStacksHolder;
+    return myState.getUndoStacksHolder();
   }
 
   @Override
   protected UndoRedoStacksHolder getReverseStacksHolder() {
-    return myState.myRedoStacksHolder;
+    return myState.getRedoStacksHolder();
   }
 
   @Override

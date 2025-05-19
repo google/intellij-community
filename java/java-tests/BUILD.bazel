@@ -21,6 +21,7 @@ jvm_library(
   deps = [
     "//platform/editor-ui-api:editor-ui",
     "//platform/foldings",
+    "//jps/model-api:model",
     "//platform/refactoring",
     "//platform/structure-view-impl:structureView-impl",
     "//platform/testFramework",
@@ -41,6 +42,7 @@ jvm_library(
     "//plugins/java-i18n:java-i18n_test_lib",
     "//java/compiler/impl",
     "//java/compiler/instrumentation-util",
+    "//platform/workspace/storage",
     "//plugins/junit",
     "//plugins/testng",
     "//plugins/testng:testng_test_lib",

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.projectView.impl;
 
 import com.intellij.ide.*;
@@ -119,7 +119,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
         rebuildCompletely(true);
       }
     }, this);
-    ProjectViewNodeDecorator.EP.addExtensionPointListener(project, new ExtensionPointListener<>() {
+    CompoundProjectViewNodeDecorator.EP.addExtensionPointListener(project, new ExtensionPointListener<>() {
       @Override
       public void extensionAdded(@NotNull ProjectViewNodeDecorator extension, @NotNull PluginDescriptor pluginDescriptor) {
         rebuildCompletely(false);
@@ -233,6 +233,17 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
   }
 
   public abstract void select(Object element, VirtualFile file, boolean requestFocus);
+
+  @NotNull
+  public final ActionCallback selectWithCallback(@Nullable Object element, @Nullable VirtualFile file, boolean requestFocus) {
+    if (this instanceof ProjectViewPaneWithAsyncSelect async) {
+      return async.selectCB(element, file, requestFocus);
+    }
+    else {
+      select(element, file, requestFocus);
+      return ActionCallback.DONE;
+    }
+  }
 
   public void selectModule(@NotNull Module module, final boolean requestFocus) {
     doSelectModuleOrGroup(module, requestFocus);

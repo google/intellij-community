@@ -4,6 +4,7 @@ package com.jetbrains.python.packaging.conda
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.jetbrains.python.PyBundle
+import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
 import com.jetbrains.python.packaging.management.PythonPackageInstallRequest
@@ -24,6 +25,27 @@ internal class CompositePythonPackageManager(
 
   private val managerNames = managers.joinToString { it.javaClass.simpleName }
 
+  override suspend fun loadOutdatedPackagesCommand(): Result<List<PythonOutdatedPackage>> {
+    val results = mutableListOf<PythonOutdatedPackage>()
+    val exceptions = mutableListOf<Throwable>()
+
+    for (manager in managers) {
+      manager.loadOutdatedPackagesCommand()
+        .onSuccess { results.addAll(it) }
+        .onFailure { exceptions.add(it) }
+    }
+
+    return if (results.isNotEmpty()) {
+      Result.success(results)
+    }
+    else {
+      Result.failure(createCompositeException(
+        exceptions,
+        PyBundle.message("python.packaging.composite.list.outdated.packages.error", managerNames)
+      ))
+    }
+  }
+
   override suspend fun installPackageCommand(installRequest: PythonPackageInstallRequest, options: List<String>): Result<Unit> {
     return processPackageOperation(
       errorMessageKey = "python.packaging.composite.install.package.error",
@@ -35,7 +57,7 @@ internal class CompositePythonPackageManager(
   override suspend fun updatePackageCommand(specification: PythonRepositoryPackageSpecification): Result<Unit> {
     return processPackageOperation(
       errorMessageKey = "python.packaging.composite.update.package.error",
-      operation = { it.updatePackage(specification) },
+      operation = { it.updatePackageCommand(specification) },
       name = specification.name
     )
   }
@@ -43,7 +65,7 @@ internal class CompositePythonPackageManager(
   override suspend fun uninstallPackageCommand(pkg: PythonPackage): Result<Unit> {
     return processPackageOperation(
       errorMessageKey = "python.packaging.composite.uninstall.package.error",
-      operation = { it.uninstallPackage(pkg) },
+      operation = { it.uninstallPackageCommand(pkg) },
       name = pkg.name
     )
   }
@@ -89,7 +111,7 @@ internal class CompositePythonPackageManager(
 
   fun createCompositeException(
     exceptions: List<Throwable>,
-    defaultMessage: String
+    defaultMessage: String,
   ): RuntimeException {
     if (exceptions.isEmpty()) {
       return RuntimeException(defaultMessage)

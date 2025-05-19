@@ -69,6 +69,8 @@
     <requiredForSmartModeStartupActivity implementation="com.intellij.util.indexing.DumbModeWhileScanningSubscriber"/>
     <initProjectActivity id="vfsStartup" implementation="com.intellij.psi.impl.file.impl.PsiVfsInitProjectActivity" order="first"/>
 
+    <initProjectActivity id="projectRootProjectActivity" implementation="com.intellij.platform.ProjectRootProjectActivity"/>
+
     <projectService serviceInterface="com.intellij.codeInsight.multiverse.ProjectModelContextBridge"
                     serviceImplementation="com.intellij.codeInsight.multiverse.ProjectModelContextBridgeImpl"/>
 
@@ -152,6 +154,9 @@
     <projectService serviceInterface="com.intellij.codeInsight.lookup.impl.ClientLookupManager"
                     serviceImplementation="com.intellij.codeInsight.lookup.impl.GuestLookupManager"
                     client="remote"/>
+
+    <projectService serviceImplementation="com.intellij.ide.projectView.impl.SelectInProjectViewImpl"
+                    client="local"/>
 
     <applicationService serviceInterface="com.intellij.psi.meta.MetaDataRegistrar"
                         serviceImplementation="com.intellij.psi.impl.meta.MetaRegistry"/>
@@ -995,10 +1000,6 @@
 
     <applicationService serviceImplementation="com.intellij.ui.debugger.extensions.PlaybackDebugger$PlaybackDebuggerState"/>
 
-    <globalInspection language="" shortName="Annotator" groupKey="inspection.general.tools.group.name" groupBundle="messages.InspectionsBundle"
-                      enabledByDefault="true" level="ERROR"
-                      bundle="messages.InspectionsBundle" key="inspection.annotator.display.name"
-                      implementationClass="com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection"/>
     <localInspection language="" shortName="LossyEncoding" bundle="messages.LangBundle" key="lossy.encoding"
                      groupBundle="messages.InspectionsBundle" groupKey="group.names.internationalization.issues" enabledByDefault="true"
                      level="WARNING"
@@ -1330,6 +1331,7 @@
                     serviceImplementation="com.intellij.ide.actions.searcheverywhere.SearchEverywhereManagerImpl"/>
     <searchEverywhere.manager implementation="com.intellij.ide.actions.searcheverywhere.MonolithSearchEverywhereManagerFactory"/>
 
+    <searchEverywhereContributor implementation="com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributorFactory"/>
     <searchEverywhereContributor implementation="com.intellij.ide.actions.searcheverywhere.ActionSearchEverywhereContributor$Factory"/>
     <searchEverywhereContributor implementation="com.intellij.ide.actions.searcheverywhere.CalculatorSEContributorFactory"/>
     <searchEverywhereContributor implementation="com.intellij.ide.actions.searcheverywhere.RecentFilesSEContributor$Factory"/>
@@ -1450,7 +1452,6 @@
     <editorFactoryMouseMotionListener
       implementation="com.intellij.codeInsight.inline.completion.tooltip.InlineCompletionMouseMotionListener"/>
 
-    <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.GeneralHighlightingPassFactory"/>
     <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.ChameleonSyntaxHighlightingPass$Factory"/>
     <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.InjectedGeneralHighlightingPassFactory"/>
     <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.LineMarkersPassFactory"/>

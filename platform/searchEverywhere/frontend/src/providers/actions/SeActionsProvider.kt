@@ -34,13 +34,17 @@ class SeActionsProvider(project: Project? = null, contextComponent: Component? =
   override suspend fun collectItems(params: SeParams, collector: SeItemsProvider.Collector) {
     val filter = SeActionsFilter.from(params.filter)
     processItems(params.inputQuery, filter.includeDisabled) { value ->
-      val item = SeActionItem(value)
+      val item = SeActionItem(value, null)
       collector.put(item)
     }
   }
 
   override suspend fun itemSelected(item: SeItem, modifiers: Int, searchText: String): Boolean {
     TODO()
+  }
+
+  override suspend fun canBeShownInFindResults(): Boolean {
+    return false
   }
 
   private suspend fun processItems(text: String, includeDisabled: Boolean, processor: suspend (MatchedValue) -> Boolean) {
@@ -87,7 +91,9 @@ class SeActionsProvider(project: Project? = null, contextComponent: Component? =
 }
 
 @ApiStatus.Internal
-class SeActionItem(val matchedValue: MatchedValue): SeItem {
+class SeActionItem(val matchedValue: MatchedValue, val extendedDescription: String?): SeItem {
   override fun weight(): Int = matchedValue.matchingDegree
-  override suspend fun presentation(): SeItemPresentation = SeActionPresentationProvider.get(matchedValue)
+  override suspend fun presentation(): SeItemPresentation {
+    return SeActionPresentationProvider.get(matchedValue, extendedDescription)
+  }
 }

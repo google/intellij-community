@@ -40,6 +40,12 @@ interface WorkspaceFileIndex {
   fun isInContent(file: VirtualFile): Boolean
 
   /**
+   * Returns `true` if [file] is included to the workspace and doesn't have [WorkspaceFileKind.CONTENT_NON_INDEXABLE] kind.
+   */
+  @RequiresReadLock
+  fun isIndexable(file: VirtualFile): Boolean
+
+  /**
    * Return the root file of a file set of [content][WorkspaceFileKind.isContent] kind containing [file]. 
    * If [file] doesn't belong to such a file set, `null` is returned.
    * 
@@ -74,6 +80,7 @@ interface WorkspaceFileIndex {
   fun findFileSet(file: VirtualFile,
                   honorExclusion: Boolean,
                   includeContentSets: Boolean,
+                  includeContentNonIndexableSets: Boolean,
                   includeExternalSets: Boolean,
                   includeExternalSourceSets: Boolean,
                   includeCustomKindSets: Boolean
@@ -97,6 +104,7 @@ interface WorkspaceFileIndex {
   fun findFileSets(file: VirtualFile,
                    honorExclusion: Boolean,
                    includeContentSets: Boolean,
+                   includeContentNonIndexableSets: Boolean,
                    includeExternalSets: Boolean,
                    includeExternalSourceSets: Boolean,
                    includeCustomKindSets: Boolean
@@ -110,6 +118,7 @@ interface WorkspaceFileIndex {
     file: VirtualFile,
     honorExclusion: Boolean,
     includeContentSets: Boolean,
+    includeContentNonIndexableSets: Boolean,
     includeExternalSets: Boolean,
     includeExternalSourceSets: Boolean,
     includeCustomKindSets: Boolean,
@@ -125,6 +134,7 @@ interface WorkspaceFileIndex {
     file: VirtualFile,
     honorExclusion: Boolean,
     includeContentSets: Boolean,
+    includeContentNonIndexableSets: Boolean,
     includeExternalSets: Boolean,
     includeExternalSourceSets: Boolean,
     includeCustomKindSets: Boolean,

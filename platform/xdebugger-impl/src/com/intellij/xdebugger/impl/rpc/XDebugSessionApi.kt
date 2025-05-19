@@ -9,7 +9,6 @@ import com.intellij.ide.rpc.FrontendDocumentId
 import com.intellij.ide.ui.icons.IconId
 import com.intellij.ide.vfs.VirtualFileId
 import com.intellij.openapi.util.NlsContexts
-import kotlinx.serialization.Transient
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
@@ -25,6 +24,7 @@ import fleet.rpc.remoteApiDescriptor
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 
@@ -53,8 +53,8 @@ interface XDebugSessionApi : RemoteApi<Unit> {
 
   suspend fun smartStepInto(smartStepTargetId: XSmartStepIntoTargetId)
   suspend fun smartStepIntoEmpty(sessionId: XDebugSessionId)
-  suspend fun computeSmartStepTargets(sessionId: XDebugSessionId, sourcePositionDto: XSourcePositionDto): List<XSmartStepIntoTargetDto>
-  suspend fun computeStepTargets(sessionId: XDebugSessionId, sourcePositionDto: XSourcePositionDto): List<XSmartStepIntoTargetDto>
+  suspend fun computeSmartStepTargets(sessionId: XDebugSessionId): List<XSmartStepIntoTargetDto>
+  suspend fun computeStepTargets(sessionId: XDebugSessionId): List<XSmartStepIntoTargetDto>
 
   suspend fun forceStepInto(sessionId: XDebugSessionId)
 
@@ -73,12 +73,9 @@ interface XDebugSessionApi : RemoteApi<Unit> {
   suspend fun getFileColorsFlow(sessionId: XDebugSessionId): Flow<XFileColorDto>
   suspend fun scheduleFileColorComputation(sessionId: XDebugSessionId, virtualFileId: VirtualFileId)
 
-  suspend fun showExecutionPoint(sessionId: XDebugSessionId)
+  suspend fun switchToTopFrame(sessionId: XDebugSessionId)
 
   suspend fun muteBreakpoints(sessionId: XDebugSessionId, muted: Boolean)
-
-  suspend fun canDrop(sessionId: XDebugSessionId, stackFrameId: XStackFrameId): Boolean
-  suspend fun dropFrame(sessionId: XDebugSessionId, stackFrameId: XStackFrameId)
 
   companion object {
     @JvmStatic

@@ -173,6 +173,10 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
     return myTopmostReadAction.get()
   }
 
+  override fun <T> relaxPreventiveLockingActions(action: () -> T): T {
+    return action()
+  }
+
   override fun getLockingProhibitedAdvice(): String? {
     return myLockingProhibited.get()?.second
   }
@@ -558,6 +562,10 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
     if (myLockAcquisitionListener != null)
       error("LockAcquisitionListener already registered")
     myLockAcquisitionListener = listener
+  }
+
+  override fun setLockAcquisitionInterceptor(delayMillis: Long, consumer: (() -> Boolean) -> Unit) {
+    return
   }
 
   @ApiStatus.Internal

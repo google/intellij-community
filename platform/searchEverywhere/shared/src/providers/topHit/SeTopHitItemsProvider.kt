@@ -14,15 +14,16 @@ import com.intellij.platform.searchEverywhere.SeItemsProvider
 import com.intellij.platform.searchEverywhere.SeParams
 import com.intellij.platform.searchEverywhere.providers.AsyncProcessor
 import com.intellij.platform.searchEverywhere.providers.SeAsyncContributorWrapper
+import com.intellij.platform.searchEverywhere.providers.getExtendedDescription
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 
 @ApiStatus.Internal
-class SeTopHitItem(val item: Any, private val weight: Int, private val project: Project) : SeItem {
+class SeTopHitItem(val item: Any, private val weight: Int, private val project: Project, val extendedDescription: String?) : SeItem {
   override fun weight(): Int = weight
-  override suspend fun presentation(): SeItemPresentation = SeTopHitItemPresentationProvider.getPresentation(item, project)
+  override suspend fun presentation(): SeItemPresentation = SeTopHitItemPresentationProvider.getPresentation(item, project, extendedDescription)
 }
 
 @ApiStatus.Internal
@@ -44,7 +45,7 @@ open class SeTopHitItemsProvider(
 
       contributorWrapper.fetchElements(inputQuery, indicator, object : AsyncProcessor<Any> {
         override suspend fun process(t: Any): Boolean {
-          return collector.put(SeTopHitItem(t, weight, project))
+          return collector.put(SeTopHitItem(t, weight, project, getExtendedDescription(t)))
         }
       })
     }
@@ -55,6 +56,14 @@ open class SeTopHitItemsProvider(
     return withContext(Dispatchers.EDT) {
       contributorWrapper.contributor.processSelectedItem(legacyItem, modifiers, searchText)
     }
+  }
+
+  fun getExtendedDescription(item: Any): String? {
+    return contributorWrapper.contributor.getExtendedDescription(item)
+  }
+
+  override suspend fun canBeShownInFindResults(): Boolean {
+    return contributorWrapper.contributor.showInFindResults()
   }
 
   override fun dispose() {

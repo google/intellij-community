@@ -37,6 +37,7 @@ import com.intellij.openapi.util.*
 import com.intellij.openapi.util.registry.Registry.Companion.intValue
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil
 import com.intellij.psi.util.PsiUtilBase
 import com.intellij.util.Alarm
@@ -197,6 +198,7 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
     val offsetBefore = hostEditor.caretModel.offset
     val visibleRange = hostEditor.calculateVisibleRange()
     val job = coroutineScope.launch {
+      val psiModCountBefore = PsiManager.getInstance(project).modificationTracker.modificationCount
       val injected = readAction { BackgroundHighlightingUtil.findInjected(hostEditor, project, offsetBefore)} ?: return@launch
       val newFile = injected.first
       val newEditor = injected.second
@@ -205,9 +207,8 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
       }
       val modalityState = ModalityState.stateForComponent(hostEditor.component).asContextElement()
       launch(Dispatchers.EDT + modalityState) {
-        val isEditorUpToDate = BackgroundHighlightingUtil.isValidEditor(hostEditor) && newFile.isValid
-        if (isEditorUpToDate) {
-          applyBraceMatching(project, newEditor, newFile, maybeMatch, alarm)
+        if (isEditorUpToDate(hostEditor, offsetBefore, newEditor, psiModCountBefore, project)) {
+          applyBraceMatching(project, newEditor, newFile, maybeMatch)
         }
       }
 
@@ -228,8 +229,7 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
         catch (_: IndexNotReadyException) {
         }
         launch(Dispatchers.EDT + modalityState) {
-          val isEditorUpToDate = BackgroundHighlightingUtil.isValidEditor(hostEditor) && hostEditor.caretModel.offset == offsetBefore && newFile.isValid
-          if (isEditorUpToDate) {
+          if (isEditorUpToDate(hostEditor, offsetBefore, newEditor, psiModCountBefore, project)) {
             identPass.doAdditionalCodeBlockHighlighting(markupInfos)
           }
         }
@@ -242,6 +242,41 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
     job.invokeOnCompletion {
       (hostEditor as UserDataHolderEx).getAndUpdateUserData(BACKGROUND_TASK) {
         oldJob -> if (oldJob == job) null else oldJob // remove my job, but don't touch the job if not mine because it might be the newest job
+      }
+    }
+  }
+
+  private fun isEditorUpToDate(
+    hostEditor: Editor,
+    offsetBefore: Int,
+    newEditor: Editor,
+    psiModCountBefore: Long,
+    project: Project,
+  ): Boolean {
+    return BackgroundHighlightingUtil.isValidEditor(hostEditor)
+           && hostEditor.caretModel.offset == offsetBefore
+           && (newEditor == hostEditor || BackgroundHighlightingUtil.isValidEditor(newEditor))
+           && psiModCountBefore == PsiManager.getInstance(project).modificationTracker.modificationCount
+  }
+
+  @RequiresEdt
+  fun applyBraceMatching(
+    project: Project,
+    newEditor: Editor,
+    newFile: PsiFile,
+    maybeMatch: Pair<TextRange, TextRange>?,
+  ) {
+    val handler = BraceHighlightingHandler(project, newEditor, alarm, newFile)
+    if (maybeMatch == null) {
+      alarm.cancelAllRequests()
+      handler.updateBraces()
+    }
+    else {
+      val codeInsightSettings = CodeInsightSettings.getInstance()
+      if (BackgroundHighlightingUtil.needMatching(newEditor, codeInsightSettings)) {
+        val fileType = PsiUtilBase.getPsiFileAtOffset(newFile, maybeMatch.first.startOffset).fileType
+        BraceHighlightingHandler.clearBraceHighlighters(newEditor)
+        handler.highlightBraces(maybeMatch.first, maybeMatch.second, true, false, fileType)
       }
     }
   }
@@ -262,29 +297,6 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
       }
       finally {
         Disposer.dispose(parentDisposable)
-      }
-    }
-
-    @RequiresEdt
-    fun applyBraceMatching(
-      project: Project,
-      newEditor: Editor,
-      newFile: PsiFile,
-      maybeMatch: Pair<TextRange, TextRange>?,
-      alarm: Alarm,
-    ) {
-      val handler = BraceHighlightingHandler(project, newEditor, alarm, newFile)
-      if (maybeMatch == null) {
-        alarm.cancelAllRequests()
-        handler.updateBraces()
-      }
-      else {
-        val codeInsightSettings = CodeInsightSettings.getInstance()
-        if (BackgroundHighlightingUtil.needMatching(newEditor, codeInsightSettings)) {
-          val fileType = PsiUtilBase.getPsiFileAtOffset(newFile, maybeMatch.first.startOffset).fileType
-          BraceHighlightingHandler.clearBraceHighlighters(newEditor)
-          handler.highlightBraces(maybeMatch.first, maybeMatch.second, true, false, fileType)
-        }
       }
     }
 

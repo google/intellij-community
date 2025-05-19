@@ -39,11 +39,12 @@ import com.intellij.openapi.vcs.*;
 import com.intellij.openapi.vcs.changes.actions.diff.ShowDiffFromLocalChangesActionProvider;
 import com.intellij.openapi.vcs.changes.shelf.ShelveChangesManager;
 import com.intellij.openapi.vcs.changes.ui.*;
-import com.intellij.openapi.vcs.telemetry.VcsTelemetrySpan.ChangesView;
+import com.intellij.openapi.vcs.telemetry.VcsBackendTelemetrySpan.ChangesView;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.platform.vcs.impl.shared.changes.PreviewDiffSplitterComponent;
+import com.intellij.platform.vcs.impl.shared.telemetry.VcsScopeKt;
 import com.intellij.problems.ProblemListener;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.JBColor;
@@ -662,7 +663,7 @@ public class ChangesViewManager implements ChangesViewEx,
 
         ChangesViewCommitPanel newCommitPanel = (ChangesViewCommitPanel)newWorkflowHandler.getUi();
         newCommitPanel.registerRootComponent(this);
-        myCommitPanelSplitter.setSecondComponent(newCommitPanel);
+        myCommitPanelSplitter.setSecondComponent(newCommitPanel.getComponent());
 
         myCommitWorkflowHandler = newWorkflowHandler;
         myCommitPanel = newCommitPanel;
@@ -689,7 +690,6 @@ public class ChangesViewManager implements ChangesViewEx,
     private void configureToolbars() {
       boolean isToolbarHorizontal = CommitModeManager.getInstance(myProject).getCurrentCommitMode().useCommitToolWindow();
       myChangesPanel.setToolbarHorizontal(isToolbarHorizontal);
-      if (myCommitPanel != null) myCommitPanel.setToolbarHorizontal(isToolbarHorizontal);
     }
 
     @Override

@@ -18,6 +18,7 @@ interface WorkspaceFileIndexData {
   fun getFileInfo(file: VirtualFile,
                   honorExclusion: Boolean,
                   includeContentSets: Boolean,
+                  includeContentNonIndexableSets: Boolean,
                   includeExternalSets: Boolean,
                   includeExternalSourceSets: Boolean,
                   includeCustomKindSets: Boolean): WorkspaceFileInternalInfo
@@ -49,10 +50,10 @@ interface WorkspaceFileIndexData {
   fun analyzeVfsChanges(events: List<VFileEvent>): VfsChangeApplier?
 
   /**
-   * Returns package name for [directory] if it's located under source root or classes root of Java library, or `null` otherwise.
+   * Returns package name for [dirOrFile] if it's located under source root or classes root of Java library, or `null` otherwise.
    * This is an internal function, plugins must use [com.intellij.openapi.roots.PackageIndex.getPackageNameByDirectory] instead.
    */
-  fun getPackageName(dir: VirtualFile): String?
+  fun getPackageName(dirOrFile: VirtualFile): String?
 
   /**
    * Returns a query producing directories which correspond to [packageName].
@@ -61,7 +62,7 @@ interface WorkspaceFileIndexData {
   fun getDirectoriesByPackageName(packageName: String, includeLibrarySources: Boolean): Query<VirtualFile>
 
   /**
-   * Returns a query producing directories which correspond to [packageName].
+   * Returns a query producing files, which are single-file source roots and correspond to [packageName].
    * This is an internal function, plugins must use [com.intellij.openapi.roots.PackageIndex.getFilesByPackageName] instead.
    */
   fun getFilesByPackageName(packageName: String): Query<VirtualFile>

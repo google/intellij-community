@@ -61,7 +61,8 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
   override suspend fun sessions(projectId: ProjectId): XDebugSessionsList {
     val project = projectId.findProject()
     val sessions = XDebuggerManager.getInstance(project).debugSessions.map { createSessionDto(it as XDebugSessionImpl, it.debugProcess) }
-    return XDebugSessionsList(sessions, createSessionManagerEvents(projectId).toRpc())
+    val initialSessions = sessions.map { it.id }.toSet()
+    return XDebugSessionsList(sessions, createSessionManagerEvents(projectId, initialSessions).toRpc())
   }
 
   private suspend fun createSessionDto(currentSession: XDebugSessionImpl, debugProcess: XDebugProcess): XDebugSessionDto {
@@ -93,7 +94,7 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
       initialSessionState,
       currentSession.suspendData(),
       currentSession.sessionName,
-      createSessionEvents(currentSession).toRpc(),
+      createSessionEvents(currentSession, initialSessionState).toRpc(),
       sessionDataDto,
       consoleView,
       createProcessHandlerDto(currentSession.coroutineScope, currentSession.debugProcess.processHandler),
@@ -104,8 +105,8 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  private fun createSessionEvents(currentSession: XDebugSessionImpl): Flow<XDebuggerSessionEvent> = channelFlow {
-    currentSession.addSessionListener(object : XDebugSessionListener {
+  private fun createSessionEvents(currentSession: XDebugSessionImpl, initialSessionState: XDebugSessionState): Flow<XDebuggerSessionEvent> = channelFlow {
+    val listener = object : XDebugSessionListener {
       override fun sessionPaused() {
         val suspendContext = currentSession.suspendContext ?: return
         val suspendScope = currentSession.currentSuspendCoroutineScope ?: return
@@ -129,15 +130,15 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
       }
 
       override fun sessionResumed() {
-        trySend(XDebuggerSessionEvent.SessionResumed())
+        trySend(XDebuggerSessionEvent.SessionResumed)
       }
 
       override fun sessionStopped() {
-        trySend(XDebuggerSessionEvent.SessionStopped())
+        trySend(XDebuggerSessionEvent.SessionStopped)
       }
 
       override fun beforeSessionResume() {
-        trySend(XDebuggerSessionEvent.BeforeSessionResume())
+        trySend(XDebuggerSessionEvent.BeforeSessionResume)
       }
 
       override fun stackFrameChanged() {
@@ -149,26 +150,37 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
       }
 
       override fun settingsChanged() {
-        trySend(XDebuggerSessionEvent.SettingsChanged())
+        trySend(XDebuggerSessionEvent.SettingsChanged)
       }
 
       override fun breakpointsMuted(muted: Boolean) {
         trySend(XDebuggerSessionEvent.BreakpointsMuted(muted))
       }
-    }, this.asDisposable())
+    }
+    currentSession.addSessionListener(listener, this.asDisposable())
+    // Try to send the important events lost during listener installation
+    if (currentSession.isStopped && !initialSessionState.isStopped) {
+      listener.sessionStopped()
+    }
+    else if (currentSession.isPaused && !initialSessionState.isPaused) {
+      listener.sessionPaused()
+    }
+    else if (!currentSession.isPaused && initialSessionState.isPaused) {
+      listener.sessionResumed()
+    }
     awaitClose()
   }.buffer(Channel.UNLIMITED)
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  private fun createSessionManagerEvents(projectId: ProjectId): Flow<XDebuggerManagerSessionEvent> {
+  private fun createSessionManagerEvents(projectId: ProjectId, initialSessionIds: Set<XDebugSessionId>): Flow<XDebuggerManagerSessionEvent> {
     val project = projectId.findProject()
     return channelFlow {
-      project.messageBus.connect(this).subscribe(XDebuggerManager.TOPIC, object : XDebuggerManagerListener {
+      val listener = object : XDebuggerManagerListener {
         override fun processStarted(debugProcess: XDebugProcess) {
           val session = debugProcess.session as? XDebugSessionImpl ?: return
           launch {
             val sessionDto = createSessionDto(session, debugProcess)
-            send(XDebuggerManagerSessionEvent.ProcessStarted(sessionDto.id, sessionDto))
+            send(XDebuggerManagerSessionEvent.ProcessStarted(sessionDto))
           }
         }
 
@@ -182,7 +194,20 @@ internal class BackendXDebuggerManagerApi : XDebuggerManagerApi {
           val currentSessionId = (currentSession as? XDebugSessionImpl)?.id
           trySend(XDebuggerManagerSessionEvent.CurrentSessionChanged(previousSessionId, currentSessionId))
         }
-      })
+      }
+      project.messageBus.connect(this).subscribe(XDebuggerManager.TOPIC, listener)
+      val currentSessions = XDebuggerManager.getInstance(project).debugSessions.filterIsInstance<XDebugSessionImpl>().associateBy { it.id }
+      val newlyAddedSessions = currentSessions.keys - initialSessionIds
+      val completedSessions = initialSessionIds - currentSessions.keys
+
+      for (newlyAddedSession in newlyAddedSessions) {
+        val session = currentSessions[newlyAddedSession] ?: continue
+        listener.processStarted(session.debugProcess)
+      }
+      for (completedSession in completedSessions) {
+        send(XDebuggerManagerSessionEvent.ProcessStopped(completedSession))
+      }
+
       awaitClose()
     }.buffer(Channel.UNLIMITED)
   }

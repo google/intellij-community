@@ -18,12 +18,11 @@ import com.intellij.vcs.git.shared.branch.GitInOutCountersInProject
 import com.intellij.vcs.git.shared.branch.GitInOutStateHolder
 import com.intellij.vcs.git.shared.branch.GitIncomingOutgoingColors
 import com.intellij.vcs.git.shared.branch.calcTooltip
-import git4idea.GitLocalBranch
+import com.intellij.vcs.git.shared.repo.GitRepositoryFrontendModel
 import git4idea.GitRemoteBranch
-import git4idea.branch.GitBranchUtil
+import git4idea.GitStandardLocalBranch
 import git4idea.branch.GitTagType
 import git4idea.i18n.GitBundle
-import git4idea.repo.GitRepository
 import git4idea.ui.branch.tree.GitBranchesTreeModel
 import git4idea.ui.branch.tree.GitBranchesTreeRenderer
 import icons.DvcsImplIcons
@@ -104,9 +103,9 @@ internal class GitBranchesTreePopupRenderer(treePopupStep: GitBranchesTreePopupS
   private fun getSecondaryText(treeNode: Any?): @NlsSafe String? {
     return when (treeNode) {
       is PopupFactoryImpl.ActionItem -> KeymapUtil.getFirstKeyboardShortcutText(treeNode.action)
-      is GitBranchesTreeModel.RepositoryNode -> GitBranchUtil.getDisplayableBranchText(treeNode.repository)
-      is GitLocalBranch -> {
-        treeNode.getCommonTrackedBranch(treePopupStep.affectedRepositories)?.name
+      is GitBranchesTreeModel.RepositoryNode -> treeNode.repository.state.getDisplayableBranchText()
+      is GitStandardLocalBranch -> {
+        treeNode.getCommonTrackedBranch(treePopupStep.affectedRepositoriesFrontendModel)?.name
       }
       is GitTagType -> {
         if (treePopupStep.repositories.any { it.tagHolder.isLoading }) GitBundle.message("group.Git.Tags.loading.text")
@@ -116,11 +115,11 @@ internal class GitBranchesTreePopupRenderer(treePopupStep: GitBranchesTreePopupS
     }
   }
 
-  private fun GitLocalBranch.getCommonTrackedBranch(repositories: List<GitRepository>): GitRemoteBranch? {
+  private fun GitStandardLocalBranch.getCommonTrackedBranch(repositories: List<GitRepositoryFrontendModel>): GitRemoteBranch? {
     var commonTrackedBranch: GitRemoteBranch? = null
 
     for (repository in repositories) {
-      val trackedBranch = findTrackedBranch(repository) ?: return null
+      val trackedBranch = repository.state.getTrackingInfo(this) ?: return null
 
       if (commonTrackedBranch == null) {
         commonTrackedBranch = trackedBranch
@@ -136,7 +135,7 @@ internal class GitBranchesTreePopupRenderer(treePopupStep: GitBranchesTreePopupS
     treeNode ?: return GitInOutCountersInProject.EMPTY
 
     return when (treeNode) {
-      is GitLocalBranch -> GitInOutStateHolder.getInstance(treePopupStep.project)
+      is GitStandardLocalBranch -> GitInOutStateHolder.getInstance(treePopupStep.project)
         .getState(treeNode, treePopupStep.affectedRepositoriesIds)
       is GitBranchesTreeModel.RefUnderRepository -> getIncomingOutgoingState(treeNode.ref)
       else -> GitInOutCountersInProject.EMPTY

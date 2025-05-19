@@ -157,6 +157,7 @@ internal class ReworkedTerminalView(
     )
 
     controller = TerminalSessionController(
+      project,
       sessionModel,
       outputModel,
       alternateBufferModel,
@@ -320,7 +321,7 @@ internal class ReworkedTerminalView(
       addTopAndBottomInsets(editor)
     }
 
-    val eventsHandler = TerminalEventsHandlerImpl(sessionModel, editor, encodingManager, terminalInput, settings, scrollingModel)
+    val eventsHandler = TerminalEventsHandlerImpl(sessionModel, editor, encodingManager, terminalInput, settings, scrollingModel, model)
     setupKeyEventDispatcher(editor, settings, eventsHandler, parentDisposable)
     setupMouseListener(editor, sessionModel, settings, eventsHandler, parentDisposable)
 

@@ -11,7 +11,7 @@ jvm_library(
   name = "built-in-help",
   module_name = "intellij.builtInHelp",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:netty-codec-http",
@@ -24,7 +24,6 @@ jvm_library(
     "@lib//:lucene-highlighter",
     "@lib//:lucene-queryparser",
     "@lib//:lucene-suggest",
-    "@lib//:commons-compress",
     "@lib//:jsoup",
     "@lib//:jaxb-api",
     "//platform/platform-api:ide",
@@ -39,7 +38,6 @@ jvm_library(
     "@lib//:jackson",
     "@lib//:jackson-databind",
     "@lib//:jackson-module-kotlin",
-    "//plugins/maven/maven-server-indexer:server-indexer",
   ],
   runtime_deps = [":built-in-help_resources"]
 )

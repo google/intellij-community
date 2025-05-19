@@ -28,6 +28,7 @@ import com.intellij.modcommand.ModUpdateFileText.Fragment;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -57,6 +58,7 @@ import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.RefactoringBundle;
+import com.intellij.refactoring.rename.NameSuggestionProvider;
 import com.intellij.refactoring.rename.PsiElementRenameHandler;
 import com.intellij.refactoring.rename.Renamer;
 import com.intellij.refactoring.rename.RenamerFactory;
@@ -71,9 +73,7 @@ import org.jetbrains.annotations.*;
 
 import javax.swing.*;
 import java.awt.datatransfer.StringSelection;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 
 import static java.util.Objects.requireNonNull;
@@ -323,9 +323,10 @@ public class ModCommandExecutorImpl extends ModCommandBatchExecutorImpl {
     PsiFile psiFile = PsiManagerEx.getInstanceEx(project).findFile(file);
     if (psiFile == null) return false;
     TextRange range = rename.symbolRange().range();
+    TextRange nameRange = requireNonNullElse(rename.symbolRange().nameIdentifierRange(), range);
     InjectedLanguageManager manager = InjectedLanguageManager.getInstance(project);
-    PsiElement injectedElement = manager.findInjectedElementAt(psiFile, range.getStartOffset());
-    PsiElement psiElement = injectedElement != null ? injectedElement : psiFile.findElementAt(range.getStartOffset());
+    PsiElement injectedElement = manager.findInjectedElementAt(psiFile, nameRange.getStartOffset());
+    PsiElement psiElement = injectedElement != null ? injectedElement : psiFile.findElementAt(nameRange.getStartOffset());
     PsiNamedElement namedElement = PsiTreeUtil.getNonStrictParentOfType(psiElement, PsiNamedElement.class);
     if (namedElement == null) return false;
     Editor finalEditor = getEditor(project, editor, file);
@@ -334,11 +335,16 @@ public class ModCommandExecutorImpl extends ModCommandBatchExecutorImpl {
       finalEditor = InjectedLanguageUtil.getInjectedEditorForInjectedFile(finalEditor, injectedElement.getContainingFile()); 
     }
     DataContext context = DataManager.getInstance().getDataContext(finalEditor.getComponent());
+    Set<String> nameSuggestions = new LinkedHashSet<>(rename.nameSuggestions());
+    if (nameSuggestions.isEmpty() || nameSuggestions.equals(Collections.singleton(namedElement.getName()))) {
+      ActionUtil.underModalProgress(project, RefactoringBundle.message("progress.title.collecting.suggested.names"),
+                                    () -> NameSuggestionProvider.suggestNames(namedElement, psiElement, nameSuggestions));
+    }
     DataContext finalContext = SimpleDataContext.builder()
       .setParent(context)
       .add(CommonDataKeys.PSI_ELEMENT, namedElement)
       .add(CommonDataKeys.EDITOR, finalEditor)
-      .add(PsiElementRenameHandler.NAME_SUGGESTIONS, rename.nameSuggestions())
+      .add(PsiElementRenameHandler.NAME_SUGGESTIONS, List.copyOf(nameSuggestions))
       .build();
     PsiElement anchor = namedElement instanceof PsiNameIdentifierOwner owner ? 
                         requireNonNullElse(owner.getNameIdentifier(), namedElement) : namedElement;

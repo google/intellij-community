@@ -16,7 +16,6 @@ f:com.intellij.codeInsight.completion.CompletionUtilCoreImpl
 - s:getOriginalElement(com.intellij.psi.PsiElement,com.intellij.psi.PsiFile):com.intellij.psi.PsiElement
 - s:getOriginalOrSelf(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
 c:com.intellij.codeInsight.controlflow.ControlFlowBuilder
-- sf:LOG:com.intellij.openapi.diagnostic.Logger
 - instructionCount:I
 - instructions:java.util.List
 - pending:java.util.List
@@ -3737,7 +3736,6 @@ pc:com.intellij.psi.stubs.DefaultStubBuilder$StubBuildingWalkingVisitor
 - p:visitNode(com.intellij.psi.stubs.StubElement,com.intellij.lang.ASTNode,Z):V
 c:com.intellij.psi.stubs.LightStubBuilder
 - com.intellij.psi.StubBuilder
-- sf:FORCED_AST:java.lang.ThreadLocal
 - <init>():V
 - p:buildStubTree(com.intellij.lang.LighterAST,com.intellij.lang.LighterASTNode,com.intellij.psi.stubs.StubElement):V
 - buildStubTree(com.intellij.psi.PsiFile):com.intellij.psi.stubs.StubElement

@@ -1356,6 +1356,21 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
              """);
   }
 
+  // PY-80775
+  public void testParamSpecProtocolFull() {
+    doTestByText("""
+             from typing import Protocol
+             
+             class Proto[**P](Protocol):
+                 def f(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+             
+             class Impl:
+                 def f(self, i: int) -> None: ...
+             
+             p: Proto[[int]] = Impl()
+             """);
+  }
+
   // PY-46661
   public void testTypedDictInReturnType() {
     doTest();
@@ -2794,6 +2809,54 @@ def foo(param: str | int) -> TypeGuard[str]:
                    foo_set2: set[Foo] = <warning descr="Expected type 'set[Foo]', got 'set[dict[str, str]]' instead">{{"foo": bar, "buz": "qux"} for bar in ["bar"]}</warning>
                    foo_dict1: dict[str, Foo] = {bar: {"foo": bar} for bar in ["bar"]}
                    foo_dict2: dict[str, Foo] = <warning descr="Expected type 'dict[str, Foo]', got 'dict[str, dict[str, str]]' instead">{bar: {"foo": bar, "buz": "qux"} for bar in ["bar"]}</warning>
+                   """);
+  }
+
+  public void testTupleTypesAreCovariantOnAssignment() {
+    doTestByText("""
+                   def func(p1: tuple[int, int], p2: tuple[float, complex]):
+                       t1: tuple[float, complex] = p1
+                       t2: tuple[int, int] = <warning descr="Expected type 'tuple[int, int]', got 'tuple[float, complex]' instead">p2</warning>
+                   """);
+  }
+
+  public void testTupleAnyIsBidirectionallyCompatibleWithAnyTuple() {
+    doTestByText("""
+                   from typing import Any
+                   def func(p1: tuple[Any], p2: tuple[float]):
+                       v1: tuple[Any] = p2
+                       v2: tuple[float] = p1
+                   """);
+  }
+
+  public void testTupleAnyArbitraryLengthCanBeAssignedToAnyTuple() {
+    doTestByText("""
+                   from typing import Any
+                   def func(p1: tuple[Any, ...]):
+                       v1: tuple[float, float] = p1
+                       v2: tuple[float, ...] = p1
+                   """);
+  }
+
+  public void testTupleAnyArbitraryLengthIsAssignableFromAnyTuple() {
+    doTestByText("""
+                   from typing import Any
+                   def func(p1: tuple[float, float]):
+                       v1: tuple[Any, ...] = p1
+                   """);
+  }
+
+  public void testHomogeneousUnpackedTupleIsAssignableToHomogeneousTuple() {
+    doTestByText("""
+                   def func(p1: tuple[int, *tuple[int, ...]]):
+                       v1: tuple[int, ...] = p1
+                   """);
+  }
+
+  public void testHomogeneousUnpackedTupleIsNotAssignableToNonHomogeneousTupleOfSize1() {
+    doTestByText("""
+                   def func(p: tuple[int, *tuple[int, ...]]):
+                       v: tuple[int] = <warning>p</warning>
                    """);
   }
 }

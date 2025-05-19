@@ -15,16 +15,12 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Internal
 public final class ProjectPackageIndexImpl extends PackageIndex {
   private static final Logger LOG = Logger.getInstance(ProjectPackageIndexImpl.class);
+  
   private final DirectoryIndex myDirectoryIndex;
 
   @ApiStatus.Internal
   public ProjectPackageIndexImpl(@NotNull Project project) {
     myDirectoryIndex = DirectoryIndex.getInstance(project);
-  }
-
-  @Override
-  public VirtualFile @NotNull [] getDirectoriesByPackageName(@NotNull @NlsSafe String packageName, boolean includeLibrarySources) {
-    return getDirsByPackageName(packageName, includeLibrarySources).toArray(VirtualFile.EMPTY_ARRAY);
   }
 
   @Override
@@ -44,7 +40,15 @@ public final class ProjectPackageIndexImpl extends PackageIndex {
   }
 
   @Override
+  public @Nullable String getPackageName(@NotNull VirtualFile fileOrDir) {
+    return myDirectoryIndex.getPackageName(fileOrDir);
+  }
+
+  @Override
   public @Nullable String getPackageNameByDirectory(@NotNull VirtualFile dir) {
+    if (!dir.isDirectory()) {
+      LOG.error(dir.getPresentableUrl() + " is not a directory");
+    }
     return myDirectoryIndex.getPackageName(dir);
   }
 }

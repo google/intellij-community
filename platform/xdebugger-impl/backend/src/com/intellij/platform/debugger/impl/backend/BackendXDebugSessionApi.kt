@@ -13,16 +13,10 @@ import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.util.NlsContexts
-import com.intellij.platform.debugger.impl.rpc.XDebuggerEvaluatorDto
-import com.intellij.platform.debugger.impl.rpc.XStackFrameCaptionInfo
-import com.intellij.platform.debugger.impl.rpc.XStackFrameCustomBackgroundInfo
-import com.intellij.platform.debugger.impl.rpc.XStackFrameDto
-import com.intellij.platform.debugger.impl.rpc.XStackFramePresentation
-import com.intellij.platform.debugger.impl.rpc.XStackFramePresentationFragment
-import com.intellij.platform.debugger.impl.rpc.XStackFrameStringEqualityObject
-import com.intellij.platform.debugger.impl.rpc.toRpc
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.ui.ColoredTextContainer
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.util.ThreeState
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.evaluation.EvaluationMode
 import com.intellij.xdebugger.frame.XExecutionStack
@@ -89,7 +83,7 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
     val session = sessionId.findValue() ?: return emptyFlow()
     return session.tabInitDataFlow.map {
       if (it == null) return@map null
-      XDebuggerSessionTabDto(it, session.getPausedFlow().toRpc())
+      XDebuggerSessionTabDto(it, session.getPausedEventsFlow().toRpc())
     }
   }
 
@@ -145,16 +139,16 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
     }
   }
 
-  override suspend fun computeSmartStepTargets(sessionId: XDebugSessionId, sourcePositionDto: XSourcePositionDto): List<XSmartStepIntoTargetDto> {
-    return computeTargets(sessionId, sourcePositionDto) { handler, position ->
+  override suspend fun computeSmartStepTargets(sessionId: XDebugSessionId): List<XSmartStepIntoTargetDto> {
+    return computeTargets(sessionId) { handler, position ->
       withContext(Dispatchers.EDT) {
         handler.computeSmartStepVariantsAsync(position).await()
       }
     }
   }
 
-  override suspend fun computeStepTargets(sessionId: XDebugSessionId, sourcePositionDto: XSourcePositionDto): List<XSmartStepIntoTargetDto> {
-    return computeTargets(sessionId, sourcePositionDto) { handler, position ->
+  override suspend fun computeStepTargets(sessionId: XDebugSessionId): List<XSmartStepIntoTargetDto> {
+    return computeTargets(sessionId) { handler, position ->
       withContext(Dispatchers.EDT) {
         handler.computeStepIntoVariants(position).await()
       }
@@ -163,13 +157,12 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
 
   private suspend fun computeTargets(
     sessionId: XDebugSessionId,
-    sourcePositionDto: XSourcePositionDto,
     computeVariants: suspend (XSmartStepIntoHandler<*>, XSourcePosition) -> List<XSmartStepIntoVariant>,
   ): List<XSmartStepIntoTargetDto> {
     val session = sessionId.findValue() ?: return emptyList()
     val scope = session.currentSuspendCoroutineScope ?: return emptyList()
     val handler = session.debugProcess.smartStepIntoHandler ?: return emptyList()
-    val sourcePosition = sourcePositionDto.sourcePosition()
+    val sourcePosition = session.topFramePosition ?: return emptyList()
     return computeVariants(handler, sourcePosition).map { variant ->
       val id = variant.storeGlobally(scope, session)
       readAction {
@@ -271,7 +264,7 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
     session.fileColorsComputer.sendRequest(file)
   }
 
-  override suspend fun showExecutionPoint(sessionId: XDebugSessionId) {
+  override suspend fun switchToTopFrame(sessionId: XDebugSessionId) {
     val session = sessionId.findValue() ?: return
     withContext(Dispatchers.EDT) {
       session.showExecutionPoint()
@@ -282,22 +275,6 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
     val session = sessionId.findValue() ?: return
     withContext(Dispatchers.EDT) {
       session.setBreakpointMuted(muted)
-    }
-  }
-
-  override suspend fun canDrop(sessionId: XDebugSessionId, stackFrameId: XStackFrameId): Boolean {
-    val session = sessionId.findValue() ?: return false
-    val stack = stackFrameId.findValue() ?: return false
-    return withContext(Dispatchers.EDT) {
-      session.debugProcess.dropFrameHandler?.canDrop(stack.stackFrame) ?: false
-    }
-  }
-
-  override suspend fun dropFrame(sessionId: XDebugSessionId, stackFrameId: XStackFrameId) {
-    val session = sessionId.findValue() ?: return
-    val stack = stackFrameId.findValue() ?: return
-    withContext(Dispatchers.EDT) {
-      session.debugProcess.dropFrameHandler?.drop(stack.stackFrame)
     }
   }
 }
@@ -351,8 +328,9 @@ private fun XStackFrame.customBackgroundInfo(): XStackFrameCustomBackgroundInfo?
   return XStackFrameCustomBackgroundInfo(backgroundColor?.rpcId())
 }
 
-private fun XStackFrame.canDrop(session: XDebugSessionImpl): Boolean {
-  return session.debugProcess.dropFrameHandler?.canDrop(this) ?: false
+private fun XStackFrame.canDrop(session: XDebugSessionImpl): ThreeState {
+  val handler = session.debugProcess.dropFrameHandler ?: return ThreeState.NO
+  return handler.canDropFrame(this)
 }
 
 private fun XStackFrame.initialPresentation(): XStackFramePresentation {

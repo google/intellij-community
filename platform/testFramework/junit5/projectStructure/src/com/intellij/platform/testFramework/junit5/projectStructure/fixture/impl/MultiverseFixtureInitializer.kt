@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.junit5.projectStructure.fixture.impl
 
+import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
@@ -25,8 +26,11 @@ internal class MultiverseFixtureInitializer(
 
   private val sdkFixtures = mutableMapOf<String, TestFixture<Sdk>>()
 
-  suspend fun TestFixtureInitializer.R<Project>.initializeProjectModel(): Project {
-    projectFixture = projectFixture()
+  suspend fun TestFixtureInitializer.R<Project>.initializeProjectModel(
+    openProjectTask: OpenProjectTask = OpenProjectTask.build(),
+    openAfterCreation: Boolean
+  ): Project {
+    projectFixture = projectFixture(openProjectTask = openProjectTask, openAfterCreation = openAfterCreation)
     val project = projectFixture.init()
 
     projectRootPath = project.basePath?.let { Path(it) } ?: error("Project base path is not available")
@@ -48,6 +52,7 @@ internal class MultiverseFixtureInitializer(
     val modulePath = module.path.resolvePath()
     val modulePathFixture = dirFixture(modulePath)
     val moduleFixture = projectFixture.moduleFixture(modulePathFixture)
+    structure.addModuleFixture(module.moduleName, moduleFixture)
     val moduleInstance = moduleFixture.init()
 
     module.usedSdk?.let { usedSdk ->
@@ -56,6 +61,17 @@ internal class MultiverseFixtureInitializer(
       writeAction {
         val model = ModuleRootManager.getInstance(moduleInstance).modifiableModel
         model.sdk = sdkInstance
+        model.commit()
+      }
+    }
+
+    module.dependencies.forEach { dependency ->
+      val dependencyModuleName = dependency.moduleName
+      val dependencyModuleFixture = structure.findModuleFixture(dependencyModuleName) ?: error("Module '$dependencyModuleName' isn't found")
+      val dependencyModuleInstance = dependencyModuleFixture.init()
+      writeAction {
+        val model = ModuleRootManager.getInstance(moduleInstance).modifiableModel
+        model.addModuleOrderEntry(dependencyModuleInstance)
         model.commit()
       }
     }

@@ -7,6 +7,7 @@ import com.intellij.openapi.util.NlsSafe
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
 import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.java.JavaResourceRootType
+import org.jetbrains.jps.model.java.JavaSourceRootProperties
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import org.jetbrains.jps.model.java.JpsJavaDependencyScope
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
@@ -56,7 +57,7 @@ internal val customModules: Map<String, CustomModuleDescription> = listOf(
   CustomModuleDescription(moduleName = "intellij.platform.jps.build.dependencyGraph", bazelPackage = "@rules_jvm//dependency-graph", bazelTargetName = "dependency-graph",
                           outputDirectory = "out/bazel-out/rules_jvm+/\${CONF}/bin/dependency-graph"),
   CustomModuleDescription(moduleName = "intellij.platform.jps.build.javac.rt", bazelPackage = "@rules_jvm//jps-builders-6", bazelTargetName = "build-javac-rt",
-                          outputDirectory = "out/bazel-out/rules_jvm+/\${CONF}/bin/build-javac-rt"),
+                          outputDirectory = "out/bazel-out/rules_jvm+/\${CONF}/bin/jps-builders-6"),
 ).associateBy { it.moduleName }
 
 @Suppress("ReplaceGetOrSet")
@@ -95,7 +96,11 @@ internal class BazelBuildFileGenerator(
     }
 
     val resourceDescriptors = computeResources(module = module, contentRoots = contentRoots, bazelBuildDir = bazelBuildDir, type = JavaResourceRootType.RESOURCE)
-    val extraResourceTarget = extraResourceTarget(module = module, contentRoots = contentRoots, bazelBuildDir = bazelBuildDir)
+    val extraResourceTarget = computeExtraResourceTarget(module = module, contentRoots = contentRoots, bazelBuildDir = bazelBuildDir)
+    if (extraResourceTarget.any() && !module.name.contains(".android.")) {
+      throw IllegalStateException("Extra resource target for module ${module.name} is not null")
+    }
+
     val moduleContent = ModuleDescriptor(
       module = module,
       contentRoots = contentRoots,
@@ -403,10 +408,10 @@ internal class BazelBuildFileGenerator(
         if (module.name == "fleet.util.multiplatform" || module.name == "intellij.platform.syntax.multiplatformSupport") {
           option("exported_compiler_plugins", arrayOf("@lib//:expects-plugin"))
         }
-        else if (module.name == "fleet.rhizomedb") {
+        //else if (module.name == "fleet.rhizomedb") {
           // https://youtrack.jetbrains.com/issue/IJI-2662/RhizomedbCommandLineProcessor-requires-output-dir-but-we-dont-have-it-for-Bazel-compilation
           //option("exported_compiler_plugins", arrayOf("@lib//:rhizomedb-plugin"))
-        }
+        //}
 
         var deps = moduleList.deps.get(moduleDescriptor)
         if (deps != null && deps.provided.isNotEmpty()) {
@@ -658,7 +663,14 @@ private fun computeSources(module: JpsModule, contentRoots: List<Path>, bazelBui
       }
 
       if (type == JavaSourceRootType.SOURCE || type == JavaSourceRootType.TEST_SOURCE) {
-        sequenceOf(SourceDirDescriptor(glob = listOf("$prefix**/*.kt", "$prefix**/*.java"), excludes = excludes))
+        val rootProperties = root.properties
+        if ((rootProperties !is JavaSourceRootProperties || !rootProperties.isForGeneratedSources) && moduleWithForm.contains (module.name)) {
+          // rootDir.walk().any { it.extension == "form" }
+          sequenceOf(SourceDirDescriptor(glob = listOf("$prefix**/*.kt", "$prefix**/*.java", "$prefix**/*.form"), excludes = excludes))
+        }
+        else {
+          sequenceOf(SourceDirDescriptor(glob = listOf("$prefix**/*.kt", "$prefix**/*.java"), excludes = excludes))
+        }
       }
       else {
         sequenceOf(SourceDirDescriptor(glob = listOf("$prefix**/*"), excludes = excludes))
@@ -679,7 +691,7 @@ private fun computeResources(module: JpsModule, contentRoots: List<Path>, bazelB
 }
 
 @OptIn(ExperimentalPathApi::class)
-private fun extraResourceTarget(
+private fun computeExtraResourceTarget(
   module: JpsModule,
   contentRoots: List<Path>,
   bazelBuildDir: Path,
@@ -732,7 +744,7 @@ private fun isReferencedAsTestDep(
     }
   }
   for ((m, deps) in moduleList.deps) {
-    // kotlin.all-tests uses scope RUNTIME to depend on test module
+    // kotlin.all-tests uses scope RUNTIME to depend on the test module
     if (m.sources.isEmpty() && isUsed(deps, referencedModule)) {
       return true
     }
@@ -756,8 +768,8 @@ private fun jpsModuleNameToBazelBuildName(module: JpsModule, baseBuildDir: Path,
     return customModule.bazelTargetName
   }
 
-  val baseDirFilename = baseBuildDir.fileName.toString()
-  if (baseDirFilename != "resources" &&
+  val baseDirFilename = if (baseBuildDir == projectDir) null else baseBuildDir.fileName.toString()
+  if (baseDirFilename != null && baseDirFilename != "resources" &&
       (moduleName.endsWith(".$baseDirFilename") || (camelToSnakeCase(moduleName, '-')).endsWith(".$baseDirFilename"))) {
     return baseDirFilename
   }
@@ -767,9 +779,9 @@ private fun jpsModuleNameToBazelBuildName(module: JpsModule, baseBuildDir: Path,
     .removePrefix("intellij.idea.community.")
     .removePrefix("intellij.")
 
-  val parentDirDirName = if (baseBuildDir.parent == projectDir) "idea" else baseBuildDir.parent.fileName
+  val parentDirDirName = if (baseBuildDir == projectDir) null else if (baseBuildDir.parent == projectDir) "idea" else baseBuildDir.parent.fileName.toString()
   return result
-    .removePrefix("$parentDirDirName.")
+    .let { if (parentDirDirName != null) it.removePrefix("$parentDirDirName.") else it }
     .replace('.', '-')
 }
 

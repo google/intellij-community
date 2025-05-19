@@ -23,6 +23,7 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/redundantVisibilityModifier", pattern = pattern)
             model("${idea}/inspectionsLocal/redundantWith", pattern = pattern)
             model("${idea}/inspectionsLocal/implicitThis")
+            model("${idea}/inspectionsLocal/redundantInnerClassModifier")
             model("${idea}/inspectionsLocal/doubleNegation")
             model("${idea}/inspectionsLocal/safeCastWithReturn")
             model("${idea}/inspectionsLocal/enumValuesSoftDeprecate")
@@ -115,6 +116,7 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/javaCollectionsWithNullableTypes")
             model("${idea}/inspectionsLocal/redundantNullableReturnType")
             model("${idea}/inspectionsLocal/copyWithoutNamedArguments")
+            model("${idea}/inspectionsLocal/unusedUnaryOperator")
 
             // There is no `RemoveExplicitTypeArgumentsIntention` in K2 because `RemoveExplicitTypeArgumentsInspection` is available
             // and the inspection can have the "No highlighting (fix available)" severity.

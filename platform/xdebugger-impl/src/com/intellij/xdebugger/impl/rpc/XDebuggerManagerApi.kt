@@ -61,7 +61,7 @@ sealed interface XBreakpointEvent {
 @Serializable
 sealed interface XDebuggerManagerSessionEvent {
   @Serializable
-  data class ProcessStarted(val sessionId: XDebugSessionId, val sessionDto: XDebugSessionDto) : XDebuggerManagerSessionEvent
+  data class ProcessStarted(val sessionDto: XDebugSessionDto) : XDebuggerManagerSessionEvent
 
   @Serializable
   data class ProcessStopped(val sessionId: XDebugSessionId) : XDebuggerManagerSessionEvent
@@ -79,22 +79,22 @@ sealed interface XDebuggerSessionEvent {
   ) : XDebuggerSessionEvent
 
   @Serializable
-  class SessionResumed() : XDebuggerSessionEvent
+  object SessionResumed : XDebuggerSessionEvent
 
   @Serializable
-  class SessionStopped() : XDebuggerSessionEvent
+  object SessionStopped : XDebuggerSessionEvent
 
   @Serializable
   class StackFrameChanged(val stackFrame: XStackFrameDto?) : XDebuggerSessionEvent
 
   @Serializable
-  class BeforeSessionResume() : XDebuggerSessionEvent
+  object BeforeSessionResume : XDebuggerSessionEvent
 
   @Serializable
-  class SettingsChanged() : XDebuggerSessionEvent
+  object SettingsChanged : XDebuggerSessionEvent
 
   @Serializable
-  class BreakpointsMuted(val muted: Boolean) : XDebuggerSessionEvent
+  data class BreakpointsMuted(val muted: Boolean) : XDebuggerSessionEvent
 }
 
 @ApiStatus.Internal

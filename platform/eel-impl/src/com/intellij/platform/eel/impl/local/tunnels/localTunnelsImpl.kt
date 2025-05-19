@@ -9,12 +9,7 @@ import com.intellij.platform.eel.*
 import com.intellij.platform.eel.EelTunnelsApi.*
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
-import com.intellij.platform.eel.impl.NetworkError
-import com.intellij.platform.eel.impl.NetworkOk
-import com.intellij.platform.eel.impl.UnknownFailure
 import com.intellij.platform.eel.impl.asResolvedSocketAddress
-import com.intellij.platform.eel.provider.ResultErrImpl
-import com.intellij.platform.eel.provider.ResultOkImpl
 import com.intellij.platform.eel.provider.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -96,10 +91,10 @@ internal object EelLocalTunnelsApiImpl : EelTunnelsPosixApi, EelTunnelsWindowsAp
   }
 
 
-  override suspend fun getConnectionToRemotePort(args: GetConnectionToRemotePortArgs): EelResult<Connection, EelConnectionError> =
+  override suspend fun getConnectionToRemotePort(args: GetConnectionToRemotePortArgs): Connection =
     getConnectionToRemotePortImpl(args)
 
-  override suspend fun getAcceptorForRemotePort(args: GetAcceptorForRemotePort): EelResult<ConnectionAcceptor, EelConnectionError> =
+  override suspend fun getAcceptorForRemotePort(args: GetAcceptorForRemotePort): ConnectionAcceptor =
     getAcceptorForRemotePortImpl(args)
 }
 
@@ -113,7 +108,7 @@ private suspend fun deleteFileSilently(file: Path) {
   }
 }
 
-private suspend fun getConnectionToRemotePortImpl(args: GetConnectionToRemotePortArgs): EelResult<Connection, EelConnectionError> = withContext(Dispatchers.IO) {
+private suspend fun getConnectionToRemotePortImpl(args: GetConnectionToRemotePortArgs): Connection = withContext(Dispatchers.IO) {
   val socketChannel = args.protocolPreference.protocolFamily?.let {
     SocketChannel.open(it)
   } ?: SocketChannel.open()
@@ -124,17 +119,17 @@ private suspend fun getConnectionToRemotePortImpl(args: GetConnectionToRemotePor
   }
   return@withContext try {
     socketChannel.connect(args.asInetSocketAddress)
-    NetworkOk(SocketAdapter(socketChannel))
+    SocketAdapter(socketChannel)
   }
   catch (e: IOException) {
-    NetworkError(UnknownFailure(e.toString()))
+    throw EelConnectionError.UnknownFailure(e.toString())
   }
   finally {
     connKiller.cancel()
   }
 }
 
-private fun getAcceptorForRemotePortImpl(args: GetAcceptorForRemotePort): EelResult<ConnectionAcceptor, EelConnectionError> {
+private fun getAcceptorForRemotePortImpl(args: GetAcceptorForRemotePort): ConnectionAcceptor {
   val channel = try {
     ServerSocketChannel.open().apply {
       bind(args.asInetSocketAddress)
@@ -142,10 +137,10 @@ private fun getAcceptorForRemotePortImpl(args: GetAcceptorForRemotePort): EelRes
     }
   }
   catch (e: IOException) {
-    return ResultErrImpl(UnknownFailure(e.localizedMessage))
+    throw EelConnectionError.UnknownFailure(e.localizedMessage)
   }
   args.configureServerSocket(ConfigurableServerSocketImpl(channel.socket()))
-  return ResultOkImpl(ConnectionAcceptorImpl(channel))
+  return ConnectionAcceptorImpl(channel)
 }
 
 private val EelIpPreference.protocolFamily: ProtocolFamily?
@@ -199,20 +194,19 @@ private class ConnectionAcceptorImpl(private val boundServerSocket: ServerSocket
 @Service
 private class MyService(val scope: CoroutineScope)
 
-private suspend fun copyWithLoggingAndErrorHandling(src: EelReceiveChannel<IOException>, dest: EelSendChannel<IOException>, title: String, onError: (IOException) -> Unit) {
-  when (val r = copy(src, dest)) {
-    is EelResult.Error -> {
-      when (val e = r.error) {
-        is CopyResultError.InError -> {
-          logger.warn("$title input error", e.inError)
-          onError(e.inError)
-        }
-        is CopyResultError.OutError -> {
-          logger.warn("$title output error", e.outError)
-          onError(e.outError)
-        }
+private suspend fun copyWithLoggingAndErrorHandling(src: EelReceiveChannel, dest: EelSendChannel, title: String, onError: (IOException) -> Unit) {
+  try {
+    copy(src, dest)
+  } catch (e: CopyError) {
+    when (e) {
+      is CopyError.InError -> {
+        logger.warn("$title input error", e.cause)
+        onError(e.cause as IOException)
+      }
+      is CopyError.OutError -> {
+        logger.warn("$title output error", e.cause)
+        onError(e.cause as IOException)
       }
     }
-    is EelResult.Ok -> Unit
   }
 }

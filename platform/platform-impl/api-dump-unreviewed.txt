@@ -8486,6 +8486,7 @@ f:com.intellij.openapi.fileEditor.impl.EditorWindow
 - bs:closeFile$default(com.intellij.openapi.fileEditor.impl.EditorWindow,com.intellij.openapi.vfs.VirtualFile,Z,I,java.lang.Object):V
 - bs:closeFile$default(com.intellij.openapi.fileEditor.impl.EditorWindow,com.intellij.openapi.vfs.VirtualFile,Z,Z,I,java.lang.Object):V
 - f:composites():kotlin.sequences.Sequence
+- f:findCompositeAndTab(com.intellij.openapi.vfs.VirtualFile):kotlin.Pair
 - f:findFileComposite(com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWithProviderComposite
 - f:findSiblings():com.intellij.openapi.fileEditor.impl.EditorWindow[]
 - f:getAllComposites():java.util.List
@@ -10180,13 +10181,6 @@ e:com.intellij.openapi.updateSettings.impl.ChannelStatus
 - getDisplayName():java.lang.String
 - s:valueOf(java.lang.String):com.intellij.openapi.updateSettings.impl.ChannelStatus
 - s:values():com.intellij.openapi.updateSettings.impl.ChannelStatus[]
-f:com.intellij.openapi.updateSettings.impl.DetectedPluginsPanel
-- com.intellij.ui.OrderPanel
-- <init>(com.intellij.openapi.project.Project):V
-- addAll(java.util.Collection):V
-- isChecked(com.intellij.openapi.updateSettings.impl.PluginDownloader):Z
-- requestFocus():V
-- setChecked(com.intellij.openapi.updateSettings.impl.PluginDownloader,Z):V
 e:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
 - java.lang.Enum
 - sf:ACTUAL:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
@@ -17162,9 +17156,6 @@ f:com.intellij.xml.breadcrumbs.BreadcrumbsComponent
 - setHoveredCrumb(com.intellij.xml.breadcrumbs.BreadcrumbsComponent$Crumb):V
 - setItems(java.util.List):V
 - setOffset(I):V
-f:com.intellij.xml.breadcrumbs.BreadcrumbsComponent$ButtonSettings
-- <init>():V
-- s:getBackgroundColor(Z,Z,Z,Z):java.awt.Color
 a:com.intellij.xml.breadcrumbs.BreadcrumbsPanel
 - javax.swing.JComponent
 - com.intellij.openapi.Disposable

@@ -1,13 +1,11 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.dependency.impl;
 
-import com.intellij.openapi.util.SystemInfoRt;
-import com.intellij.openapi.util.text.StringUtilRt;
-import com.intellij.openapi.util.text.Strings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.jps.dependency.GraphDataInput;
 import org.jetbrains.jps.dependency.GraphDataOutput;
 import org.jetbrains.jps.dependency.NodeSource;
+import org.jetbrains.jps.util.SystemInfo;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,11 +37,7 @@ public final class PathSource implements NodeSource {
     }
 
     final PathSource that = (PathSource)o;
-
-    if (Strings.areSameInstance(myPath, that.myPath)) {
-      return true;
-    }
-    return SystemInfoRt.isFileSystemCaseSensitive? myPath.equals(that.myPath) : myPath.equalsIgnoreCase(that.myPath);
+    return SystemInfo.isFileSystemCaseSensitive? myPath.equals(that.myPath) : myPath.equalsIgnoreCase(that.myPath);
   }
 
   @Override
@@ -51,11 +45,26 @@ public final class PathSource implements NodeSource {
     if (myPath.isEmpty()) {
       return 0;
     }
-    return SystemInfoRt.isFileSystemCaseSensitive? myPath.hashCode() : StringUtilRt.stringHashCodeInsensitive(myPath);
+    return SystemInfo.isFileSystemCaseSensitive? myPath.hashCode() : stringHashCodeInsensitive(myPath);
   }
 
   @Override
   public String toString() {
     return myPath;
+  }
+
+  private static int stringHashCodeInsensitive(@NotNull CharSequence chars) {
+    int h = 0;
+    for (int off = 0; off < chars.length(); off++) {
+      h = 31 * h + toLowerCase(chars.charAt(off));
+    }
+    return h;
+  }
+
+  private static char toLowerCase(char a) {
+    if (a <= 'z') {
+      return a >= 'A' && a <= 'Z' ? (char)(a + ('a' - 'A')) : a;
+    }
+    return Character.toLowerCase(a);
   }
 }

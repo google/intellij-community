@@ -85,8 +85,8 @@
     <postStartupActivity implementation="com.intellij.codeInsight.actions.ReaderModeEditorSettingsListener"/>
     <backgroundPostStartupActivity implementation="com.intellij.openapi.wm.impl.LibraryDependentToolWindowManager"/>
 
-    <applicationService serviceImplementation="com.intellij.openapi.command.impl.UndoManagerImpl$ClientState" client="all"/>
-    <projectService serviceImplementation="com.intellij.openapi.command.impl.UndoManagerImpl$ClientState" client="all"/>
+    <applicationService serviceImplementation="com.intellij.openapi.command.impl.UndoClientState" client="all"/>
+    <projectService serviceImplementation="com.intellij.openapi.command.impl.UndoClientState" client="all"/>
 
     <applicationService serviceInterface="com.intellij.openapi.fileEditor.impl.CurrentEditorProvider"
                         serviceImplementation="com.intellij.openapi.fileEditor.impl.FocusBasedCurrentEditorProvider"
@@ -182,7 +182,7 @@
 
     <!--XNext-->
     <applicationService serviceInterface="com.intellij.openapi.application.impl.InternalUICustomization"
-                        serviceImplementation="com.intellij.openapi.application.impl.manyIslands.ManyIslandsUICustomization"/>
+                        serviceImplementation="com.intellij.openapi.application.impl.islands.IslandsUICustomization"/>
     <!---->
 
     <adEntityProvider implementation="com.intellij.openapi.editor.impl.ad.document.DefaultAdEntityProvider" />
@@ -190,7 +190,7 @@
   </extensions>
 
   <applicationListeners>
-    <listener class="com.intellij.openapi.command.impl.UndoManagerImpl$MyCommandListener"
+    <listener class="com.intellij.openapi.command.impl.UndoCommandListener"
               topic="com.intellij.openapi.command.CommandListener"/>
 
     <listener class="com.intellij.openapi.editor.impl.VisibleEditorsTracker$MyCommandListener"
@@ -266,7 +266,7 @@
               topic="com.intellij.openapi.options.advanced.AdvancedSettingsChangeListener"/>
   </applicationListeners>
   <projectListeners>
-    <listener class="com.intellij.openapi.command.impl.UndoManagerImpl$MyCommandListener"
+    <listener class="com.intellij.openapi.command.impl.UndoCommandListener"
               topic="com.intellij.openapi.command.CommandListener"/>
 
     <listener class="com.intellij.notification.impl.NotificationsModelConsumingListener"

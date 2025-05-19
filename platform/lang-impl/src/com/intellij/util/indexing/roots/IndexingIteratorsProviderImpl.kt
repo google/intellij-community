@@ -68,6 +68,8 @@ class IndexingIteratorsProviderImpl(
 
     index.visitFileSets { fileSet, entityPointer ->
       fileSet as WorkspaceFileSetWithCustomData<*>
+      if (!fileSet.kind.isIndexable) return@visitFileSets
+
       val root = fileSet.root
       val customData = fileSet.data
       if (customData is ModuleRelatedRootData) {
@@ -182,6 +184,7 @@ class IndexingIteratorsProviderImpl(
       parent,
       honorExclusion = false,
       includeContentSets = true,
+      includeContentNonIndexableSets = true,
       includeExternalSets = false,
       includeExternalSourceSets = false,
       includeCustomKindSets = false

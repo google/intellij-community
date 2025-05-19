@@ -1441,11 +1441,6 @@ public abstract class K2JsBasicCompletionLegacyStdlibTestGenerated extends Abstr
                 runTest("../../completion/testData/basic/common/getOperator/NotForSafeCall.kt");
             }
 
-            @TestMetadata("PreferOperator.kt")
-            public void testPreferOperator() throws Exception {
-                runTest("../../completion/testData/basic/common/getOperator/PreferOperator.kt");
-            }
-
             @TestMetadata("Simple.kt")
             public void testSimple() throws Exception {
                 runTest("../../completion/testData/basic/common/getOperator/Simple.kt");
@@ -3557,6 +3552,16 @@ public abstract class K2JsBasicCompletionLegacyStdlibTestGenerated extends Abstr
                 runTest("../../completion/testData/basic/common/InnerClass.kt");
             }
 
+            @TestMetadata("InnerClassWithParameters.kt")
+            public void testInnerClassWithParameters() throws Exception {
+                runTest("../../completion/testData/basic/common/InnerClassWithParameters.kt");
+            }
+
+            @TestMetadata("InnerClassWithParameters2.kt")
+            public void testInnerClassWithParameters2() throws Exception {
+                runTest("../../completion/testData/basic/common/InnerClassWithParameters2.kt");
+            }
+
             @TestMetadata("InnerInBaseClass.kt")
             public void testInnerInBaseClass() throws Exception {
                 runTest("../../completion/testData/basic/common/InnerInBaseClass.kt");
@@ -3955,6 +3960,11 @@ public abstract class K2JsBasicCompletionLegacyStdlibTestGenerated extends Abstr
             @TestMetadata("TypeArgOfOwnerClass.kt")
             public void testTypeArgOfOwnerClass() throws Exception {
                 runTest("../../completion/testData/basic/common/TypeArgOfOwnerClass.kt");
+            }
+
+            @TestMetadata("TypeArgumentPriority.kt")
+            public void testTypeArgumentPriority() throws Exception {
+                runTest("../../completion/testData/basic/common/TypeArgumentPriority.kt");
             }
 
             @TestMetadata("TypeParamAsTypeArg.kt")

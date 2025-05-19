@@ -19,12 +19,15 @@ class EmptyWorkspaceFileIndexData private constructor(private val debugName: Str
     val RESET: EmptyWorkspaceFileIndexData = EmptyWorkspaceFileIndexData("reset")
   }
   
-  override fun getFileInfo(file: VirtualFile,
-                           honorExclusion: Boolean,
-                           includeContentSets: Boolean,
-                           includeExternalSets: Boolean,
-                           includeExternalSourceSets: Boolean,
-                           includeCustomKindSets: Boolean): WorkspaceFileInternalInfo {
+  override fun getFileInfo(
+    file: VirtualFile,
+    honorExclusion: Boolean,
+    includeContentSets: Boolean,
+    includeContentNonIndexableSets: Boolean,
+    includeExternalSets: Boolean,
+    includeExternalSourceSets: Boolean,
+    includeCustomKindSets: Boolean
+  ): WorkspaceFileInternalInfo {
     return WorkspaceFileInternalInfo.NonWorkspace.NOT_UNDER_ROOTS
   }
 
@@ -32,7 +35,7 @@ class EmptyWorkspaceFileIndexData private constructor(private val debugName: Str
   override fun markDirty(entityPointers: Collection<EntityPointer<WorkspaceEntity>>, filesToInvalidate: Collection<VirtualFile>) {}
   override fun onEntitiesChanged(event: VersionedStorageChange, storageKind: EntityStorageKind) {}
   override fun updateDirtyEntities() {}
-  override fun getPackageName(dir: VirtualFile): String? = null
+  override fun getPackageName(dirOrFile: VirtualFile): String? = null
   override fun getDirectoriesByPackageName(packageName: String, includeLibrarySources: Boolean): Query<VirtualFile> = EmptyQuery.getEmptyQuery()
   override fun getFilesByPackageName(packageName: String): Query<VirtualFile> = EmptyQuery.getEmptyQuery()
   override fun resetCustomContributors() {}

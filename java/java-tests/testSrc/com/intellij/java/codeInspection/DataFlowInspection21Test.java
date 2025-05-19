@@ -162,6 +162,12 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
     doTest();
   }
 
+  public void testJSpecifyCallExplicitTypeParameters() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
+  }
+
   public void testJSpecifyGetOrDefault() {
     addJSpecifyNullMarked(myFixture);
     setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
@@ -171,6 +177,11 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
   public void testJSpecifyReturnFromParameterized() {
     addJSpecifyNullMarked(myFixture);
     setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
+  }
+  
+  public void testJsr305NicknameAsTypeAnnotation() {
+    DataFlowInspectionTest.addJavaxNullabilityAnnotations(myFixture);
     doTest();
   }
 }

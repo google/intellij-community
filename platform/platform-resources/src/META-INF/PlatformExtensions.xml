@@ -194,10 +194,6 @@
                         serviceImplementation="com.intellij.execution.wsl.WslDistributionManagerImpl"/>
     <applicationService serviceInterface="com.intellij.execution.wsl.WslIjentAvailabilityService"
                         serviceImplementation="com.intellij.execution.wsl.DummyWslIjentAvailabilityService"/>
-    <applicationService serviceInterface="com.intellij.execution.wsl.WslIjentManager"
-                        serviceImplementation="com.intellij.platform.ide.impl.wsl.ProductionWslIjentManager"/>
-
-    <eelProvider implementation="com.intellij.platform.ide.impl.wsl.WslEelProvider" os="windows"/>
 
     <executionTargetType implementation="com.intellij.execution.wsl.target.WslTargetType" os="windows"/>
 
@@ -507,9 +503,9 @@
     <applicationService serviceImplementation="com.intellij.openapi.keymap.impl.DefaultKeymap"/>
 
     <applicationService serviceInterface="com.intellij.openapi.options.SchemeManagerFactory"
-                        serviceImplementation="com.intellij.configurationStore.schemeManager.SchemeManagerFactoryBase$ApplicationSchemeManagerFactory"/>
+                        serviceImplementation="com.intellij.configurationStore.schemeManager.ApplicationSchemeManagerFactory"/>
     <projectService serviceInterface="com.intellij.openapi.options.SchemeManagerFactory"
-                    serviceImplementation="com.intellij.configurationStore.schemeManager.SchemeManagerFactoryBase$ProjectSchemeManagerFactory"/>
+                    serviceImplementation="com.intellij.configurationStore.schemeManager.ProjectSchemeManagerFactory"/>
 
     <applicationService serviceInterface="com.intellij.openapi.editor.colors.TextAttributesKey$TextAttributeKeyDefaultsProvider"
                         serviceImplementation="com.intellij.openapi.editor.colors.impl.TextAttributeKeyDefaultsProviderImpl"/>
@@ -698,6 +694,13 @@
 
     <themeProvider id="JetBrainsHighContrastTheme" path="/themes/HighContrast.theme.json"/>
     <bundledColorScheme id="High contrast" path="themes/highContrastScheme.xml"/>
+
+    <themeProvider id="One Island Light" path="/themes/islands/OneIslandLight.theme.json" targetUi="island"/>
+    <themeProvider id="One Island Darker" path="/themes/islands/OneIslandDarker.theme.json" targetUi="island"/>
+    <themeProvider id="One Island Darkest" path="/themes/islands/OneIslandDarkest.theme.json" targetUi="island"/>
+
+    <themeProvider id="Many Islands Darker" path="/themes/islands/ManyIslandsDarker.theme.json" targetUi="islands"/>
+    <themeProvider id="Many Islands Light" path="/themes/islands/ManyIslandsLight.theme.json" targetUi="islands"/>
 
     <themeMetadataProvider path="/themes/metadata/IntelliJPlatform.themeMetadata.json"/>
     <themeMetadataProvider path="/themes/metadata/JDK.themeMetadata.json"/>
@@ -1784,6 +1787,8 @@
     <initProjectActivity implementation="com.intellij.openapi.roots.impl.ProjectRootManagerInitProjectActivity"/>
 
     <idePerformanceListener implementation="com.intellij.diagnostic.FusFreezeReporter"/>
+
+    <backgroundPostStartupActivity implementation="com.intellij.internal.DumpPluginDescriptorsOnProjectOpenTrigger"/>
 
     <registryKey key="search.everywhere.footer.extended.info"
                  defaultValue="true"

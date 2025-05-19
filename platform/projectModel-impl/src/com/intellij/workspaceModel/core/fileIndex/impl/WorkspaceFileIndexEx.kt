@@ -27,6 +27,7 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
   fun getFileInfo(file: VirtualFile,
                   honorExclusion: Boolean,
                   includeContentSets: Boolean,
+                  includeContentNonIndexableSets: Boolean,
                   includeExternalSets: Boolean,
                   includeExternalSourceSets: Boolean,
                   includeCustomKindSets: Boolean): WorkspaceFileInternalInfo
@@ -41,8 +42,9 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
    */
   fun <E: WorkspaceEntity> findContainingEntities(file: VirtualFile,
                                                   entityClass: Class<E>,
-                                                  honorExclusion: Boolean, 
-                                                  includeContentSets: Boolean, 
+                                                  honorExclusion: Boolean,
+                                                  includeContentSets: Boolean,
+                                                  includeContentNonIndexableSets: Boolean,
                                                   includeExternalSets: Boolean,
                                                   includeExternalSourceSets: Boolean,
                                                   includeCustomKindSets: Boolean): Collection<E>
@@ -56,6 +58,7 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
     file: VirtualFile,
     honorExclusion: Boolean,
     includeContentSets: Boolean,
+    includeContentNonIndexableSets: Boolean,
     includeExternalSets: Boolean,
     includeExternalSourceSets: Boolean,
     includeCustomKindSets: Boolean,
@@ -67,21 +70,22 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
   val indexData: WorkspaceFileIndexData
 
   /**
-   * Processes [content][com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind.isContent] files from the file sets located under 
+   * Processes [indexable][com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind.isIndexable] files from the file sets located under
    * [fileOrDir] directory using [processor].
    * @param customFilter determines whether an individual file or directory should be processed;
    * @param fileSetFilter determines whether files belonging to a specific file set should be processed;
    * @return `true` if all files were processed, or `false` if processing was stopped because [processor] returned 
    * [STOP][com.intellij.util.containers.TreeNodeProcessingResult.STOP]. 
    */
-  fun processContentFilesRecursively(fileOrDir: VirtualFile, processor: ContentIteratorEx, customFilter: VirtualFileFilter?,
-                                     fileSetFilter: (WorkspaceFileSetWithCustomData<*>) -> Boolean): Boolean
+  fun processIndexableFilesRecursively(fileOrDir: VirtualFile, processor: ContentIteratorEx, customFilter: VirtualFileFilter?,
+                                       fileSetFilter: (WorkspaceFileSetWithCustomData<*>) -> Boolean): Boolean
 
   /**
-   * Returns package name for [directory] if it's located under source root or classes root of Java library, or `null` otherwise.
+   * Returns package name for [fileOrDir] if it's a single file source root, or a directory located under source root or 
+   * classes root of a Java library. Returns `null` otherwise.
    * This is an internal function, plugins must use [com.intellij.openapi.roots.PackageIndex.getPackageNameByDirectory] instead.
    */
-  fun getPackageName(directory: VirtualFile): String?
+  fun getPackageName(fileOrDir: VirtualFile): String?
 
   /**
    * Returns a query producing directories which correspond to [packageName]. 

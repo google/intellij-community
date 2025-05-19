@@ -5,6 +5,7 @@ import com.intellij.ide.actions.ApplyIntentionAction
 import com.intellij.ide.actions.searcheverywhere.PromoAction
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.icons.rpcId
+import com.intellij.ide.ui.icons.rpcIdOrNull
 import com.intellij.ide.ui.search.BooleanOptionDescription
 import com.intellij.ide.ui.search.OptionDescription
 import com.intellij.ide.util.gotoByName.GotoActionModel
@@ -23,6 +24,8 @@ import com.intellij.platform.searchEverywhere.SeItemPresentation
 import com.intellij.platform.searchEverywhere.SeOptionActionItemPresentation
 import com.intellij.platform.searchEverywhere.SeRunnableActionItemPresentation
 import com.intellij.platform.searchEverywhere.SeRunnableActionItemPresentation.Promo
+import com.intellij.platform.searchEverywhere.providers.SeLog
+import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
 import com.intellij.util.text.nullize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,10 +33,10 @@ import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 object SeActionPresentationProvider {
-  suspend fun get(matchedValue: GotoActionModel.MatchedValue): SeItemPresentation {
+  suspend fun get(matchedValue: GotoActionModel.MatchedValue, extendedDescription: String?): SeItemPresentation {
     val value = matchedValue.value
     if (value is GotoActionModel.ActionWrapper) {
-      var presentation = SeRunnableActionItemPresentation(commonData = SeActionItemPresentation.Common(text = ""))
+      var presentation = SeRunnableActionItemPresentation(commonData = SeActionItemPresentation.Common(text = "", extendedDescription = extendedDescription))
 
       val anAction = value.action
       val actionPresentation = value.presentation
@@ -54,8 +57,8 @@ object SeActionPresentationProvider {
 
       if (UISettings.getInstance().showIconsInMenus) {
         presentation = presentation.run {
-          copy(iconId = actionPresentation.icon?.rpcId(),
-               selectedIconId = actionPresentation.selectedIcon?.rpcId())
+          copy(iconId = actionPresentation.icon?.rpcIdOrNull(),
+               selectedIconId = actionPresentation.selectedIcon?.rpcIdOrNull())
         }
       }
 
@@ -88,7 +91,7 @@ object SeActionPresentationProvider {
     }
     else if (value is OptionDescription) {
       val hit = GotoActionModel.GotoActionListCellRenderer.calcHit(value)
-      var presentation = SeOptionActionItemPresentation(commonData = SeActionItemPresentation.Common(text = hit))
+      var presentation = SeOptionActionItemPresentation(commonData = SeActionItemPresentation.Common(text = hit, extendedDescription = extendedDescription),)
 
       (value as? BooleanOptionDescription)?.isOptionEnabled.let {
         presentation = presentation.run {
@@ -103,6 +106,8 @@ object SeActionPresentationProvider {
       return presentation
     }
 
+    SeLog.log(ITEM_EMIT) { "Couldn't generate an action presentation. Unknown item: $matchedValue" }
+    @Suppress("HardCodedStringLiteral")
     return SeRunnableActionItemPresentation(SeActionItemPresentation.Common(text = "Unknown item"))
   }
 }

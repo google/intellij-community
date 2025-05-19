@@ -4,6 +4,7 @@ package com.intellij.platform.ide.progress
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.NlsContexts.ModalProgressTitle
 import com.intellij.openapi.util.NlsContexts.ProgressTitle
 import com.intellij.platform.ide.progress.suspender.TaskSuspender
 import com.intellij.platform.util.progress.reportProgress
@@ -81,7 +82,7 @@ suspend fun <T> withBackgroundProgress(
 
 suspend fun <T> withModalProgress(
   project: Project,
-  title: @ProgressTitle String,
+  title: @ModalProgressTitle String,
   action: suspend CoroutineScope.() -> T,
 ): T {
   return withModalProgress(ModalTaskOwner.project(project), title, TaskCancellation.cancellable(), action)
@@ -109,7 +110,7 @@ suspend fun <T> withModalProgress(
  */
 suspend fun <T> withModalProgress(
   owner: ModalTaskOwner,
-  title: @ProgressTitle String,
+  title: @ModalProgressTitle String,
   cancellation: TaskCancellation,
   action: suspend CoroutineScope.() -> T,
 ): T {
@@ -120,7 +121,7 @@ suspend fun <T> withModalProgress(
 @RequiresEdt
 fun <T> runWithModalProgressBlocking(
   project: Project,
-  title: @ProgressTitle String,
+  title: @ModalProgressTitle String,
   action: suspend CoroutineScope.() -> T,
 ): T {
   return runWithModalProgressBlocking(ModalTaskOwner.project(project), title, TaskCancellation.cancellable(), action)
@@ -194,7 +195,7 @@ fun <T> runWithModalProgressBlocking(
 @RequiresEdt
 fun <T> runWithModalProgressBlocking(
   owner: ModalTaskOwner,
-  title: @ProgressTitle String,
+  title: @ModalProgressTitle String,
   cancellation: TaskCancellation = TaskCancellation.cancellable(),
   action: suspend CoroutineScope.() -> T,
 ): T {

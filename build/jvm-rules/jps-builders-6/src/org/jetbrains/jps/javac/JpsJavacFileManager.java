@@ -1,14 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.javac;
 
-import com.intellij.openapi.util.io.FileUtilRt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.builders.java.JavaSourceTransformer;
-import org.jetbrains.jps.javac.Iterators.BooleanFunction;
-import org.jetbrains.jps.javac.Iterators.Function;
+import org.jetbrains.jps.util.Iterators;
+import org.jetbrains.jps.util.Iterators.BooleanFunction;
+import org.jetbrains.jps.util.Iterators.Function;
+import org.jetbrains.jps.util.SystemInfo;
 
 import javax.tools.*;
 import java.io.Closeable;
@@ -22,11 +23,6 @@ import java.util.*;
 
 @ApiStatus.Internal
 public final class JpsJavacFileManager extends ForwardingJavaFileManager<StandardJavaFileManager> implements StandardJavaFileManager {
-  private static final String _OS_NAME = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-  private static final boolean isWindows = _OS_NAME.startsWith("windows");
-  private static final boolean isOS2 = _OS_NAME.startsWith("os/2") || _OS_NAME.startsWith("os2");
-  private static final boolean isMac = _OS_NAME.startsWith("mac");
-  private static final boolean isFileSystemCaseSensitive = !isWindows && !isOS2 && !isMac;
   private static final Set<JavaFileObject.Kind> ourSourceOrClass = EnumSet.of(JavaFileObject.Kind.SOURCE, JavaFileObject.Kind.CLASS);
   private static final Set<StandardLocation> ourFSLocations = EnumSet.of(
     StandardLocation.PLATFORM_CLASS_PATH,
@@ -332,14 +328,14 @@ public final class JpsJavacFileManager extends ForwardingJavaFileManager<Standar
   }
 
   private File findOutputDir(File src) {
-    File file = FileUtilRt.getParentFile(src);
+    File file = myFileOperations.getParentFile(src);
     while (file != null) {
       for (Map.Entry<File, Set<File>> entry : myOutputsMap.entrySet()) {
         if (entry.getValue().contains(file)) {
           return entry.getKey();
         }
       }
-      file = FileUtilRt.getParentFile(file);
+      file = myFileOperations.getParentFile(file);
     }
     return null;
   }
@@ -424,7 +420,7 @@ public final class JpsJavacFileManager extends ForwardingJavaFileManager<Standar
   public String inferBinaryName(Location location, JavaFileObject file) {
     final JavaFileObject _fo = unwrapFileObject(file);
     if (_fo instanceof JpsFileObject) {
-      final String inferred = ((JpsFileObject)_fo).inferBinaryName(getLocation(location), isFileSystemCaseSensitive);
+      final String inferred = ((JpsFileObject)_fo).inferBinaryName(getLocation(location), SystemInfo.isFileSystemCaseSensitive);
       if (inferred != null) {
         return inferred;
       }
@@ -644,13 +640,13 @@ public final class JpsJavacFileManager extends ForwardingJavaFileManager<Standar
   }
 
   private static boolean isAncestor(File dir, File file) {
-    final String dirPath = FileUtilRt.toCanonicalPath(dir.getAbsolutePath(), File.separatorChar, false);
-    final String filePath = FileUtilRt.toCanonicalPath(file.getAbsolutePath(), File.separatorChar, false);
+    final String dirPath = DefaultFileOperations.toSystemIndependentName(dir.getAbsoluteFile().toPath().normalize().toString());
+    final String filePath = DefaultFileOperations.toSystemIndependentName(file.getAbsoluteFile().toPath().normalize().toString());
     final boolean trailingSlash = dirPath.endsWith("/");
     if (filePath.length() < (trailingSlash? dirPath.length() : dirPath.length() + 1)) {
       return false;
     }
-    if (!filePath.regionMatches(!isFileSystemCaseSensitive, 0, dirPath, 0, dirPath.length())) {
+    if (!filePath.regionMatches(!SystemInfo.isFileSystemCaseSensitive, 0, dirPath, 0, dirPath.length())) {
       return false;
     }
     if (!trailingSlash && filePath.charAt(dirPath.length()) != '/') {

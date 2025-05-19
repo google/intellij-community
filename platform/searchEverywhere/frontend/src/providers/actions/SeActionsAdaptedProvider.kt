@@ -3,17 +3,22 @@ package com.intellij.platform.searchEverywhere.frontend.providers.actions
 
 import com.intellij.ide.actions.searcheverywhere.ActionSearchEverywhereContributor
 import com.intellij.ide.actions.searcheverywhere.CheckBoxSearchEverywhereToggleAction
+import com.intellij.ide.util.gotoByName.GotoActionModel.MatchedValue
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.searchEverywhere.SeItem
 import com.intellij.platform.searchEverywhere.SeItemsProvider
 import com.intellij.platform.searchEverywhere.SeParams
+import com.intellij.platform.searchEverywhere.providers.getExtendedDescription
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
 
 
 @Internal
-class SeActionsAdaptedProvider(private val legacyContributor: ActionSearchEverywhereContributor): SeItemsProvider {
+class SeActionsAdaptedProvider(private val legacyContributor: ActionSearchEverywhereContributor) : SeItemsProvider {
   override val id: String get() = ID
   override val displayName: @Nls String
     get() = legacyContributor.fullGroupName
@@ -21,22 +26,30 @@ class SeActionsAdaptedProvider(private val legacyContributor: ActionSearchEveryw
   override suspend fun collectItems(params: SeParams, collector: SeItemsProvider.Collector) {
     val inputQuery = params.inputQuery
     val filter = SeActionsFilter.from(params.filter)
-    legacyContributor.getActions({}).firstOrNull {
-      it is CheckBoxSearchEverywhereToggleAction
-    }?.let {
-      (it as CheckBoxSearchEverywhereToggleAction).isEverywhere = filter.includeDisabled
+    legacyContributor.getActions({}).filterIsInstance<CheckBoxSearchEverywhereToggleAction>().firstOrNull()?.let {
+      it.isEverywhere = filter.includeDisabled
     }
 
     coroutineScope {
       legacyContributor.fetchWeightedElements(this, inputQuery) {
-        collector.put(SeActionItem(it.item))
+        collector.put(SeActionItem(it.item, getExtendedDescription(it.item)))
       }
     }
   }
 
   override suspend fun itemSelected(item: SeItem, modifiers: Int, searchText: String): Boolean {
     val legacyItem = (item as? SeActionItem)?.matchedValue ?: return false
-    return legacyContributor.processSelectedItem(legacyItem, modifiers, searchText)
+    return withContext(Dispatchers.EDT) {
+      legacyContributor.processSelectedItem(legacyItem, modifiers, searchText)
+    }
+  }
+
+  fun getExtendedDescription(item: MatchedValue): String? {
+    return legacyContributor.getExtendedDescription(item)
+  }
+
+  override suspend fun canBeShownInFindResults(): Boolean {
+    return legacyContributor.showInFindResults()
   }
 
   override fun dispose() {

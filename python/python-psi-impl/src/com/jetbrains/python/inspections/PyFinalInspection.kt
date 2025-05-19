@@ -46,21 +46,7 @@ class PyFinalInspection : PyInspection() {
                                             superClassList, finalSuperClasses.size))
       }
 
-      if (PyiUtil.isInsideStub(node)) {
-        val visitedNames = mutableSetOf<String?>()
-
-        node.visitMethods(
-          { m ->
-            if (!visitedNames.add(m.name) && isFinal(m)) {
-              registerProblem(m.nameIdentifier, PyPsiBundle.message("INSP.final.final.should.be.placed.on.first.overload"))
-            }
-            true
-          },
-          false,
-          myTypeEvalContext
-        )
-      }
-      else {
+      if (!PyiUtil.isInsideStub(node)) {
         val (classLevelFinals, initAttributes) = getClassLevelFinalsAndInitAttributes(node)
         if (!isDataclass(node)) {
           checkClassLevelFinalsAreInitialized(classLevelFinals, initAttributes)
@@ -76,7 +62,10 @@ class PyFinalInspection : PyInspection() {
 
       val cls = node.containingClass
       if (cls != null) {
-        if (!PyiUtil.isOverload(node, myTypeEvalContext)) {
+        val isOverload = PyiUtil.isOverload(node, myTypeEvalContext)
+        if (!isOverload ||
+            PyiUtil.getImplementation(node, myTypeEvalContext) == null &&
+            PyiUtil.getOverloads(node, myTypeEvalContext).firstOrNull() === node) {
           PySuperMethodsSearch
             .search(node, myTypeEvalContext)
             .asIterable()
@@ -90,10 +79,6 @@ class PyFinalInspection : PyInspection() {
             }
         }
         if (!PyiUtil.isInsideStub(node)) {
-          if (isFinal(node) && PyiUtil.isOverload(node, myTypeEvalContext)) {
-            registerProblem(node.nameIdentifier, PyPsiBundle.message("INSP.final.final.should.be.placed.on.implementation"))
-          }
-
           checkInstanceFinalsOutsideInit(node)
         }
 

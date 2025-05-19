@@ -37,16 +37,8 @@ public class MethodsTracker {
       return myMethod != null && getOccurrenceCount(myMethod) > 1;
     }
 
-    // check that all methods are not native to be able to drop a frame
-    public boolean canDrop() {
-      for (int i = 0; i <= myFrameIndex + 1; i++) {
-        MethodOccurrence occurrence = myCache.get(i);
-        Method method = occurrence != null ? occurrence.myMethod : null;
-        if (method == null || method.isNative()) {
-          return false;
-        }
-      }
-      return true;
+    MethodOccurrence getMethodOccurrence(int frameIndex) {
+      return myCache.get(frameIndex);
     }
   }
 

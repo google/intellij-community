@@ -13,8 +13,7 @@ import com.intellij.platform.searchEverywhere.SeUsageEventsLogger
 import com.intellij.platform.searchEverywhere.frontend.SeTab
 import com.intellij.util.SystemProperties
 import fleet.kernel.DurableRef
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -54,12 +53,6 @@ class SePopupVm(
 
   val usageLogger: SeUsageEventsLogger = SeUsageEventsLogger()
 
-  var shouldLoadMore: Boolean
-    get() = currentTab.shouldLoadMore
-    set(value) {
-      currentTab.shouldLoadMore = value
-    }
-
   init {
     check(tabVms.isNotEmpty()) { "Search Everywhere tabs must not be empty" }
 
@@ -88,14 +81,31 @@ class SePopupVm(
     return currentTab.itemSelected(item, modifiers, searchPattern.value)
   }
 
+  suspend fun itemsSelected(items: List<SeItemData>, modifiers: Int): Boolean {
+    logItemSelected()
+    val currentTab = currentTab
+
+    return coroutineScope {
+      items.map { item ->
+        async {
+          currentTab.itemSelected(item, modifiers, searchPattern.value)
+        }
+      }.awaitAll().any { it }
+    }
+  }
+
   fun selectNextTab() {
-    currentTabIndex.value = (currentTabIndex.value + 1).coerceIn(tabVms.indices)
-    usageLogger.tabSwitched()
+    val oldIndex = currentTabIndex.value
+    currentTabIndex.value = (currentTabIndex.value + 1) % tabVms.size
+
+    if (oldIndex != currentTabIndex.value) usageLogger.tabSwitched()
   }
 
   fun selectPreviousTab() {
-    currentTabIndex.value = (currentTabIndex.value - 1).coerceIn(tabVms.indices)
-    usageLogger.tabSwitched()
+    val oldIndex = currentTabIndex.value
+    currentTabIndex.value = (currentTabIndex.value - 1 + tabVms.size) % tabVms.size
+
+    if (oldIndex != currentTabIndex.value) usageLogger.tabSwitched()
   }
 
   fun showTab(tabId: String) {
