@@ -47,15 +47,12 @@ class GradleModelFetchActionRunner private constructor(
 
     val resultHandler = GradleModelFetchActionResultHandlerBridge(resolverContext, modelFetchAction, modelFetchActionListener)
 
-    val gradleVersion = resolverContext.projectGradleVersion
-    when {
-      // Fallback to default executor for Gradle projects with incorrect build environment or scripts
-      gradleVersion == null -> runDefaultBuildAction(resultHandler)
-
-      // Gradle older than 4.8 doesn't support phased execution
-      GradleVersionUtil.isGradleOlderThan(gradleVersion, "4.8") -> runDefaultBuildAction(resultHandler)
-
-      else -> runPhasedBuildAction(resultHandler)
+    // Gradle older than 4.8 doesn't support phased execution
+    if (GradleVersionUtil.isGradleOlderThan(resolverContext.gradleVersion, "4.8")) {
+      runDefaultBuildAction(resultHandler)
+    }
+    else {
+      runPhasedBuildAction(resultHandler)
     }
 
     resultHandler.collectAllEvents()
@@ -95,14 +92,7 @@ class GradleModelFetchActionRunner private constructor(
   }
 
   private fun <T : LongRunningOperation> T.prepareOperationForSync(): T {
-    GradleExecutionHelper.prepareForExecution(
-      this,
-      resolverContext.cancellationToken,
-      resolverContext.externalSystemTaskId,
-      resolverContext.settings,
-      resolverContext.listener,
-      resolverContext.buildEnvironment
-    )
+    GradleExecutionHelper.prepareForExecution(this, resolverContext)
     return this
   }
 

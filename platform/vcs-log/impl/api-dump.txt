@@ -339,10 +339,11 @@ c:com.intellij.vcs.log.history.FileHistoryUi
 - p:onVisiblePackUpdated(Z):V
 - setVisiblePack(com.intellij.vcs.log.visible.VisiblePack):V
 f:com.intellij.vcs.log.history.FileHistoryUtil
-- <init>():V
-- s:affectsDirectory(com.intellij.openapi.vcs.changes.Change,com.intellij.openapi.vcs.FilePath):Z
-- s:affectsFile(com.intellij.openapi.vcs.changes.Change,com.intellij.openapi.vcs.FilePath,Z):Z
-- s:createVcsVirtualFile(com.intellij.openapi.vcs.history.VcsFileRevision):com.intellij.openapi.vfs.VirtualFile
+- sf:INSTANCE:com.intellij.vcs.log.history.FileHistoryUtil
+- f:affectsDirectory(com.intellij.openapi.vcs.changes.Change,com.intellij.openapi.vcs.FilePath):Z
+- f:affectsFile(com.intellij.openapi.vcs.changes.Change,com.intellij.openapi.vcs.FilePath,Z):Z
+- sf:createChangeToParents(I,java.util.List,com.intellij.vcs.log.visible.VisiblePack,com.intellij.vcs.log.VcsLogDiffHandler,com.intellij.vcs.log.data.VcsLogData):com.intellij.openapi.vcs.changes.Change
+- sf:createVcsVirtualFile(com.intellij.openapi.vcs.history.VcsFileRevision):com.intellij.openapi.vfs.VirtualFile
 f:com.intellij.vcs.log.impl.CommonUiProperties
 - sf:COLUMN_ID_ORDER:com.intellij.vcs.log.impl.VcsLogUiProperties$VcsLogUiProperty
 - sf:COMPACT_REFERENCES_VIEW:com.intellij.vcs.log.impl.VcsLogUiProperties$VcsLogUiProperty
@@ -483,13 +484,7 @@ f:com.intellij.vcs.log.impl.VcsLogApplicationSettings$State
 - f:setShowTagNames(Z):V
 f:com.intellij.vcs.log.impl.VcsLogContentUtil
 - sf:INSTANCE:com.intellij.vcs.log.impl.VcsLogContentUtil
-- f:closeLogTab(com.intellij.ui.content.ContentManager,java.lang.String):Z
-- f:getId(com.intellij.ui.content.Content):java.lang.String
-- sf:openLogTab(com.intellij.openapi.project.Project,com.intellij.vcs.log.impl.VcsLogManager,com.intellij.ui.content.TabGroupId,java.util.function.Function,com.intellij.vcs.log.impl.VcsLogManager$VcsLogUiFactory,Z):com.intellij.vcs.log.ui.VcsLogUiEx
 - sf:runInMainLog(com.intellij.openapi.project.Project,com.intellij.util.Consumer):V
-- f:selectMainLog(com.intellij.openapi.project.Project):Z
-- f:showLogIsNotAvailableMessage(com.intellij.openapi.project.Project):V
-- sf:updateLogUiName(com.intellij.openapi.project.Project,com.intellij.vcs.log.VcsLogUi):V
 com.intellij.vcs.log.impl.VcsLogErrorHandler
 - a:displayMessage(java.lang.String):V
 - a:handleError(com.intellij.vcs.log.impl.VcsLogErrorHandler$Source,java.lang.Throwable):V
@@ -519,33 +514,19 @@ com.intellij.vcs.log.impl.VcsLogIndexer$CompressedDetails
 - a:getRenamedPaths(I):it.unimi.dsi.fastutil.ints.Int2IntMap
 com.intellij.vcs.log.impl.VcsLogIndexer$PathsEncoder
 - a:encode(com.intellij.openapi.vfs.VirtualFile,java.lang.String,Z):I
-c:com.intellij.vcs.log.impl.VcsLogManager
-- com.intellij.openapi.Disposable
-- pf:myProject:com.intellij.openapi.project.Project
-- <init>(com.intellij.openapi.project.Project,com.intellij.vcs.log.impl.VcsLogTabsProperties,java.util.Collection):V
-- <init>(com.intellij.openapi.project.Project,com.intellij.vcs.log.impl.VcsLogTabsProperties,java.util.Map,java.lang.String,Z,Z,java.util.function.BiConsumer):V
-- createLogUi(com.intellij.vcs.log.impl.VcsLogManager$VcsLogUiFactory,com.intellij.vcs.log.impl.VcsLogTabLocation):com.intellij.vcs.log.ui.VcsLogUiEx
-- createLogUi(java.lang.String,com.intellij.vcs.log.impl.VcsLogTabLocation):com.intellij.vcs.log.ui.MainVcsLogUi
-- dispose():V
-- dispose(java.lang.Runnable):V
-- s:findLogProviders(java.util.Collection,com.intellij.openapi.project.Project):java.util.Map
-- getColorManager():com.intellij.vcs.log.ui.VcsLogColorManager
-- getDataManager():com.intellij.vcs.log.data.VcsLogData
+Fc:com.intellij.vcs.log.impl.VcsLogManager
+- sf:Companion:com.intellij.vcs.log.impl.VcsLogManager$Companion
+- sf:findLogProviders(java.util.Collection,com.intellij.openapi.project.Project):java.util.Map
+- f:getColorManager():com.intellij.vcs.log.ui.VcsLogColorManager
+- f:getDataManager():com.intellij.vcs.log.data.VcsLogData
 - getLogUis():java.util.List
-- getLogUis(com.intellij.vcs.log.impl.VcsLogTabLocation):java.util.List
-- getMainLogUiFactory(java.lang.String,com.intellij.vcs.log.VcsLogFilterCollection):com.intellij.vcs.log.impl.VcsLogManager$VcsLogUiFactory
-- getName():java.lang.String
-- getUiProperties():com.intellij.vcs.log.impl.VcsLogTabsProperties
-- getVisibleLogUis(com.intellij.vcs.log.impl.VcsLogTabLocation):java.util.List
-- isDisposed():Z
-- isLogVisible():Z
-a:com.intellij.vcs.log.impl.VcsLogManager$BaseVcsLogUiFactory
-- com.intellij.vcs.log.impl.VcsLogManager$VcsLogUiFactory
-- <init>(java.lang.String,com.intellij.vcs.log.VcsLogFilterCollection,com.intellij.vcs.log.impl.VcsLogTabsProperties,com.intellij.vcs.log.ui.VcsLogColorManager):V
-- createLogUi(com.intellij.openapi.project.Project,com.intellij.vcs.log.data.VcsLogData):com.intellij.vcs.log.ui.VcsLogUiImpl
-- pa:createVcsLogUiImpl(java.lang.String,com.intellij.vcs.log.data.VcsLogData,com.intellij.vcs.log.impl.MainVcsLogUiProperties,com.intellij.vcs.log.ui.VcsLogColorManager,com.intellij.vcs.log.visible.VisiblePackRefresherImpl,com.intellij.vcs.log.VcsLogFilterCollection):com.intellij.vcs.log.ui.VcsLogUiImpl
-com.intellij.vcs.log.impl.VcsLogManager$VcsLogUiFactory
-- a:createLogUi(com.intellij.openapi.project.Project,com.intellij.vcs.log.data.VcsLogData):com.intellij.vcs.log.ui.VcsLogUiEx
+- f:getUiProperties():com.intellij.vcs.log.impl.VcsLogTabsProperties
+- f:isDisposed():Z
+- f:isLogUpToDate():Z
+f:com.intellij.vcs.log.impl.VcsLogManager$Companion
+- f:findLogProviders(java.util.Collection,com.intellij.openapi.project.Project):java.util.Map
+f:com.intellij.vcs.log.impl.VcsLogManagerKt
+- sf:waitForRefresh(com.intellij.vcs.log.impl.VcsLogManager,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.vcs.log.impl.VcsLogNavigationUtil
 - sf:INSTANCE:com.intellij.vcs.log.impl.VcsLogNavigationUtil
 - sf:jumpToBranch(com.intellij.vcs.log.ui.VcsLogUiEx,java.lang.String,Z,Z):V
@@ -555,67 +536,7 @@ f:com.intellij.vcs.log.impl.VcsLogNavigationUtil
 - sf:jumpToHash(com.intellij.vcs.log.ui.VcsLogUiEx,java.lang.String,Z,Z):com.google.common.util.concurrent.ListenableFuture
 - sf:jumpToRefOrHash(com.intellij.vcs.log.ui.VcsLogUiEx,java.lang.String,Z,Z):com.google.common.util.concurrent.ListenableFuture
 - sf:jumpToRevisionAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash,com.intellij.openapi.vcs.FilePath):java.util.concurrent.CompletableFuture
-- sf:jumpToRevisionAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash,com.intellij.openapi.vcs.FilePath,Z):java.util.concurrent.CompletableFuture
 - bs:jumpToRevisionAsync$default(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash,com.intellij.openapi.vcs.FilePath,I,java.lang.Object):java.util.concurrent.CompletableFuture
-- f:waitForRefresh(com.intellij.vcs.log.impl.VcsLogManager,kotlin.coroutines.Continuation):java.lang.Object
-f:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties
-- com.intellij.openapi.components.PersistentStateComponent
-- com.intellij.vcs.log.impl.VcsLogTabsProperties
-- sf:Companion:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$Companion
-- <init>():V
-- sf:addRecentGroup(java.util.Map,java.lang.String,java.util.Collection):V
-- f:addRecentlyFilteredGroup(java.lang.String,java.util.Collection):V
-- f:addTab(java.lang.String,com.intellij.vcs.log.impl.VcsLogTabLocation):V
-- createProperties(java.lang.String):com.intellij.vcs.log.impl.MainVcsLogUiProperties
-- sf:getRecentGroup(java.util.Map,java.lang.String):java.util.List
-- f:getRecentlyFilteredGroups(java.lang.String):java.util.List
-- getState():com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$State
-- f:getTabs():java.util.Map
-- loadState(com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$State):V
-- f:removeTab(java.lang.String):V
-- f:resetState(java.lang.String):V
-f:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$Companion
-- f:addRecentGroup(java.util.Map,java.lang.String,java.util.Collection):V
-- f:getRecentGroup(java.util.Map,java.lang.String):java.util.List
-c:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$CustomBooleanTabProperty
-- com.intellij.vcs.log.impl.VcsLogUiProperties$VcsLogUiProperty
-- <init>(java.lang.String):V
-- defaultValue(java.lang.String):Z
-f:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$MyState
-- com.intellij.vcs.log.impl.VcsLogUiPropertiesImpl$State
-- <init>():V
-- f:getCustomBooleanProperties():java.util.Map
-- f:setCustomBooleanProperties(java.util.Map):V
-f:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$RecentGroup
-- <init>():V
-- <init>(java.util.Collection):V
-- equals(java.lang.Object):Z
-- f:getFILTER_VALUES():java.util.List
-- hashCode():I
-- f:setFILTER_VALUES(java.util.List):V
-f:com.intellij.vcs.log.impl.VcsLogProjectTabsProperties$State
-- <init>():V
-- f:getOpenTabs():java.util.LinkedHashMap
-- f:getRecentFilters():java.util.Map
-- f:getTabStates():java.util.Map
-- f:setOpenTabs(java.util.LinkedHashMap):V
-- f:setRecentFilters(java.util.Map):V
-- f:setTabStates(java.util.Map):V
-e:com.intellij.vcs.log.impl.VcsLogTabLocation
-- java.lang.Enum
-- sf:Companion:com.intellij.vcs.log.impl.VcsLogTabLocation$Companion
-- sf:TOOL_WINDOW:com.intellij.vcs.log.impl.VcsLogTabLocation
-- s:getEntries():kotlin.enums.EnumEntries
-- s:valueOf(java.lang.String):com.intellij.vcs.log.impl.VcsLogTabLocation
-- s:values():com.intellij.vcs.log.impl.VcsLogTabLocation[]
-f:com.intellij.vcs.log.impl.VcsLogTabLocation$Companion
-- f:findLogUi(com.intellij.vcs.log.impl.VcsLogManager,com.intellij.vcs.log.impl.VcsLogTabLocation,java.lang.Class,Z,kotlin.jvm.functions.Function1):com.intellij.vcs.log.VcsLogUi
-f:com.intellij.vcs.log.impl.VcsLogTabsManager
-- sf:Companion:com.intellij.vcs.log.impl.VcsLogTabsManager$Companion
-- f:openAnotherLogTab(com.intellij.vcs.log.VcsLogFilterCollection,com.intellij.vcs.log.impl.VcsLogTabLocation):com.intellij.vcs.log.ui.MainVcsLogUi
-f:com.intellij.vcs.log.impl.VcsLogTabsManager$Companion
-- f:getTAB_GROUP_ID():com.intellij.ui.content.TabGroupId
-- f:onDisplayNameChange(com.intellij.vcs.log.ui.MainVcsLogUi,kotlin.jvm.functions.Function0):V
 com.intellij.vcs.log.impl.VcsLogTabsProperties
 - a:createProperties(java.lang.String):com.intellij.vcs.log.impl.MainVcsLogUiProperties
 com.intellij.vcs.log.impl.VcsLogUiProperties
@@ -676,27 +597,33 @@ f:com.intellij.vcs.log.impl.VcsLogUiPropertiesImpl$TextFilterSettings
 - f:isRegex():Z
 - f:setMatchCase(Z):V
 - f:setRegex(Z):V
-f:com.intellij.vcs.log.impl.VcsProjectLog
+Fa:com.intellij.vcs.log.impl.VcsProjectLog
 - sf:Companion:com.intellij.vcs.log.impl.VcsProjectLog$Companion
 - sf:VCS_PROJECT_LOG_CHANGED:com.intellij.util.messages.Topic
-- <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
-- f:createLogInBackground(Z):V
-- f:getDataManager():com.intellij.vcs.log.data.VcsLogData
+- getDataManager():com.intellij.vcs.log.data.VcsLogData
 - sf:getInstance(com.intellij.openapi.project.Project):com.intellij.vcs.log.impl.VcsProjectLog
-- f:getLogManager():com.intellij.vcs.log.impl.VcsLogManager
+- getLogManager():com.intellij.vcs.log.impl.VcsLogManager
 - sf:getLogProviders(com.intellij.openapi.project.Project):java.util.Map
-- f:getMainLogUi():com.intellij.vcs.log.ui.VcsLogUiImpl
+- getMainLogUi():com.intellij.vcs.log.ui.VcsLogUiImpl
+- f:getMainUi():com.intellij.vcs.log.ui.MainVcsLogUi
 - sf:getSupportedVcs(com.intellij.openapi.project.Project):java.util.Set
-- f:getTabManager():com.intellij.vcs.log.impl.VcsLogTabsManager
-- f:isDisposing():Z
-- f:openLogTab(com.intellij.vcs.log.VcsLogFilterCollection):com.intellij.vcs.log.ui.MainVcsLogUi
-- f:openLogTab(com.intellij.vcs.log.VcsLogFilterCollection,com.intellij.vcs.log.impl.VcsLogTabLocation):com.intellij.vcs.log.ui.MainVcsLogUi
+- sf:isAvailable(com.intellij.openapi.project.Project):Z
+- openLogTab(com.intellij.vcs.log.VcsLogFilterCollection):com.intellij.vcs.log.ui.MainVcsLogUi
+- sf:runInMainLog(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function1):V
+- sf:showRevisionInMainLog(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash):V
+- sf:showRevisionInMainLog(com.intellij.openapi.project.Project,com.intellij.vcs.log.Hash):V
+- a:showRevisionInMainLog(com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash):V
+- a:showRevisionInMainLog(com.intellij.vcs.log.Hash):V
 f:com.intellij.vcs.log.impl.VcsProjectLog$Companion
 - f:awaitLogIsReady(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 - f:getInstance(com.intellij.openapi.project.Project):com.intellij.vcs.log.impl.VcsProjectLog
 - f:getLogProviders(com.intellij.openapi.project.Project):java.util.Map
 - f:getSupportedVcs(com.intellij.openapi.project.Project):java.util.Set
+- f:isAvailable(com.intellij.openapi.project.Project):Z
+- f:runInMainLog(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function1):V
 - f:runWhenLogIsReady(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function1):V
+- f:showRevisionInMainLog(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.vcs.log.Hash):V
+- f:showRevisionInMainLog(com.intellij.openapi.project.Project,com.intellij.vcs.log.Hash):V
 - f:waitWhenLogIsReady(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 com.intellij.vcs.log.impl.VcsProjectLog$ProjectLogListener
 - a:logCreated(com.intellij.vcs.log.impl.VcsLogManager):V
@@ -1218,6 +1145,7 @@ a:com.intellij.vcs.log.ui.table.VcsLogIconCellRenderer
 - pa:customize(com.intellij.vcs.log.ui.table.VcsLogGraphTable,java.lang.Object,Z,Z,I,I):V
 - pf:customizeCellRenderer(javax.swing.JTable,java.lang.Object,Z,Z,I,I):V
 - getPreferredWidth():com.intellij.vcs.log.ui.table.VcsLogCellRenderer$PreferredWidth
+- paintComponent(java.awt.Graphics):V
 com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn
 - com.intellij.vcs.log.ui.table.column.VcsLogColumn
 - sf:Companion:com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn$Companion

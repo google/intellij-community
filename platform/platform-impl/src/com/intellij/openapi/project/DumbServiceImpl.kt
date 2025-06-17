@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.project
 
 import com.intellij.icons.AllIcons
@@ -12,7 +12,6 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.progress.util.PingProgress
 import com.intellij.openapi.project.MergingQueueGuiExecutor.ExecutorStateListener
@@ -183,15 +182,13 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     // we assume that queueStartupActivitiesRequiredForSmartMode will be invoked to advance DUMB > SMART
   }
 
-  internal suspend fun queueStartupActivitiesRequiredForSmartMode() {
+  internal fun queueStartupActivitiesRequiredForSmartMode() {
     if (!initialDumbTaskRequiredForSmartModeSubmitted.compareAndSet(false, true)) {
       return
     }
 
     val task = InitialDumbTaskRequiredForSmartMode(project)
-    blockingContext {
-      queueTask(task)
-    }
+    queueTask(task)
   }
 
   override fun cancelTask(task: DumbModeTask) {
@@ -211,7 +208,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     guiDumbTaskRunner.suspendAndRun(activityName, activity)
   }
 
-  override suspend fun suspendIndexingAndRun(activityName: @NlsContexts.ProgressText String, activity: suspend () -> Unit) {
+  override suspend fun suspendIndexingAndRun(activityName: @NlsContexts.ProgressText String, activity: suspend CoroutineScope.() -> Unit) {
     guiDumbTaskRunner.guiSuspender().suspendAndRun(activityName, activity)
   }
 
@@ -229,11 +226,10 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     LOG.info("[$project]: running dumb task without visible indicator: $debugReason")
 
     suspend fun incrementCounter() {
-      blockingContext { // because we need correct modality
-        // Because we need to avoid additional dispatch. UNDISPATCHED coroutine is not a solution, because
-        // multiple UNDISPATCHED coroutines in the same (EDT) thread ends up in some strange state (as revealed by unit tests)
-        incrementDumbCounter(trace = Throwable())
-      }
+      // we need correct modality
+      // Because we need to avoid additional dispatch. UNDISPATCHED coroutine is not a solution, because
+      // multiple UNDISPATCHED coroutines in the same (EDT) thread ends up in some strange state (as revealed by unit tests)
+      incrementDumbCounter(trace = Throwable())
     }
 
     if (EDT.isCurrentThreadEdt()) {
@@ -251,9 +247,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     finally {
       // in the case of cancellation, this block won't execute if NonCancellable is omitted
       withContext(Dispatchers.EDT + NonCancellable) {
-        blockingContext {
-          decrementDumbCounter()
-        }
+        decrementDumbCounter()
         LOG.info("[$project]: finished dumb task without visible indicator: $debugReason")
       }
     }
@@ -273,6 +267,9 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
       })
       if (enteredDumb) {
         LOG.info("enter dumb mode [${project.name}]")
+        if (LOG.isDebugEnabled) {
+          LOG.debug("dumb mode [${project.name}] trace", trace)
+        }
         dumbModeStartTrace = trace
         try {
           publishDumbModeChangedEvent()
@@ -404,9 +401,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     }.invokeOnCompletion {
       if (!dumbModeCounterWillBeDecrementedFromOnFinish) {
         scope.launch(modality.asContextElement() + Dispatchers.EDT) {
-          blockingContext {
-            launcher.cancel()
-          }
+          launcher.cancel()
         }
       }
     }

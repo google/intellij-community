@@ -543,6 +543,60 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../completion/testData/basic/common/bracketOperators")
+    public static class BracketOperators extends AbstractKotlinKmpCompletionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        @java.lang.Override
+        public KMPTestPlatform getTestPlatform() {
+            return KMPTestPlatform.Js;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ExtensionGet.kt")
+        public void testExtensionGet() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/ExtensionGet.kt");
+        }
+
+        @TestMetadata("ExtensionInvoke.kt")
+        public void testExtensionInvoke() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/ExtensionInvoke.kt");
+        }
+
+        @TestMetadata("NotForImplicitReceiver.kt")
+        public void testNotForImplicitReceiver() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/NotForImplicitReceiver.kt");
+        }
+
+        @TestMetadata("NotForSafeCall.kt")
+        public void testNotForSafeCall() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/NotForSafeCall.kt");
+        }
+
+        @TestMetadata("SimpleGet.kt")
+        public void testSimpleGet() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/SimpleGet.kt");
+        }
+
+        @TestMetadata("SimpleInvoke.kt")
+        public void testSimpleInvoke() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/SimpleInvoke.kt");
+        }
+
+        @TestMetadata("SimpleSet.kt")
+        public void testSimpleSet() throws Exception {
+            runTest("../../completion/testData/basic/common/bracketOperators/SimpleSet.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../completion/testData/basic/common/callableReference")
     public static class CallableReference extends AbstractKotlinKmpCompletionTest {
         @java.lang.Override
@@ -669,6 +723,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("AbstractConstructor.kt")
+        public void testAbstractConstructor() throws Exception {
+            runTest("../../completion/testData/basic/common/constructor/AbstractConstructor.kt");
+        }
+
         @TestMetadata("DoNotOfferConstructorForClassifier.kt")
         public void testDoNotOfferConstructorForClassifier() throws Exception {
             runTest("../../completion/testData/basic/common/constructor/DoNotOfferConstructorForClassifier.kt");
@@ -702,6 +761,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("PreferConstructorInReturn.kt")
         public void testPreferConstructorInReturn() throws Exception {
             runTest("../../completion/testData/basic/common/constructor/PreferConstructorInReturn.kt");
+        }
+
+        @TestMetadata("PrivateConstructor.kt")
+        public void testPrivateConstructor() throws Exception {
+            runTest("../../completion/testData/basic/common/constructor/PrivateConstructor.kt");
         }
 
         @TestMetadata("SingleConstructor.kt")
@@ -1483,45 +1547,6 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("../../completion/testData/basic/common/getOperator")
-    public static class GetOperator extends AbstractKotlinKmpCompletionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
-        @java.lang.Override
-        public KMPTestPlatform getTestPlatform() {
-            return KMPTestPlatform.Js;
-        }
-
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-        }
-
-        @TestMetadata("Extension.kt")
-        public void testExtension() throws Exception {
-            runTest("../../completion/testData/basic/common/getOperator/Extension.kt");
-        }
-
-        @TestMetadata("NotForImplicitReceiver.kt")
-        public void testNotForImplicitReceiver() throws Exception {
-            runTest("../../completion/testData/basic/common/getOperator/NotForImplicitReceiver.kt");
-        }
-
-        @TestMetadata("NotForSafeCall.kt")
-        public void testNotForSafeCall() throws Exception {
-            runTest("../../completion/testData/basic/common/getOperator/NotForSafeCall.kt");
-        }
-
-        @TestMetadata("Simple.kt")
-        public void testSimple() throws Exception {
-            runTest("../../completion/testData/basic/common/getOperator/Simple.kt");
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../completion/testData/basic/common/highOrderFunctions")
     public static class HighOrderFunctions extends AbstractKotlinKmpCompletionTest {
         @java.lang.Override
@@ -1803,11 +1828,6 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
-        @TestMetadata("KTIJ-32210.kt")
-        public void testKTIJ_32210() throws Exception {
-            runTest("../../completion/testData/basic/common/lambdaSignature/KTIJ-32210.kt");
-        }
-
         @TestMetadata("ParameterName1.kt")
         public void testParameterName1() throws Exception {
             runTest("../../completion/testData/basic/common/lambdaSignature/ParameterName1.kt");
@@ -1856,6 +1876,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("ParameterType5.kt")
         public void testParameterType5() throws Exception {
             runTest("../../completion/testData/basic/common/lambdaSignature/ParameterType5.kt");
+        }
+
+        @TestMetadata("ParameterTypeWithOuterTypeQualifier.kt")
+        public void testParameterTypeWithOuterTypeQualifier() throws Exception {
+            runTest("../../completion/testData/basic/common/lambdaSignature/ParameterTypeWithOuterTypeQualifier.kt");
         }
     }
 
@@ -1920,6 +1945,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("CompactTypeNames.kt")
         public void testCompactTypeNames() throws Exception {
             runTest("../../completion/testData/basic/common/namedArguments/CompactTypeNames.kt");
+        }
+
+        @TestMetadata("CompanionObjectInvoke.kt")
+        public void testCompanionObjectInvoke() throws Exception {
+            runTest("../../completion/testData/basic/common/namedArguments/CompanionObjectInvoke.kt");
         }
 
         @TestMetadata("ForEmptyParametersFunction.kt")
@@ -2251,6 +2281,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("PreferImplementToOverride.kt")
         public void testPreferImplementToOverride() throws Exception {
             runTest("../../completion/testData/basic/common/override/PreferImplementToOverride.kt");
+        }
+
+        @TestMetadata("PreferImplementToOverrideK2.kt")
+        public void testPreferImplementToOverrideK2() throws Exception {
+            runTest("../../completion/testData/basic/common/override/PreferImplementToOverrideK2.kt");
         }
 
         @TestMetadata("SecondConstructorParameter.kt")
@@ -3766,9 +3801,39 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
             runTest("../../completion/testData/basic/common/InsideAnonymousClass.kt");
         }
 
-        @TestMetadata("InsideAnonymousObject.kt")
-        public void testInsideAnonymousObject() throws Exception {
-            runTest("../../completion/testData/basic/common/InsideAnonymousObject.kt");
+        @TestMetadata("InsideAnonymousObjectPrivate.kt")
+        public void testInsideAnonymousObjectPrivate() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideAnonymousObjectPrivate.kt");
+        }
+
+        @TestMetadata("InsideAnonymousObjectProtected.kt")
+        public void testInsideAnonymousObjectProtected() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideAnonymousObjectProtected.kt");
+        }
+
+        @TestMetadata("InsideAnonymousObjectPublic.kt")
+        public void testInsideAnonymousObjectPublic() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideAnonymousObjectPublic.kt");
+        }
+
+        @TestMetadata("InsideLocalClassAndAnonymousObject.kt")
+        public void testInsideLocalClassAndAnonymousObject() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideLocalClassAndAnonymousObject.kt");
+        }
+
+        @TestMetadata("InsideLocalClassPrivate.kt")
+        public void testInsideLocalClassPrivate() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideLocalClassPrivate.kt");
+        }
+
+        @TestMetadata("InsideLocalClassProtected.kt")
+        public void testInsideLocalClassProtected() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideLocalClassProtected.kt");
+        }
+
+        @TestMetadata("InsideLocalClassPublic.kt")
+        public void testInsideLocalClassPublic() throws Exception {
+            runTest("../../completion/testData/basic/common/InsideLocalClassPublic.kt");
         }
 
         @TestMetadata("InterfaceNameBeforeRunBug.kt")

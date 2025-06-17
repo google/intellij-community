@@ -18,6 +18,13 @@
   files:
   - name: $MAVEN_REPOSITORY$/com/google/code/findbugs/jsr305/3/jsr305-3.jar
   reason: <- intellij.python.community.impl
+- name: lib/kaml.jar
+  library: kaml
+  files:
+  - name: $MAVEN_REPOSITORY$/com/charleskorn/kaml/kaml-jvm/0/kaml-jvm-0.jar
+  - name: $MAVEN_REPOSITORY$/it/krzeminski/snakeyaml-engine-kmp-jvm/3/snakeyaml-engine-kmp-jvm-3.jar
+  - name: $MAVEN_REPOSITORY$/net/thauvin/erik/urlencoder/urlencoder-lib-jvm/1/urlencoder-lib-jvm-1.jar
+  reason: <- intellij.python.community.impl
 - name: lib/libthrift.jar
   library: libthrift
   files:
@@ -34,6 +41,7 @@
   - name: intellij.python.ast
   - name: intellij.python.syntax.core
   - name: intellij.python.syntax
+  - name: intellij.python.community.helpersLocator
 - name: lib/python-ce.jar
   modules:
   - name: intellij.python.community.plugin
@@ -47,6 +55,7 @@
   - name: intellij.python.community
   - name: intellij.python.community.impl
   - name: intellij.python.community.execService
+  - name: intellij.python.community.execService.python
   - name: intellij.python.community.impl.installer
   - name: intellij.python.pydev
   - name: intellij.python.community.impl.venv

@@ -2,54 +2,53 @@
 package com.intellij.openapi.command.impl;
 
 import com.intellij.codeWithMe.ClientId;
-import com.intellij.ide.IdeBundle;
 import com.intellij.idea.ActionsBundle;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.client.*;
+import com.intellij.openapi.client.ClientKind;
+import com.intellij.openapi.client.ClientSession;
+import com.intellij.openapi.client.ClientSessionsManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
-import com.intellij.openapi.command.undo.*;
+import com.intellij.openapi.command.undo.DocumentReference;
+import com.intellij.openapi.command.undo.DocumentReferenceManager;
+import com.intellij.openapi.command.undo.UndoManager;
+import com.intellij.openapi.command.undo.UndoableAction;
 import com.intellij.openapi.components.ComponentManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.fileEditor.*;
+import com.intellij.openapi.fileEditor.ClientFileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.impl.CurrentEditorProvider;
-import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.*;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.EmptyRunnable;
 import com.intellij.openapi.util.NlsActions.ActionDescription;
 import com.intellij.openapi.util.NlsActions.ActionText;
+import com.intellij.openapi.util.NlsContexts.Command;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.ExternalChangeAction;
+import com.intellij.psi.ExternalChangeActionUtil;
 import com.intellij.serviceContainer.NonInjectable;
 import com.intellij.util.ObjectUtils;
-import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import org.jetbrains.annotations.*;
 
 import java.util.*;
 
 public class UndoManagerImpl extends UndoManager {
+
   private static final Logger LOG = Logger.getInstance(UndoManagerImpl.class);
 
-  @SuppressWarnings("StaticNonFinalField")
   @TestOnly
-  public static boolean ourNeverAskUser;
-
-  private final @Nullable Project myProject;
-
-  private @Nullable CurrentEditorProvider myOverriddenEditorProvider;
-
-  private final SharedAdjustableUndoableActionsHolder myAdjustableUndoableActionsHolder = new SharedAdjustableUndoableActionsHolder();
-  private final SharedUndoRedoStacksHolder mySharedUndoStacksHolder = new SharedUndoRedoStacksHolder(true, myAdjustableUndoableActionsHolder);
-  private final SharedUndoRedoStacksHolder mySharedRedoStacksHolder = new SharedUndoRedoStacksHolder(false, myAdjustableUndoableActionsHolder);
+  @SuppressWarnings("StaticNonFinalField")
+  public static boolean ourNeverAskUser = false;
 
   public static boolean isRefresh() {
-    return ApplicationManager.getApplication().hasWriteAction(ExternalChangeAction.class);
+    return ExternalChangeActionUtil.isExternalChangeInProgress();
   }
 
   public static int getGlobalUndoLimit() {
@@ -59,6 +58,13 @@ public class UndoManagerImpl extends UndoManager {
   public static int getDocumentUndoLimit() {
     return Registry.intValue("undo.documentUndoLimit");
   }
+
+  private final @Nullable Project myProject;
+  private final @NotNull SharedAdjustableUndoableActionsHolder myAdjustableUndoableActionsHolder;
+  private final @NotNull SharedUndoRedoStacksHolder mySharedUndoStacksHolder;
+  private final @NotNull SharedUndoRedoStacksHolder mySharedRedoStacksHolder;
+
+  private @Nullable CurrentEditorProvider myOverriddenEditorProvider;
 
   @SuppressWarnings("unused")
   private UndoManagerImpl(@NotNull Project project) {
@@ -73,163 +79,30 @@ public class UndoManagerImpl extends UndoManager {
   @ApiStatus.Internal
   @NonInjectable
   protected UndoManagerImpl(@Nullable ComponentManager componentManager) {
-    myProject = componentManager instanceof Project ? (Project)componentManager : null;
-  }
-
-  public @Nullable Project getProject() {
-    return myProject;
-  }
-
-  private @Nullable UndoClientState getClientState() {
-    ClientId clientId = ClientId.getCurrentOrNull();
-    if (clientId != null) {
-      ClientSession appSession = ClientSessionsManager.getAppSession(clientId);
-      if (appSession != null && appSession.isController()) {
-        // IJPL-168172: If current session is a controller, return a local client state instead
-        try (AccessToken ignored = ClientId.withExplicitClientId(ClientId.getLocalId())) {
-          return getComponentManager().getService(UndoClientState.class);
-        }
-      }
-    }
-
-    return getComponentManager().getService(UndoClientState.class);
-  }
-
-  private @Nullable UndoClientState getClientState(@Nullable FileEditor editor) {
-    UndoClientState state = getClientState();
-    if (myProject == null || editor == null) return state;
-
-    try (AccessToken ignored = ClientId.withExplicitClientId(ClientFileEditorManager.getClientId(editor))) {
-      UndoClientState editorState = getClientState();
-      LOG.assertTrue(state == editorState,
-                     "Using editor belonging to '" + (editorState != null ? editorState.getClientId().getValue() : "null") +
-                     "' under '" + (state != null ? state.getClientId().getValue() : "null") + "'");
-    }
-
-    return state;
-  }
-
-  private List<UndoClientState> getAllClientStates() {
-    return getComponentManager().getServices(UndoClientState.class, ClientKind.ALL);
-  }
-
-  private ComponentManager getComponentManager() {
-    return myProject != null ? myProject : ApplicationManager.getApplication();
-  }
-
-  void trimSharedStacks(@NotNull DocumentReference docRef) {
-    trimSharedStacks(Set.of(docRef));
-  }
-
-  void trimSharedStacks(@NotNull Set<DocumentReference> docRefs) {
-    mySharedRedoStacksHolder.trimStacks(docRefs);
-    mySharedUndoStacksHolder.trimStacks(docRefs);
-  }
-
-  public boolean isActive() {
-    UndoClientState state = getClientState();
-    if (state == null) {
-      return false;
-    }
-    return Comparing.equal(myProject, state.getCurrentProject()) || myProject == null && state.getCurrentProject().isDefault();
-  }
-
-  @ApiStatus.Internal
-  public boolean isInsideCommand() {
-    UndoClientState state = getClientState();
-    return state != null && state.isInsideCommand();
-  }
-
-  private @NotNull List<UndoProvider> getUndoProviders() {
-    return myProject == null ? UndoProvider.EP_NAME.getExtensionList() : UndoProvider.PROJECT_EP_NAME.getExtensionList(myProject);
-  }
-
-  void onCommandStarted(final Project project, UndoConfirmationPolicy undoConfirmationPolicy, boolean recordOriginalReference) {
-    UndoClientState state = getClientState();
-    if (state == null || !state.isInsideCommand()) {
-      for (UndoProvider undoProvider : getUndoProviders()) {
-        undoProvider.commandStarted(project);
-      }
-      if (state != null) {
-        state.setCurrentProject(project);
-      }
-    }
-
-    if (state != null) {
-      state.commandStarted(myProject, getEditorProvider(), undoConfirmationPolicy, myProject == project && recordOriginalReference);
-    }
-
-    LOG.assertTrue(state == null || !state.isInsideCommand() || !(state.getCurrentProject() instanceof DummyProject));
-  }
-
-  void onCommandFinished(final Project project, final @NlsContexts.Command String commandName, final Object commandGroupId) {
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.commandFinished(myProject, getEditorProvider(), commandName, commandGroupId);
-    }
-    if (state == null || !state.isInsideCommand()) {
-      for (UndoProvider undoProvider : getUndoProviders()) {
-        undoProvider.commandFinished(project);
-      }
-      if (state != null) {
-        state.setCurrentProject(DummyProject.getInstance());
-      }
-    }
-    LOG.assertTrue(state == null || !state.isInsideCommand() || !(state.getCurrentProject() instanceof DummyProject));
-  }
-
-  public void addDocumentAsAffected(@NotNull Document document) {
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.addDocumentAsAffected(DocumentReferenceManager.getInstance().create(document));
-    }
+    myProject = componentManager instanceof Project project ? project : null;
+    myAdjustableUndoableActionsHolder = new SharedAdjustableUndoableActionsHolder();
+    mySharedUndoStacksHolder = new SharedUndoRedoStacksHolder(true, myAdjustableUndoableActionsHolder);
+    mySharedRedoStacksHolder = new SharedUndoRedoStacksHolder(false, myAdjustableUndoableActionsHolder);
   }
 
   @Override
-  public void nonundoableActionPerformed(final @NotNull DocumentReference ref, final boolean isGlobal) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
-    if (myProject != null && myProject.isDisposed()) return;
-    undoableActionPerformed(new NonUndoableAction(ref, isGlobal));
+  public boolean isUndoAvailable(@Nullable FileEditor editor) {
+    return isUndoRedoAvailable(editor, true);
   }
 
   @Override
-  public void undoableActionPerformed(@NotNull UndoableAction action) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
-    if (myProject != null && myProject.isDisposed()) {
-      return;
-    }
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.addUndoableAction(myProject, getEditorProvider(), action);
-    }
+  public boolean isRedoAvailable(@Nullable FileEditor editor) {
+    return isUndoRedoAvailable(editor, false);
   }
 
-  public void markCurrentCommandAsGlobal() {
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.markCurrentCommandAsGlobal();
-    }
+  @Override
+  public @NotNull Pair<String, String> getUndoActionNameAndDescription(FileEditor editor) {
+    return getUndoOrRedoActionNameAndDescription(editor, true);
   }
 
-  void addAffectedDocuments(Document @NotNull ... docs) {
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.addAffectedDocuments(docs);
-    }
-  }
-
-  public void addAffectedFiles(VirtualFile @NotNull ... files) {
-    UndoClientState state = getClientState();
-    if (state != null) {
-      state.addAffectedFiles(files);
-    }
-  }
-
-  public void invalidateActionsFor(@NotNull DocumentReference ref) {
-    for (UndoClientState state : getAllClientStates()) {
-      ApplicationManager.getApplication().assertWriteIntentLockAcquired();
-      state.invalidateActions(ref);
-    }
+  @Override
+  public @NotNull Pair<String, String> getRedoActionNameAndDescription(FileEditor editor) {
+    return getUndoOrRedoActionNameAndDescription(editor, false);
   }
 
   @Override
@@ -246,93 +119,6 @@ public class UndoManagerImpl extends UndoManager {
     undoOrRedo(editor, false);
   }
 
-  @ApiStatus.Internal
-  public @Nullable ResetUndoHistoryToken createResetUndoHistoryToken(@NotNull FileEditor editor) {
-    Collection<DocumentReference> references = UndoDocumentUtil.getDocumentReferences(editor);
-    if (references.size() != 1)
-      return null;
-
-    DocumentReference reference = references.iterator().next();
-    LocalUndoRedoSnapshot snapshot = getUndoRedoSnapshotForDocument(reference);
-    if (snapshot == null) return null;
-
-    return new ResetUndoHistoryToken(this, snapshot, reference);
-  }
-
-  @Nullable LocalUndoRedoSnapshot getUndoRedoSnapshotForDocument(DocumentReference reference) {
-    HashMap<ClientId, PerClientLocalUndoRedoSnapshot> map = new HashMap<>();
-    for (UndoClientState state : getAllClientStates()) {
-      PerClientLocalUndoRedoSnapshot perClientSnapshot = state.getUndoRedoSnapshotForDocument(reference, myAdjustableUndoableActionsHolder);
-      if (perClientSnapshot == null)
-        return null;
-
-      map.put(state.getClientId(), perClientSnapshot);
-    }
-
-    return new LocalUndoRedoSnapshot(
-      map,
-      mySharedUndoStacksHolder.getStack(reference).snapshot(),
-      mySharedRedoStacksHolder.getStack(reference).snapshot()
-    );
-  }
-
-  boolean resetLocalHistory(DocumentReference reference, LocalUndoRedoSnapshot snapshot) {
-    for (UndoClientState state : getAllClientStates()) {
-      PerClientLocalUndoRedoSnapshot perClientSnapshot = snapshot.getClientSnapshots().get(state.getClientId());
-      if (perClientSnapshot == null) {
-        perClientSnapshot = PerClientLocalUndoRedoSnapshot.Companion.empty();
-      }
-
-      boolean success = state.resetLocalHistory(reference, perClientSnapshot);
-      if (success) {
-        myAdjustableUndoableActionsHolder.getStack(reference).resetTo(perClientSnapshot.getActionsHolderSnapshot());
-      } else {
-        return false;
-      }
-    }
-
-    mySharedUndoStacksHolder.getStack(reference).resetTo(snapshot.getSharedUndoStack());
-    mySharedRedoStacksHolder.getStack(reference).resetTo(snapshot.getSharedRedoStack());
-
-    return true;
-  }
-
-  private void undoOrRedo(final FileEditor editor, final boolean isUndo) {
-    UndoClientState state = getClientState(editor);
-    if (state == null) {
-      return;
-    }
-    Disposable disposable = Disposer.newDisposable();
-    state.startUndoOrRedo(isUndo);
-    try {
-      RuntimeException[] exception = new RuntimeException[1];
-      String name = getUndoOrRedoActionNameAndDescription(editor, state.isUndoInProgress()).getSecond();
-      CommandProcessor.getInstance().executeCommand(
-        myProject,
-        () -> {
-          notifyUndoRedoStarted(editor, isUndo, disposable);
-          try {
-            CopyPasteManager.getInstance().stopKillRings();
-            state.getCommandMerger().undoOrRedo(editor, isUndo);
-          }
-          catch (RuntimeException ex) {
-            exception[0] = ex;
-          }
-        },
-        name,
-        null,
-        state.getCommandMerger().getUndoConfirmationPolicy()
-      );
-      if (exception[0] != null) {
-        throw exception[0];
-      }
-    }
-    finally {
-      state.finishUndoOrRedo();
-      Disposer.dispose(disposable);
-    }
-  }
-
   @Override
   public boolean isUndoInProgress() {
     UndoClientState state = getClientState();
@@ -346,132 +132,24 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   @Override
-  public boolean isUndoAvailable(@Nullable FileEditor editor) {
-    return isUndoRedoAvailable(editor, true);
+  public void nonundoableActionPerformed(@NotNull DocumentReference ref, boolean isGlobal) {
+    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    if (myProject != null && myProject.isDisposed()) {
+      return;
+    }
+    undoableActionPerformed(new NonUndoableAction(ref, isGlobal));
   }
 
   @Override
-  public boolean isRedoAvailable(@Nullable FileEditor editor) {
-    return isUndoRedoAvailable(editor, false);
-  }
-
-  boolean isUndoRedoAvailable(@Nullable FileEditor editor, boolean undo) {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
-    UndoClientState state = getClientState(editor);
-    return state != null && state.isUndoRedoAvailable(editor, undo);
-  }
-
-  boolean isUndoRedoAvailable(@NotNull DocumentReference docRef, boolean undo) {
+  public void undoableActionPerformed(@NotNull UndoableAction action) {
+    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    if (myProject != null && myProject.isDisposed()) {
+      return;
+    }
     UndoClientState state = getClientState();
-    return state != null && state.isUndoRedoAvailable(Collections.singleton(docRef), undo);
-  }
-
-  /**
-   * In case of global group blocking undo we can perform undo locally and separate undone changes from others stacks
-   */
-  boolean splitGlobalCommand(@NotNull UndoRedo undoRedo) {
-    UndoableGroup group = undoRedo.myUndoableGroup;
-    Collection<DocumentReference> refs = undoRedo.getDocRefs();
-    if (refs == null || refs.size() != 1) return false;
-    DocumentReference docRef = refs.iterator().next();
-
-    UndoClientState clientState = getClientState(undoRedo.myEditor);
-    if (clientState == null) return false;
-    UndoRedoStacksHolder stackHolder = getStackHolder(clientState, true);
-
-    UndoRedoList<UndoableGroup> stack = stackHolder.getStack(docRef);
-    if (stack.getLast() == group) {
-      Pair<List<UndoableAction>, List<UndoableAction>> actions = separateLocalAndNonLocalActions(group.getActions(), docRef);
-      if (actions.first.isEmpty()) return false;
-
-      stack.removeLast();
-
-      UndoableGroup replacingGroup = new UndoableGroup(IdeBundle.message("undo.command.local.name") + group.getCommandName(),
-                                                       false,
-                                                       group.getCommandTimestamp(),
-                                                       group.getStateBefore(),
-                                                       group.getStateAfter(),
-                                                       // only action that changes file locally
-                                                       actions.first,
-                                                       stackHolder, getProject(), group.getConfirmationPolicy(), group.isTransparent(),
-                                                       group.isValid());
-      stack.add(replacingGroup);
-
-      UndoableGroup groupWithoutLocalChanges = new UndoableGroup(group.getCommandName(),
-                                                                 group.isGlobal(),
-                                                                 group.getCommandTimestamp(),
-                                                                 group.getStateBefore(),
-                                                                 group.getStateAfter(),
-                                                                 // all action except local
-                                                                 actions.second,
-                                                                 stackHolder, getProject(), group.getConfirmationPolicy(), group.isTransparent(),
-                                                                 group.isValid());
-
-      if (stackHolder.replaceOnStacks(group, groupWithoutLocalChanges)) {
-        replacingGroup.setOriginalContext(new UndoableGroup.UndoableGroupOriginalContext(group, groupWithoutLocalChanges));
-      }
-
-      return true;
+    if (state != null) {
+      state.addUndoableAction(getEditorProvider(), action);
     }
-
-    return false;
-  }
-
-  private static Pair<List<UndoableAction>, List<UndoableAction>> separateLocalAndNonLocalActions(@NotNull List<? extends UndoableAction> actions,
-                                                                                                  @NotNull DocumentReference affectedDocument) {
-    List<UndoableAction> localActions = new SmartList<>();
-    List<UndoableAction> nonLocalActions = new SmartList<>();
-    for (UndoableAction action : actions) {
-      DocumentReference[] affectedDocuments = action.getAffectedDocuments();
-      if (affectedDocuments != null && affectedDocuments.length == 1 && affectedDocuments[0].equals(affectedDocument)) {
-        localActions.add(action);
-      }
-      else {
-        nonLocalActions.add(action);
-      }
-    }
-
-    return new Pair<>(localActions, nonLocalActions);
-  }
-
-  /**
-   * If we redo group that was splitted before, we gather that group into global cammand(as it was before splitting)
-   * and recover that command on all stacks
-   */
-  void gatherGlobalCommand(@NotNull UndoRedo undoRedo) {
-    UndoableGroup group = undoRedo.myUndoableGroup;
-    UndoableGroup.UndoableGroupOriginalContext context = group.getGroupOriginalContext();
-    if (context == null) return;
-
-    Collection<DocumentReference> refs = undoRedo.getDocRefs();
-    if (refs.size() > 1) return;
-    DocumentReference docRef = refs.iterator().next();
-
-    UndoClientState clientState = getClientState(undoRedo.myEditor);
-    if (clientState == null) return;
-    UndoRedoStacksHolder stackHolder = getStackHolder(clientState, true);
-    UndoRedoList<UndoableGroup> stack = stackHolder.getStack(docRef);
-    if (stack.getLast() != group) return;
-
-    boolean shouldGatherGroup = stackHolder.replaceOnStacks(context.getCurrentStackGroup(), context.getOriginalGroup());
-    if (!shouldGatherGroup) return;
-
-    stack.removeLast();
-    stack.add(context.getOriginalGroup());
-  }
-
-  private static @NotNull UndoRedoStacksHolder getStackHolder(@NotNull UndoClientState state, boolean isUndo) {
-    return isUndo ? state.getUndoStacksHolder() : state.getRedoStacksHolder();
-  }
-
-  @Override
-  public @NotNull Pair<String, String> getUndoActionNameAndDescription(FileEditor editor) {
-    return getUndoOrRedoActionNameAndDescription(editor, true);
-  }
-
-  @Override
-  public @NotNull Pair<String, String> getRedoActionNameAndDescription(FileEditor editor) {
-    return getUndoOrRedoActionNameAndDescription(editor, false);
   }
 
   @Override
@@ -498,29 +176,269 @@ public class UndoManagerImpl extends UndoManager {
     return state != null && state.isNextAskConfirmation(editor, false);
   }
 
-  @NotNull
-  SharedAdjustableUndoableActionsHolder getAdjustableUndoableActionsHolder() {
+  public boolean isActive() {
+    UndoClientState state = getClientState();
+    return state != null && state.isActive();
+  }
+
+  public void addDocumentAsAffected(@NotNull Document document) {
+    UndoClientState state = getClientState();
+    if (state != null) {
+      state.addDocumentAsAffected(DocumentReferenceManager.getInstance().create(document));
+    }
+  }
+
+  public void markCurrentCommandAsGlobal() {
+    UndoClientState state = getClientState();
+    if (state != null) {
+      state.markCurrentCommandAsGlobal();
+    }
+  }
+
+  public void addAffectedFiles(VirtualFile @NotNull ... files) {
+    UndoClientState state = getClientState();
+    if (state != null) {
+      state.addAffectedFiles(files);
+    }
+  }
+
+  public void invalidateActionsFor(@NotNull DocumentReference ref) {
+    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    for (UndoClientState state : getAllClientStates()) {
+      state.invalidateActions(ref);
+    }
+  }
+
+  public @NotNull CurrentEditorProvider getEditorProvider() {
+    CurrentEditorProvider provider = myOverriddenEditorProvider;
+    return (provider != null) ? provider : CurrentEditorProvider.getInstance();
+  }
+
+  public @Nullable Project getProject() {
+    return myProject;
+  }
+
+  @ApiStatus.Internal
+  public boolean isInsideCommand() {
+    UndoClientState state = getClientState();
+    return state != null && state.isInsideCommand();
+  }
+
+  @ApiStatus.Internal
+  public @Nullable ResetUndoHistoryToken createResetUndoHistoryToken(@NotNull FileEditor editor) {
+    Collection<DocumentReference> references = UndoDocumentUtil.getDocumentReferences(editor);
+    if (references.size() != 1) {
+      return null;
+    }
+    DocumentReference reference = references.iterator().next();
+    LocalUndoRedoSnapshot snapshot = getUndoRedoSnapshotForDocument(reference);
+    if (snapshot == null) {
+      return null;
+    }
+    return new ResetUndoHistoryToken(this, reference, snapshot);
+  }
+
+  @ApiStatus.Internal
+  public @NotNull String dumpState(@Nullable FileEditor editor, @NotNull String title) {
+    String editorString = "dump for " + (editor == null ? "GLOBAL" : editor.toString());
+    String undoAvailable = String.valueOf(isUndoAvailable(editor)).toUpperCase(Locale.ROOT);
+    String redoAvailable = String.valueOf(isRedoAvailable(editor)).toUpperCase(Locale.ROOT);
+    Pair<String, String> undoDescription = getUndoActionNameAndDescription(editor);
+    Pair<String, String> redoDescription = getRedoActionNameAndDescription(editor);
+    String undoStatus = "undo: %s, %s, %s".formatted(undoAvailable, undoDescription.getFirst(), undoDescription.getSecond());
+    String redoStatus = "redo: %s, %s, %s".formatted(redoAvailable, redoDescription.getFirst(), redoDescription.getSecond());
+    String stacks;
+    UndoClientState state = getClientState(editor);
+    if (state == null) {
+      stacks = "no state";
+    } else {
+      stacks = state.dump(editor);
+    }
+    return """
+
+      _____________________________________________________________________________________________________________________
+      %s
+      %s
+      %s
+      %s
+      %s
+      _____________________________________________________________________________________________________________________
+      """.formatted(title, editorString, undoStatus, redoStatus, stacks);
+  }
+
+  @ApiStatus.Internal
+  public void clearDocumentReferences(@NotNull Document document) {
+    ThreadingAssertions.assertEventDispatchThread();
+    for (UndoClientState state : getAllClientStates()) {
+      state.clearDocumentReferences(document);
+    }
+    mySharedUndoStacksHolder.clearDocumentReferences(document);
+    mySharedRedoStacksHolder.clearDocumentReferences(document);
+  }
+
+  // TODO: remove public
+  @ApiStatus.Internal
+  public void clearStacks(@Nullable FileEditor editor) {
+    for (UndoClientState state : getAllClientStates()) {
+      state.clearStacks(editor);
+    }
+  }
+
+  @ApiStatus.Internal
+  protected void undoOrRedo(@Nullable FileEditor editor, boolean isUndo) {
+    UndoClientState state = getClientState(editor);
+    if (state != null) {
+      String commandName = getUndoOrRedoActionNameAndDescription(editor, isUndo).getSecond();
+      Disposable disposable = Disposer.newDisposable();
+      Runnable beforeUndoRedoStarted = () -> notifyUndoRedoStarted(editor, disposable, isUndo);
+      try {
+        state.undoOrRedo(editor, commandName, beforeUndoRedoStarted, isUndo);
+      } finally {
+        Disposer.dispose(disposable);
+      }
+      if (myProject != null) {
+        getUndoSpy().undoRedoPerformed(myProject, editor, isUndo);
+      }
+    }
+  }
+
+  @ApiStatus.Internal
+  protected void notifyUndoRedoStarted(@Nullable FileEditor editor, @NotNull Disposable disposable, boolean isUndo) {
+    ApplicationManager.getApplication()
+      .getMessageBus()
+      .syncPublisher(UndoRedoListener.Companion.getTOPIC())
+      .undoRedoStarted(myProject, this, editor, isUndo, disposable);
+  }
+
+  @ApiStatus.Internal
+  protected @NotNull UndoSpy getUndoSpy() {
+    return UndoSpy.BLIND;
+  }
+
+  @ApiStatus.Internal
+  protected boolean isTransparentSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
+  protected boolean isConfirmationSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
+  protected boolean isCompactSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
+  protected boolean isGlobalSplitSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
+  protected final int getStackSize(@Nullable DocumentReference docRef, boolean isUndo) {
+    UndoClientState state = Objects.requireNonNull(getClientState(), "undo/redo is not available");
+    return state.getStackSize(docRef, isUndo);
+  }
+
+  void trimSharedStacks(@NotNull DocumentReference docRef) {
+    mySharedRedoStacksHolder.trimStacks(Collections.singleton(docRef));
+    mySharedUndoStacksHolder.trimStacks(Collections.singleton(docRef));
+  }
+
+  void onCommandStarted(
+    @Nullable Project project,
+    @NotNull UndoConfirmationPolicy undoConfirmationPolicy,
+    boolean recordOriginalReference
+  ) {
+    UndoClientState state = getClientState();
+    if (state == null || !state.isInsideCommand()) {
+      for (UndoProvider undoProvider : getUndoProviders()) {
+        undoProvider.commandStarted(project);
+      }
+    }
+    if (state != null) {
+      state.commandStarted(project, getEditorProvider(), undoConfirmationPolicy, recordOriginalReference);
+    }
+  }
+
+  void onCommandFinished(
+    @Nullable Project project,
+    @Nullable @Command String commandName,
+    @Nullable Object commandGroupId
+  ) {
+    UndoClientState state = getClientState();
+    if (state != null) {
+      state.commandFinished(getEditorProvider(), commandName, commandGroupId);
+    }
+    if (state == null || !state.isInsideCommand()) {
+      for (UndoProvider undoProvider : getUndoProviders()) {
+        undoProvider.commandFinished(project);
+      }
+    }
+  }
+
+  void addAffectedDocuments(Document @NotNull ... docs) {
+    UndoClientState state = getClientState();
+    if (state != null) {
+      state.addAffectedDocuments(docs);
+    }
+  }
+
+  @Nullable LocalUndoRedoSnapshot getUndoRedoSnapshotForDocument(@NotNull DocumentReference reference) {
+    HashMap<ClientId, PerClientLocalUndoRedoSnapshot> map = new HashMap<>();
+    for (UndoClientState state : getAllClientStates()) {
+      PerClientLocalUndoRedoSnapshot perClientSnapshot = state.getUndoRedoSnapshotForDocument(reference, myAdjustableUndoableActionsHolder);
+      if (perClientSnapshot == null) {
+        return null;
+      }
+      map.put(state.getClientId(), perClientSnapshot);
+    }
+    return new LocalUndoRedoSnapshot(
+      map,
+      mySharedUndoStacksHolder.getStack(reference).snapshot(),
+      mySharedRedoStacksHolder.getStack(reference).snapshot()
+    );
+  }
+
+  boolean resetLocalHistory(DocumentReference reference, LocalUndoRedoSnapshot snapshot) {
+    for (UndoClientState state : getAllClientStates()) {
+      PerClientLocalUndoRedoSnapshot perClientSnapshot = snapshot.getClientSnapshots().get(state.getClientId());
+      if (perClientSnapshot == null) {
+        perClientSnapshot = PerClientLocalUndoRedoSnapshot.empty();
+      }
+      boolean success = state.resetLocalHistory(reference, perClientSnapshot);
+      if (success) {
+        myAdjustableUndoableActionsHolder.getStack(reference).resetTo(perClientSnapshot.getActionsHolderSnapshot());
+      } else {
+        return false;
+      }
+    }
+    mySharedUndoStacksHolder.getStack(reference).resetTo(snapshot.getSharedUndoStack());
+    mySharedRedoStacksHolder.getStack(reference).resetTo(snapshot.getSharedRedoStack());
+    return true;
+  }
+
+  boolean isUndoRedoAvailable(@NotNull DocumentReference docRef, boolean undo) {
+    UndoClientState state = getClientState();
+    return state != null && state.isUndoRedoAvailable(Collections.singleton(docRef), undo);
+  }
+
+  @NotNull SharedAdjustableUndoableActionsHolder getAdjustableUndoableActionsHolder() {
     return myAdjustableUndoableActionsHolder;
   }
 
-  @NotNull
-  SharedUndoRedoStacksHolder getSharedUndoStacksHolder() {
+  @NotNull SharedUndoRedoStacksHolder getSharedUndoStacksHolder() {
     return mySharedUndoStacksHolder;
   }
 
-  @NotNull
-  SharedUndoRedoStacksHolder getSharedRedoStacksHolder() {
+  @NotNull SharedUndoRedoStacksHolder getSharedRedoStacksHolder() {
     return mySharedRedoStacksHolder;
   }
 
   @TestOnly
   public void setOverriddenEditorProvider(@Nullable CurrentEditorProvider p) {
     myOverriddenEditorProvider = p;
-  }
-
-  public @NotNull CurrentEditorProvider getEditorProvider() {
-    CurrentEditorProvider provider = myOverriddenEditorProvider;
-    return (provider != null) ? provider : CurrentEditorProvider.getInstance();
   }
 
   @TestOnly
@@ -533,18 +451,10 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   @TestOnly
-  private void flushMergers() {
-    assert myProject == null || !myProject.isDisposed() : myProject;
-    // Run dummy command in order to flush all mergers...
-    //noinspection HardCodedStringLiteral
-    CommandProcessor.getInstance().executeCommand(myProject, EmptyRunnable.getInstance(), "Dummy", null);
-  }
-
-  @TestOnly
   public void flushCurrentCommandMerger() {
     UndoClientState state = getClientState();
     if (state != null) {
-      state.getCommandMerger().flushCurrentCommand();
+      state.flushCurrentCommand(UndoCommandFlushReason.MANAGER_FORCE);
     }
   }
 
@@ -568,72 +478,6 @@ public class UndoManagerImpl extends UndoManager {
     }
   }
 
-  @ApiStatus.Internal
-  public void clearDocumentReferences(@NotNull Document document) {
-    ThreadingAssertions.assertEventDispatchThread();
-    for (UndoClientState state : getAllClientStates()) {
-      state.getUndoStacksHolder().clearDocumentReferences(document);
-      state.getRedoStacksHolder().clearDocumentReferences(document);
-      state.getCommandMerger().clearDocumentReferences(document);
-    }
-    mySharedUndoStacksHolder.clearDocumentReferences(document);
-    mySharedRedoStacksHolder.clearDocumentReferences(document);
-  }
-
-  @ApiStatus.Internal
-  protected void notifyUndoRedoStarted(FileEditor editor, boolean isUndo, Disposable disposable) {
-    ApplicationManager.getApplication()
-      .getMessageBus()
-      .syncPublisher(UndoRedoListener.Companion.getTOPIC())
-      .undoRedoStarted(myProject, this, editor, isUndo, disposable);
-  }
-
-  @ApiStatus.Experimental
-  @ApiStatus.Internal
-  public @NotNull String dumpState(@Nullable FileEditor editor) {
-    boolean undoAvailable = isUndoAvailable(editor);
-    boolean redoAvailable = isRedoAvailable(editor);
-    Pair<String, String> undoDescription = getUndoActionNameAndDescription(editor);
-    Pair<String, String> redoDescription = getRedoActionNameAndDescription(editor);
-    String undoStatus = "undo: %s, %s, %s".formatted(undoAvailable, undoDescription.getFirst(), undoDescription.getSecond());
-    String redoStatus = "redo: %s, %s, %s".formatted(redoAvailable, redoDescription.getFirst(), redoDescription.getSecond());
-
-    String stacks;
-    UndoClientState state = getClientState(editor);
-    Collection<DocumentReference> docRefs = UndoDocumentUtil.getDocRefs(editor);
-    if (state == null && docRefs == null) {
-      stacks = "no state, no docs";
-    } else if (state != null && docRefs == null) {
-      stacks = "no docs";
-    } else if (state == null /* && docRefs != null */) {
-      stacks = "no state";
-    } else {
-      stacks = state.dump(docRefs);
-    }
-    return  "\n" + undoStatus + "\n" + redoStatus + "\n" + stacks;
-  }
-
-  @ApiStatus.Internal
-  protected boolean isSpeculativeUndoPossible(@Nullable FileEditor editor, boolean isUndo) {
-    UndoClientState clientState = getClientState(editor);
-    if (clientState != null && clientState.getCommandMerger().hasActions()) {
-      return clientState.getCommandMerger().isSpeculativeUndoPossible();
-    }
-    UndoableGroup action = getLastAction(editor, isUndo);
-    return action != null && action.isSpeculativeUndoPossible();
-  }
-
-  private @Nullable UndoableGroup getLastAction(@Nullable FileEditor editor, boolean isUndo) {
-    UndoClientState clientState = getClientState(editor);
-    Collection<DocumentReference> references = UndoDocumentUtil.getDocRefs(editor);
-    if (clientState == null || references == null) {
-      return null;
-    }
-    UndoRedoStacksHolder stacksHolder = getStackHolder(clientState, isUndo);
-    UndoableGroup action = stacksHolder.getLastAction(references);
-    return action;
-  }
-
   private @NotNull Pair<@ActionText String, @ActionDescription String> getUndoOrRedoActionNameAndDescription(@Nullable FileEditor editor, boolean undo) {
     UndoClientState state = getClientState(editor);
     String desc = null;
@@ -653,6 +497,66 @@ public class UndoManagerImpl extends UndoManager {
     String description = undo ? ActionsBundle.message("action.undo.description", desc)
                               : ActionsBundle.message("action.redo.description", desc);
     return Pair.create(name.trim(), description.trim());
+  }
+
+  @ApiStatus.Internal
+  protected boolean isUndoRedoAvailable(@Nullable FileEditor editor, boolean undo) {
+    ApplicationManager.getApplication().assertReadAccessAllowed();
+    UndoClientState state = getClientState(editor);
+    return state != null && state.isUndoRedoAvailable(editor, undo);
+  }
+
+  private @Nullable UndoClientState getClientState() {
+    ClientId clientId = ClientId.getCurrentOrNull();
+    if (clientId != null) {
+      ClientSession appSession = ClientSessionsManager.getAppSession(clientId);
+      if (appSession != null && appSession.isController()) {
+        // IJPL-168172: If current session is a controller, return a local client state instead
+        try (AccessToken ignored = ClientId.withExplicitClientId(ClientId.getLocalId())) {
+          return getComponentManager().getService(UndoClientState.class);
+        }
+      }
+    }
+    return getComponentManager().getService(UndoClientState.class);
+  }
+
+  private @Nullable UndoClientState getClientState(@Nullable FileEditor editor) {
+    UndoClientState state = getClientState();
+    if (myProject == null || editor == null) {
+      return state;
+    }
+    try (AccessToken ignored = ClientId.withExplicitClientId(ClientFileEditorManager.getClientId(editor))) {
+      UndoClientState editorState = getClientState();
+      LOG.assertTrue(
+        state == editorState,
+        "Using editor belonging to '" +
+        (editorState != null ? editorState.getClientId().getValue() : "null") + "' under '" +
+        (state != null ? state.getClientId().getValue() : "null") + "'"
+      );
+    }
+    return state;
+  }
+
+  private @Unmodifiable @NotNull List<UndoClientState> getAllClientStates() {
+    return getComponentManager().getServices(UndoClientState.class, ClientKind.ALL);
+  }
+
+  private @NotNull List<UndoProvider> getUndoProviders() {
+    return myProject == null
+           ? UndoProvider.EP_NAME.getExtensionList()
+           : UndoProvider.PROJECT_EP_NAME.getExtensionList(myProject);
+  }
+
+  private @NotNull ComponentManager getComponentManager() {
+    return myProject != null ? myProject : ApplicationManager.getApplication();
+  }
+
+  @TestOnly
+  private void flushMergers() {
+    assert myProject == null || !myProject.isDisposed() : myProject;
+    // Run dummy command in order to flush all mergers...
+    //noinspection HardCodedStringLiteral
+    CommandProcessor.getInstance().executeCommand(myProject, EmptyRunnable.getInstance(), "Dummy", null);
   }
 
   @Override

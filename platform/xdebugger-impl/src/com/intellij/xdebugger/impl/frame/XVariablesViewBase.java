@@ -17,7 +17,6 @@ import com.intellij.util.Alarm;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.FixedHashMap;
-import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.evaluation.ExpressionInfo;
@@ -95,7 +94,7 @@ public abstract class XVariablesViewBase extends XDebugView {
     DebuggerUIUtil.freezePaintingToReduceFlickering(myTreePanel.getContentComponent());
     tree.setSourcePosition(position);
     createNewRootNode(stackFrame);
-    XVariablesView.InlineVariablesInfo.set(getSession(tree), new XVariablesView.InlineVariablesInfo());
+    XVariablesView.InlineVariablesInfo.set(getSessionProxy(tree), new XVariablesView.InlineVariablesInfo());
     clearInlays(tree);
     Object newEqualityObject = stackFrame.getEqualityObject();
     if (newEqualityObject != null) {
@@ -241,12 +240,12 @@ public abstract class XVariablesViewBase extends XDebugView {
 
       final String text = myEditor.getDocument().getText(e.getNewRange()).trim();
       if (!IGNORED_TEXTS.contains(text) && !ContainerUtil.exists(SIDE_EFFECT_PRODUCERS, text::contains)) {
-        final XDebugSession session = getSession(myTreePanel.getTree());
+        XDebugSessionProxy session = getSessionProxy(myTreePanel.getTree());
         if (session == null) return;
         XDebuggerEvaluator evaluator = myStackFrame.getEvaluator();
         if (evaluator == null) return;
         TextRange range = e.getNewRange();
-        ExpressionInfo info = new ExpressionInfo(range);
+        ExpressionInfo info = new ExpressionInfo(range, null, null, true);
         int offset = range.getStartOffset();
         LogicalPosition pos = myEditor.offsetToLogicalPosition(offset);
         Point point = myEditor.logicalPositionToXY(pos);
@@ -258,7 +257,7 @@ public abstract class XVariablesViewBase extends XDebugView {
                              int offset,
                              @NotNull ExpressionInfo info,
                              @NotNull XDebuggerEvaluator evaluator,
-                             @NotNull XDebugSession session) {
+                             @NotNull XDebugSessionProxy session) {
       ALARM.cancelAllRequests();
       ALARM.addRequest(() -> {
         if (DocumentUtil.isValidOffset(info.getTextRange().getEndOffset(), myEditor.getDocument())) {

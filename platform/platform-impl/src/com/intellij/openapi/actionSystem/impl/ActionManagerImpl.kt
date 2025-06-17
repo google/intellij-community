@@ -30,7 +30,6 @@ import com.intellij.openapi.actionSystem.ex.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil.getActionUnavailableMessage
 import com.intellij.openapi.actionSystem.impl.ActionConfigurationCustomizer.LightCustomizeStrategy
 import com.intellij.openapi.application.*
-import com.intellij.openapi.application.impl.RawSwingDispatcher
 import com.intellij.openapi.components.ComponentManager
 import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.components.service
@@ -45,7 +44,6 @@ import com.intellij.openapi.keymap.impl.ActionProcessor
 import com.intellij.openapi.keymap.impl.KeymapImpl
 import com.intellij.openapi.keymap.impl.UpdateResult
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.ProjectType
@@ -69,6 +67,7 @@ import com.intellij.util.concurrency.*
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.with
 import com.intellij.util.containers.without
+import com.intellij.util.ui.RawSwingDispatcher
 import com.intellij.util.ui.StartupUiUtil.addAwtListener
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.xml.dom.XmlElement
@@ -1130,6 +1129,11 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
     val component = event.getData(PlatformCoreDataKeys.CONTEXT_COMPONENT)
     val actionId = getId(action)
                    ?: if (action is EmptyAction) runnable.javaClass.name else action.javaClass.name
+    if (event.presentation.getClientProperty(ActionUtil.SKIP_ACTION_EXECUTION) == true) {
+      LOG.debug("Action execution was skipped: action=$actionId")
+      fireAfterActionPerformed(action, event, AnActionResult.IGNORED)
+      return AnActionResult.IGNORED
+    }
     if (component != null && !UIUtil.isShowing(component) &&
         event.place != ActionPlaces.TOUCHBAR_GENERAL &&
         ClientProperty.get(component, ActionUtil.ALLOW_ACTION_PERFORM_WHEN_HIDDEN) != true) {
@@ -1223,9 +1227,7 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
         }
         finally {
           if (!result.isProcessed) {
-            blockingContext {
-              result.setRejected()
-            }
+            result.setRejected()
           }
         }
       }
@@ -1334,25 +1336,22 @@ private fun tryToExecuteNow(action: AnAction,
     if (contextComponent == null) it.dataContext else it.getDataContext(contextComponent)
   }
   val wrappedContext = Utils.createAsyncDataContext(dataContext)
-  val componentAdjusted = PlatformDataKeys.CONTEXT_COMPONENT.getData(wrappedContext) ?: contextComponent
   val actionProcessor = object : ActionProcessor() {}
   val inputEventAdjusted = inputEvent ?: KeyEvent(
-    componentAdjusted ?: JLabel(), KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_UNDEFINED, '\u0000')
-  val event = Utils.runWithInputEventEdtDispatcher(componentAdjusted) block@{
-    Utils.runUpdateSessionForInputEvent(
-      listOf(action), inputEventAdjusted, wrappedContext, place, actionProcessor, presentationFactory) { rearranged, updater, events ->
-      val presentation = updater(action)
-      val event = events[presentation]
-      if (event == null || !presentation.isEnabled) {
-        null
-      }
-      else {
-        UpdateResult(action, event, 0L)
-      }
+    contextComponent ?: JLabel(), KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_UNDEFINED, '\u0000')
+  val updateResult = Utils.runUpdateSessionForInputEvent(
+    listOf(action), inputEventAdjusted, wrappedContext, place, actionProcessor, presentationFactory) { _, updater, events ->
+    val presentation = updater(action)
+    val event = events[presentation]
+    if (event == null || !presentation.isEnabled) {
+      null
     }
-  }?.event
-  if (event != null && event.presentation.isEnabled) {
-    doPerformAction(action, event, callback)
+    else {
+      UpdateResult(action, event, 0L)
+    }
+  }
+  if (updateResult != null && updateResult.event.presentation.isEnabled) {
+    doPerformAction(action, updateResult.event, callback)
   }
 }
 

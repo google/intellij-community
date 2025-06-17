@@ -202,8 +202,10 @@ public final class DaemonListeners implements Disposable {
         boolean showing = ComponentUtil.isShowing(editor.getContentComponent(), true);
         boolean worthBothering = worthBothering(document, editorProject);
         if (!showing || !worthBothering) {
-          LOG.debug("Not worth bothering about editor created for: " + editor.getVirtualFile() + " because editor isShowing(): " +
-                    showing + "; project is open and file is mine: " + worthBothering);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Not worth bothering about editor created for: " + editor.getVirtualFile() + " because editor isShowing(): " +
+                      showing + "; project is open and file is mine: " + worthBothering);
+          }
           return;
         }
 
@@ -537,16 +539,7 @@ public final class DaemonListeners implements Disposable {
     return HighlightingSessionImpl.canChangeFileSilently(file, isInContent, extensionsAllowToChangeFileSilently);
   }
 
-  /**
-   * @deprecated use {@link #canChangeFileSilently(PsiFileSystemItem, boolean, ThreeState)} instead
-   */
   @Deprecated(forRemoval = true)
-  public static boolean canChangeFileSilently(@NotNull PsiFileSystemItem file) {
-    PluginException.reportDeprecatedUsage("this method", "");
-    return canChangeFileSilently(file, true, ThreeState.UNSURE);
-  }
-
-  @Deprecated
   public static boolean canChangeFileSilently(@NotNull PsiFileSystemItem file, boolean isInContent) {
     PluginException.reportDeprecatedUsage("this method", "");
     return canChangeFileSilently(file, isInContent, ThreeState.UNSURE);

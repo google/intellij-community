@@ -2,9 +2,11 @@
 package com.intellij.platform.eel.path
 
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.EelOsFamily
+import org.jetbrains.annotations.ApiStatus
 
-val EelPath.platform: EelPlatform get() = descriptor.platform
+@get:ApiStatus.Internal
+val EelPath.platform: EelOsFamily get() = descriptor.osFamily
 
 /**
  * An interface for **absolute** paths on some environment.
@@ -16,6 +18,7 @@ val EelPath.platform: EelPlatform get() = descriptor.platform
  *
  * All operations listed here do not require I/O.
  */
+@ApiStatus.Experimental
 sealed interface EelPath {
   companion object {
     @Throws(EelPathException::class)
@@ -26,6 +29,7 @@ sealed interface EelPath {
 
     @Throws(EelPathException::class)
     @JvmStatic
+    @ApiStatus.Internal
     fun build(parts: List<String>, descriptor: EelDescriptor): EelPath {
       return ArrayListEelAbsolutePath.build(parts, descriptor)
     }
@@ -156,6 +160,8 @@ sealed interface EelPath {
   }
 }
 
+@ApiStatus.Internal
 operator fun EelPath.div(part: String): EelPath = resolve(part)
 
+@ApiStatus.Experimental
 class EelPathException(val raw: String, val reason: String) : RuntimeException("`$raw`: $reason")

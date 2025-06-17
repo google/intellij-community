@@ -22,10 +22,12 @@ import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 import com.intellij.util.IJSwingUtilities
 import com.intellij.util.ObjectUtils.tryCast
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.vcs.commit.CommitMode
 import com.intellij.vcs.commit.CommitModeManager
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import java.util.function.Predicate
 
@@ -208,13 +210,6 @@ class ChangesViewContentManager private constructor(private val project: Project
     return content.resolveToolWindowId()
   }
 
-  fun initLazyContent(content: Content) {
-    val provider = content.getUserData(CONTENT_PROVIDER_SUPPLIER_KEY)?.invoke() ?: return
-    content.putUserData(CONTENT_PROVIDER_SUPPLIER_KEY, null)
-    provider.initTabContent(content)
-    IJSwingUtilities.updateComponentTreeUI(content.component)
-  }
-
   private inner class ContentProvidersListener(val toolWindow: ToolWindow) : ContentManagerListener, ToolWindowManagerListener {
     override fun stateChanged(toolWindowManager: ToolWindowManager) {
       if (toolWindow.isVisible) {
@@ -325,6 +320,14 @@ class ChangesViewContentManager private constructor(private val project: Project
       return !isContentVertical || !isCommitToolWindowShown(project)
     }
 
+    @ApiStatus.Internal
+    fun initLazyContent(content: Content) {
+      val provider = content.getUserData(CONTENT_PROVIDER_SUPPLIER_KEY)?.invoke() ?: return
+      content.putUserData(CONTENT_PROVIDER_SUPPLIER_KEY, null)
+      provider.initTabContent(content)
+      IJSwingUtilities.updateComponentTreeUI(content.component)
+    }
+
     /**
      * Specified tab order in the toolwindow.
      *
@@ -364,4 +367,21 @@ fun MessageBusConnection.subscribeOnVcsToolWindowLayoutChanges(updateLayout: Run
   subscribe(ToolWindowManagerListener.TOPIC, object : ToolWindowManagerListener {
     override fun stateChanged(toolWindowManager: ToolWindowManager) = updateLayout.run()
   })
+}
+
+/**
+ * Hides windowed/floating Commit TW when the commit started. Only for default non-modal commit mode
+ */
+@RequiresEdt
+internal fun hideWindowedFloatingTwOnCommit(project: Project) {
+  val commitTw = getCommitToolWindow(project) ?: return
+  if (!commitTw.isActive || !commitTw.isVisible) return
+  if (CommitToolWindowUtil.isInWindow(commitTw.type)) {
+    commitTw.hide()
+  }
+}
+
+
+private fun getCommitToolWindow(project: Project): ToolWindow? {
+  return ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.COMMIT)
 }

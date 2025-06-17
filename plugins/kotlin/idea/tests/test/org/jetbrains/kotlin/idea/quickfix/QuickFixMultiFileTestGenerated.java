@@ -132,6 +132,25 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractQuickFixMul
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/quickfix/addTypeAnnotationToValueParameter")
+    public static class AddTypeAnnotationToValueParameter extends AbstractQuickFixMultiFileTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K1;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+        }
+
+        @TestMetadata("platformType.before.Main.kt")
+        public void testPlatformType() throws Exception {
+            runTest("testData/quickfix/addTypeAnnotationToValueParameter/platformType.before.Main.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("testData/quickfix/autoImports")
     public abstract static class AutoImports extends AbstractQuickFixMultiFileTest {
         @RunWith(JUnit3RunnerWithInners.class)
@@ -2143,6 +2162,11 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractQuickFixMul
                 public void testClassMember() throws Exception {
                     runTest("testData/quickfix/createFromUsage/createFunction/fromKotlinToJava/classMember.before.Main.kt");
                 }
+
+                @TestMetadata("noExtFunctionForJavaClass.before.Main.kt")
+                public void testNoExtFunctionForJavaClass() throws Exception {
+                    runTest("testData/quickfix/createFromUsage/createFunction/fromKotlinToJava/noExtFunctionForJavaClass.before.Main.kt");
+                }
             }
         }
 
@@ -2284,6 +2308,11 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractQuickFixMul
 
                     private void runTest(String testDataFilePath) throws Exception {
                         KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+                    }
+
+                    @TestMetadata("brokenJavaType.before.Main.java")
+                    public void testBrokenJavaType() throws Exception {
+                        runTest("testData/quickfix/createFromUsage/createVariable/property/fieldFromJava/brokenJavaType.before.Main.java");
                     }
 
                     @TestMetadata("classMemberLateinitVar.before.Main.java")

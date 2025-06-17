@@ -6,7 +6,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.plugins.parser.impl.LoadPathUtil
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorBuilder
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorFromXmlStreamConsumer
-import com.intellij.platform.plugins.parser.impl.ReadModuleContext
+import com.intellij.platform.plugins.parser.impl.PluginDescriptorReaderContext
 import com.intellij.platform.plugins.parser.impl.XIncludeLoader
 import com.intellij.platform.plugins.parser.impl.consume
 import com.intellij.util.lang.UrlClassLoader
@@ -19,7 +19,7 @@ import java.io.InputStream
 @Internal
 class ClassPathXmlPathResolver(
   private val classLoader: ClassLoader,
-  @JvmField val isRunningFromSources: Boolean,
+  @JvmField val isRunningFromSourcesWithoutDevBuild: Boolean,
 ) : PathResolver {
   override val isFlat: Boolean
     get() = true
@@ -38,7 +38,7 @@ class ClassPathXmlPathResolver(
     return XIncludeLoader.LoadedXIncludeReference(input, dataLoader.toString())
   }
 
-  override fun resolveModuleFile(readContext: ReadModuleContext, dataLoader: DataLoader, path: String): PluginDescriptorBuilder {
+  override fun resolveModuleFile(readContext: PluginDescriptorReaderContext, dataLoader: DataLoader, path: String): PluginDescriptorBuilder {
     val resource: ByteArray?
     if (classLoader is UrlClassLoader) {
       resource = classLoader.getResourceAsBytes(path, true)
@@ -56,7 +56,7 @@ class ClassPathXmlPathResolver(
       val log = logger<ClassPathXmlPathResolver>()
       val moduleName = path.removeSuffix(".xml")
       when {
-        isRunningFromSources && path.startsWith("intellij.") && dataLoader.emptyDescriptorIfCannotResolve -> {
+        isRunningFromSourcesWithoutDevBuild && path.startsWith("intellij.") && dataLoader.emptyDescriptorIfCannotResolve -> {
           log.trace("Cannot resolve $path (dataLoader=$dataLoader, classLoader=$classLoader). ")
           return PluginDescriptorBuilder.builder().apply {
             `package` = "unresolved.$moduleName"
@@ -81,7 +81,7 @@ class ClassPathXmlPathResolver(
     }
   }
 
-  override fun resolvePath(readContext: ReadModuleContext, dataLoader: DataLoader, relativePath: String): PluginDescriptorBuilder? {
+  override fun resolvePath(readContext: PluginDescriptorReaderContext, dataLoader: DataLoader, relativePath: String): PluginDescriptorBuilder? {
     val path = LoadPathUtil.toLoadPath(relativePath)
     val reader = getXmlReader(classLoader = classLoader, path = path, dataLoader = dataLoader) ?: return null
     return PluginDescriptorFromXmlStreamConsumer(readContext, toXIncludeLoader(dataLoader)).let {

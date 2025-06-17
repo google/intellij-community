@@ -10,17 +10,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.getProjectCacheFileName
-import com.intellij.platform.eel.EelApi
-import com.intellij.platform.eel.EelPlatform
-import com.intellij.platform.eel.EelTunnelsApi
-import com.intellij.platform.eel.LocalEelApi
-import com.intellij.platform.eel.pathSeparator
-import com.intellij.platform.eel.provider.LocalEelDescriptor
-import com.intellij.platform.eel.provider.asEelPath
-import com.intellij.platform.eel.provider.asNioPath
-import com.intellij.platform.eel.provider.getEelDescriptor
-import com.intellij.platform.eel.provider.routingPrefixes
-import com.intellij.platform.eel.provider.upgradeBlocking
+import com.intellij.platform.eel.*
+import com.intellij.platform.eel.provider.*
 import com.intellij.platform.eel.provider.utils.EelPathUtils
 import com.intellij.platform.eel.provider.utils.forwardLocalServer
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +26,7 @@ class EelBuildCommandLineBuilder(val project: Project, exePath: Path) : BuildCom
     private val logger = logger<EelBuildCommandLineBuilder>()
   }
 
-  private val eel: EelApi = exePath.getEelDescriptor().upgradeBlocking()
+  private val eel: EelApi = exePath.getEelDescriptor().toEelApiBlocking()
   private val commandLine = GeneralCommandLine().withExePath(exePath.toString())
 
   private val workingDirectory: Path = getSystemSubfolder(BuildManager.SYSTEM_ROOT)
@@ -58,7 +49,7 @@ class EelBuildCommandLineBuilder(val project: Project, exePath: Path) : BuildCom
       runCatching {
         copyProjectSpecificPathToTargetIfRequired(project, Path.of(hostLocation)).asEelPath()
       }.onFailure { error -> logger.warn("Can't map classpath parameter: $hostLocation", error) }.getOrNull()
-    }.joinToString(eel.platform.pathSeparator)
+    }.joinToString(eel.platform.osFamily.pathSeparator)
     require(classpathInTarget.isEmpty()) {
       "Target classpath is not supported"
     }

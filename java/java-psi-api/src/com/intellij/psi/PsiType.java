@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi;
 
+import com.intellij.codeInsight.TypeNullability;
 import com.intellij.lang.jvm.types.JvmPrimitiveTypeKind;
 import com.intellij.lang.jvm.types.JvmType;
 import com.intellij.openapi.project.Project;
@@ -93,6 +94,17 @@ public abstract class PsiType implements PsiAnnotationOwner, Cloneable, JvmType 
   }
 
   /**
+   * Returns a type with the specified nullability. May return the original type if nullability update
+   * cannot be performed (e.g., for primitive type)
+   * 
+   * @param nullability wanted nullability
+   * @return the type with the specified nullability, or the original type if nullability cannot be updated.
+   */
+  public @NotNull PsiType withNullability(@NotNull TypeNullability nullability) {
+    return this;
+  }
+
+  /**
    * Creates array type with this type as a component.
    */
   public @NotNull PsiArrayType createArrayType() {
@@ -168,6 +180,13 @@ public abstract class PsiType implements PsiAnnotationOwner, Cloneable, JvmType 
    * @return true if the string is equivalent to the type, false otherwise
    */
   public abstract boolean equalsToText(@NotNull @NonNls String text);
+
+  /**
+   * @return nullability of this type
+   */
+  public @NotNull TypeNullability getNullability() {
+    return TypeNullability.UNKNOWN;
+  }
 
   /**
    * Returns the class type for qualified class name.

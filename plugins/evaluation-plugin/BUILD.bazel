@@ -19,8 +19,13 @@ jvm_library(
     "//plugins/completion-ml-ranking",
     "//libraries/io",
     "//libraries/ktor-client",
+    "//platform/analysis-api:analysis",
+    "//platform/util/concurrency",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/projectModel-api:projectModel",
     "//plugins/stats-collector",
     "//platform/ide-core-impl",
     "//platform/platform-impl:ide-impl",
@@ -36,7 +41,6 @@ jvm_library(
     "//platform/warmup",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:jetbrains-annotations",
-    "@lib//:ktor-client-logging",
   ],
   runtime_deps = [":evaluation-plugin_resources"]
 )
@@ -54,6 +58,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//plugins/evaluation-plugin/core",
     "//plugins/evaluation-plugin",
+    "//platform/core-api:core",
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl:ide-impl_test_lib",
     "@lib//:mockito",
@@ -63,6 +68,7 @@ jvm_library(
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/evaluation-plugin/languages/python",
+    "@lib//:mockito-kotlin",
   ]
 )
 

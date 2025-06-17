@@ -14,20 +14,15 @@ import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
 import com.intellij.platform.searchEverywhere.SeProviderId
 import com.intellij.platform.searchEverywhere.SeResultEvent
-import com.intellij.platform.searchEverywhere.frontend.SeEmptyResultInfo
-import com.intellij.platform.searchEverywhere.frontend.SeEmptyResultInfoProvider
-import com.intellij.platform.searchEverywhere.frontend.SeFilterActionsPresentation
-import com.intellij.platform.searchEverywhere.frontend.SeFilterEditor
-import com.intellij.platform.searchEverywhere.frontend.SeFilterPresentation
-import com.intellij.platform.searchEverywhere.frontend.SeTab
+import com.intellij.platform.searchEverywhere.frontend.AutoToggleAction
+import com.intellij.platform.searchEverywhere.frontend.*
 import com.intellij.platform.searchEverywhere.frontend.resultsProcessing.SeTabDelegate
 import com.intellij.platform.searchEverywhere.frontend.tabs.utils.SeFilterEditorBase
-import com.intellij.platform.searchEverywhere.frontend.utils.SuspendLazyProperty
-import com.intellij.platform.searchEverywhere.frontend.utils.suspendLazy
 import com.intellij.platform.searchEverywhere.providers.SeEverywhereFilter
+import com.intellij.platform.searchEverywhere.utils.SuspendLazyProperty
+import com.intellij.platform.searchEverywhere.utils.initAsync
 import com.intellij.ui.IdeUICustomization
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.util.function.Function
@@ -41,22 +36,22 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
     get() = name
 
   override val id: String get() = ID
-  private val filterEditor: SuspendLazyProperty<SeFilterEditor> = suspendLazy { SeAllFilterEditor(delegate.getProvidersIdToName()) }
+  private val filterEditor: SuspendLazyProperty<SeFilterEditor> = initAsync(delegate.scope) {
+    SeAllFilterEditor(delegate.getProvidersIdToName())
+  }
 
   override fun getItems(params: SeParams): Flow<SeResultEvent> {
-    if (params.inputQuery.isEmpty()) return emptyFlow()
-
     val allTabFilter = SeEverywhereFilter.from(params.filter)
     return delegate.getItems(params, allTabFilter.disabledProviderIds)
   }
 
-  override suspend fun getFilterEditor(): SeFilterEditor? = filterEditor.getValue()
+  override suspend fun getFilterEditor(): SeFilterEditor = filterEditor.getValue()
 
   override suspend fun itemSelected(item: SeItemData, modifiers: Int, searchText: String): Boolean {
     return delegate.itemSelected(item, modifiers, searchText)
   }
 
-  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo? {
+  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo {
     return SeEmptyResultInfoProvider(getFilterEditor(),
                                      delegate.getProvidersIds(),
                                      delegate.canBeShownInFindResults()).getEmptyResultInfo(delegate.project, context)
@@ -73,19 +68,30 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
 }
 
 private class SeAllFilterEditor(private val providersIdToName: Map<SeProviderId, @Nls String>) : SeFilterEditorBase<SeEverywhereFilter>(SeEverywhereFilter(false, disabledProviders)) {
-  override fun getPresentation(): SeFilterPresentation {
-    return object : SeFilterActionsPresentation {
-      override fun getActions(): List<AnAction> = listOf(getEverywhereToggleAction(), getFilterTypesAction(providersIdToName))
-    }
+  private val presentation = object : SeFilterActionsPresentation {
+    private val actions = listOf(getEverywhereToggleAction(), getFilterTypesAction(providersIdToName))
+    override fun getActions(): List<AnAction> = actions
   }
 
-  private fun getEverywhereToggleAction() = object : CheckBoxSearchEverywhereToggleAction(IdeUICustomization.getInstance().projectMessage("checkbox.include.non.project.items")) {
+  override fun getPresentation(): SeFilterPresentation = presentation
+
+  private fun getEverywhereToggleAction() = object : CheckBoxSearchEverywhereToggleAction(IdeUICustomization.getInstance().projectMessage("checkbox.include.non.project.items")), AutoToggleAction {
+    private var isAutoToggleEnabled: Boolean = true
+
     override fun isEverywhere(): Boolean {
       return filterValue.isEverywhere
     }
 
     override fun setEverywhere(state: Boolean) {
       filterValue = filterValue.cloneWith(state)
+      isAutoToggleEnabled = false
+    }
+
+    override fun autoToggle(everywhere: Boolean): Boolean {
+      if (!canToggleEverywhere() || !isAutoToggleEnabled || isEverywhere == everywhere) return false
+
+      filterValue = filterValue.cloneWith(everywhere)
+      return true
     }
   }
 
@@ -97,7 +103,7 @@ private class SeAllFilterEditor(private val providersIdToName: Map<SeProviderId,
       PersistentSearchEverywhereContributorFilter(namesMap.keys.toList().sortedWith { a, b -> namesMap[a]!!.compareTo(namesMap[b]!!) },
                                                   configuration,
                                                   Function { key: String? -> namesMap[key] },
-                                                  Function { c: String? -> null })
+                                                  Function { null })
 
     return SearchEverywhereFiltersAction(persistentFilter) {
       filterValue = filterValue.cloneWith(disabledProviders)

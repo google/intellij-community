@@ -200,6 +200,7 @@ public final class org/jetbrains/jewel/foundation/code/MimeType$Known {
 	public final fun getC-9EQw4cI ()Ljava/lang/String;
 	public final fun getCPP-9EQw4cI ()Ljava/lang/String;
 	public final fun getDART-9EQw4cI ()Ljava/lang/String;
+	public final fun getDIFF-9EQw4cI ()Ljava/lang/String;
 	public final fun getGO-9EQw4cI ()Ljava/lang/String;
 	public final fun getGRADLE-9EQw4cI ()Ljava/lang/String;
 	public final fun getGRADLE_KTS-9EQw4cI ()Ljava/lang/String;
@@ -209,6 +210,7 @@ public final class org/jetbrains/jewel/foundation/code/MimeType$Known {
 	public final fun getJSON-9EQw4cI ()Ljava/lang/String;
 	public final fun getKOTLIN-9EQw4cI ()Ljava/lang/String;
 	public final fun getMANIFEST-9EQw4cI ()Ljava/lang/String;
+	public final fun getPATCH-9EQw4cI ()Ljava/lang/String;
 	public final fun getPROGUARD-9EQw4cI ()Ljava/lang/String;
 	public final fun getPROPERTIES-9EQw4cI ()Ljava/lang/String;
 	public final fun getPROTO-9EQw4cI ()Ljava/lang/String;
@@ -906,6 +908,7 @@ public final class org/jetbrains/jewel/foundation/theme/JewelTheme$Companion {
 	public final fun getEditorTextStyle (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 	public final fun getGlobalColors (Landroidx/compose/runtime/Composer;I)Lorg/jetbrains/jewel/foundation/GlobalColors;
 	public final fun getGlobalMetrics (Landroidx/compose/runtime/Composer;I)Lorg/jetbrains/jewel/foundation/GlobalMetrics;
+	public final fun getInstanceUuid (Landroidx/compose/runtime/Composer;I)Ljava/util/UUID;
 	public final fun getName (Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 	public final fun isDark (Landroidx/compose/runtime/Composer;I)Z
 	public final fun isSwingCompatMode (Landroidx/compose/runtime/Composer;I)Z
@@ -921,6 +924,7 @@ public final class org/jetbrains/jewel/foundation/theme/JewelThemeKt {
 	public static final fun getLocalEditorTextStyle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalIconData ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalTextStyle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalThemeInstanceUuid ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalThemeName ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 

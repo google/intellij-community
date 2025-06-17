@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.configurationStore
 
 import com.intellij.openapi.application.EDT
@@ -7,7 +7,6 @@ import com.intellij.openapi.components.RoamingType
 import com.intellij.openapi.components.ServiceDescriptor
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.extensions.PluginId
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.util.concurrency.SynchronizedClearableLazy
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
@@ -27,10 +26,8 @@ abstract class ComponentStoreWithExtraComponents : ComponentStoreImpl() {
         result.add(object : SettingsSavingComponent {
           override suspend fun save() {
             withContext(Dispatchers.EDT) {
-              blockingContext {
-                @Suppress("removal")
-                instance.save()
-              }
+              @Suppress("removal")
+              instance.save()
             }
           }
         })
@@ -39,7 +36,14 @@ abstract class ComponentStoreWithExtraComponents : ComponentStoreImpl() {
     result
   }
 
-  final override fun initComponent(component: Any, serviceDescriptor: ServiceDescriptor?, pluginId: PluginId) {
+  final override fun initComponentBlocking(component: Any, serviceDescriptor: ServiceDescriptor?, pluginId: PluginId) {
+    if (component is SettingsSavingComponent) {
+      asyncSettingsSavingComponents.drop()
+    }
+    super.initComponentBlocking(component = component, serviceDescriptor = serviceDescriptor, pluginId = pluginId)
+  }
+
+  final override suspend fun initComponent(component: Any, serviceDescriptor: ServiceDescriptor?, pluginId: PluginId) {
     if (component is SettingsSavingComponent) {
       asyncSettingsSavingComponents.drop()
     }

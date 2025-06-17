@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAct
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.asJava.toLightMethods
@@ -46,6 +47,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.isTopLevelKtOrJavaMember
 import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
+import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import org.jetbrains.kotlin.utils.sure
@@ -119,11 +121,11 @@ internal class KotlinFunctionCallUsage(
                     val replacement = when (symbol) {
                         is KaReceiverParameterSymbol -> symbol.containingSymbol?.name?.asString()?.let { "this@$it" } ?: "this"
 
-                        is KaContextParameterSymbol -> symbol.name.asString()
+                        is KaContextParameterSymbol -> symbol.name.takeUnless { it.isSpecial }?.toString() ?: "contextOf<${symbol.returnType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.IN_VARIANCE)}>()"
 
-                        else -> return@forEachIndexed
-                    }
-                    map.put(idx, psiFactory.createExpression(replacement).createSmartPointer())
+                        else -> null
+                    } ?: return@forEachIndexed
+                    map[idx] = psiFactory.createExpression(replacement).createSmartPointer()
                 }
                 map
             }
@@ -325,7 +327,7 @@ internal class KotlinFunctionCallUsage(
         var firstNamedIndex = newArgumentInfos.firstOrNull {
             !canMixArguments && it.wasNamed ||
                     it.parameter.isNewParameter && it.parameter.defaultValue != null ||
-                    it.resolvedArgument is KtValueArgument && it.parameterIndex < lastParameterIndex //todo varargs
+                    it.shouldSkip()
         }?.parameterIndex
 
         if (firstNamedIndex == null) {
@@ -377,11 +379,12 @@ internal class KotlinFunctionCallUsage(
             }
         }
         val receiver: PsiElement?  =
-            if (newReceiverInfo?.oldIndex != originalReceiverInfo?.oldIndex && newReceiverInfo != null && !newReceiverInfo.wasContextParameter) {
-                val receiverArgument = argumentMapping[newReceiverInfo.oldIndex]?.element
+            if (newReceiverInfo?.oldIndex != originalReceiverInfo?.oldIndex && newReceiverInfo != null) {
+                val receiverArgument = if (!newReceiverInfo.wasContextParameter) argumentMapping[newReceiverInfo.oldIndex]?.element else contextParameters?.get(newReceiverInfo.oldIndex)?.element
                 val defaultValueForCall = newReceiverInfo.defaultValueForCall
                 receiverArgument?.let { psiFactory.createExpression(it.text) }
                     ?: defaultValueForCall
+                    ?: psiFactory.createExpression("contextOf<${newReceiverInfo.currentType.text}>()").takeIf { newReceiverInfo.wasContextParameter && newReceiverInfo.currentType.text != null }
                     ?: psiFactory.createExpression("_")
             } else {
                 null
@@ -414,7 +417,7 @@ internal class KotlinFunctionCallUsage(
 
         var newElement: KtElement = element
         if (newReceiverInfo?.oldIndex != originalReceiverInfo?.oldIndex) {
-            val replacingElement: PsiElement = if (newReceiverInfo != null && !newReceiverInfo.wasContextParameter) {
+            val replacingElement: PsiElement = if (newReceiverInfo != null) {
                 psiFactory.createExpressionByPattern("$0.$1", receiver!!, element)
             } else {
                 element.copy()

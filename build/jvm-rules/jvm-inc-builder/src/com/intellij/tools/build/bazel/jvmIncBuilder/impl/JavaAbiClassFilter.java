@@ -1,19 +1,21 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tools.build.bazel.jvmIncBuilder.impl;
 
-import com.intellij.compiler.instrumentation.FailSafeClassReader;
-import com.intellij.compiler.instrumentation.InstrumentationClassFinder;
-import com.intellij.compiler.instrumentation.InstrumenterClassWriter;
+import com.intellij.tools.build.bazel.jvmIncBuilder.instrumentation.FailSafeClassReader;
+import com.intellij.tools.build.bazel.jvmIncBuilder.instrumentation.InstrumentationClassFinder;
+import com.intellij.tools.build.bazel.jvmIncBuilder.instrumentation.InstrumenterClassWriter;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.org.objectweb.asm.*;
 import org.jetbrains.org.objectweb.asm.tree.FieldNode;
+import org.jetbrains.org.objectweb.asm.tree.InsnNode;
 import org.jetbrains.org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
 
 public class JavaAbiClassFilter extends ClassVisitor {
-
+  public static final String MODULE_INFO_CLASS_NAME = "module-info";
   private boolean isAbiClass;
+  private boolean allowPackageLocalMethods;
   private Set<String> myExcludedClasses = new HashSet<>();
   private List<FieldNode> myFields = new ArrayList<>();
   private List<MethodNode> myMethods = new ArrayList<>();
@@ -35,17 +37,20 @@ public class JavaAbiClassFilter extends ClassVisitor {
 
   @Override
   public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-    isAbiClass = isAbiVisible(access);
-    if (isAbiClass) {
-      super.visit(version, access, name, signature, superName, interfaces);
-    }
-    else {
+    isAbiClass = MODULE_INFO_CLASS_NAME.equals(name) || isAbiVisible(access);
+    allowPackageLocalMethods = name.contains("/android/");   // todo: temporary condition to enable android tests compilation
+    if (!isAbiClass) {
       myExcludedClasses.add(name);
     }
+    super.visit(version, access, name, signature, superName, interfaces);
   }
 
   private static boolean isAbiVisible(int access) {
     return (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) != 0;
+  }
+
+  private static boolean isPackageLocal(int access) {
+    return (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE)) == 0;
   }
 
   @Override
@@ -60,8 +65,8 @@ public class JavaAbiClassFilter extends ClassVisitor {
 
   @Override
   public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-    if (isAbiVisible(access)) {
-      MethodNode method = new MethodNode(Opcodes.API_VERSION, access, name, descriptor, signature, exceptions);
+    if (isAbiVisible(access) || (allowPackageLocalMethods && isPackageLocal(access))) {
+      MethodNode method = new AbiMethod(access, name, descriptor, signature, exceptions);
       myMethods.add(method);
       return method;
     }
@@ -103,4 +108,16 @@ public class JavaAbiClassFilter extends ClassVisitor {
     }
   }
 
+  private static final class AbiMethod extends MethodNode {
+    private static final InsnNode NOP_INSTRUCTION = new InsnNode(Opcodes.NOP);
+
+    AbiMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+      super(Opcodes.API_VERSION, access, name, descriptor, signature, exceptions);
+
+      if ((access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0) {
+        // in a valid bytecode non-abstract and non-native methods must have a code attribute
+        instructions.add(NOP_INSTRUCTION);
+      }
+    }
+  }
 }

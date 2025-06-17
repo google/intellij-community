@@ -177,7 +177,10 @@ object SearchEverywhereMLStatisticsCollector : CounterUsagesCollector() {
     val contributorFeaturesProvider = { it: SearchEverywhereFoundElementInfoWithMl ->
       buildList {
         if (shouldLogFeatures) {
-          addAll(contributorFeaturesProvider.getFeatures(it.contributor, mixedListInfo, sessionStartTime))
+          val baseFeatures = contributorFeaturesProvider.getFeatures(it.contributor, mixedListInfo, sessionStartTime)
+          val essentialFeatures = contributorFeaturesProvider.getEssentialContributorFeatures(it.contributor)
+          addAll(baseFeatures)
+          addAll(essentialFeatures)
         }
         else {
           add(contributorFeaturesProvider.getContributorIdFeature(it.contributor))
@@ -294,7 +297,7 @@ object SearchEverywhereMLStatisticsCollector : CounterUsagesCollector() {
     return true
   }
 
-  private val GROUP = EventLogGroup("mlse.log", 114, MLSE_RECORDER_ID)
+  private val GROUP = EventLogGroup("mlse.log", 116, MLSE_RECORDER_ID)
 
   private val IS_INTERNAL = EventFields.Boolean("isInternal")
   private val ORDER_BY_ML_GROUP = EventFields.Boolean("orderByMl")

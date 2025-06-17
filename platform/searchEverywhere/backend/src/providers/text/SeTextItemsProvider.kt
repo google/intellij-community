@@ -4,6 +4,7 @@ package com.intellij.platform.searchEverywhere.backend.providers.text
 import com.intellij.find.impl.SearchEverywhereItem
 import com.intellij.ide.actions.searcheverywhere.FoundItemDescriptor
 import com.intellij.ide.ui.colors.rpcId
+import com.intellij.ide.ui.toSerializableTextChunk
 import com.intellij.ide.util.DelegatingProgressIndicator
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.progress.ProgressManager
@@ -26,11 +27,7 @@ class SeTextSearchItem(val item: SearchEverywhereItem, private val weight: Int, 
     SeTextSearchItemPresentation(item.presentableText,
                                  extendedDescription,
                                  item.presentation.text.map { chunk ->
-                                   SerializableTextChunk(
-                                     chunk.text,
-                                     chunk.attributes.foregroundColor.rpcId(),
-                                     chunk.attributes.fontType
-                                   )
+                                   chunk.toSerializableTextChunk()
                                  },
                                  item.presentation.backgroundColor?.rpcId(),
                                  item.presentation.fileString)
@@ -38,7 +35,7 @@ class SeTextSearchItem(val item: SearchEverywhereItem, private val weight: Int, 
 
 @ApiStatus.Internal
 class SeTextItemsProvider(private val contributorWrapper: SeAsyncWeightedContributorWrapper<Any>) : SeItemsProvider {
-  override val id: String get() = ID
+  override val id: String get() = SeProviderIdUtils.TEXT_ID
   override val displayName: @Nls String
     get() = contributorWrapper.contributor.fullGroupName
 
@@ -76,9 +73,5 @@ class SeTextItemsProvider(private val contributorWrapper: SeAsyncWeightedContrib
 
   override fun dispose() {
     Disposer.dispose(contributorWrapper)
-  }
-
-  companion object {
-    const val ID: String = "com.intellij.TextSearchEverywhereItemProvider"
   }
 }

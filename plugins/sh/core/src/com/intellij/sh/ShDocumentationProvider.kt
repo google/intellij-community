@@ -96,11 +96,11 @@ internal class ShDocumentationProvider(private val scope: CoroutineScope) : Docu
     if (commandName == null) return null
     val manExecutablePromise = myManExecutableCache.computeIfAbsent(eelDescriptor) {
       scope.suspendingLazy {
-        val eel = eelDescriptor.upgrade()
+        val eel = eelDescriptor.toEelApi()
         val path = eel.exec.fetchLoginShellEnvVariables()["PATH"]
 
         if (path != null) {
-          for (dir in StringUtil.tokenize(path, eelDescriptor.platform.pathSeparator)) {
+          for (dir in StringUtil.tokenize(path, eelDescriptor.osFamily.pathSeparator)) {
             val eelDir = runCatching { parse(dir, eelDescriptor) }.getOrNull() ?: continue
             val file = eelDir.resolve("info").asNioPath()
 

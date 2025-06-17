@@ -25,6 +25,8 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-fe10",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "@lib//:kotlinc-assignment-compiler-plugin",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/base/scripting",
@@ -37,6 +39,7 @@ jvm_library(
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/base/fe10/analysis",
     "//platform/lang-impl",
+    "//plugins/kotlin/base/scripting.k1",
   ],
   runtime_deps = [":kotlin-compiler-plugins-assignment-common-k1_resources"]
 )

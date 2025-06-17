@@ -16,6 +16,7 @@ import com.intellij.codeInspection.util.InspectionMessage
 import com.intellij.execution.JUnitBundle
 import com.intellij.execution.junit.*
 import com.intellij.execution.junit.references.MethodSourceReference
+import com.intellij.execution.junit.references.PsiMethodSourceResolveResult
 import com.intellij.jvm.analysis.quickFix.CompositeModCommandQuickFix
 import com.intellij.jvm.analysis.quickFix.createModifierQuickfixes
 import com.intellij.lang.Language
@@ -562,12 +563,15 @@ private class JUnitMalformedSignatureVisitor(
       annotationMemberValue.forEach { attributeValue ->
         for (reference in attributeValue.references) {
           if (reference is MethodSourceReference) {
-            val parametrizedMethod = reference.fastResolveFor(method)
-            if (parametrizedMethod !is PsiMethod) {
+            val sourceProviders = reference.multiResolve(false)
+            val sourceProvider = sourceProviders
+              .mapNotNull { it as? PsiMethodSourceResolveResult }
+              .firstNotNullOfOrNull { it.getSourceMethodForClass(method.javaPsi.containingClass ?: return) }
+            if (sourceProvider == null) {
               return checkAbsentSourceProvider(containingClass, attributeValue, reference.value, method)
             }
             else {
-              val uSourceProvider = parametrizedMethod.toUElementOfType<UMethod>() ?: return
+              val uSourceProvider = sourceProvider.toUElementOfType<UMethod>() ?: return
               return checkSourceProvider(uSourceProvider, containingClass, attributeValue, method)
             }
           }
@@ -576,9 +580,16 @@ private class JUnitMalformedSignatureVisitor(
     }
   }
 
+  private fun PsiMethodSourceResolveResult.getSourceMethodForClass(owner: PsiClass): PsiMethod? {
+    val method = element as? PsiMethod ?: return null
+    if (owners.isEmpty()) return method // direct link
+    return owner.findMethodBySignature(method, true)
+  }
+
   private fun checkAbsentSourceProvider(
     containingClass: PsiClass, attributeValue: PsiElement, sourceProviderName: String, method: UMethod
   ) {
+    if (containingClass.isInterface || PsiUtil.isAbstractClass(containingClass)) return
     val place = (if (method.javaPsi.isAncestor(attributeValue, true)) attributeValue
     else method.javaPsi.nameIdentifier ?: method.javaPsi).toUElement()?.sourcePsi ?: return
     val message = JUnitBundle.message(

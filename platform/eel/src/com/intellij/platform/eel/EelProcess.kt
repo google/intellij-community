@@ -4,13 +4,15 @@ package com.intellij.platform.eel
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
 import kotlinx.coroutines.Deferred
-import java.io.IOException
+import org.jetbrains.annotations.ApiStatus
 
 /**
  * Represents some process that was launched via [EelExecApi.spawnProcess].
  *
  */
+@ApiStatus.Experimental
 sealed interface EelProcess {
+  @get:ApiStatus.Experimental
   val pid: EelApi.Pid
 
   /**
@@ -19,9 +21,16 @@ sealed interface EelProcess {
    *
    * Note that each chunk of data is individually and immediately flushed into the process without any intermediate buffer storage.
    */
+  @get:ApiStatus.Experimental
   val stdin: EelSendChannel
+
+  @get:ApiStatus.Experimental
   val stdout: EelReceiveChannel
+
+  @get:ApiStatus.Experimental
   val stderr: EelReceiveChannel
+
+  @get:ApiStatus.Experimental
   val exitCode: Deferred<Int>
 
   /**
@@ -30,6 +39,7 @@ sealed interface EelProcess {
    * Calls [`TerminateProcess`](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess)
    * on Windows.
    */
+  @ApiStatus.Experimental
   suspend fun kill()
 
   /**
@@ -38,6 +48,7 @@ sealed interface EelProcess {
    *
    * Warning: This signal can be ignored.
    */
+  @ApiStatus.Experimental
   suspend fun interrupt()
 
   /**
@@ -45,11 +56,14 @@ sealed interface EelProcess {
    * Note: After conversion, this [EelProcess] shouldn't be used: Use result [Process] instead
    * If the process was launched with PTY, `com.pty4j.PtyProcess` instance is returned.
    */
+  @ApiStatus.Experimental
   fun convertToJavaProcess(): Process
 
   @Throws(ResizePtyError::class)  // Can't use @CheckReturnValue: KTIJ-7061
+  @ApiStatus.Experimental
   suspend fun resizePty(columns: Int, rows: Int)
 
+  @ApiStatus.Experimental
   sealed class ResizePtyError(msg: String) : Exception(msg) {
     class ProcessExited : ResizePtyError("Process exited")
     class NoPty : ResizePtyError("Process has no PTY")
@@ -57,13 +71,16 @@ sealed interface EelProcess {
   }
 }
 
+@ApiStatus.Experimental
 interface EelPosixProcess : EelProcess {
   /**
    * Sends `SIGTERM` on Unix.
    */
+  @ApiStatus.Experimental
   suspend fun terminate()
 }
 
+@ApiStatus.Experimental
 interface EelWindowsProcess : EelProcess {
   // Nothing yet.
 }

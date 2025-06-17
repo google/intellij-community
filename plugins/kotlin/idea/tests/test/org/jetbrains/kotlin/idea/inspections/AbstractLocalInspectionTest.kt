@@ -22,13 +22,13 @@ import com.intellij.profile.codeInspection.ProjectInspectionProfileManager
 import com.intellij.testFramework.PlatformTestUtil.dispatchAllEventsInIdeEventQueue
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
-import com.intellij.util.io.write
 import com.intellij.util.currentJavaVersion
+import com.intellij.util.io.write
 import org.jdom.Element
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.base.test.registerDirectiveBasedChooserOptionInterceptor
-import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
+import org.jetbrains.kotlin.idea.core.script.k1.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.highlighter.AbstractHighlightingPassBase
 import org.jetbrains.kotlin.idea.intentions.computeOnBackground
 import org.jetbrains.kotlin.idea.test.DirectiveBasedActionUtils
@@ -39,6 +39,7 @@ import org.jetbrains.kotlin.idea.test.KotlinTestUtils
 import org.jetbrains.kotlin.idea.test.withCustomCompilerOptions
 import org.jetbrains.kotlin.idea.util.application.executeCommand
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.test.utils.withExtension
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -452,8 +453,12 @@ abstract class AbstractLocalInspectionTest : KotlinLightCodeInsightFixtureTestCa
         }
     }
 
-    protected fun loadInspectionSettings(testFile: File): Element? =
-        File(testFile.parentFile, "settings.xml")
-            .takeIf { it.exists() }
+    protected fun loadInspectionSettings(testFile: File): Element? {
+        val customSettings = testFile.withExtension("settings.xml")
+        val commonSettings = testFile.resolveSibling("settings.xml")
+
+        return listOf(customSettings, commonSettings)
+            .firstOrNull { it.exists() }
             ?.let { JDOMUtil.load(it) }
+    }
 }

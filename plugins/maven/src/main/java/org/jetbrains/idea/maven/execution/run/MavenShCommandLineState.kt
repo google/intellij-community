@@ -30,7 +30,7 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
-import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.ExecuteProcessException
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath
@@ -67,7 +67,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
 
   private fun startProcess(debug: Boolean): ProcessHandler {
     return runWithModalProgressBlocking(myConfiguration.project, RunnerBundle.message("maven.target.run.label")) {
-      val eelApi = myConfiguration.project.getEelDescriptor().upgrade()
+      val eelApi = myConfiguration.project.getEelDescriptor().toEelApi()
 
       val exe = if (isWindows()) "cmd.exe" else "/bin/sh"
       val env = getEnv(eelApi.exec.fetchLoginShellEnvVariables(), debug)
@@ -89,33 +89,42 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
 
 
     return if (isWindows()) {
-      val cmdArgs = listOf("/c",
-                           params.parameters
-                             .joinToString(separator = " ", prefix = "\"", postfix = "\"") {
-                               CommandLineUtil.escapeParameterOnWindows(it, true)
-                             }
-      )
-      val pair = writeParamsToBatBecauseCmdIsReallyReallyBad(exe, cmdArgs)
-      var pathForCmd: String = pair.first
-      val tmpBat: File = pair.second
-
-      val commandLineForUser = if (Registry.`is`("maven.spy.events.debug")) {
-        "cmd.exe /c $pathForCmd"
-      }
-      else {
-        "$exe ${cmdArgs.joinToString(" ")}"
-      }
-
-      doRunProcessInEel(eelApi, exe, env, listOf("/c", pathForCmd), commandLineForUser) {
-        try {
-          tmpBat.delete()
-        }
-        catch (ignore: IOException) {
-        }
-      }
+      prepareBatScriptForWindows(params, exe, eelApi, env)
     }
     else {
       doRunProcessInEel(eelApi, exe, env, params.list, "$exe ${params.list.joinToString(" ")}", null)
+    }
+  }
+
+  private suspend fun prepareBatScriptForWindows(
+    params: ParametersList,
+    exe: String,
+    eelApi: EelApi,
+    env: Map<String, String>,
+  ): KillableColoredProcessHandler.Silent {
+    val cmdArgs = listOf("/c",
+                         params.parameters
+                           .joinToString(separator = " ", prefix = "\"", postfix = "\"") {
+                             CommandLineUtil.escapeParameterOnWindows(it, true)
+                           }
+    )
+    val pair = writeParamsToBatBecauseCmdIsReallyReallyBad(exe, cmdArgs)
+    var pathForCmd: String = pair.first
+    val tmpBat: File = pair.second
+
+    val commandLineForUser = if (Registry.`is`("maven.spy.events.debug")) {
+      "cmd.exe /c $pathForCmd"
+    }
+    else {
+      "$exe ${cmdArgs.joinToString(" ")}"
+    }
+
+    return doRunProcessInEel(eelApi, exe, env, listOf("/c", pathForCmd), commandLineForUser) {
+      try {
+        tmpBat.delete()
+      }
+      catch (ignore: IOException) {
+      }
     }
   }
 
@@ -204,7 +213,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       MavenBuildEventProcessor(myConfiguration, buildView!!, descriptor, taskId, { it }, Function { ctx: MavenParsingContext? -> StartBuildEventImpl(descriptor, "") }, isWrapperedOutput())
 
     processHandler.addProcessListener(BuildToolConsoleProcessAdapter(eventProcessor))
-    buildView.attachToProcess(MavenHandlerFilterSpyWrapper(processHandler, isWrapperedOutput()))
+    buildView.attachToProcess(MavenHandlerFilterSpyWrapper(processHandler, isWrapperedOutput(), isWindows()))
 
     return DefaultExecutionResult(buildView, processHandler)
   }
@@ -240,7 +249,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
     val consoleView = createConsole()
     val viewManager = environment.project.getService<BuildViewManager?>(BuildViewManager::class.java)
 
-    descriptor.withProcessHandler(MavenBuildHandlerFilterSpyWrapper(processHandler, isWrapperedOutput()), null)
+    descriptor.withProcessHandler(MavenBuildHandlerFilterSpyWrapper(processHandler, isWrapperedOutput(), isWindows()), null)
     descriptor.withExecutionEnvironment(environment)
     val startBuildEvent = StartBuildEventImpl(descriptor, "")
     val eventProcessor =
@@ -330,6 +339,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       val maven_opts = map["MAVEN_OPTS"] ?: ""
       map["MAVEN_OPTS"] = mavenConnectionWrapper!!.enhanceMavenOpts(maven_opts)
     }
+    myConfiguration.runnerSettings?.environmentProperties?.let { map.putAll(it) }
     return map
   }
 
@@ -397,7 +407,10 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
   }
 
   private fun isWindows() =
-    myConfiguration.project.getEelDescriptor().platform is EelPlatform.Windows
+    when (myConfiguration.project.getEelDescriptor().osFamily) {
+      EelOsFamily.Posix -> false
+      EelOsFamily.Windows -> true
+    }
 
   private fun isWrapperedOutput(): Boolean {
     val mavenDistribution = MavenDistributionsCache.getInstance(myConfiguration.project).getMavenDistribution(myConfiguration.runnerParameters.workingDirPath)

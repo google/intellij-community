@@ -15,7 +15,6 @@ import com.intellij.util.xml.dom.createNonCoalescingXmlStreamReader
 import com.intellij.util.xml.dom.readXmlAsModel
 import org.codehaus.stax2.XMLStreamReader2
 import org.codehaus.stax2.typed.TypedXMLStreamException
-import org.jetbrains.annotations.ApiStatus
 import java.io.IOException
 import java.io.InputStream
 import java.text.ParseException
@@ -253,7 +252,7 @@ private val actionNameToEnum = run {
   entries.associateByTo(HashMap<String, ActionElementName>(entries.size), ActionElementName::name)
 }
 
-private fun readActions(builder: PluginDescriptorBuilder, reader: XMLStreamReader2, readContext: ReadModuleContext) {
+private fun readActions(builder: PluginDescriptorBuilder, reader: XMLStreamReader2, readContext: PluginDescriptorReaderContext) {
   val resourceBundle = XmlReadUtils.findAttributeValue(reader, PluginXmlConst.ACTIONS_RESOURCE_BUNDLE_ATTR)
   reader.consumeChildElements { elementName ->
     if (checkXInclude(elementName, reader)) {
@@ -637,7 +636,7 @@ private fun readComponents(reader: XMLStreamReader2, containerDescriptor: Scoped
   }
 }
 
-private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuilder, readContext: ReadModuleContext) {
+private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuilder, readContext: PluginDescriptorReaderContext) {
   reader.consumeChildElements { elementName ->
     if (elementName != PluginXmlConst.CONTENT_MODULE_ELEM) {
       reader.skipElement()
@@ -728,16 +727,6 @@ private fun readDependencies(reader: XMLStreamReader2, builder: PluginDescriptor
     reader.skipElement()
   }
   assert(reader.isEndElement)
-}
-
-@ApiStatus.Internal
-interface ReadModuleContext {
-  val interner: XmlInterner
-
-  val elementOsFilter: (OS) -> Boolean
-
-  val isMissingIncludeIgnored: Boolean
-    get() = false
 }
 
 private fun readInclude(

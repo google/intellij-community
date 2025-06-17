@@ -6,7 +6,7 @@ import com.intellij.ide.impl.DataManagerImpl;
 import com.intellij.internal.InternalActionsBundle;
 import com.intellij.internal.inspector.*;
 import com.intellij.internal.inspector.accessibilityAudit.AccessibilityAuditManager;
-import com.intellij.internal.inspector.accessibilityAudit.Severity;
+import com.intellij.internal.inspector.accessibilityAudit.SeverityCount;
 import com.intellij.internal.inspector.accessibilityAudit.UiInspectorAccessibilityInspection;
 import com.intellij.openapi.actionSystem.DataProvider;
 import com.intellij.openapi.actionSystem.UiDataProvider;
@@ -39,8 +39,8 @@ import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.InaccessibleObjectException;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
 @ApiStatus.Internal
 public abstract class HierarchyTree extends JTree implements TreeSelectionListener {
@@ -176,7 +176,7 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
       return;
     }
 
-    // this will be performed for elements that implement Accessible interface, but are not Components (for example JTree nodes)
+    // This will be performed for elements that implement the Accessible interface but aren't Components (for example, JTree nodes)
     if (paths.length > 0 &&
         paths[0].getLastPathComponent() instanceof ComponentNode node &&
         node.getComponent() == null &&
@@ -224,7 +224,6 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
     private final String myName;
     private final boolean isAccessibleNode;
     private final AccessibilityAuditManager accessibilityAudit;
-
     String myText;
 
     public static ComponentNode createAccessibleNode(@NotNull Accessible accessible) {
@@ -273,10 +272,6 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
       TreeUtil.addChildrenTo(node, prepareComponentChildren(component));
       return node;
     }
-
-    public void runAccessibilityTests(@NotNull AccessibleContext ac) { accessibilityAudit.runAccessibilityTests(ac); }
-
-    public void clearAccessibilityTestsResult() { accessibilityAudit.clearAccessibilityTestsResult(); }
 
     private ComponentNode(@Nullable Component component,
                           @Nullable Accessible accessible,
@@ -360,12 +355,23 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
 
       return result;
     }
+
+    public List<UiInspectorAccessibilityInspection> getFailedAccessibilityInspections() {
+      return accessibilityAudit.getFailedInspections();
+    }
+
+    public void runAccessibilityAudit() {
+      accessibilityAudit.runAccessibilityTests(myAccessible);
+    }
+
+    public void clearAccessibilityAuditResult() {
+      accessibilityAudit.clearAccessibilityTestsResult();
+    }
   }
 
   private static final class ComponentTreeCellRenderer extends ColoredTreeCellRenderer {
     private final Component myInitialSelection;
     private final List<IconWithErrorCount> myAccessibilityAuditIcons = new ArrayList<>();
-    private int myIconsWidth;
     private String myToolTipText = "";
 
     ComponentTreeCellRenderer(Component initialSelection) {
@@ -387,7 +393,7 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
       boolean isRenderer = false;
 
       myAccessibilityAuditIcons.clear();
-      StringBuilder sb = new StringBuilder();
+      myToolTipText = "";
 
       if (value instanceof ComponentNode componentNode) {
         isRenderer = componentNode.getUserObject() instanceof List<?> ||
@@ -468,52 +474,38 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
         }
 
         AccessibilityAuditManager accessibilityAudit = componentNode.accessibilityAudit;
-        List<UiInspectorAccessibilityInspection> accessibilityResult = accessibilityAudit.getFailedInspections();
-
-        int warningCount = 0;
-        int recommendationCount = 0;
-
         if (accessibilityAudit.isRunning()) {
           int fontHeight = getFontMetrics(getFont()).getHeight();
-
-          if (!accessibilityResult.isEmpty()) {
-            for (UiInspectorAccessibilityInspection inspection : accessibilityResult) {
-              if (inspection.getSeverity() == Severity.WARNING) {
-                warningCount++;
-              }
-              else if (inspection.getSeverity() == Severity.RECOMMENDATION) {
-                recommendationCount++;
-              }
+          SeverityCount count = accessibilityAudit.getSeverityCount();
+          if (count.getTotal() == 0) {
+            myAccessibilityAuditIcons.add(new IconWithErrorCount(
+              IconUtil.scale(AllIcons.General.GreenCheckmark, this, fontHeight / (float) AllIcons.General.GreenCheckmark.getIconHeight()), 0));
+          } else {
+            if (count.getErrors() > 0) {
+              myAccessibilityAuditIcons.add(new IconWithErrorCount(
+                IconUtil.scale(AllIcons.General.Error, this, fontHeight / (float)AllIcons.General.Error.getIconHeight()),
+                count.getErrors()
+              ));
             }
-            sb.append(InternalActionsBundle.message("ui.inspector.accessibility.audit.tooltip", warningCount + recommendationCount));
-            if (warningCount > 0) {
+            if (count.getWarnings() > 0) {
               myAccessibilityAuditIcons.add(new IconWithErrorCount(
                 IconUtil.scale(AllIcons.General.Warning, this, fontHeight / (float)AllIcons.General.Warning.getIconHeight()),
-                warningCount
+                count.getWarnings()
               ));
-              sb.append(" ")
-                .append(InternalActionsBundle.message("ui.inspector.accessibility.audit.tooltipWarnings", warningCount));
             }
-
-            if (recommendationCount > 0) {
+            if (count.getRecommendations() > 0) {
               myAccessibilityAuditIcons.add(new IconWithErrorCount(
                 IconUtil.scale(AllIcons.General.Information, this, fontHeight / (float)AllIcons.General.Information.getIconHeight()),
-                recommendationCount
+                count.getRecommendations()
               ));
-              sb.append(" ")
-                .append(InternalActionsBundle.message("ui.inspector.accessibility.audit.tooltipRecommendations", warningCount));
             }
           }
-          else {
-            myAccessibilityAuditIcons.add(new IconWithErrorCount(
-              IconUtil.scale(AllIcons.General.GreenCheckmark, this, fontHeight / (float)AllIcons.General.GreenCheckmark.getIconHeight()),
-              0
-            ));
-            sb.append(InternalActionsBundle.message("ui.inspector.accessibility.audit.tooltip", 0));
-          }
+          myToolTipText =
+            InternalActionsBundle.message("ui.inspector.accessibility.audit.tree.tooltip", count.getTotal(), count.getErrors(),
+                                                        count.getWarnings(), count.getRecommendations());
         }
       }
-      myToolTipText = sb.toString();
+
       if (isRenderer) {
         setIcon(AllIcons.Ide.Rating);
       }
@@ -525,61 +517,41 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
 
     @Override
     public String getToolTipText(MouseEvent event) {
-      if (event.getX() >= getPreferredSize().width - myIconsWidth && event.getX() <= getPreferredSize().width) {
-        return myToolTipText;
-      }
-      return super.getToolTipText(event);
+      return myToolTipText;
     }
 
     @Override
     public void paint(Graphics g) {
       super.paint(g);
-      myIconsWidth = 0;
       if (myAccessibilityAuditIcons.isEmpty()) {
         return;
       }
 
       GraphicsUtil.setupAntialiasing(g);
 
-      int componentHeight = getSize().height;
       int iconX = getPreferredSize().width;
       int iconSpacing = getIconTextGap() * 2;
       FontMetrics fontMetrics = g.getFontMetrics();
-      int textHeight = fontMetrics.getHeight();
 
       g.setColor(UIUtil.getTreeForeground());
 
       for (IconWithErrorCount entry : myAccessibilityAuditIcons) {
         Icon icon = entry.getIcon();
-        int errorCount = entry.getErrorCount();
-        int iconHeight = icon.getIconHeight();
-        int iconY = (componentHeight - iconHeight) / 2;
-
+        int iconY = (getHeight() - icon.getIconHeight()) / 2;
         icon.paintIcon(this, g, iconX, iconY);
 
-        if (errorCount != 0) {
+        if (entry.getErrorCount() != 0) {
           int textX = iconX + icon.getIconWidth() + iconSpacing;
-          int textY = (componentHeight - textHeight) / 2 + fontMetrics.getAscent();
-          g.drawString(String.valueOf(errorCount), textX, textY);
+          int textY = (getHeight() + fontMetrics.getAscent() - fontMetrics.getDescent()) / 2;
 
-          iconX = textX + fontMetrics.stringWidth(String.valueOf(errorCount)) + iconSpacing;
-        }
-        else {
+          String countStr = String.valueOf(entry.getErrorCount());
+          g.drawString(countStr, textX, textY);
+
+          iconX = textX + fontMetrics.stringWidth(countStr) + iconSpacing;
+        } else {
           iconX += icon.getIconWidth() + iconSpacing;
         }
-        myIconsWidth += icon.getIconWidth() + iconSpacing;
       }
-    }
-
-    @Override
-    public @NotNull Dimension getPreferredSize() {
-      Dimension size = super.getPreferredSize();
-      return new Dimension(size.width + myIconsWidth, size.height);
-    }
-
-    @Override
-    public @NotNull Dimension getSize() {
-      return getPreferredSize();
     }
   }
 

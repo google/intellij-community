@@ -22,6 +22,11 @@
     <extensionPoint qualifiedName="com.intellij.vcs.github.gistContentsCollector"
                     interface="org.jetbrains.plugins.github.GithubGistContentsCollector"
                     dynamic="true"/>
+
+    <!-- Removal pending after 2025.2 -->
+    <extensionPoint qualifiedName="com.intellij.github.ghShareProjectCompatibilityExtension"
+                    interface="org.jetbrains.plugins.github.GHShareProjectCompatibilityExtension"
+                    dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -83,7 +88,7 @@
 
     <registryKey defaultValue="true"
                  description="Whether to check that the PR list is up-to-date using ETags"
-                 key="github.pr.list.automatic.refresh.seconds"/>
+                 key="github.pr.list.automatic.refresh.enabled"/>
     <registryKey defaultValue="30"
                  description="Seconds between checking the ETag for the PR list"
                  key="github.pr.list.automatic.refresh.seconds"/>
@@ -109,11 +114,15 @@
   </extensions>
 
   <actions>
-    <action id="Github.Share" class="org.jetbrains.plugins.github.GithubShareAction" icon="AllIcons.Vcs.Vendors.Github">
-      <add-to-group group-id="Vcs.Import"/>
-      <add-to-group group-id="Vcs.ToolbarWidget.ShareProject" relative-to-action="Start.Use.Vcs" anchor="before"/>
-      <override-text place="Vcs.Toolbar.Widget"/>
-    </action>
+    <action id="GitHub.Diff.Review.PreviousComment"
+            class="org.jetbrains.plugins.github.pullrequest.comment.action.GHPRDiffReviewPreviousCommentAction"
+            icon="com.intellij.icons.AllIcons.Actions.PreviousOccurence"
+            use-shortcut-of="PreviousOccurence"/>
+    <action id="GitHub.Diff.Review.NextComment"
+            class="org.jetbrains.plugins.github.pullrequest.comment.action.GHPRDiffReviewNextCommentAction"
+            icon="com.intellij.icons.AllIcons.Actions.NextOccurence"
+            use-shortcut-of="NextOccurence"/>
+
     <action id="Github.Sync.Fork"
             class="org.jetbrains.plugins.github.GithubSyncForkAction"
             icon="AllIcons.Vcs.Vendors.Github">
@@ -151,7 +160,6 @@
       <add-to-group group-id="ConsoleEditorPopupMenu"/>
     </action>
     <group id="GitHub.MainMenu" popup="true">
-      <reference ref="Github.Share"/>
       <reference ref="Github.Create.Pull.Request"/>
       <reference ref="Github.View.Pull.Request"/>
       <reference ref="Github.Sync.Fork"/>
@@ -159,6 +167,7 @@
       <reference ref="Github.Open.In.Browser"/>
 
       <add-to-group group-id="Git.MainMenu" relative-to-action="Git.Configure.Remotes" anchor="before"/>
+      <add-to-group group-id="GitRepositoryActions" relative-to-action="Git.Configure.Remotes" anchor="before"/>
     </group>
 
     <action id="Github.PullRequest.Open.Link"

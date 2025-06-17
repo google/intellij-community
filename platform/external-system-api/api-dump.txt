@@ -306,6 +306,8 @@ com.intellij.openapi.externalSystem.importing.ImportSpec
 - a:getExternalSystemId():com.intellij.openapi.externalSystem.model.ProjectSystemId
 - a:getProgressExecutionMode():com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
 - a:getProject():com.intellij.openapi.project.Project
+- a:getProjectResolverPolicy():com.intellij.openapi.externalSystem.importing.ProjectResolverPolicy
+- a:getRerunAction():java.lang.Runnable
 - a:getUserData():com.intellij.openapi.util.UserDataHolderBase
 - a:getVmOptions():java.lang.String
 - a:isActivateBuildToolWindowOnFailure():Z
@@ -313,6 +315,8 @@ com.intellij.openapi.externalSystem.importing.ImportSpec
 - a:isNavigateToError():com.intellij.util.ThreeState
 - a:isPreviewMode():Z
 - a:shouldCreateDirectoriesForEmptyContentRoots():Z
+- a:shouldImportProjectData():Z
+- a:shouldSelectProjectDataToImport():Z
 c:com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - <init>(com.intellij.openapi.externalSystem.importing.ImportSpec):V
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.model.ProjectSystemId):V
@@ -326,7 +330,16 @@ c:com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - navigateToError():com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - use(com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - usePreviewMode():com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withActivateToolWindowOnFailure(Z):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withActivateToolWindowOnStart(Z):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - withArguments(java.lang.String):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withCallback(com.intellij.openapi.externalSystem.service.project.ExternalProjectRefreshCallback):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withCallback(java.util.concurrent.CompletableFuture):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withCallback(java.util.function.Consumer):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withImportProjectData(Z):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withPreviewMode(Z):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withRerunAction(java.lang.Runnable):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+- withSelectProjectDataToImport(Z):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - withUserData(com.intellij.openapi.util.UserDataHolderBase):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 - withVmOptions(java.lang.String):com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 c:com.intellij.openapi.externalSystem.model.DataNode
@@ -841,7 +854,6 @@ com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationLis
 - onTaskOutput(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId,java.lang.String,Z):V
 a:com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListenerAdapter
 - com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
-- sf:NULL_OBJECT:com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 - <init>():V
 - <init>(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener):V
 - beforeCancel(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId):V
@@ -1039,11 +1051,6 @@ com.intellij.openapi.externalSystem.service.project.ExternalProjectRefreshCallba
 - onFailure(java.lang.String,java.lang.String):V
 - onSuccess(com.intellij.openapi.externalSystem.model.DataNode):V
 - onSuccess(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId,com.intellij.openapi.externalSystem.model.DataNode):V
-com.intellij.openapi.externalSystem.service.project.ExternalSystemCoordinateContributor
-- sf:Companion:com.intellij.openapi.externalSystem.service.project.ExternalSystemCoordinateContributor$Companion
-- findLibraryCoordinate(com.intellij.openapi.roots.libraries.Library):com.intellij.openapi.externalSystem.model.project.ProjectCoordinate
-- findModuleCoordinate(com.intellij.openapi.module.Module):com.intellij.openapi.externalSystem.model.project.ProjectCoordinate
-f:com.intellij.openapi.externalSystem.service.project.ExternalSystemCoordinateContributor$Companion
 com.intellij.openapi.externalSystem.service.project.ExternalSystemProjectResolver
 - a:cancelTask(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId,com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener):Z
 - resolveProjectInfo(com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId,java.lang.String,Z,com.intellij.openapi.externalSystem.model.settings.ExternalSystemExecutionSettings,com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener):com.intellij.openapi.externalSystem.model.DataNode

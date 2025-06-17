@@ -24,7 +24,6 @@ import com.intellij.openapi.actionSystem.impl.ActionMenu.Companion.isAlignedInGr
 import com.intellij.openapi.actionSystem.util.ActionSystem
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationManagerEx
-import com.intellij.openapi.application.impl.getGlobalThreadingSupport
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
@@ -44,6 +43,7 @@ import com.intellij.platform.ide.menu.FrameMenuUiKind
 import com.intellij.platform.ide.menu.IdeJMenuBar
 import com.intellij.platform.ide.menu.MacNativeActionMenuItem
 import com.intellij.platform.ide.menu.createMacNativeActionMenu
+import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.ClientProperty
 import com.intellij.ui.ExperimentalUI
@@ -285,7 +285,7 @@ object Utils {
     ThreadingAssertions.assertEventDispatchThread()
     val asyncDataContext = createAsyncDataContext(dataContext)
     checkAsyncDataContext(asyncDataContext, place)
-    val fastTrackTime = getFastTrackMaxTime(fastTrack, group, place, asyncDataContext, uiKind is ActionUiKind.Toolbar, true)
+    val fastTrackTime = getFastTrackMaxTime(fastTrack, place, uiKind is ActionUiKind.Toolbar, true)
     val edtDispatcher =
       if (fastTrackTime > 0) AltEdtDispatcher.apply { switchToQueue() }
       else Dispatchers.ui(UiDispatcherKind.RELAX)[CoroutineDispatcher]!!
@@ -351,7 +351,7 @@ object Utils {
     if (uiKind is ActionUiKind.Popup) {
       cancelAllUpdates("context menu requested")
     }
-    val fastTrackTime = getFastTrackMaxTime(true, group, place, asyncDataContext, false, false)
+    val fastTrackTime = getFastTrackMaxTime(true, place, false, false)
     val mainJob = coroutineContext.job
     val loopJob = if (isUnitTestMode) null else launch {
       val start = System.nanoTime()
@@ -452,12 +452,14 @@ object Utils {
   ) {
     if (LOG.isDebugEnabled) {
       LOG.debug("fillMenu: " + operationName(group, "", place) {
-        if (it is ActionIdProvider) it.id
-        else if (it is AnAction) ActionManager.getInstance().getId(it)
-        else null
+        when (it) {
+          is ActionIdProvider -> it.id
+          is AnAction -> ActionManager.getInstance().getId(it)
+          else -> null
+        }
       })
     }
-    if (ApplicationManagerEx.getApplicationEx().isWriteActionInProgress()) {
+    if (shallAbortActionUpdateDueToProhibitingWriteAction()) {
       throw ProcessCanceledException()
     }
     val menuComponent = (uiKind as? ActualActionUiKind)?.component
@@ -548,18 +550,15 @@ object Utils {
     val children = ArrayList<Component>()
     for (action in filtered) {
       val presentation = presentationFactory.getPresentation(action)
-      var childComponent: JComponent
-      if (action is Separator) {
-        childComponent = createSeparator(action.text, children.isEmpty())
-      }
-      else if (action is ActionGroup && !isSubmenuSuppressed(presentation)) {
-        val menu = ActionMenu(context, place, action, presentationFactory, enableMnemonics, useDarkIcons)
-        childComponent = menu
-      }
-      else {
-        val each = ActionMenuItem(action, context, place, uiKind, enableMnemonics, checked, useDarkIcons)
-        each.updateFromPresentation(presentation)
-        childComponent = each
+      val childComponent = when (action) {
+        is Separator ->
+          createSeparator(action.text, children.isEmpty())
+        is ActionGroup if !isSubmenuSuppressed(presentation) ->
+          ActionMenu(context, place, action, presentationFactory, enableMnemonics, useDarkIcons)
+        else ->
+          ActionMenuItem(action, context, place, uiKind, enableMnemonics, checked, useDarkIcons).apply {
+            updateFromPresentation(presentation)
+          }
       }
       component.add(childComponent)
       children.add(childComponent)
@@ -928,9 +927,14 @@ object Utils {
     }
   }
 
-  fun <R> runWithInputEventEdtDispatcher(contextComponent: Component?, block: suspend CoroutineScope.() -> R): R? {
+  private fun shallAbortActionUpdateDueToProhibitingWriteAction(): Boolean {
     val applicationEx = ApplicationManagerEx.getApplicationEx()
-    if (ProgressIndicatorUtils.isWriteActionRunningOrPending(applicationEx) && !applicationEx.isBackgroundWriteActionRunningOrPending) {
+    return ProgressIndicatorUtils.isWriteActionRunningOrPending(applicationEx) &&
+           !applicationEx.isBackgroundWriteActionRunningOrPending
+  }
+
+  private fun <R> runWithPotemkinOverlayProgress(contextComponent: Component?, block: suspend CoroutineScope.() -> R): R? {
+    if (shallAbortActionUpdateDueToProhibitingWriteAction()) {
       LOG.error("Actions cannot be updated when write-action is running or pending on EDT")
       return null
     }
@@ -998,39 +1002,46 @@ object Utils {
   }
 
 
-  suspend fun <T> runUpdateSessionForInputEvent(actions: List<AnAction>,
-                                                inputEvent: InputEvent,
-                                                dataContext: DataContext,
-                                                place: String,
-                                                actionProcessor: ActionProcessor,
-                                                factory: PresentationFactory,
-                                                function: suspend (List<AnAction>,
-                                                                   suspend (AnAction) -> Presentation,
-                                                                   Map<Presentation, AnActionEvent>) -> T): T = withContext(
-    CoroutineName("runUpdateSessionForInputEvent")) {
-    checkAsyncDataContext(dataContext, place)
-    val start = System.nanoTime()
-    val events = ConcurrentHashMap<Presentation, AnActionEvent>()
-    val edtDispatcher = coroutineContext[CoroutineDispatcher]!!
-    val actionUpdater = ActionUpdater(factory, dataContext, place, ActionUiKind.NONE, edtDispatcher) {
-      val event = actionProcessor.createEvent(inputEvent, it.dataContext, it.place, it.presentation, it.actionManager)
-      events.putIfAbsent(event.presentation, event) ?: event
-    }
-    cancelAllUpdates("'$place' invoked")
-
-    val result = actionUpdater.runUpdateSession(shortcutUpdateDispatcher) {
-      ActionUpdaterInterceptor.runUpdateSessionForInputEvent(actions, dataContext, place, actionUpdater.asUpdateSession()) { promoted ->
-        val rearranged = if (promoted.isNotEmpty()) promoted
-        else rearrangeByPromoters(actions, dataContext)
-        function(rearranged, actionUpdater::presentation, events)
+  fun <T> runUpdateSessionForInputEvent(
+    actions: List<AnAction>,
+    inputEvent: InputEvent,
+    dataContext: DataContext,
+    place: String,
+    actionProcessor: ActionProcessor,
+    factory: PresentationFactory,
+    block: suspend (
+      List<AnAction>,
+      suspend (AnAction) -> Presentation,
+      Map<Presentation, AnActionEvent>,
+    ) -> T,
+  ): T? = runWithPotemkinOverlayProgress(dataContext.getData(PlatformCoreDataKeys.CONTEXT_COMPONENT)) {
+    withContext(CoroutineName("runUpdateSessionForInputEvent")) {
+      checkAsyncDataContext(dataContext, place)
+      val start = System.nanoTime()
+      val events = ConcurrentHashMap<Presentation, AnActionEvent>()
+      val edtDispatcher = coroutineContext[CoroutineDispatcher]!!
+      val actionUpdater = ActionUpdater(factory, dataContext, place, ActionUiKind.NONE, edtDispatcher) {
+        val event = actionProcessor.createEvent(inputEvent, it.dataContext, it.place, it.presentation, it.actionManager)
+        events.putIfAbsent(event.presentation, event) ?: event
       }
+      cancelAllUpdates("'$place' invoked")
+
+      val result = actionUpdater.runUpdateSession(shortcutUpdateDispatcher) {
+        ActionUpdaterInterceptor.runUpdateSessionForInputEvent(
+          actions, dataContext, place, actionUpdater.asUpdateSession()) { promoted ->
+          val rearranged = promoted.ifEmpty {
+            rearrangeByPromoters(actions, dataContext)
+          }
+          block(rearranged, actionUpdater::presentation, events)
+        }
+      }
+      actionUpdater.applyPresentationChanges()
+      val elapsed = TimeoutUtil.getDurationMillis(start)
+      if (elapsed > 1000) {
+        LOG.warn("$elapsed ms to runUpdateSessionForInputEvent@$place")
+      }
+      result
     }
-    actionUpdater.applyPresentationChanges()
-    val elapsed = TimeoutUtil.getDurationMillis(start)
-    if (elapsed > 1000) {
-      LOG.warn("$elapsed ms to runUpdateSessionForInputEvent@$place")
-    }
-    result
   }
 
   @ApiStatus.Internal
@@ -1112,16 +1123,13 @@ fun rearrangeByPromotersImpl(actions: List<AnAction>,
   return result
 }
 
-private fun getFastTrackMaxTime(useFastTrack: Boolean,
-                                group: ActionGroup,
-                                place: String,
-                                context: DataContext,
-                                checkLastFailedFastTrackTime: Boolean,
-                                checkMainMenuOrToolbarFirstTime: Boolean): Int {
+private fun getFastTrackMaxTime(
+  useFastTrack: Boolean,
+  place: String,
+  checkLastFailedFastTrackTime: Boolean,
+  checkMainMenuOrToolbarFirstTime: Boolean
+): Int {
   if (!useFastTrack) return 0
-  if (!service<ActionUpdaterInterceptor>().allowsFastUpdate(CommonDataKeys.PROJECT.getData(context), group, place)) {
-    return 0
-  }
   val mainMenuOrToolbarFirstTime = checkMainMenuOrToolbarFirstTime &&
                                    (ActionPlaces.MAIN_MENU == place || (ExperimentalUI.isNewUI() && ActionPlaces.MAIN_TOOLBAR == place))
   if (mainMenuOrToolbarFirstTime) return 1000 // one second to fully update the main menu or toolbar for the first time
@@ -1162,9 +1170,11 @@ private class PotemkinElement(val potemkin: PotemkinOverlayProgress) : ThreadCon
 }
 
 private fun updaterContext(place: String, fastTrackTime: Int, uiKind: ActionUiKind): CoroutineContext {
-  val dispatcher = if (uiKind is ActionUiKind.Popup) contextMenuDispatcher
-  else if (uiKind is ActionUiKind.Toolbar && fastTrackTime > 0) toolbarFastDispatcher
-  else toolbarDispatcher
+  val dispatcher = when (uiKind) {
+    is ActionUiKind.Popup -> contextMenuDispatcher
+    is ActionUiKind.Toolbar if fastTrackTime > 0 -> toolbarFastDispatcher
+    else -> toolbarDispatcher
+  }
   return dispatcher + CoroutineName("ActionUpdater ($place)")
 }
 
@@ -1279,7 +1289,7 @@ internal inline fun <R> runBlockingForActionExpand(context: CoroutineContext = E
     // sometimes, this code runs under read action, so the parallelization here may just grant read access to the whole `block`
     // without a new parallelization layer
     val (lockContextElement, cleanup) = getGlobalThreadingSupport().getPermitAsContextElement(ctx, true)
-    cleanup.use {
+    try {
       @Suppress("RAW_RUN_BLOCKING")
       runBlocking(ctx +
                   context +
@@ -1289,6 +1299,9 @@ internal inline fun <R> runBlockingForActionExpand(context: CoroutineContext = E
                   SafeForRunBlockingUnderReadAction +
                   Context.current().asContextElement(),
                   block)
+    }
+    finally {
+      cleanup()
     }
   }
   catch (pce : ProcessCanceledException) {
@@ -1305,7 +1318,8 @@ internal suspend inline fun <R> readActionUndispatchedForActionExpand(noinline b
     return readActionUndispatched(block)
   }
   else {
-    return blockingContext { ApplicationManager.getApplication().runReadAction<R, Throwable> { block() } }
+    @Suppress("ForbiddenInSuspectContextMethod")
+    return ApplicationManager.getApplication().runReadAction<R, Throwable> { block() }
   }
 }
 

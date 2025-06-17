@@ -215,10 +215,11 @@ com.intellij.openapi.application.Application
 - *:isWriteThread():Z
 - *:runWriteIntentReadAction(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 f:com.intellij.openapi.application.CoroutinesKt
+- *sf:backgroundWriteAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:getEdtImmediate(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
 - *sf:getUI(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
 - *sf:getUiImmediate(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
-- *sf:isBackgroundWriteAction(kotlin.coroutines.CoroutineContext):Z
+- *sf:readAndBackgroundWriteAction(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:ui(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
 - *sf:ui(kotlinx.coroutines.Dispatchers,com.intellij.openapi.application.UiDispatcherKind):kotlin.coroutines.CoroutineContext
 - *sf:ui(kotlinx.coroutines.Dispatchers,com.intellij.openapi.application.UiDispatcherKind,Z):kotlin.coroutines.CoroutineContext
@@ -287,13 +288,7 @@ c:com.intellij.openapi.editor.markup.TextAttributes
 - com.intellij.openapi.module.ModuleDescription
 - a:getContentRoots():java.util.List
 - a:getGroupPath():java.util.List
-*f:com.intellij.openapi.progress.CoroutinesKt
-- sf:blockingContext(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
-- sf:blockingContextScope(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
-- sf:checkCanceled(kotlin.coroutines.Continuation):java.lang.Object
-- *sf:coroutineToIndicator(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
-- sf:currentThreadCoroutineScope():kotlinx.coroutines.CoroutineScope
-- sf:runBlockingCancellable(kotlin.jvm.functions.Function2):java.lang.Object
+f:com.intellij.openapi.progress.CoroutinesKt
 - *sf:withCurrentThreadCoroutineScope(kotlin.jvm.functions.Function2,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:withCurrentThreadCoroutineScopeBlocking(kotlin.jvm.functions.Function0):kotlin.Pair
 *f:com.intellij.openapi.progress.SuspenderKt
@@ -305,7 +300,7 @@ a:com.intellij.openapi.progress.Task
 - com.intellij.openapi.progress.TaskInfo
 - *:getId():java.lang.Object
 a:com.intellij.openapi.project.DumbService
-- *a:suspendIndexingAndRun(java.lang.String,kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
+- *a:suspendIndexingAndRun(java.lang.String,kotlin.jvm.functions.Function2,kotlin.coroutines.Continuation):java.lang.Object
 *:com.intellij.openapi.project.IncompleteDependenciesService
 - a:enterIncompleteState(java.lang.Object):com.intellij.openapi.project.IncompleteDependenciesService$IncompleteDependenciesAccessToken
 - a:getState():com.intellij.openapi.project.IncompleteDependenciesService$DependenciesState

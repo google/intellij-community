@@ -9,13 +9,20 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.jps.dependency.NodeSource;
 import org.jetbrains.jps.dependency.NodeSourcePathMapper;
 
+import java.util.List;
+
 import static org.jetbrains.jps.util.Iterators.isEmpty;
 import static org.jetbrains.jps.util.Iterators.map;
 
 public interface CompilerRunner extends Runner{
   boolean canCompile(NodeSource src);
 
-  ExitCode compile(Iterable<NodeSource> sources, Iterable<NodeSource> deletedSources, DiagnosticSink diagnostic, OutputSink out);
+  ExitCode compile(Iterable<NodeSource> sources, Iterable<NodeSource> deletedSources, DiagnosticSink diagnostic, OutputSink out)
+    throws Exception;
+
+  default Iterable<String> getOutputPathsToDelete() {
+    return List.of();
+  }
 
   default void logCompiledFiles(BuildContext context, Iterable<@NotNull NodeSource> toCompile) {
     if (!context.isRebuild()) {

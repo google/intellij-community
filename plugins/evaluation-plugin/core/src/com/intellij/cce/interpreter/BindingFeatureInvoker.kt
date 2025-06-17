@@ -1,15 +1,11 @@
 package com.intellij.cce.interpreter
 
-import com.intellij.cce.core.Lookup
-import com.intellij.cce.core.Session
-import com.intellij.cce.core.Suggestion
-import com.intellij.cce.core.SuggestionSource
-import com.intellij.cce.core.TokenProperties
+import com.intellij.cce.core.*
 import com.intellij.cce.evaluable.AIA_PROBLEMS
-import com.intellij.cce.evaluation.data.Binding
 import com.intellij.cce.evaluation.data.Bindable
-import com.intellij.cce.evaluation.data.EvalDataDescription
+import com.intellij.cce.evaluation.data.Binding
 import com.intellij.cce.evaluation.data.DataProps
+import com.intellij.cce.evaluation.data.EvalDataDescription
 
 /**
  * Feature invoker that add an abstraction layer over evaluation data storage format.

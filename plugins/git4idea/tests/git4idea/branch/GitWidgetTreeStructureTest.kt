@@ -12,16 +12,16 @@ import com.intellij.testFramework.utils.io.deleteRecursively
 import com.intellij.ui.SeparatorWithText
 import com.intellij.ui.tree.TreeTestUtil
 import com.intellij.ui.treeStructure.Tree
-import com.intellij.vcs.git.shared.repo.GitRepositoriesFrontendHolder
+import com.intellij.vcs.git.shared.branch.popup.GitBranchesPopupStepBase
+import com.intellij.vcs.git.shared.branch.popup.GitDefaultBranchesPopupStep
+import com.intellij.vcs.git.shared.branch.popup.GitDefaultBranchesTreeRenderer
+import com.intellij.vcs.git.shared.branch.tree.GitBranchesTreeRenderer
+import com.intellij.vcs.git.shared.repo.GitRepositoriesHolder
 import git4idea.GitUtil
 import git4idea.config.GitVcsSettings
 import git4idea.repo.GitRepository
 import git4idea.test.*
 import git4idea.ui.branch.GitBranchManager
-import git4idea.ui.branch.popup.GitBranchesTreePopup
-import git4idea.ui.branch.popup.GitBranchesTreePopupRenderer
-import git4idea.ui.branch.popup.GitBranchesTreePopupStepBase
-import git4idea.ui.branch.tree.GitBranchesTreeRenderer
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 
@@ -32,7 +32,7 @@ class GitWidgetTreeStructureTest : GitPlatformTest() {
   private lateinit var repo: GitRepository
   private lateinit var broRepoPath: Path
 
-  private lateinit var popupStep: GitBranchesTreePopupStepBase
+  private lateinit var popupStep: GitBranchesPopupStepBase
 
   override fun setUp() {
     super.setUp()
@@ -46,7 +46,7 @@ class GitWidgetTreeStructureTest : GitPlatformTest() {
 
     runBlocking {
       // Ensure that the state holder is initialized
-      GitRepositoriesFrontendHolder.getInstance(project).init()
+      GitRepositoriesHolder.getInstance(project).init()
     }
   }
 
@@ -249,10 +249,13 @@ class GitWidgetTreeStructureTest : GitPlatformTest() {
     repositoryManager.updateAllRepositories()
 
     return invokeAndWaitIfNeeded {
+      val holder = GitRepositoriesHolder.getInstance(project)
+      val repositories = holder.getAll().sorted()
       //TODO replace with the actual tree from GitBranchesTreePopupBase
       val tree = Tree()
-      popupStep = GitBranchesTreePopup.createBranchesTreePopupStep(project, repo)
-      tree.cellRenderer = GitBranchesTreePopupRenderer(popupStep)
+      val preferredSelection = checkNotNull(holder.get(repo.rpcId))
+      popupStep = GitDefaultBranchesPopupStep.create(project, preferredSelection, repositories)
+      tree.cellRenderer = GitDefaultBranchesTreeRenderer(popupStep)
       tree.model = popupStep.treeModel
       popupStep.updateTreeModelIfNeeded(tree, filter)
       popupStep.setSearchPattern(filter)

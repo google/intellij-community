@@ -4,32 +4,31 @@
 package com.intellij.platform.eel.provider.utils
 
 import com.intellij.openapi.util.IntellijInternalApi
-import com.intellij.platform.eel.*
-import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.EelProcess
 import com.intellij.util.io.computeDetached
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.annotations.ApiStatus
 import java.io.ByteArrayOutputStream
-import java.nio.file.Path
-import kotlin.io.path.pathString
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.days
 
 /**
  * To simplify [EelProcessExecutionResult] delegation
  */
+@ApiStatus.Experimental
 interface EelProcessExecutionResultInfo {
   val exitCode: Int
   val stdout: ByteArray
   val stderr: ByteArray
 }
 
+@get:ApiStatus.Experimental
 val EelProcessExecutionResultInfo.stdoutString: String get() = String(stdout)
+
+@get:ApiStatus.Experimental
 val EelProcessExecutionResultInfo.stderrString: String get() = String(stderr)
 
+@ApiStatus.Experimental
 class EelProcessExecutionResult(override val exitCode: Int, override val stdout: ByteArray, override val stderr: ByteArray) : EelProcessExecutionResultInfo
 
 /**
@@ -48,6 +47,7 @@ class EelProcessExecutionResult(override val exitCode: Int, override val stdout:
  * @see EelProcess
  */
 @OptIn(DelicateCoroutinesApi::class)
+@ApiStatus.Experimental
 suspend fun EelProcess.awaitProcessResult(): EelProcessExecutionResult {
   return computeDetached {
     ByteArrayOutputStream().use { out ->
@@ -65,25 +65,5 @@ suspend fun EelProcess.awaitProcessResult(): EelProcessExecutionResult {
         EelProcessExecutionResult(exitCode.await(), out.toByteArray(), err.toByteArray())
       }
     }
-  }
-}
-
-/**
- * Given [this] is a binary, executes it with [args] and returns either [EelExecApi.ExecuteProcessError] (couldn't execute) or
- * [ProcessOutput] as a result of the execution.
- * If [timeout] elapsed then return value is an error with `null`.
- * ```kotlin
- * withTimeout(10.seconds) {python.exec("-v")}.getOr{return it}
- * ```
- */
-@ApiStatus.Internal
-@ApiStatus.Experimental
-suspend fun Path.exec(vararg args: String, timeout: Duration = Int.MAX_VALUE.days): EelProcessExecutionResult {
-  val process = getEelDescriptor().upgrade().exec.spawnProcess(pathString, *args).eelIt()
-  return withTimeoutOrNull(timeout) {
-    process.awaitProcessResult()
-  } ?: run {
-    process.kill()
-    throw ExecuteProcessException(-1, "Timeout exceeded: $timeout")
   }
 }

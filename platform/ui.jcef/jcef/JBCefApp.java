@@ -25,15 +25,18 @@ import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.CefSettings;
 import org.cef.browser.CefMessageRouter;
+import org.cef.browser.CefRendering;
 import org.cef.callback.CefSchemeHandlerFactory;
 import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
+import org.cef.handler.CefRenderHandler;
 import org.cef.misc.BoolRef;
 import org.cef.misc.CefLog;
+import org.cef.misc.Utils;
 import org.jdom.IllegalDataException;
 import org.jetbrains.annotations.*;
 
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -47,6 +50,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.intellij.ui.paint.PaintUtil.RoundingMode.ROUND;
@@ -126,6 +130,32 @@ public final class JBCefApp {
     }
 
     IS_REMOTE_ENABLED = CefApp.isRemoteEnabled();
+
+    if (IS_REMOTE_ENABLED) {
+      final Supplier<CefRendering> defaultRenderingFactory = () -> {
+        JBCefOSRHandlerFactory osrHandlerFactory = JBCefOSRHandlerFactory.getInstance();
+        JComponent component = osrHandlerFactory.createComponent(true);
+        CefRenderHandler handler = osrHandlerFactory.createCefRenderHandler(component);
+        return new CefRendering.CefRenderingWithHandler(handler, component);
+      };
+
+      // Temporary use reflection to avoid jcef-version increment
+      // TODO: use setDefaultRenderingFactory directly
+      try {
+        Class<?> cefAppClass = Class.forName("org.cef.CefApp");
+        Class<?> supplierClass = Class.forName("java.util.function.Supplier");
+        Method setDefaultRenderingFactoryMethod = cefAppClass.getMethod("setDefaultRenderingFactory", supplierClass);
+        setDefaultRenderingFactoryMethod.invoke(cefAppClass, defaultRenderingFactory);
+      }
+      catch (NoSuchMethodException | ClassNotFoundException ignored) {
+      }
+      catch (IllegalAccessException | InvocationTargetException ex) {
+        LOG.debug(ex);
+      }
+      catch (Throwable e) {
+        LOG.warn(e);
+      }
+    }
   }
 
   private JBCefApp(@NotNull JCefAppConfig config) throws IllegalStateException {
@@ -176,20 +206,24 @@ public final class JBCefApp {
 
       if (IS_REMOTE_ENABLED) {
         StartupTest.checkBrowserCreation(myCefApp, () -> restartJCEF(true, true));
-        //noinspection UnresolvedPluginConfigReference
-        ActionManagerEx.getInstanceEx().registerAction("RestartJCEFActionId", new AnAction(JcefBundle.message("action.RestartJCEFActionId.text")) {
-          @Override
-          public void actionPerformed(@NotNull AnActionEvent e) {
-            restartJCEF(false, true);
-          }
-        });
-        //noinspection UnresolvedPluginConfigReference
-        ActionManagerEx.getInstanceEx().registerAction("RestartJCEFWithDebugActionId", new AnAction(JcefBundle.message("action.RestartJCEFWithDebugActionId.text")) {
-          @Override
-          public void actionPerformed(@NotNull AnActionEvent e) {
-            restartJCEF(true, true);
-          }
-        });
+        if (ApplicationManager.getApplication().isInternal()) {
+          //noinspection UnresolvedPluginConfigReference
+          ActionManagerEx.getInstanceEx()
+            .registerAction("RestartJCEFActionId", new AnAction(JcefBundle.message("action.RestartJCEFActionId.text")) {
+              @Override
+              public void actionPerformed(@NotNull AnActionEvent e) {
+                restartJCEF(false, true);
+              }
+            });
+          //noinspection UnresolvedPluginConfigReference
+          ActionManagerEx.getInstanceEx()
+            .registerAction("RestartJCEFWithDebugActionId", new AnAction(JcefBundle.message("action.RestartJCEFWithDebugActionId.text")) {
+              @Override
+              public void actionPerformed(@NotNull AnActionEvent e) {
+                restartJCEF(true, true);
+              }
+            });
+        }
       }
     }
 
@@ -383,7 +417,15 @@ public final class JBCefApp {
       altCefPath = System.getenv("ALT_CEF_FRAMEWORK_DIR");
     }
 
-    final boolean skipModuleCheck = (altCefPath != null && !altCefPath.isEmpty()) || SKIP_MODULE_CHECK;
+
+    final String altFramework = Utils.getString("ALT_CEF_FRAMEWORK_DIR");
+    final String altPipe = Utils.getString("ALT_CEF_SERVER_PIPE");
+    final String altPort = Utils.getString("ALT_CEF_SERVER_PORT");
+    final boolean isAltCefPathUsed = (altFramework != null && !altFramework.isEmpty())
+                                     || (altPipe != null && !altPipe.isEmpty())
+                                     || (altPort != null && !altPort.isEmpty());
+
+    final boolean skipModuleCheck = isAltCefPathUsed || SKIP_MODULE_CHECK;
     if (!skipModuleCheck) {
       URL url = JCefAppConfig.class.getResource("JCefAppConfig.class");
       if (url == null) {

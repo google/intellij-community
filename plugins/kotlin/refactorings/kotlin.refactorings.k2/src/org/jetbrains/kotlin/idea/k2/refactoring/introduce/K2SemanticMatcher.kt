@@ -7,8 +7,10 @@ import com.intellij.psi.util.elementType
 import com.intellij.psi.util.startOffset
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.impl.base.components.KaBaseIllegalPsiException
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
@@ -73,6 +75,7 @@ object K2SemanticMatcher {
                 }
             }
         )
+
 
         return matches
     }
@@ -467,15 +470,19 @@ object K2SemanticMatcher {
 
         override fun visitConstantExpression(expression: KtConstantExpression, data: KtElement): Boolean {
             val patternExpression = data.deparenthesized() as? KtConstantExpression ?: return false
-            with(analysisSession) {
+            val exprText = with(analysisSession) {
                 val evaluatedExpression = expression.evaluate() ?: return false
-                val evaluatedPatternExpression = patternExpression.evaluate() ?: return false
-                if (evaluatedExpression.value is KaConstantValue.ErrorValue ||
-                    evaluatedPatternExpression.value is KaConstantValue.ErrorValue ||
-                    evaluatedExpression.render() != evaluatedPatternExpression.render()
-                ) return false
+                if (evaluatedExpression.value is KaConstantValue.ErrorValue) return false
+                evaluatedExpression.render()
             }
-            return true
+
+            val patternText = analyze(patternExpression) {
+                val evaluatedPatternExpression = patternExpression.evaluate() ?: return false
+                if (evaluatedPatternExpression.value is KaConstantValue.ErrorValue) return false
+                evaluatedPatternExpression.render()
+            }
+
+            return exprText == patternText
         }
 
         override fun visitLabeledExpression(expression: KtLabeledExpression, data: KtElement): Boolean = false // TODO()

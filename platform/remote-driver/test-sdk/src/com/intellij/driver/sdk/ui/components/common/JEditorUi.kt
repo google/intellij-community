@@ -57,6 +57,10 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
       }
     }
 
+  fun expandAllFoldings() {
+    driver.invokeAction("ExpandAllRegions", component = component)
+  }
+
   fun isEditable(): Boolean = editorComponent.isEditable()
 
   fun isSoftWrappingEnabled(): Boolean = interact { getSoftWrapModel().isSoftWrappingEnabled() }
@@ -199,7 +203,7 @@ interface IntentionActionUtils {
   fun invokeQuickFix(editor: Editor, highlightInfo: HighlightInfo, name: String)
 }
 
-@Remote("com.intellij.ml.llm.intentions.TestIntentionUtils", plugin = "com.intellij.ml.llm/intellij.ml.llm.core")
+@Remote("com.intellij.ml.llm.codeGeneration.testGeneration.TestIntentionUtils", plugin = "com.intellij.ml.llm/intellij.ml.llm.core")
 interface AiTestIntentionUtils {
   fun invokeAiAssistantIntention(editor: Editor, intentionName: String)
 }

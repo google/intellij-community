@@ -41,7 +41,6 @@ import com.intellij.openapi.extensions.impl.ExtensionPointImpl
 import com.intellij.openapi.extensions.impl.ExtensionsAreaImpl
 import com.intellij.openapi.extensions.useOrLogError
 import com.intellij.openapi.keymap.KeymapManager
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.updateSettings.impl.UpdateSettings
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.SystemPropertyBean
@@ -281,6 +280,7 @@ private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "com.intellij.internal.statistic.updater.StatisticsJobsScheduler",
   "com.intellij.internal.statistic.updater.StatisticsStateCollectorsScheduler",
   "org.jetbrains.kotlin.idea.base.plugin.K2UnsupportedPluginsNotificationActivity",
+  "com.intellij.platform.eel.impl.fs.EelEarlyAccessApplicationActivity",
 )
 
 private fun CoroutineScope.executeAsyncAppInitListeners() {
@@ -391,7 +391,7 @@ private suspend fun initLafManagerAndCss(app: ApplicationImpl, asyncScope: Corou
     if (loadIconMapping != null) {
       launch {
         loadIconMapping.join()
-        ExperimentalUI.getInstance().installIconPatcher()
+        serviceAsync<ExperimentalUI>().installIconPatcher()
       }
     }
 
@@ -455,9 +455,7 @@ internal suspend fun executeApplicationStarter(starter: ApplicationStarter, args
       }
     }
     else {
-      blockingContext {
-        starter.main(args)
-      }
+      starter.main(args)
     }
   }
   else {

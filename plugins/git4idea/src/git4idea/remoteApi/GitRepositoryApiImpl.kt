@@ -1,17 +1,18 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.remoteApi
 
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.platform.project.ProjectId
-import com.intellij.platform.project.findProject
+import com.intellij.platform.project.findProjectOrNull
 import com.intellij.platform.vcs.impl.shared.rpc.RepositoryId
 import com.intellij.vcs.git.shared.ref.GitFavoriteRefs
 import com.intellij.vcs.git.shared.ref.GitReferenceName
 import com.intellij.vcs.git.shared.rpc.GitRepositoryApi
-import com.intellij.vcs.git.shared.rpc.GitRepositoryDto
 import com.intellij.vcs.git.shared.rpc.GitRepositoryEvent
 import git4idea.GitDisposable
 import git4idea.branch.GitRefType
@@ -19,34 +20,62 @@ import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
 import git4idea.ui.branch.GitBranchManager
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 private typealias SharedRefUtil = com.intellij.vcs.git.shared.ref.GitRefUtil
 
 class GitRepositoryApiImpl : GitRepositoryApi {
-  override suspend fun getRepositories(projectId: ProjectId): List<GitRepositoryDto> {
-    val project = projectId.findProject()
-    val repositories = getAllRepositories(project)
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Known repositories: $repositories")
+  override suspend fun getRepositoriesEvents(projectId: ProjectId): Flow<GitRepositoryEvent> {
+    val project = projectId.findProjectOrNull() ?: return emptyFlow()
+
+    return callbackFlow {
+      val messageBusConnection = readAction {
+        if (project.isDisposed) {
+          close()
+          return@readAction null
+        }
+
+        val synchronizer = Synchronizer(project, this@callbackFlow)
+        val coroutineScope = GitDisposable.getInstance(project).coroutineScope
+        // Sending of the initial state should be delayed until initialization is complete
+        ProjectLevelVcsManager.getInstance(project).runAfterInitialization {
+          coroutineScope.launch {
+            val allRepositories = getAllRepositories(project)
+            allRepositories.forEach { repository -> synchronizer.sendDeletedEventOnDispose(repository) }
+            send(GitRepositoryEvent.ReloadState(allRepositories.map { GitRepositoryToDtoConverter.convertToDto(it) }))
+            while (isActive) {
+              delay(SYNC_INTERVAL)
+              send(GitRepositoryEvent.RepositoriesSync(getAllRepositories(project).map { it.rpcId }))
+            }
+          }
+        }
+
+        project.messageBus.connect(coroutineScope).also {
+          it.subscribe(GitRepositoryFrontendSynchronizer.TOPIC, synchronizer)
+        }
+      }
+
+      awaitClose {
+        LOG.debug("Connection closed")
+        messageBusConnection?.disconnect()
+      }
     }
-    return repositories.map { GitRepositoryToDtoConverter.convertToDto(it) }
   }
 
-  override suspend fun getRepositoriesEvents(projectId: ProjectId): Flow<GitRepositoryEvent> {
-    val project = projectId.findProject()
-    val scope = GitDisposable.getInstance(project).childScope("Git repository synchronizer in ${project}")
-
-    return flowWithMessageBus(project, scope) { connection ->
-      val synchronizer = Synchronizer(project, this@flowWithMessageBus)
-      getAllRepositories(project).forEach(synchronizer::sendDeletedEventOnDispose)
-
-      connection.subscribe(GitRepositoryFrontendSynchronizer.TOPIC, synchronizer)
-    }
+  override suspend fun forceSync(projectId: ProjectId) {
+    val project = projectId.findProjectOrNull() ?: return
+    project.messageBus.syncPublisher(GitRepositoryFrontendSynchronizer.TOPIC).forceSync()
   }
 
   override suspend fun toggleFavorite(projectId: ProjectId, repositories: List<RepositoryId>, reference: GitReferenceName, favorite: Boolean) {
-    val project = projectId.findProject()
+    val project = projectId.findProjectOrNull() ?: return
 
     val resolvedRepositories = resolveRepositories(project, repositories)
 
@@ -60,7 +89,7 @@ class GitRepositoryApiImpl : GitRepositoryApi {
     }
   }
 
-  private inner class Synchronizer(
+  private class Synchronizer(
     private val project: Project,
     private val channel: SendChannel<GitRepositoryEvent>,
   ) : GitRepositoryFrontendSynchronizer {
@@ -71,10 +100,9 @@ class GitRepositoryApiImpl : GitRepositoryApi {
       val dto = GitRepositoryToDtoConverter.convertToDto(repository)
 
       if (LOG.isDebugEnabled) {
-        val refsSet = dto.state.refs
-        val refsString = "${refsSet.localBranches.size} local branches, " +
-                         "${refsSet.remoteBranches.size} remote branches, " +
-                         "${refsSet.tags.size} tags"
+        val refsString = "${dto.state.localBranches.size} local branches, " +
+                         "${dto.state.remoteBranches.size} remote branches, " +
+                         "${dto.state.tags.size} tags"
         LOG.debug("Repository entity created for ${repository.root}\n" +
                   "Current ref: ${dto.state.currentRef}\n" +
                   "Refs: $refsString\n" +
@@ -104,10 +132,15 @@ class GitRepositoryApiImpl : GitRepositoryApi {
         return
       }
 
-      LOG.debug("Tags were loaded for ${repository.root}. Updating state")
+      LOG.debug("Tags were loaded for ${repository.root}. Updating tags state")
 
-      val repositoryState = GitRepositoryToDtoConverter.convertRepositoryState(repository)
-      channel.trySend(GitRepositoryEvent.TagsLoaded(repository.rpcId, repositoryState))
+      val tagsState = repository.tagHolder.getTags().keys
+      channel.trySend(GitRepositoryEvent.TagsLoaded(repository.rpcId, tagsState))
+    }
+
+    override fun tagsHidden() {
+      LOG.debug("Tags were hidden")
+      channel.trySend(GitRepositoryEvent.TagsHidden)
     }
 
     override fun favoriteRefsUpdated(repository: GitRepository?) {
@@ -136,9 +169,17 @@ class GitRepositoryApiImpl : GitRepositoryApi {
         channel.trySend(GitRepositoryEvent.RepositoryDeleted(repository.rpcId))
       })
     }
+
+    override fun forceSync() {
+      LOG.debug("Synchronization forced")
+      val state = getAllRepositories(project).map { GitRepositoryToDtoConverter.convertToDto(it) }
+      channel.trySend(GitRepositoryEvent.ReloadState(state))
+    }
   }
 
   private companion object {
+    val SYNC_INTERVAL = 10.seconds
+
     val LOG = Logger.getInstance(GitRepositoryApiImpl::class.java)
 
     private fun getAllRepositories(project: Project): List<GitRepository> = GitRepositoryManager.getInstance(project).repositories

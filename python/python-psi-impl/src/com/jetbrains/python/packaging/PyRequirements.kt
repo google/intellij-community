@@ -4,7 +4,6 @@ package com.jetbrains.python.packaging
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.StringUtil
 import com.jetbrains.python.errorProcessing.PyResult
-import com.jetbrains.python.errorProcessing.failure
 import com.jetbrains.python.packaging.requirement.PyRequirementRelation
 import com.jetbrains.python.packaging.requirement.PyRequirementVersionSpec
 
@@ -18,7 +17,24 @@ import com.jetbrains.python.packaging.requirement.PyRequirementVersionSpec
  * @see PyRequirementParser.fromText
  * @see PyRequirementParser.fromFile
  */
-fun pyRequirement(name: String): PyRequirement = PyRequirementImpl(name, emptyList(), listOf(name), "")
+fun pyRequirement(name: String, versionSpec: PyRequirementVersionSpec? = null): PyRequirement = PyRequirementImpl(name,
+                                                                                                                  listOfNotNull(versionSpec),
+                                                                                                                  listOf(name),
+                                                                                                                  "")
+
+/**
+ * This helper is not an API, consider using methods listed below.
+ *
+ * @see PyPackageManager.parseRequirement
+ * @see PyPackageManager.parseRequirements
+ *
+ * @see PyRequirementParser.fromLine
+ * @see PyRequirementParser.fromText
+ * @see PyRequirementParser.fromFile
+ */
+fun pyRequirement(name: String, relation: PyRequirementRelation, version: String): PyRequirement =
+  pyRequirement(name, relation, version, "")
+
 
 /**
  * This helper is not an API, consider using methods listed below.
@@ -33,16 +49,16 @@ fun pyRequirement(name: String): PyRequirement = PyRequirementImpl(name, emptyLi
  *
  * @see pyRequirementVersionSpec
  */
-fun pyRequirement(name: String, relation: PyRequirementRelation, version: String): PyRequirement {
+fun pyRequirement(name: String, relation: PyRequirementRelation, version: String, extras: String = ""): PyRequirement {
   val versionSpec = pyRequirementVersionSpec(relation, version)
-  return PyRequirementImpl(name, listOf(versionSpec), listOf(name + relation.presentableText + version), "")
+  return PyRequirementImpl(name, listOf(versionSpec), listOf(name + relation.presentableText + version), extras)
 }
 
 
 fun pyRequirementVersionSpec(relationWithVersion: @NlsSafe String): PyResult<PyRequirementVersionSpec> {
   val value = relationWithVersion.trim()
   val relation = PyRequirementRelation.entries.lastOrNull { value.startsWith(it.presentableText) }
-                 ?: return failure("Could not parse relation from: $value")
+                 ?: return PyResult.localizedError("Could not parse relation from: $value")
 
   val version = value.removePrefix(relation.presentableText)
   return PyResult.success(pyRequirementVersionSpec(relation, version))

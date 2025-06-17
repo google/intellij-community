@@ -12,6 +12,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/analysis-api:analysis",
     "@lib//:kotlin-stdlib",
     "@lib//:kotlin-reflect",
     "@lib//:kotlin-test",
@@ -19,8 +20,11 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-fe10",
     "@lib//:kotlinc-kotlin-compiler-tests",
     "//java/idea-ui:ui",
+    "//platform/core-api:core",
     "@lib//:test_n_g",
+    "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/indexing-api:indexing",
     "//jps/model-api:model",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -60,8 +64,7 @@ jvm_library(
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "@lib//:junit5Pioneer",
     "//platform/statistics/testFramework",
-  ],
-  runtime_deps = ["//platform/core-api:core"]
+  ]
 )
 
 jvm_test(

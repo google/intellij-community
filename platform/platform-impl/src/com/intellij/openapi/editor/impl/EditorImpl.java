@@ -3976,7 +3976,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         myMarkupModelListener.attributesChanged((RangeHighlighterEx)highlighter, true,
                                                 EditorUtil.attributesImpactFontStyle(attributes),
                                                 EditorUtil.attributesImpactForegroundColor(attributes));
-        myMarkupModel.getErrorStripeMarkersModel().attributesChanged((RangeHighlighterEx)highlighter, true);
+        myMarkupModel.errorStripeMarkersModel.attributesChanged((RangeHighlighterEx)highlighter, true);
       }
     }
   }
@@ -4094,7 +4094,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         p.x = x - p.x;
         p.y = y - p.y;
         int pos = logicalPositionToOffset(xyToLogicalPosition(p));
-        if (composedRangeMarker.getStartOffset() <= pos && pos <= composedRangeMarker.getEndOffset()) {
+        if (composedRangeMarker.getTextRange().containsInclusive(pos)) {
           return TextHitInfo.leading(pos - composedRangeMarker.getStartOffset());
         }
       }
@@ -5386,7 +5386,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
     int caretOffset = editor.getCaretModel().getOffset();
     if (editor.myDraggedRange != null
-        && editor.myDraggedRange.getStartOffset() <= caretOffset && caretOffset < editor.myDraggedRange.getEndOffset()) {
+        && editor.myDraggedRange.getTextRange().contains(caretOffset)) {
       return false;
     }
 

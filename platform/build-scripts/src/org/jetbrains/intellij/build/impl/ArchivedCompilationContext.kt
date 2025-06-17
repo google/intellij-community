@@ -43,35 +43,36 @@ class ArchivedCompilationContext(
     return OriginalModuleRepositoryImpl(this)
   }
 
-  override suspend fun getModuleOutputDir(module: JpsModule, forTests: Boolean): Path {
-    return replaceWithCompressedIfNeeded(delegate.getModuleOutputDir(module = module, forTests = forTests))
-  }
-
-  override suspend fun getModuleTestsOutputDir(module: JpsModule): Path {
-    return replaceWithCompressedIfNeeded(delegate.getModuleTestsOutputDir(module))
+  override suspend fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
+    return delegate.getModuleOutputRoots(module, forTests).map { replaceWithCompressedIfNeeded(it) }
   }
 
   override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<String> {
     return doReplace(delegate.getModuleRuntimeClasspath(module, forTests), inputMapper = { Path.of(it) }, resultMapper = { it.toString() })
   }
 
-  override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String): ByteArray? {
-    val moduleOutput = getModuleOutputDir(module)
-    if (!moduleOutput.startsWith(archivesLocation)) {
-      return delegate.readFileContentFromModuleOutput(module, relativePath)
-    }
+  override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
+    val result = getModuleOutputRoots(module, forTests).mapNotNull { moduleOutput ->
+      if (!moduleOutput.startsWith(archivesLocation)) {
+        return delegate.readFileContentFromModuleOutput(module, relativePath)
+      }
 
-    var fileContent: ByteArray? = null
-    readZipFile(moduleOutput) { name, data ->
-      if (name == relativePath) {
-        fileContent = data().toByteArray()
-        ZipEntryProcessorResult.STOP
+      var fileContent: ByteArray? = null
+      readZipFile(moduleOutput) { name, data ->
+        if (name == relativePath) {
+          fileContent = data().toByteArray()
+          ZipEntryProcessorResult.STOP
+        }
+        else {
+          ZipEntryProcessorResult.CONTINUE
+        }
       }
-      else {
-        ZipEntryProcessorResult.CONTINUE
-      }
+      return@mapNotNull fileContent
     }
-    return fileContent
+    check(result.size < 2) {
+      "More than one '$relativePath' file for module '${module.name}' in output roots"
+    }
+    return result.singleOrNull()
   }
 
   override fun createCopy(messages: BuildMessages, options: BuildOptions, paths: BuildPaths): CompilationContext {

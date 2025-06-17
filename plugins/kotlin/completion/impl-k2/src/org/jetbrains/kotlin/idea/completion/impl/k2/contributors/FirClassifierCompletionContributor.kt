@@ -18,10 +18,8 @@ import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.symbol
-import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.FirClassifierProvider.getAvailableClassifiers
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.FirClassifierProvider.getAvailableClassifiersFromIndex
-import org.jetbrains.kotlin.idea.completion.contributors.helpers.KtOutsideTowerScopeKinds
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.KtSymbolWithOrigin
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.staticScope
 import org.jetbrains.kotlin.idea.completion.impl.k2.LookupElementSink
@@ -32,16 +30,17 @@ import org.jetbrains.kotlin.idea.completion.reference
 import org.jetbrains.kotlin.idea.completion.weighers.Weighers.applyWeighs
 import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext
 import org.jetbrains.kotlin.idea.util.positionContext.KotlinNameReferencePositionContext
+import org.jetbrains.kotlin.idea.util.positionContext.KotlinRawPositionContext
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.utils.yieldIfNotNull
+import kotlin.sequences.filter
 
 internal open class FirClassifierCompletionContributor(
-    parameters: KotlinFirCompletionParameters,
     sink: LookupElementSink,
     priority: Int = 0,
-) : FirCompletionContributorBase<KotlinNameReferencePositionContext>(parameters, sink, priority) {
+) : FirCompletionContributorBase<KotlinNameReferencePositionContext>(sink, priority) {
 
     context(KaSession)
     protected open fun filterClassifiers(classifierSymbol: KaClassifierSymbol): Boolean = true
@@ -74,6 +73,7 @@ internal open class FirClassifierCompletionContributor(
                             createClassifierLookupElement(
                                 classifierSymbol = symbolWithOrigin.symbol,
                                 expectedType = weighingContext.expectedType,
+                                positionContext = positionContext,
                             ).map { it.applyWeighs(weighingContext, symbolWithOrigin) }
                         }.forEach(sink::addElement)
                 } else {
@@ -96,6 +96,7 @@ internal open class FirClassifierCompletionContributor(
                                     classifierSymbol = it,
                                     expectedType = weighingContext.expectedType,
                                     importingStrategy = importingStrategy,
+                                    positionContext = positionContext,
                                 )
                             }.map { it.withPresentableText(selectorExpression.text + "." + it.lookupString) }
                     }
@@ -148,6 +149,7 @@ internal open class FirClassifierCompletionContributor(
                     classifierSymbol = classifierSymbol,
                     expectedType = weighingContext.expectedType,
                     importingStrategy = getImportingStrategy(classifierSymbol),
+                    positionContext = positionContext,
                 ).map {
                     it.applyWeighs(context, symbolWithOrigin)
                 }
@@ -166,6 +168,7 @@ internal open class FirClassifierCompletionContributor(
                         classifierSymbol = classifierSymbol,
                         expectedType = weighingContext.expectedType,
                         importingStrategy = getImportingStrategy(classifierSymbol),
+                        positionContext = positionContext,
                     ).map {
                         it.applyWeighs(
                             context = context,
@@ -185,13 +188,20 @@ internal open class FirClassifierCompletionContributor(
     context(KaSession)
     private fun createClassifierLookupElement(
         classifierSymbol: KaClassifierSymbol,
+        positionContext: KotlinRawPositionContext,
         expectedType: KaType? = null,
         importingStrategy: ImportStrategy = ImportStrategy.DoNothing,
     ): Sequence<LookupElementBuilder> = sequence {
         if (classifierSymbol is KaNamedClassSymbol
             && expectedType?.symbol == classifierSymbol
+            && classifierSymbol.modality != KaSymbolModality.SEALED
+            && classifierSymbol.modality != KaSymbolModality.ABSTRACT
         ) {
-            yieldIfNotNull(KotlinFirLookupElementFactory.createConstructorCallLookupElement(classifierSymbol, importingStrategy))
+            val constructorSymbols = classifierSymbol.memberScope.constructors
+                .filter { visibilityChecker.isVisible(it, positionContext) }
+                .toList()
+
+            yieldIfNotNull(KotlinFirLookupElementFactory.createConstructorCallLookupElement(classifierSymbol, constructorSymbols, importingStrategy))
         }
 
         yieldIfNotNull(KotlinFirLookupElementFactory.createClassifierLookupElement(classifierSymbol, importingStrategy))
@@ -211,10 +221,9 @@ internal open class FirClassifierCompletionContributor(
 }
 
 internal class FirAnnotationCompletionContributor(
-    parameters: KotlinFirCompletionParameters,
     sink: LookupElementSink,
     priority: Int = 0,
-) : FirClassifierCompletionContributor(parameters, sink, priority) {
+) : FirClassifierCompletionContributor(sink, priority) {
 
     context(KaSession)
     override fun filterClassifiers(classifierSymbol: KaClassifierSymbol): Boolean = when (classifierSymbol) {
@@ -237,10 +246,9 @@ internal class FirAnnotationCompletionContributor(
 }
 
 internal class FirClassifierReferenceCompletionContributor(
-    parameters: KotlinFirCompletionParameters,
     sink: LookupElementSink,
     priority: Int
-) : FirClassifierCompletionContributor(parameters, sink, priority) {
+) : FirClassifierCompletionContributor(sink, priority) {
 
     context(KaSession)
     override fun getImportingStrategy(classifierSymbol: KaClassifierSymbol): ImportStrategy = when (classifierSymbol) {

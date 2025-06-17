@@ -123,14 +123,14 @@ class MavenCommandLineSetup(
 
   private suspend fun calculateJavaHome(): String? {
     val descriptor = project.getEelDescriptor()
-    val eel = descriptor.upgrade()
+    val eel = descriptor.toEelApi()
     val targetEnv = eel.exec.fetchLoginShellEnvVariables()
     val targetJavaHome = targetEnv[JAVA_HOME_ENV_KEY]
     if (targetJavaHome != null) {
       return targetJavaHome
     }
-    val jdk = ProjectRootManager.getInstance(project).getProjectSdk() ?: getJdkForImporter(project)
-    return jdk.homePath?.asTargetPathString()
+    val jdk = ProjectRootManager.getInstance(project).getProjectSdk()
+    return jdk?.homePath?.asTargetPathString()
   }
 
   private fun setupMavenExtClassPath() {

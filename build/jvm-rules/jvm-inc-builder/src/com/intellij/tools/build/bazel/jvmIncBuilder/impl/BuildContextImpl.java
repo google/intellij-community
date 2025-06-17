@@ -19,6 +19,7 @@ import static org.jetbrains.jps.util.Iterators.map;
 public class BuildContextImpl implements BuildContext {
   private final String myTargetName;
   private final Map<CLFlags, List<String>> myFlags;
+  private final boolean myAllowWarnings;
   private final Path myBaseDir;
   private final PathSourceMapper myPathMapper;
   private final Appendable myMessageSink;
@@ -36,6 +37,7 @@ public class BuildContextImpl implements BuildContext {
   public BuildContextImpl(Path baseDir, Iterable<String> inputs, Iterable<byte[]> inputDigests, Map<CLFlags, List<String>> flags, Appendable messageSink) {
     myFlags = Map.copyOf(flags);
     myTargetName = CLFlags.TARGET_LABEL.getMandatoryScalarValue(flags);
+    myAllowWarnings = !"off".equals(CLFlags.WARN.getOptionalScalarValue(flags));
     myBaseDir = baseDir;
     myPathMapper = new PathSourceMapper(
       relPath -> {
@@ -53,7 +55,7 @@ public class BuildContextImpl implements BuildContext {
     String abiPath = CLFlags.ABI_OUT.getOptionalScalarValue(flags);
     myAbiJar = abiPath != null? baseDir.resolve(abiPath).normalize() : null;
 
-    myDataDir = myOutJar.resolveSibling(truncateExtension(myOutJar.getFileName().toString()) + "-ic");
+    myDataDir = myOutJar.resolveSibling(truncateExtension(myOutJar.getFileName().toString()) + DataPaths.DATA_DIR_NAME_SUFFIX);
     
     myIsRebuild = CLFlags.NON_INCREMENTAL.isFlagSet(flags);
 
@@ -108,11 +110,14 @@ public class BuildContextImpl implements BuildContext {
       options.add("8".equals(jvmTarget)? "1.8" : jvmTarget);
     }
 
+    StringBuilder optIns = new StringBuilder();
     for (String annotName : CLFlags.OPT_IN.getValue(flags)) {
-      options.add("-opt-in");
-      options.add(annotName);
+      optIns.append(annotName).append(",");
     }
-    
+    if (!optIns.isEmpty()) {
+      options.add("-opt-in=" + optIns.deleteCharAt(optIns.length() - 1));
+    }
+
     String warn = CLFlags.WARN.getOptionalScalarValue(flags);
     if ("off".equals(warn)) {
       options.add("-nowarn");
@@ -139,9 +144,25 @@ public class BuildContextImpl implements BuildContext {
     return options;
   }
   
-  private static @NotNull List<String> buildJavaOptions(Map<CLFlags, List<String>> flags) {
+  private @NotNull List<String> buildJavaOptions(Map<CLFlags, List<String>> flags) {
     // for now, only options available in the flags map can be specified in the build configuration
     List<String> options = new ArrayList<>();
+    options.add("-g"); // todo: for now hardcoded
+
+    String warn = CLFlags.WARN.getOptionalScalarValue(flags);
+    if ("off".equals(warn)) {
+      options.add("-nowarn");
+    }
+    else if ("error".equals(warn)) {
+      options.add("-werror");
+    }
+    else if (warn != null) {
+      throw new IllegalArgumentException("unsupported javac warning option: " + warn);
+    }
+    
+    options.add("-encoding");
+    options.add("UTF-8");
+
     String jvmTarget = CLFlags.JVM_TARGET.getOptionalScalarValue(flags);
     if (jvmTarget != null) {
       options.add("-source");
@@ -150,6 +171,11 @@ public class BuildContextImpl implements BuildContext {
       options.add("-target");
       options.add(jvmTarget);
     }
+
+    Path trashDir = DataPaths.getTrashDir(this);
+    options.add("-s");
+    options.add(trashDir.toString()); // put AP-generated sources to trash dir
+
     for (String exp : CLFlags.ADD_EXPORT.getValue(flags)) {
       options.add("--add-exports");
       options.add(exp);
@@ -233,6 +259,12 @@ public class BuildContextImpl implements BuildContext {
   @Override
   public void report(Message msg) {
     try {
+      if (!myAllowWarnings && msg.getKind() == Message.Kind.WARNING) {
+        return;
+      }
+      if (msg.getSource() != null) {
+        myMessageSink.append(msg.getSource().getName()).append(": ");
+      }
       if (msg.getKind() == Message.Kind.ERROR) {
         myHasErrors = true;
         myMessageSink.append("Error: ");

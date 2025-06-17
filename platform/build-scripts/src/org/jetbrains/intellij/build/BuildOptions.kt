@@ -172,6 +172,9 @@ data class BuildOptions(
     /** Build Linux tar.gz artifact without bundled Runtime. */
     const val LINUX_TAR_GZ_WITHOUT_BUNDLED_RUNTIME_STEP: String = "linux_tar_gz_without_jre"
 
+    /** Build Windows artifacts: .zip archive and .exe installer. */
+    const val WINDOWS_ARTIFACTS_STEP: String = "windows_artifacts"
+
     /** Build *.exe installer for Windows distribution. If skipped, only the .zip archive will be produced. */
     const val WINDOWS_EXE_INSTALLER_STEP: String = "windows_exe_installer"
 
@@ -358,25 +361,28 @@ data class BuildOptions(
   var useLocalLauncher: Boolean = false
 
   /**
-   * When `true`, cross-platform distribution will be packed using zip64 in AlwaysWithCompatibility mode
+   * When set, `WinExeInstallerBuilder` will use the given local NSIS installation.
+   */
+  var useLocalNSIS: String? = null
+
+  /**
+   * When `true`, cross-platform distribution will be packed using zip64 in AlwaysWithCompatibility mode.
    */
   var useZip64ForCrossPlatformDistribution: Boolean = getBooleanProperty("intellij.build.cross.platform.dist.zip64", false)
 
   /**
-   * Pass `true` to this system property to produce .snap packages.
-   * Requires Docker.
+   * Pass `true` to this system property to produce .snap packages. Requires Docker.
    */
   var buildUnixSnaps: Boolean = getBooleanProperty("intellij.build.unix.snaps", false)
 
   /**
-   * Docker image for snap package creation
+   * Docker image for snap package creation.
    */
   var snapDockerImage: String = System.getProperty("intellij.build.snap.docker.image") ?: DEPENDENCIES_PROPERTIES["snapDockerImage"]
   var snapDockerBuildTimeoutMin: Long = System.getProperty("intellij.build.snap.timeoutMin")?.toLong() ?: 20
 
   /**
-   * When `true`, `.resx` files are generated and bundled in the localization plugins.
-   * Requires Docker.
+   * When `true`, `.resx` files are generated and bundled in the localization plugins. Requires Docker.
    */
   var bundleLocalizationPluginResources: Boolean = getBooleanProperty("intellij.build.localization.plugin.resources", false)
 
@@ -399,11 +405,6 @@ data class BuildOptions(
       buildNumber
     }
   }
-
-  /**
-   * Use [BuildContext.pluginBuildNumber] to get the actual build number in build scripts.
-   */
-  var pluginBuildNumber: String? = buildNumber
 
   /**
    * If `true`, the build is running as a unit test.

@@ -22,6 +22,7 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   javac_opts = ":custom-javac-options",
   deps = [
+    "//platform/analysis-api:analysis",
     "//platform/bootstrap/coroutine",
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
@@ -29,6 +30,7 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-impl",
     "//platform/boot",
+    "//platform/projectModel-api:projectModel",
     "//platform/util-class-loader:util-classLoader",
     "//platform/platform-impl/bootstrap",
     "//platform/util",

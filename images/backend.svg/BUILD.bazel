@@ -13,9 +13,11 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/core-api:core",
     "//images",
     "@lib//:kotlin-stdlib",
     "//xml/xml-parser:parser",
+    "//xml/xml-psi-api:psi",
     "//xml/xml-psi-impl:psi-impl",
     "//platform/lang-api:lang",
     "//platform/core-impl",

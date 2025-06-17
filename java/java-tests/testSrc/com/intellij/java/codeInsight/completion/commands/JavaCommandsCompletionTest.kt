@@ -80,7 +80,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       .<caret>
       """.trimIndent())
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.equals("format", ignoreCase = true) })
+    selectItem(elements.first { element -> element.lookupString.contains("Reformat", ignoreCase = true) })
     myFixture.checkResult("""
       class A {
           void foo() {
@@ -177,7 +177,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }
       """.trimIndent())
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.contains("Generate 'Ge", ignoreCase = true) })
+    selectItem(elements.first { element -> element.lookupString.contains("Getter", ignoreCase = true) })
     myFixture.checkResult("""
       class A {
           String y;
@@ -242,7 +242,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
           }
       }.<caret>""".trimIndent())
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.contains("Comment by line comment", ignoreCase = true) })
+    selectItem(elements.first { element -> element.lookupString.contains("Comment with line comment", ignoreCase = true) })
     myFixture.checkResult("""
       //class A {
       //    public String getY() {
@@ -279,7 +279,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
           }
       }.<caret>""".trimIndent())
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.contains("Comment by block", ignoreCase = true) })
+    selectItem(elements.first { element -> element.lookupString.contains("Comment with block", ignoreCase = true) })
     myFixture.checkResult("""
       /*
       class A {
@@ -312,6 +312,45 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
               System.out.println(number);
           }
       }""".trimIndent())
+  }
+
+  fun testRenameMethod1() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          void foo().<caret> {
+              String y = "1";
+              System.out.println(y);
+          }
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.any { element -> element.lookupString.contains("Rename", ignoreCase = true) })
+  }
+
+  fun testRenameMethod2() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          void foo() {
+              String y = "1";
+              System.out.println(y);
+          }.<caret>
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.any { element -> element.lookupString.contains("Rename", ignoreCase = true) })
+  }
+
+  fun testRenameClass() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          void foo() {
+              String y = "1";
+              System.out.println(y);
+          }
+      }.<caret>""".trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.any { element -> element.lookupString.contains("Rename", ignoreCase = true) })
   }
 
   fun testRenameParameter() {
@@ -655,6 +694,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
 
   fun testBinaryNotAllowedCalledCompletion() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    Registry.get("ide.completion.command.support.read.only.files").setValue(true, getTestRootDisposable())
     val psiClass = JavaPsiFacade.getInstance(project).findClass(JAVA_LANG_CLASS, GlobalSearchScope.allScope(project))
     val file = psiClass?.containingFile?.virtualFile
     assertNotNull(file)
@@ -759,7 +799,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }
       """.trimIndent())
     val elements = myFixture.completeBasic()
-    assertTrue(elements.any { element -> element.lookupString.equals("Move element", ignoreCase = true) })
+    assertTrue(elements.any { element -> element.lookupString.equals("Move", ignoreCase = true) })
   }
 
   fun testCopyClass() {
@@ -775,7 +815,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }
       """.trimIndent())
     val elements = myFixture.completeBasic()
-    assertTrue(elements.any { element -> element.lookupString.equals("Copy class", ignoreCase = true) })
+    assertTrue(elements.any { element -> element.lookupString.equals("Copy", ignoreCase = true) })
   }
 
   fun testInlineReferenceOnlyVariables() {

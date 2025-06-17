@@ -4,19 +4,20 @@ package com.intellij.platform.eel
 import com.intellij.platform.eel.EelTunnelsApi.Connection
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
+import com.intellij.platform.eel.path.EelPath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
-import org.jetbrains.annotations.CheckReturnValue
+import org.jetbrains.annotations.ApiStatus
 import java.io.IOException
-import kotlin.jvm.Throws
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * API for sockets. Use [hostAddressBuilder] to create arguments.
  */
+@ApiStatus.Experimental
 sealed interface EelTunnelsApi {
   /**
    * Creates a remote UNIX socket forwarding. IJent listens for a connection on the remote machine, and when the connection
@@ -31,32 +32,44 @@ sealed interface EelTunnelsApi {
    * ```kotlin
    * val ijent: IjentApi = ijentApiFactory()
    *
-   * val (socketPath, tx, rx) = listenOnUnixSocket(CreateFilePath.MkTemp(prefix = "ijent-", suffix = ".sock"))
+   * val (socketPath, tx, rx) = listenOnUnixSocket().prefix("ijent-").suffix(".sock").eelIt()
    * println(socketPath) // /tmp/ijent-12345678.sock
    * launch {
    *   handleConnection(tx, rx)
    * }
    * while (true) {
-   *   val (_, tx, rx) = listenOnUnixSocket(CreateFilePath.Fixed(socketPath))
+   *   val (_, tx, rx) = listenOnUnixSocket(socketPath)
    *   launch {
    *     handleConnection(tx, rx)
    *   }
    * }
    * ```
    */
-  suspend fun listenOnUnixSocket(path: CreateFilePath = CreateFilePath.MkTemp()): ListenOnUnixSocketResult
+  @ApiStatus.Experimental
+  suspend fun listenOnUnixSocket(fixedPath: EelPath): ListenOnUnixSocketResult
 
-  data class ListenOnUnixSocketResult(
-    val unixSocketPath: String,
-    val tx: EelSendChannel,
-    val rx: EelReceiveChannel,
-  )
+  /**
+   * See [listenOnUnixSocket] that accepts [EelPath] parameter for full documentation.
+   */
+  @ApiStatus.Experimental
+  suspend fun listenOnUnixSocket(@GeneratedBuilder temporaryPathOptions: ListenOnUnixSocketTemporaryPathOptions): ListenOnUnixSocketResult
 
-  sealed interface CreateFilePath {
-    data class Fixed(val path: String) : CreateFilePath
+  @ApiStatus.Experimental
+  interface ListenOnUnixSocketTemporaryPathOptions {
+    val prefix: String get() = ""
+    val suffix: String get() = ""
+    val parentDirectory: EelPath? get() = null
+  }
 
-    /** When [directory] is empty, the usual tmpdir is used. */
-    data class MkTemp(val directory: String = "", val prefix: String = "", val suffix: String = "") : CreateFilePath
+  @ApiStatus.Experimental
+  interface ListenOnUnixSocketResult {
+    val unixSocketPath: EelPath
+    val tx: EelSendChannel
+    val rx: EelReceiveChannel
+
+    operator fun component1(): EelPath = unixSocketPath
+    operator fun component2(): EelSendChannel = tx
+    operator fun component3(): EelReceiveChannel = rx
   }
 
   /**
@@ -85,13 +98,18 @@ sealed interface EelTunnelsApi {
    * To configure a socket before connection use [configureSocketBeforeConnection]. After that, use [Connection.configureSocket]
    */
   @Throws(EelConnectionError::class)
+  @ThrowsChecked(EelConnectionError::class)
+  @ApiStatus.Experimental
   suspend fun getConnectionToRemotePort(@GeneratedBuilder args: GetConnectionToRemotePortArgs): Connection
 
+  @ApiStatus.Experimental
   interface GetConnectionToRemotePortArgs : HostAddress {
+    @get:ApiStatus.Internal
     val configureSocketBeforeConnection: ConfigurableClientSocket.() -> Unit get() = {}
   }
 
 
+  @ApiStatus.Experimental
   sealed interface ResolvedSocketAddress {
     val port: UShort
 
@@ -108,20 +126,27 @@ sealed interface EelTunnelsApi {
   /**
    * Represents an address to a remote host.
    */
+  @ApiStatus.Experimental
   interface HostAddress {
+    @get:ApiStatus.Experimental
     val port: UShort get() = 0u  // TODO Split into two interfaces
+
+    @get:ApiStatus.Experimental
     val hostname: String get() = "localhost"
 
     /**
      * @see [Builder.preferIPv4]
      */
+    @get:ApiStatus.Experimental
     val protocolPreference: EelIpPreference get() = EelIpPreference.USE_SYSTEM_DEFAULT
 
     /**
      * @see [Builder.connectionTimeout]
      */
+    @get:ApiStatus.Experimental
     val timeout: Duration get() = 10.seconds
 
+    @ApiStatus.Experimental
     interface Builder {
 
       /**
@@ -172,12 +197,14 @@ sealed interface EelTunnelsApi {
       /**
        * Creates a builder for address on the remote host.
        */
+      @ApiStatus.Experimental
       fun Builder(port: UShort): Builder = HostAddressBuilderImpl(port)
 
       /**
        * Creates a builder for address `localhost:0`.
        * This can be useful in remote port forwarding, as it allocates a random port on the remote host side.
        */
+      @ApiStatus.Experimental
       fun Builder(): Builder = HostAddressBuilderImpl(0u)
     }
   }
@@ -186,29 +213,35 @@ sealed interface EelTunnelsApi {
   /**
    * Represents a controller for a TCP connection
    */
+  @ApiStatus.Experimental
   interface Connection {
 
     /**
      * A channel to the server
      */
+    @get:ApiStatus.Experimental
     val sendChannel: EelSendChannel
 
     /**
      * A channel from the server
      */
+    @get:ApiStatus.Experimental
     val receiveChannel: EelReceiveChannel
 
     /**
      * Configure various socket options
      */
+    @ApiStatus.Internal
     suspend fun configureSocket(block: suspend ConfigurableClientSocket.() -> Unit)
 
     /**
      * Closes the connection to the socket.
      */
+    @ApiStatus.Experimental
     suspend fun close()
   }
 
+  @ApiStatus.Internal
   sealed class RemoteNetworkException(message: String) : IOException(message) {
     constructor() : this("")
 
@@ -239,8 +272,11 @@ sealed interface EelTunnelsApi {
    * One should not forget to invoke [Connection.close] when the connection is not needed.
    */
   @Throws(EelConnectionError::class)
+  @ThrowsChecked(EelConnectionError::class)
+  @ApiStatus.Internal
   suspend fun getAcceptorForRemotePort(@GeneratedBuilder args: GetAcceptorForRemotePort): ConnectionAcceptor
 
+  @ApiStatus.Internal
   interface GetAcceptorForRemotePort : HostAddress {
     // TODO Make it look and feel like all other builders.
     val configureServerSocket: ConfigurableSocket.() -> Unit get() = {}
@@ -249,6 +285,7 @@ sealed interface EelTunnelsApi {
   /**
    * This is a representation of a remote server bound to [boundAddress].
    */
+  @ApiStatus.Internal
   interface ConnectionAcceptor {
     /**
      * A channel of incoming connections to the remote server.
@@ -272,6 +309,7 @@ sealed interface EelTunnelsApi {
 /**
  * Socket configuration valid both for server and client socket
  */
+@ApiStatus.Internal
 interface ConfigurableSocket {
   /**
    * Sets the possibility to reuse address of the socket
@@ -283,6 +321,7 @@ interface ConfigurableSocket {
 /**
  * Client only socket options
  */
+@ApiStatus.Internal
 interface ConfigurableClientSocket : ConfigurableSocket {
   /**
    * Disables pending data until acknowledgement
@@ -295,18 +334,22 @@ interface ConfigurableClientSocket : ConfigurableSocket {
  * Convenience operator to decompose connection to a pair of channels when needed.
  * @return channel to server
  */
+@ApiStatus.Internal
 operator fun Connection.component1(): EelSendChannel = sendChannel
 
 /**
  * Convenience operator to decompose connection to a pair of channels when needed.
  * @return channel from server
  */
+@ApiStatus.Internal
 operator fun Connection.component2(): EelReceiveChannel = receiveChannel
 
+@ApiStatus.Experimental
 interface EelTunnelsPosixApi : EelTunnelsApi {
 
 }
 
+@ApiStatus.Experimental
 interface EelTunnelsWindowsApi : EelTunnelsApi
 
 /**
@@ -331,6 +374,7 @@ interface EelTunnelsWindowsApi : EelTunnelsApi
  *
  * @see EelTunnelsApi.getConnectionToRemotePort for more details on the behavior of [Connection]
  */
+@ApiStatus.Experimental
 suspend fun <T> EelTunnelsApiHelpers.GetConnectionToRemotePort.withConnectionToRemotePort(
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(Connection) -> T,
@@ -369,17 +413,20 @@ private suspend fun <T> closeWithExceptionHandling(action: suspend CoroutineScop
   }
 }
 
+@ApiStatus.Internal
 fun EelTunnelsApiHelpers.GetConnectionToRemotePort.hostAddress(
   addr: EelTunnelsApi.HostAddress,
 ): EelTunnelsApiHelpers.GetConnectionToRemotePort =
   hostname(addr.hostname).port(addr.port).protocolPreference(addr.protocolPreference).timeout(addr.timeout)
 
+@ApiStatus.Internal
 suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
   host: String, port: UShort,
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(Connection) -> T,
 ): T = getConnectionToRemotePort().hostname(host).port(port).withConnectionToRemotePort(errorHandler, action)
 
+@ApiStatus.Internal
 suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
   remotePort: UShort,
   errorHandler: suspend (EelConnectionError) -> T,
@@ -387,6 +434,7 @@ suspend fun <T> EelTunnelsApi.withConnectionToRemotePort(
 ): T = withConnectionToRemotePort("localhost", remotePort, errorHandler, action)
 
 
+@ApiStatus.Internal
 suspend fun <T> EelTunnelsApiHelpers.GetAcceptorForRemotePort.withAcceptorForRemotePort(
   errorHandler: suspend (EelConnectionError) -> T,
   action: suspend CoroutineScope.(EelTunnelsApi.ConnectionAcceptor) -> T,
@@ -399,6 +447,7 @@ suspend fun <T> EelTunnelsApiHelpers.GetAcceptorForRemotePort.withAcceptorForRem
   }
 }
 
+@ApiStatus.Internal
 fun EelTunnelsApiHelpers.GetAcceptorForRemotePort.hostAddress(
   addr: EelTunnelsApi.HostAddress,
 ): EelTunnelsApiHelpers.GetAcceptorForRemotePort =
@@ -407,31 +456,39 @@ fun EelTunnelsApiHelpers.GetAcceptorForRemotePort.hostAddress(
 /**
  * Represents a common class for all network-related errors appearing during the interaction with IJent or local process
  */
+@ApiStatus.Experimental
 sealed interface EelNetworkError : EelError
 
 /**
  * An error that can happen during the creation of a connection to a remote server
  */
+@ApiStatus.Experimental
 sealed class EelConnectionError(override val message: String) : EelNetworkError, IOException() {
 
   /**
    * Returned when the remote host cannot create an object of a socket.
    */
+  @ApiStatus.Experimental
+  @Deprecated("Unlikely to happen, to be merged into `Other`")
   open class SocketAllocationError(override val message: String) : EelConnectionError(message)
 
   /**
    * Returned when there is a problem with resolve of the hostname.
    */
+  @ApiStatus.Experimental
   open class ResolveFailure(override val message: String) : EelConnectionError(message)
 
   /**
    * Returned when there was a problem with establishing a connection to a resolved server
    */
+  @ApiStatus.Experimental
   open class ConnectionProblem(override val message: String) : EelConnectionError(message)
 
   /**
    * Unknown failure during a connection establishment
    */
+  // TODO Rename to `Other`
+  @ApiStatus.Experimental
   open class UnknownFailure(override val message: String) : EelConnectionError(message)
 }
 

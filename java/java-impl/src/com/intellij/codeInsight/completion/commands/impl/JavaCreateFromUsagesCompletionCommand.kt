@@ -22,7 +22,6 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.intellij.psi.util.parentOfType
 import org.jetbrains.annotations.Nls
-import javax.swing.Icon
 
 
 internal class JavaCreateFromUsagesCommandProvider : CommandProvider {
@@ -50,12 +49,10 @@ internal class JavaCreateFromUsagesCompletionCommand(val psiClass: PsiClass) : C
 
   private val methodNames: Set<String> = psiClass.allMethods.map { it.name }.toSet()
 
-  override val name: String
-    get() = "Create method from usage"
-  override val i18nName: @Nls String
+  override val synonyms: List<String>
+    get() = listOf("Create method from usage")
+  override val presentableName: @Nls String
     get() = QuickFixBundle.message("create.method.from.usage.family")
-  override val icon: Icon?
-    get() = null
 
   override fun execute(offset: Int, psiFile: PsiFile, editor: Editor?) {
     val fileDocument = psiFile.fileDocument
@@ -84,14 +81,14 @@ internal class JavaCreateFromUsagesCompletionCommand(val psiClass: PsiClass) : C
           generateActions(expression).firstOrNull { it is CreateMethodAction }
         }
       }?: return
-    ShowIntentionActionsHandler.chooseActionAndInvoke(psiFile, editor, action, name)
+    ShowIntentionActionsHandler.chooseActionAndInvoke(psiFile, editor, action, presentableName)
   }
 
-  override fun customPrefixMatcher(prefix: String): PrefixMatcher? {
+  override fun customPrefixMatcher(prefix: String): PrefixMatcher {
     return AlwaysMatchingCamelHumpMatcher(prefix, psiClass.project, methodNames)
   }
 
-  override val priority: Int?
+  override val priority: Int
     get() = 500
 }
 

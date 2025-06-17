@@ -193,6 +193,43 @@ public class NullableStuffInspectionBase extends AbstractBaseJavaLocalInspection
       }
 
       @Override
+      public void visitMethodCallExpression(@NotNull PsiMethodCallExpression call) {
+        super.visitMethodCallExpression(call);
+        PsiReferenceParameterList parameterList = call.getMethodExpression().getParameterList();
+        if (parameterList == null) return;
+        PsiType[] parameterization = parameterList.getTypeArguments();
+        if (parameterization.length == 0) return;
+        PsiMethod method = call.resolveMethod();
+        if (method == null) return;
+        PsiTypeParameter[] typeParameters = method.getTypeParameters();
+        if (typeParameters.length != parameterization.length) return;
+        for (int i = 0; i < typeParameters.length; i++) {
+          PsiTypeParameter typeParameter = typeParameters[i];
+          PsiType instance = parameterization[i];
+          TypeNullability nullability = TypeNullability.ofTypeParameter(typeParameter);
+          if (nullability.nullability() != Nullability.NOT_NULL) continue;
+          TypeNullability instanceNullability = instance.getNullability();
+          if (instanceNullability.nullability() == Nullability.NOT_NULL) continue;
+          NullabilitySource source = instanceNullability.source();
+          if (source instanceof NullabilitySource.ExplicitAnnotation explicit) {
+            PsiAnnotation anchor = explicit.annotation();
+            PsiJavaCodeReferenceElement ref = anchor.getNameReferenceElement();
+            if (ref != null) {
+              reportProblem(holder, anchor, "inspection.nullable.problems.nullable.instantiation.of.notnull",
+                            typeParameter.getName(), ref.getReferenceName());
+            }
+          } else if (source instanceof NullabilitySource.ContainerAnnotation container) {
+            PsiElement anchor = parameterList.getTypeParameterElements()[i];
+            PsiJavaCodeReferenceElement ref = container.annotation().getNameReferenceElement();
+            if (ref != null) {
+              reportProblem(holder, anchor, "inspection.nullable.problems.nullable.instantiation.of.notnull.container",
+                            typeParameter.getName(), ref.getReferenceName());
+            }
+          }
+        }
+      }
+
+      @Override
       public void visitParameter(@NotNull PsiParameter parameter) {
         check(parameter, holder, parameter.getType());
       }
@@ -369,20 +406,18 @@ public class NullableStuffInspectionBase extends AbstractBaseJavaLocalInspection
               PsiTypeElement typeArgument = typeArguments[i];
               Project project = element.getProject();
               PsiType type = typeArgument.getType();
-              if (DfaPsiUtil.getTypeNullability(JavaPsiFacade.getElementFactory(project).createType(typeParameters[i])) ==
-                  Nullability.NOT_NULL) {
-                Nullability typeNullability = DfaPsiUtil.getTypeNullability(type);
-                if (typeNullability != Nullability.NOT_NULL &&
-                    !(typeNullability == Nullability.UNKNOWN && type instanceof PsiWildcardType && !((PsiWildcardType)type).isExtends())) {
-                  String annotationToAdd = manager.getDefaultNotNull();
-                  PsiClass annotationClass = JavaPsiFacade.getInstance(project).findClass(annotationToAdd, element.getResolveScope());
-                  AddTypeAnnotationFix fix = null;
-                  if (annotationClass != null &&
-                      AnnotationTargetUtil.findAnnotationTarget(annotationClass, PsiAnnotation.TargetType.TYPE_USE) != null) {
-                    fix = new AddTypeAnnotationFix(typeArgument, annotationToAdd, manager.getNullables());
-                  }
-                  reportProblem(holder, typeArgument, fix, "non.null.type.argument.is.expected");
+              if (TypeNullability.ofTypeParameter(typeParameters[i]).nullability() != Nullability.NOT_NULL) continue;
+              Nullability typeNullability = DfaPsiUtil.getTypeNullability(type);
+              if (typeNullability != Nullability.NOT_NULL &&
+                  !(typeNullability == Nullability.UNKNOWN && type instanceof PsiWildcardType wildcardType && !wildcardType.isExtends())) {
+                String annotationToAdd = manager.getDefaultNotNull();
+                PsiClass annotationClass = JavaPsiFacade.getInstance(project).findClass(annotationToAdd, element.getResolveScope());
+                AddTypeAnnotationFix fix = null;
+                if (annotationClass != null &&
+                    AnnotationTargetUtil.findAnnotationTarget(annotationClass, PsiAnnotation.TargetType.TYPE_USE) != null) {
+                  fix = new AddTypeAnnotationFix(typeArgument, annotationToAdd, manager.getNullables());
                 }
+                reportProblem(holder, typeArgument, fix, "non.null.type.argument.is.expected");
               }
             }
           }

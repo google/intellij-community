@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.externalSystem.autolink
 
 import com.intellij.openapi.Disposable
@@ -6,7 +6,6 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.createExtensionDisposable
-import com.intellij.platform.externalSystem.impl.ExternalSystemImplCoroutineScope.esCoroutineScope
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectId
 import com.intellij.openapi.externalSystem.autoimport.changes.vfs.VirtualFileChangesListener
 import com.intellij.openapi.externalSystem.autoimport.changes.vfs.VirtualFileChangesListener.Companion.installAsyncVirtualFileListener
@@ -15,7 +14,6 @@ import com.intellij.openapi.externalSystem.util.ExternalSystemActivityKey
 import com.intellij.openapi.externalSystem.util.ExternalSystemInProgressService
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.module.ModuleManager
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.io.toNioPathOrNull
@@ -26,9 +24,10 @@ import com.intellij.openapi.vfs.isFile
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.toNioPathOrNull
-import com.intellij.platform.PlatformProjectOpenProcessor.Companion.isConfiguredByPlatformProcessor
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.isNewProject
 import com.intellij.platform.backend.observation.trackActivity
+import com.intellij.platform.externalSystem.impl.ExternalSystemImplCoroutineScope.esCoroutineScope
+import com.intellij.platform.isConfiguredByPlatformProcessor
 import com.intellij.util.containers.DisposableWrapperList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,11 +58,11 @@ class UnlinkedProjectStartupActivity : ProjectActivity {
   }
 
   private fun isNewPlatformProject(project: Project): Boolean {
-    return project.isNewProject()
+    return isNewProject(project)
   }
 
   private fun isOpenedWithEmptyModel(project: Project): Boolean {
-    return project.isConfiguredByPlatformProcessor() || isEmptyModel(project)
+    return isConfiguredByPlatformProcessor(project) || isEmptyModel(project)
   }
 
   private fun isEmptyModel(project: Project): Boolean {
@@ -186,14 +185,12 @@ class UnlinkedProjectStartupActivity : ProjectActivity {
     externalProjectPath: String,
     extension: ExternalSystemUnlinkedProjectAware
   ) {
-    blockingContext {
-      val extensionDisposable = EP_NAME.createExtensionDisposable(extension, project)
-      UnlinkedProjectNotificationAware.getInstance(project)
-        .notificationNotify(extension.createProjectId(externalProjectPath)) {
-          project.esCoroutineScope.launch(extensionDisposable) {
-            project.trackActivity(ExternalSystemActivityKey) {
-              extension.linkAndLoadProjectAsync(project, externalProjectPath)
-            }
+    val extensionDisposable = EP_NAME.createExtensionDisposable(extension, project)
+    UnlinkedProjectNotificationAware.getInstance(project)
+      .notificationNotify(extension.createProjectId(externalProjectPath)) {
+        project.esCoroutineScope.launch(extensionDisposable) {
+          project.trackActivity(ExternalSystemActivityKey) {
+            extension.linkAndLoadProjectAsync(project, externalProjectPath)
           }
         }
     }
@@ -204,10 +201,8 @@ class UnlinkedProjectStartupActivity : ProjectActivity {
     externalProjectPath: String,
     extension: ExternalSystemUnlinkedProjectAware
   ) {
-    blockingContext {
-      UnlinkedProjectNotificationAware.getInstance(project)
-        .notificationExpire(extension.createProjectId(externalProjectPath))
-    }
+    UnlinkedProjectNotificationAware.getInstance(project)
+      .notificationExpire(extension.createProjectId(externalProjectPath))
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -263,43 +258,6 @@ class UnlinkedProjectStartupActivity : ProjectActivity {
     }
   }
 
-  private class ProjectRoots : Iterable<String> {
-
-    private val projectRoots = CopyOnWriteArrayList<String>()
-    private val addListeners = DisposableWrapperList<suspend (String) -> Unit>()
-    private val removeListeners = DisposableWrapperList<suspend (String) -> Unit>()
-
-    override fun iterator(): Iterator<String> {
-      return projectRoots.iterator()
-    }
-
-    suspend fun addProjectRoot(projectRoot: String) {
-      projectRoots.add(projectRoot)
-      addListeners.forEach { it(projectRoot) }
-    }
-
-    suspend fun removeProjectRoot(projectRoot: String) {
-      projectRoots.remove(projectRoot)
-      removeListeners.forEach { it(projectRoot) }
-    }
-
-    fun whenProjectRootAdded(parentDisposable: Disposable, action: suspend (String) -> Unit) {
-      addListeners.add(action, parentDisposable)
-    }
-
-    fun whenProjectRootRemoved(parentDisposable: Disposable, action: suspend (String) -> Unit) {
-      removeListeners.add(action, parentDisposable)
-    }
-
-    suspend fun withProjectRoot(parentDisposable: Disposable, action: suspend (String) -> Unit) {
-      for (projectRoot in projectRoots) {
-        action(projectRoot)
-      }
-      whenProjectRootAdded(parentDisposable) { projectRoot ->
-        action(projectRoot)
-      }
-    }
-  }
 
   private fun ExternalSystemUnlinkedProjectAware.createProjectId(externalProjectPath: String): ExternalSystemProjectId {
     return ExternalSystemProjectId(systemId, externalProjectPath)
@@ -311,8 +269,43 @@ class UnlinkedProjectStartupActivity : ProjectActivity {
       projectRoot?.children?.firstOrNull { isBuildFile(project, it) } != null
     }
   }
+}
 
-  companion object {
-    private val LOG = Logger.getInstance("#com.intellij.openapi.externalSystem.autolink")
+private class ProjectRoots : Iterable<String> {
+  private val projectRoots = CopyOnWriteArrayList<String>()
+  private val addListeners = DisposableWrapperList<suspend (String) -> Unit>()
+  private val removeListeners = DisposableWrapperList<suspend (String) -> Unit>()
+
+  override fun iterator(): Iterator<String> {
+    return projectRoots.iterator()
+  }
+
+  suspend fun addProjectRoot(projectRoot: String) {
+    projectRoots.add(projectRoot)
+    addListeners.forEach { it(projectRoot) }
+  }
+
+  suspend fun removeProjectRoot(projectRoot: String) {
+    projectRoots.remove(projectRoot)
+    removeListeners.forEach { it(projectRoot) }
+  }
+
+  fun whenProjectRootAdded(parentDisposable: Disposable, action: suspend (String) -> Unit) {
+    addListeners.add(action, parentDisposable)
+  }
+
+  fun whenProjectRootRemoved(parentDisposable: Disposable, action: suspend (String) -> Unit) {
+    removeListeners.add(action, parentDisposable)
+  }
+
+  suspend fun withProjectRoot(parentDisposable: Disposable, action: suspend (String) -> Unit) {
+    for (projectRoot in projectRoots) {
+      action(projectRoot)
+    }
+    whenProjectRootAdded(parentDisposable) { projectRoot ->
+      action(projectRoot)
+    }
   }
 }
+
+private val LOG = Logger.getInstance("#com.intellij.openapi.externalSystem.autolink")

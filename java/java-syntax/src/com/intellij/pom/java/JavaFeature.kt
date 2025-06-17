@@ -100,6 +100,8 @@ enum class JavaFeature {
 
   SCOPED_VALUES(LanguageLevel.JDK_21_PREVIEW, "feature.scoped.values"),
   STRUCTURED_CONCURRENCY(LanguageLevel.JDK_21_PREVIEW, "feature.structured.concurrency"),
+
+  IMPLICIT_CLASS_NAME_OUT_OF_SCOPE(LanguageLevel.JDK_22_PREVIEW, "feature.implicit.class.name.out.of.scope"),
   CLASSFILE_API(LanguageLevel.JDK_22_PREVIEW, "feature.classfile.api"),
   STREAM_GATHERERS(LanguageLevel.JDK_22_PREVIEW, "feature.stream.gatherers"),
   STATEMENTS_BEFORE_SUPER(LanguageLevel.JDK_22_PREVIEW, "feature.statements.before.super"),
@@ -198,7 +200,7 @@ enum class JavaFeature {
     get() = if (minimumLevel.isPreview) null else this.minimumLevel
 
   companion object {
-    // Should correspond to jdk.internal.javac.PreviewFeature.Feature enum
+    // Values taken from jdk.internal.javac.PreviewFeature.Feature enum
     @Contract(pure = true)
     @JvmStatic
     fun convertFromPreviewFeatureName(feature: @NonNls String): JavaFeature? {
@@ -215,6 +217,7 @@ enum class JavaFeature {
         "STREAM_GATHERERS" -> STREAM_GATHERERS
         "FOREIGN" -> FOREIGN_FUNCTIONS
         "VIRTUAL_THREADS" -> VIRTUAL_THREADS
+        "MODULE_IMPORTS" -> MODULE_IMPORT_DECLARATIONS
         else -> null
       }
     }

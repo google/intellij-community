@@ -12,6 +12,7 @@ import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.command.impl.DummyProject
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.externalSystem.util.environment.Environment
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.progress.*
@@ -32,8 +33,8 @@ import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.LocalEelApi
 import com.intellij.platform.eel.fs.EelFileSystemApi
 import com.intellij.platform.eel.fs.getPath
+import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asNioPath
-import com.intellij.platform.eel.provider.asNioPathOrNull
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.EelPathUtils.getActualPath
 import com.intellij.platform.eel.provider.utils.fetchLoginShellEnvVariablesBlocking
@@ -93,7 +94,7 @@ object MavenEelUtil {
 
   @JvmStatic
   suspend fun Project?.resolveM2DirAsync(): Path {
-    return this?.filterAcceptable()?.getEelDescriptor()?.upgrade().resolveM2Dir()
+    return this?.filterAcceptable()?.getEelDescriptor()?.toEelApi().resolveM2Dir()
   }
 
   suspend fun <T> resolveUsingEel(project: Project?, ordinary: suspend () -> T, eel: suspend (EelApi) -> T?): T {
@@ -101,7 +102,7 @@ object MavenEelUtil {
       MavenLog.LOG.error("resolveEelAware: Project is null")
     }
 
-    return project?.filterAcceptable()?.getEelDescriptor()?.upgrade()?.let { eel(it) } ?: ordinary.invoke()
+    return project?.filterAcceptable()?.getEelDescriptor()?.toEelApi()?.let { eel(it) } ?: ordinary.invoke()
   }
 
   private fun Project.filterAcceptable(): Project? = takeIf { !it.isDefault && it !is DummyProject }
@@ -129,10 +130,14 @@ object MavenEelUtil {
   }
 
   fun EelApi.findMavenDistribution(): MavenInSpecificPath? {
-    return tryMavenRootFromEnvironment()
-           ?: fs.tryMavenRoot("/usr/share/maven")
-           ?: fs.tryMavenRoot("/usr/share/maven2")
-           ?: tryMavenFromPath()
+    return runCatching {
+      tryMavenRootFromEnvironment()
+      ?: fs.tryMavenRoot("/usr/share/maven")
+      ?: fs.tryMavenRoot("/usr/share/maven2")
+      ?: tryMavenFromPath()
+    }.getOrLogException {
+      MavenLog.LOG.error("Unable to resolve a Maven distribution. An error occurred", it)
+    }
   }
 
   @JvmStatic
@@ -422,7 +427,7 @@ object MavenEelUtil {
   ) {
     project.service<CoroutineService>().coroutineScope.launch(Dispatchers.IO) {
       withBackgroundProgress(project, MavenProjectBundle.message("wsl.jdk.searching"), cancellable = false) {
-        val eel = project.getEelDescriptor().upgrade()
+        val eel = project.getEelDescriptor().toEelApi()
         val sdkPath = service<JdkFinder>().suggestHomePaths(project).firstOrNull()
         if (sdkPath != null) {
           edtWriteAction {
@@ -484,26 +489,22 @@ object MavenEelUtil {
   }
 
   private fun EelApi.tryMavenFromPath(): MavenInSpecificPath? {
-    val path = runBlockingMaybeCancellable { exec.where("mvn") } ?: return null
-    val mavenHome = path.asNioPathOrNull()?.parent?.parent?.toString() ?: return null
+    val eelPath = runBlockingMaybeCancellable { exec.where("mvn") } ?: return null
+    val mavenHome = eelPath.parent?.parent ?: return null
     return fs.tryMavenRoot(mavenHome)
   }
 
   private fun EelFileSystemApi.tryMavenRoot(path: String): MavenInSpecificPath? {
+    return tryMavenRoot(getPath(path))
+  }
+
+  private fun EelFileSystemApi.tryMavenRoot(path: EelPath): MavenInSpecificPath? {
+    val home = path.asNioPath()
     // we want to prevent paths like "\\wsl.localhost\Ubuntu\mnt\c\Something\something" from being leaked into the execution
-    if (!path.isActualPathString()) {
-      return null
-    }
-    val home = getPath(path).asNioPath()
-    if (isValidMavenHome(home)) {
+    if (isValidMavenHome(home) && home == getActualPath(home)) {
       MavenLog.LOG.debug("Maven home found at $path")
       return MavenInSpecificPath(home)
     }
     return null
-  }
-
-  private fun String.isActualPathString(): Boolean {
-    val path = Path.of(this)
-    return path == getActualPath(path)
   }
 }

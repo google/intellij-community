@@ -22,10 +22,7 @@ import com.intellij.openapi.actionSystem.impl.Utils.operationName
 import com.intellij.openapi.actionSystem.toolbarLayout.RIGHT_ALIGN_KEY
 import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
 import com.intellij.openapi.actionSystem.toolbarLayout.autoLayoutStrategy
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.asContextElement
+import com.intellij.openapi.application.*
 import com.intellij.openapi.application.impl.InternalUICustomization
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
@@ -295,10 +292,17 @@ open class ActionToolbarImpl @JvmOverloads constructor(
       updateActionsImmediately()
     }
     else {
-      if (myUpdateOnFirstShowJob != null) return
+      if (myUpdateOnFirstShowJob != null) {
+        return
+      }
+
       launchOnceOnShow("ActionToolbarImpl.updateActionsOnAdd") {
-        withContext(Dispatchers.EDT) {
-          updateActionsFirstTime()
+        withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+          // a first update really
+          if (myForcedUpdateRequested && myLastUpdate == null) {
+            @Suppress("DEPRECATION")
+            (updateActionsImmediately())
+          }
         }
       }.apply {
         myUpdateOnFirstShowJob = this
@@ -306,13 +310,6 @@ open class ActionToolbarImpl @JvmOverloads constructor(
           myUpdateOnFirstShowJob = null
         }
       }
-    }
-  }
-
-  fun updateActionsFirstTime() {
-    if (myForcedUpdateRequested && myLastUpdate == null) { // a first update really
-      @Suppress("DEPRECATION")
-      updateActionsImmediately()
     }
   }
 
@@ -1096,9 +1093,21 @@ open class ActionToolbarImpl @JvmOverloads constructor(
     return true
   }
 
-  // don't call getPreferredSize for "best parent" if it isn't popup or lightweight hint
+  /**
+   * Automatic container window size adjustment is performed only if:
+   * 
+   * - the window is a popup or a lightweight hint;
+   * - and fast track actions update is not suppressed.
+   * 
+   * Fast track action update is normally enabled for regular toolbars inside popups
+   * but it's usually suppressed for toolbars of a "floating" nature,
+   * and for such toolbars size adjustment can create UI bugs like IJPL-187340,
+   * when the popup is resized over and over again every time the toolbar is shown.
+   */
   private fun skipSizeAdjustments(): Boolean {
-    return PopupUtil.getPopupContainerFor(this) == null && getParentLightweightHintComponent(this) == null
+    return (PopupUtil.getPopupContainerFor(this) == null &&
+            getParentLightweightHintComponent(this) == null) ||
+           ClientProperty.isTrue(this, SUPPRESS_FAST_TRACK)
   }
 
   private fun adjustContainerWindowSize(

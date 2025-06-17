@@ -3,6 +3,7 @@ package com.intellij.platform.searchEverywhere.providers.topHit
 
 import com.intellij.ide.actions.ActivateToolWindowAction
 import com.intellij.ide.actions.searcheverywhere.TopHitSEContributor
+import com.intellij.ide.ui.SerializableTextChunk
 import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.ui.search.BooleanOptionDescription
 import com.intellij.ide.ui.search.OptionDescription
@@ -13,7 +14,10 @@ import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager.Companion.getInstance
-import com.intellij.platform.searchEverywhere.*
+import com.intellij.platform.searchEverywhere.SeActionItemPresentation
+import com.intellij.platform.searchEverywhere.SeItemPresentation
+import com.intellij.platform.searchEverywhere.SeOptionActionItemPresentation
+import com.intellij.platform.searchEverywhere.SeSimpleItemPresentation
 import com.intellij.ui.Changeable
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.scale.JBUIScale
@@ -63,7 +67,7 @@ object SeTopHitItemPresentationProvider {
             }
 
           if (item is BooleanOptionDescription) {
-            SeOptionActionItemPresentation(SeActionItemPresentation.Common(text + " TOP_HIT", _switcherState = item.isOptionEnabled),
+            SeOptionActionItemPresentation(SeActionItemPresentation.Common(text, _switcherState = item.isOptionEnabled),
                                            isBooleanOption = true)
           }
           else SeSimpleItemPresentation(iconId = EmptyIcon.ICON_16.rpcId(),

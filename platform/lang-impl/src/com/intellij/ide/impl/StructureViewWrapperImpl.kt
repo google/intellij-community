@@ -56,6 +56,7 @@ import com.intellij.util.PlatformUtils
 import com.intellij.util.cancelOnDispose
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.messages.Topic
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.TimerUtil
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.*
@@ -129,9 +130,11 @@ class StructureViewWrapperImpl(
       override fun stateChanged(toolWindowManager: ToolWindowManager, toolWindow: ToolWindow, changeType: ToolWindowManagerEventType) {
         if (toolWindow !== myToolWindow) return
         when (changeType) {
+          ToolWindowManagerEventType.ActivateToolWindow,
           ToolWindowManagerEventType.ShowToolWindow -> loggedRun("update file") { checkUpdate() }
           ToolWindowManagerEventType.HideToolWindow -> if (!project.isDisposed) {
             myFile = null
+            myFirstRun = true
             rebuildNow("clear a structure on hide")
           }
           else -> {}
@@ -237,7 +240,10 @@ class StructureViewWrapperImpl(
           myFirstRun = false
 
           coroutineScope.launch {
-            if (file != null) {
+            if (!myToolWindow.isVisible) {
+              return@launch
+            }
+            else if (file != null) {
               setFile(file)
             }
             else if (firstRun) {
@@ -479,7 +485,7 @@ class StructureViewWrapperImpl(
       if (myModuleStructureComponent == null && myStructureView == null) {
         val panel: JBPanelWithEmptyText = object : JBPanelWithEmptyText() {
           override fun getBackground(): Color {
-            return UIUtil.getTreeBackground()
+            return JBUI.CurrentTheme.ToolWindow.background()
           }
         }
         panel.emptyText.setText(LangBundle.message("panel.empty.text.no.structure"))
@@ -547,7 +553,7 @@ class StructureViewWrapperImpl(
 
   private fun createContentPanel(component: JComponent): ContentPanel {
     val panel = ContentPanel()
-    panel.background = UIUtil.getTreeBackground()
+    panel.background = JBUI.CurrentTheme.ToolWindow.background()
     panel.add(component, BorderLayout.CENTER)
     return panel
   }

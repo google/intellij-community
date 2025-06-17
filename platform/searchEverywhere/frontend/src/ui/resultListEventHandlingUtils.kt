@@ -51,27 +51,34 @@ fun SeResultList.handleEvent(event: SeResultEvent) {
       }
     }
     is SeResultReplacedEvent -> {
-      val index = firstIndexOrNull(true) { event.oldItemData == it }
-                  ?: if (ApplicationManager.getApplication().isInternal) {
-                    error("Item ${event.oldItemData} is not found in the list")
-                  }
-                  else null
+      val indexes = event.uuidsToReplace.mapNotNull { uuidToReplace ->
+        firstIndexOrNull(true) { uuidToReplace == it.uuid }
+        ?: if (ApplicationManager.getApplication().isInternal) {
+          error("Item with UUID = ${uuidToReplace} is not found in the list")
+        }
+        else null
+      }.sorted()
 
-      index?.takeIf { it >= frozenCount }?.let { indexToRemove ->
-        removeRow(indexToRemove)
-        // Replace item and keep the same index for now
-        val index = indexToRemove
-        addRow(index, SeResultListItemRow(event.newItemData))
+      var wasAdded = false
+      indexes.forEach { index ->
+        removeRow(index)
+        if (!wasAdded) {
+          addRow(index, SeResultListItemRow(event.newItemData))
+          wasAdded = true
+        }
+      }
+
+      if (!wasAdded) {
+        addRow(lastIndexToInsertItem, SeResultListItemRow(event.newItemData))
       }
     }
-    is SeResultSkippedEvent -> null
   }
 }
 
 private fun SeResultList.indexToAdd(newItem: SeItemData): Int {
   return firstIndexOrNull(false) { item ->
-    val newItemProviderPriority = SeResultList.Companion.prioritizedProvidersPriorities[newItem.providerId] ?: 0
-    val itemProviderPriority = SeResultList.Companion.prioritizedProvidersPriorities[item.providerId] ?: 0
+    val newItemProviderPriority = SeResultList.prioritizedProvidersPriorities[newItem.providerId] ?: 0
+    val itemProviderPriority = SeResultList.prioritizedProvidersPriorities[item.providerId] ?: 0
 
     if (newItemProviderPriority == itemProviderPriority) {
       newItem.weight > item.weight

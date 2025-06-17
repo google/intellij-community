@@ -23,6 +23,9 @@
   ]]></description>
 
   <dependencies>
+    <module name="intellij.libraries.lucene.common"/>
+    <module name="intellij.libraries.ai.grazie.spell.gec.engine.local"/>
+    <module name="intellij.spellchecker"/>
     <module name="intellij.platform.vcs.impl"/>
   </dependencies>
 
@@ -105,6 +108,8 @@
                     dynamic="true">
       <with attribute="implementationClass" implements="com.intellij.grazie.text.ProblemFilter"/>
     </extensionPoint>
+    <extensionPoint qualifiedName="com.intellij.grazie.proofreadSettingsExtension" interface="com.intellij.openapi.options.Configurable"
+                    dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.grazie.textChecker" interface="com.intellij.grazie.text.TextChecker"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.grazie.disableChecking"
@@ -112,8 +117,7 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.grazie.textContentModificationTrackerProvider"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
-                    dynamic="true"
-    >
+                    dynamic="true">
       <with attribute="implementationClass" implements="com.intellij.grazie.text.TextContentModificationTrackerProvider"/>
     </extensionPoint>
   </extensionPoints>

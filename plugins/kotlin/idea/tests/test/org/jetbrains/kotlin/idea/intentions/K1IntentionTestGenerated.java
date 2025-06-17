@@ -2864,6 +2864,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithReturnsAndEmptyLines.kt");
                 }
 
+                @TestMetadata("ifWithSmartCast.kt")
+                public void testIfWithSmartCast() throws Exception {
+                    runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithSmartCast.kt");
+                }
+
                 @TestMetadata("ifWithoutElse.kt")
                 public void testIfWithoutElse() throws Exception {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithoutElse.kt");
@@ -6792,50 +6797,6 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("val.kt")
         public void testVal() throws Exception {
             runTest("testData/intentions/convertLateinitPropertyToNullable/val.kt");
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("testData/intentions/convertLazyPropertyToOrdinary")
-    public static class ConvertLazyPropertyToOrdinary extends AbstractK1IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K1;
-        }
-
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-        }
-
-        @TestMetadata("comment.kt")
-        public void testComment() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/comment.kt");
-        }
-
-        @TestMetadata("multiStatement.kt")
-        public void testMultiStatement() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/multiStatement.kt");
-        }
-
-        @TestMetadata("noStatement.kt")
-        public void testNoStatement() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/noStatement.kt");
-        }
-
-        @TestMetadata("singleStatement.kt")
-        public void testSingleStatement() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/singleStatement.kt");
-        }
-
-        @TestMetadata("singleStatement2.kt")
-        public void testSingleStatement2() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/singleStatement2.kt");
-        }
-
-        @TestMetadata("var.kt")
-        public void testVar() throws Exception {
-            runTest("testData/intentions/convertLazyPropertyToOrdinary/var.kt");
         }
     }
 
@@ -15078,6 +15039,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/movePropertyToConstructor/local.kt");
         }
 
+        @TestMetadata("localClass.kt")
+        public void testLocalClass() throws Exception {
+            runTest("testData/intentions/movePropertyToConstructor/localClass.kt");
+        }
+
         @TestMetadata("map.kt")
         public void testMap() throws Exception {
             runTest("testData/intentions/movePropertyToConstructor/map.kt");
@@ -16649,35 +16615,6 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("notApplicable_parameterExplicitlyNamedIt.kt")
         public void testNotApplicable_parameterExplicitlyNamedIt() throws Exception {
             runTest("testData/intentions/replaceItWithExplicitFunctionLiteralParam/notApplicable_parameterExplicitlyNamedIt.kt");
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("testData/intentions/replaceMapGetOrDefault")
-    public static class ReplaceMapGetOrDefault extends AbstractK1IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K1;
-        }
-
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-        }
-
-        @TestMetadata("inExpression.kt")
-        public void testInExpression() throws Exception {
-            runTest("testData/intentions/replaceMapGetOrDefault/inExpression.kt");
-        }
-
-        @TestMetadata("nullableValue.kt")
-        public void testNullableValue() throws Exception {
-            runTest("testData/intentions/replaceMapGetOrDefault/nullableValue.kt");
-        }
-
-        @TestMetadata("simple.kt")
-        public void testSimple() throws Exception {
-            runTest("testData/intentions/replaceMapGetOrDefault/simple.kt");
         }
     }
 

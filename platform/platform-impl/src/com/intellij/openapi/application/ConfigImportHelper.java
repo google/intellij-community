@@ -18,6 +18,7 @@ import com.intellij.openapi.application.impl.ApplicationInfoImpl;
 import com.intellij.openapi.application.migrations.JpaBuddyMigration242;
 import com.intellij.openapi.application.migrations.NotebooksMigration242;
 import com.intellij.openapi.application.migrations.PythonProMigration242;
+import com.intellij.openapi.application.migrations.SpaceMigration252;
 import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
@@ -608,10 +609,25 @@ public final class ConfigImportHelper {
     return findConfigDirectories(newConfigDir, null, List.of());
   }
 
+  @ApiStatus.Internal
+  public static @Nullable FileTime getConfigLastModifiedTime(@NotNull Path configDir) {
+    FileTime max = null;
+    for (String name : OPTIONS) {
+      try {
+        FileTime cur = Files.getLastModifiedTime(configDir.resolve(name));
+        if (max == null || cur.compareTo(max) > 0) {
+          max = cur;
+        }
+      }
+      catch (IOException ignore) { }
+    }
+    return max;
+  }
+
   @VisibleForTesting
   public static @NotNull ConfigDirsSearchResult findConfigDirectories(@NotNull Path newConfigDir,
-                                                               @Nullable ConfigImportSettings settings,
-                                                               @NotNull List<String> otherProductPrefixes) {
+                                                                      @Nullable ConfigImportSettings settings,
+                                                                      @NotNull List<String> otherProductPrefixes) {
     // looking for existing config directories ...
     Set<Path> homes = new HashSet<>();
     homes.add(newConfigDir.getParent());  // ... in the vicinity of the new config directory
@@ -685,17 +701,7 @@ public final class ConfigImportHelper {
       Path candidate = child, config = child.resolve(CONFIG);
       if (Files.isDirectory(config)) candidate = config;
 
-      FileTime max = null;
-      for (String name : OPTIONS) {
-        try {
-          FileTime cur = Files.getLastModifiedTime(candidate.resolve(name));
-          if (max == null || cur.compareTo(max) > 0) {
-            max = cur;
-          }
-        }
-        catch (IOException ignore) { }
-      }
-
+      FileTime max = getConfigLastModifiedTime(candidate);
       lastModified.add(new Pair<>(candidate, max != null ? max : FileTime.fromMillis(0)));
     }
 
@@ -1204,6 +1210,7 @@ public final class ConfigImportHelper {
     new PythonProMigration242().migratePlugins(options);
     new NotebooksMigration242().migratePlugins(options);
     new JpaBuddyMigration242().migratePlugins(options);
+    new SpaceMigration252().migratePlugins(options);
   }
 
   private static void migrateGlobalPlugins(Path newConfigDir,

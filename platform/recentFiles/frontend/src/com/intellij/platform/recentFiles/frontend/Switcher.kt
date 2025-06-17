@@ -11,6 +11,7 @@ import com.intellij.ide.util.gotoByName.QuickSearchComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.service
@@ -20,7 +21,6 @@ import com.intellij.openapi.fileEditor.impl.EditorWindow
 import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl
 import com.intellij.openapi.fileEditor.impl.getOpenMode
 import com.intellij.openapi.keymap.KeymapUtil
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.LightEditActionFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
@@ -39,6 +39,7 @@ import com.intellij.platform.recentFiles.frontend.SwitcherLogger.NAVIGATED_ORIGI
 import com.intellij.platform.recentFiles.frontend.SwitcherLogger.SHOWN_TIME_ACTIVITY
 import com.intellij.platform.recentFiles.frontend.SwitcherSpeedSearch.Companion.installOn
 import com.intellij.platform.recentFiles.frontend.model.FrontendRecentFilesModel
+import com.intellij.platform.recentFiles.shared.FileChangeKind
 import com.intellij.platform.recentFiles.shared.FileSwitcherApi
 import com.intellij.platform.recentFiles.shared.RecentFileKind
 import com.intellij.platform.recentFiles.shared.RecentFilesBackendRequest
@@ -81,7 +82,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private const val ACTION_PLACE = "Switcher"
 
-object Switcher : BaseSwitcherAction(null) {
+object Switcher : BaseSwitcherAction(null), ActionRemoteBehaviorSpecification.Frontend {
   @ApiStatus.Internal
   val SWITCHER_KEY: Key<SwitcherPanel> = Key.create("SWITCHER_KEY")
 
@@ -475,7 +476,7 @@ object Switcher : BaseSwitcherAction(null) {
         else -> RecentFileKind.RECENTLY_OPENED
       }
       if (filesToHide.isNotEmpty()) {
-        frontendModel.applyFrontendChanges(currentlyShownFileType, filesToHide.mapNotNull { it.virtualFile }, false)
+        frontendModel.applyFrontendChanges(currentlyShownFileType, filesToHide.mapNotNull { it.virtualFile }, FileChangeKind.REMOVED)
       }
     }
 
@@ -605,9 +606,7 @@ object Switcher : BaseSwitcherAction(null) {
         }
         val event = AnActionEvent.createEvent(dataContext, gotoAction.templatePresentation.clone(),
                                               ACTION_PLACE, ActionUiKind.NONE, e)
-        blockingContext {
-          ActionUtil.performAction(gotoAction, event)
-        }
+        ActionUtil.performAction(gotoAction, event)
       }
     }
 

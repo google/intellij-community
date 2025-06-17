@@ -5,11 +5,7 @@ PyFile:ExtendedSlices.py
         PsiElement(Py:IDENTIFIER)('d')
       PsiElement(Py:LBRACKET)('[')
       PySliceItem
-        PyEmptyExpression
-          <empty list>
         PsiElement(Py:COLON)(':')
-        PyEmptyExpression
-          <empty list>
         PsiElement(Py:COLON)(':')
       PsiElement(Py:RBRACKET)(']')
   PsiWhiteSpace('\n')
@@ -22,8 +18,6 @@ PyFile:ExtendedSlices.py
         PyNumericLiteralExpression
           PsiElement(Py:INTEGER_LITERAL)('1')
         PsiElement(Py:COLON)(':')
-        PyEmptyExpression
-          <empty list>
         PsiElement(Py:COLON)(':')
         PyNumericLiteralExpression
           PsiElement(Py:INTEGER_LITERAL)('2')
@@ -52,8 +46,6 @@ PyFile:ExtendedSlices.py
         PyNumericLiteralExpression
           PsiElement(Py:INTEGER_LITERAL)('0')
         PsiElement(Py:COLON)(':')
-        PyEmptyExpression
-          <empty list>
       PsiElement(Py:RBRACKET)(']')
   PsiWhiteSpace('\n')
   PyAssignmentStatement
@@ -61,26 +53,27 @@ PyFile:ExtendedSlices.py
       PyReferenceExpression: d
         PsiElement(Py:IDENTIFIER)('d')
       PsiElement(Py:LBRACKET)('[')
-      PySliceItem
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('1')
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('2')
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('3')
-      PsiElement(Py:COMMA)(',')
-      PsiWhiteSpace(' ')
-      PySliceItem
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('1')
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('2')
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('3')
+      PyTupleExpression
+        PySliceItem
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('1')
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('2')
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('3')
+        PsiElement(Py:COMMA)(',')
+        PsiWhiteSpace(' ')
+        PySliceItem
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('1')
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('2')
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('3')
       PsiElement(Py:RBRACKET)(']')
     PsiWhiteSpace(' ')
     PsiElement(Py:EQ)('=')
@@ -93,34 +86,30 @@ PyFile:ExtendedSlices.py
       PyReferenceExpression: d
         PsiElement(Py:IDENTIFIER)('d')
       PsiElement(Py:LBRACKET)('[')
-      PySliceItem
-        PyEmptyExpression
-          <empty list>
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('42')
-      PsiElement(Py:COMMA)(',')
-      PsiWhiteSpace(' ')
-      PySliceItem
-        PyNoneLiteralExpression
+      PyTupleExpression
+        PySliceItem
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('42')
+        PsiElement(Py:COMMA)(',')
+        PsiWhiteSpace(' ')
+        PyEllipsisLiteralExpression
           PsiElement(Py:DOT)('.')
           PsiElement(Py:DOT)('.')
           PsiElement(Py:DOT)('.')
-      PsiElement(Py:COMMA)(',')
-      PsiWhiteSpace(' ')
-      PySliceItem
-        PsiElement(Py:COLON)(':')
-        PyNumericLiteralExpression
-          PsiElement(Py:INTEGER_LITERAL)('24')
-        PsiElement(Py:COLON)(':')
-      PsiElement(Py:COMMA)(',')
-      PsiWhiteSpace(' ')
-      PySliceItem
+        PsiElement(Py:COMMA)(',')
+        PsiWhiteSpace(' ')
+        PySliceItem
+          PsiElement(Py:COLON)(':')
+          PyNumericLiteralExpression
+            PsiElement(Py:INTEGER_LITERAL)('24')
+          PsiElement(Py:COLON)(':')
+        PsiElement(Py:COMMA)(',')
+        PsiWhiteSpace(' ')
         PyNumericLiteralExpression
           PsiElement(Py:INTEGER_LITERAL)('24')
-      PsiElement(Py:COMMA)(',')
-      PsiWhiteSpace(' ')
-      PySliceItem
+        PsiElement(Py:COMMA)(',')
+        PsiWhiteSpace(' ')
         PyNumericLiteralExpression
           PsiElement(Py:INTEGER_LITERAL)('100')
       PsiElement(Py:RBRACKET)(']')

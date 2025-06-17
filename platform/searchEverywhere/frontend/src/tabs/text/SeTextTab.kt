@@ -13,18 +13,15 @@ import com.intellij.platform.searchEverywhere.frontend.SeFilterEditor
 import com.intellij.platform.searchEverywhere.frontend.SeTab
 import com.intellij.platform.searchEverywhere.frontend.resultsProcessing.SeTabDelegate
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 class SeTextTab(private val delegate: SeTabDelegate) : SeTab {
   override val name: String get() = FindBundle.message("search.everywhere.group.name")
   override val shortName: String get() = name
-  override val id: String get() = "TextSearchContributor"
+  override val id: String get() = ID
 
-  override fun getItems(params: SeParams): Flow<SeResultEvent> =
-    if (params.inputQuery.isEmpty()) emptyFlow()
-    else delegate.getItems(params)
+  override fun getItems(params: SeParams): Flow<SeResultEvent> = delegate.getItems(params)
 
   override suspend fun getFilterEditor(): SeFilterEditor? = null
 
@@ -32,7 +29,7 @@ class SeTextTab(private val delegate: SeTabDelegate) : SeTab {
     return delegate.itemSelected(item, modifiers, searchText)
   }
 
-  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo? {
+  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo {
     return SeEmptyResultInfoProvider(getFilterEditor(),
                                      delegate.getProvidersIds(),
                                      delegate.canBeShownInFindResults()).getEmptyResultInfo(delegate.project, context)
@@ -40,5 +37,10 @@ class SeTextTab(private val delegate: SeTabDelegate) : SeTab {
 
   override fun dispose() {
     Disposer.dispose(delegate)
+  }
+
+  companion object {
+    @ApiStatus.Internal
+    const val ID: String = "TextSearchContributor"
   }
 }

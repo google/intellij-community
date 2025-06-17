@@ -4,19 +4,21 @@ package com.intellij.ide.plugins.newui;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.IdeBundle;
 import com.intellij.ide.plugins.*;
+import com.intellij.ide.plugins.marketplace.PrepareToUninstallResult;
+import com.intellij.ide.plugins.newui.buttons.OptionButton;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.ui.components.JBOptionButton;
 import com.intellij.util.Producer;
-import com.intellij.util.ui.UIUtil;
 import com.intellij.xml.util.XmlStringUtil;
+import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -29,19 +31,19 @@ import static com.intellij.util.containers.ContainerUtil.*;
 
 abstract class SelectionBasedPluginModelAction<C extends JComponent> extends DumbAwareAction {
 
-  protected final @NotNull PluginModelFacade pluginModelFacade;
+  protected final @NotNull PluginModelFacade myPluginModelFacade;
   protected final boolean myShowShortcut;
   private final @NotNull List<? extends C> mySelection;
   private final @NotNull Function<? super C, PluginUiModel> myPluginDescriptorGetter;
 
   protected SelectionBasedPluginModelAction(@NotNull @Nls String text,
-                                            @NotNull PluginModelFacade pluginModel,
+                                            @NotNull PluginModelFacade pluginModelFacade,
                                             boolean showShortcut,
                                             @NotNull List<? extends C> selection,
                                             @NotNull Function<? super C, PluginUiModel> pluginModelGetter) {
     super(text);
 
-    pluginModelFacade = pluginModel;
+    myPluginModelFacade = pluginModelFacade;
     myShowShortcut = showShortcut;
     mySelection = selection;
     myPluginDescriptorGetter = pluginModelGetter;
@@ -74,14 +76,14 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
     private final @NotNull PluginEnableDisableAction myAction;
     private final @NotNull Runnable myOnFinishAction;
 
-    EnableDisableAction(@NotNull PluginModelFacade pluginModel,
+    EnableDisableAction(@NotNull PluginModelFacade pluginModelFacade,
                         @NotNull PluginEnableDisableAction action,
                         boolean showShortcut,
                         @NotNull List<? extends C> selection,
                         @NotNull Function<? super C, PluginUiModel> pluginModelGetter,
                         @NotNull Runnable onFinishAction) {
       super(action.getPresentableText(),
-            pluginModel,
+            pluginModelFacade,
             showShortcut,
             selection,
             pluginModelGetter);
@@ -93,7 +95,7 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
     @Override
     public void update(@NotNull AnActionEvent e) {
       Collection<PluginUiModel> descriptors = getAllDescriptors();
-      List<PluginEnabledState> states = map(descriptors, pluginModelFacade::getState);
+      List<PluginEnabledState> states = map(descriptors, myPluginModelFacade::getState);
 
       boolean allEnabled = all(states, PluginEnabledState.ENABLED::equals);
       boolean isForceEnableAll = myAction == PluginEnableDisableAction.ENABLE_GLOBALLY &&
@@ -102,12 +104,11 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       boolean disabled = descriptors.isEmpty() ||
                          !all(states, myAction::isApplicable) ||
                          myAction == PluginEnableDisableAction.DISABLE_GLOBALLY &&
-                         exists(descriptors, pluginModelFacade::isPluginRequiredForProject);
+                         exists(descriptors, myPluginModelFacade::isPluginRequiredForProject);
 
       boolean enabled = !disabled;
       e.getPresentation().setEnabledAndVisible(isForceEnableAll || enabled);
-
-      if(pluginModelFacade.hasPluginRequiresUltimateButItsDisabled(descriptors)) {
+      if (UiPluginManager.getInstance().hasPluginRequiresUltimateButItsDisabled(map(descriptors, PluginUiModel::getPluginId))) {
         e.getPresentation().setEnabled(false);
       }
 
@@ -122,7 +123,7 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-      pluginModelFacade.setEnabledState(getAllDescriptors(), myAction);
+      myPluginModelFacade.setEnabledState(getAllDescriptors(), myAction);
       myOnFinishAction.run();
     }
   }
@@ -142,21 +143,20 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
     private final @NotNull Runnable myOnFinishAction;
     private final boolean myDynamicTitle;
 
-    UninstallAction(@NotNull PluginModelFacade pluginModel,
+    UninstallAction(@NotNull PluginModelFacade pluginModelFacade,
                     boolean showShortcut,
                     @NotNull JComponent uiParent,
                     @NotNull List<? extends C> selection,
-                    @NotNull Function<? super C, ? extends PluginUiModel> pluginModelGetter,
+                    @NotNull Function<? super C, PluginUiModel> pluginModelGetter,
                     @NotNull Runnable onFinishAction) {
       //noinspection unchecked
-      super(IdeBundle.message(isBundledUpdate(selection, (Function<Object, PluginUiModel>)pluginModelGetter, pluginModel)
+      super(IdeBundle.message(isBundledUpdate(selection, (Function<Object, PluginUiModel>)pluginModelGetter, pluginModelFacade)
                               ? "plugins.configurable.uninstall.bundled.update"
                               : "plugins.configurable.uninstall"),
-            pluginModel,
+            pluginModelFacade,
             showShortcut,
             selection,
-            pluginModelGetter.andThen(model -> PluginUiModel.getDescriptorOrNull(model) instanceof IdeaPluginDescriptorImpl ?
-                                               model : null));
+            pluginModelGetter);
 
       myUiParent = uiParent;
       myOnFinishAction = onFinishAction;
@@ -165,13 +165,12 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
 
     private static boolean isBundledUpdate(@NotNull List<?> selection, Function<Object, @Nullable PluginUiModel> pluginDescriptor,
                                            @NotNull PluginModelFacade pluginModelFacade) {
-      for (Object o : selection) {
-        PluginUiModel uiModel = pluginDescriptor.apply(o);
-        if (!pluginModelFacade.isBundledUpdate(uiModel)) {
-          return false;
-        }
-      }
-      return true;
+      List<PluginId> pluginIds = StreamEx.of(selection)
+        .map(pluginDescriptor)
+        .filter(Objects::nonNull)
+        .map(PluginUiModel::getPluginId)
+        .toList();
+      return UiPluginManager.getInstance().isBundledUpdate(pluginIds);
     }
 
     @Override
@@ -179,15 +178,16 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       Collection<PluginUiModel> descriptors = getAllDescriptors();
 
       if (myDynamicTitle) {
+        PluginId id = descriptors.iterator().next().getPluginId();
         e.getPresentation().setText(IdeBundle.message(
-          descriptors.size() == 1 && pluginModelFacade.isBundledUpdate(descriptors.iterator().next())
+          descriptors.size() == 1 && UiPluginManager.getInstance().isBundledUpdate(Collections.singletonList(id))
           ? "plugins.configurable.uninstall.bundled.update"
           : "plugins.configurable.uninstall"));
       }
 
       boolean disabled = descriptors.isEmpty() ||
                          exists(descriptors, PluginUiModel::isBundled) ||
-                         exists(descriptors, pluginModelFacade::isUninstalled);
+                         exists(descriptors, it -> myPluginModelFacade.isUninstalled(it.getPluginId()));
       e.getPresentation().setEnabledAndVisible(!disabled);
 
       setShortcutSet(SHORTCUT_SET, myShowShortcut);
@@ -205,15 +205,16 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       List<PluginUiModel> toDeleteWithAsk = new ArrayList<>();
       List<PluginUiModel> toDelete = new ArrayList<>();
 
-      Map<PluginUiModel, List<PluginUiModel>> dependentsMap = pluginModelFacade.getDependents(selection.values());
+      List<PluginId> pluginIds = map(selection.values(), PluginUiModel::getPluginId);
+      PrepareToUninstallResult prepareToUninstallResult = UiPluginManager.getInstance().prepareToUninstall(pluginIds);
       for (Map.Entry<C, PluginUiModel> entry : selection.entrySet()) {
         PluginUiModel model = entry.getValue();
-        List<PluginUiModel> dependents = dependentsMap.get(model);
+        List<String> dependents = prepareToUninstallResult.getDependants().get(model.getPluginId());
         if (dependents.isEmpty()) {
           toDeleteWithAsk.add(model);
         }
         else {
-          boolean bundledUpdate = pluginModelFacade.isBundledUpdate(model);
+          boolean bundledUpdate = prepareToUninstallResult.isPluginBundled(model.getPluginId());
           if (askToUninstall(getUninstallDependentsMessage(model, dependents, bundledUpdate), entry.getKey(), bundledUpdate)) {
             toDelete.add(model);
           }
@@ -223,17 +224,18 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       boolean runFinishAction = false;
 
       if (!toDeleteWithAsk.isEmpty()) {
-        boolean bundledUpdate = toDeleteWithAsk.size() == 1 && pluginModelFacade.isBundledUpdate(toDeleteWithAsk.get(0));
+        boolean bundledUpdate = toDeleteWithAsk.size() == 1
+                                && prepareToUninstallResult.isPluginBundled(toDeleteWithAsk.get(0).getPluginId());
         if (askToUninstall(getUninstallAllMessage(toDeleteWithAsk, bundledUpdate), myUiParent, bundledUpdate)) {
           for (PluginUiModel descriptor : toDeleteWithAsk) {
-            pluginModelFacade.uninstallAndUpdateUi(descriptor);
+            myPluginModelFacade.uninstallAndUpdateUi(descriptor);
           }
           runFinishAction = true;
         }
       }
 
       for (PluginUiModel descriptor : toDelete) {
-        pluginModelFacade.uninstallAndUpdateUi(descriptor);
+        myPluginModelFacade.uninstallAndUpdateUi(descriptor);
       }
 
       if (runFinishAction || !toDelete.isEmpty()) {
@@ -251,10 +253,10 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
     }
 
     private static @NotNull @Nls String getUninstallDependentsMessage(@NotNull PluginUiModel descriptor,
-                                                                      @NotNull List<PluginUiModel> dependents,
+                                                                      @NotNull List<String> dependents,
                                                                       boolean bundledUpdate) {
       String listOfDeps = join(dependents,
-                               plugin -> "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + plugin.getName(),
+                               plugin -> "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + plugin,
                                "<br>");
       String message = IdeBundle.message("dialog.message.following.plugin.depend.on",
                                          dependents.size(),
@@ -345,7 +347,15 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       AnActionEvent event = AnActionEvent.createFromDataContext("", presentation, DataContext.EMPTY_CONTEXT);
 
       myEnableAction.update(event);
-      myCurrentAction = presentation.isEnabledAndVisible() ? myEnableAction : myDisableAction;
+      boolean isEnableAction = presentation.isEnabledAndVisible();
+      myCurrentAction = isEnableAction ? myEnableAction : myDisableAction;
+
+      if (!isEnableAction) {
+        myDisableAction.update(event);
+        if (!presentation.isEnabledAndVisible()) {
+          myCurrentAction = myEnableAction;
+        }
+      }
 
       String text = myCurrentAction.getTemplateText();
       button.getAction().putValue(Action.NAME, text);
@@ -357,41 +367,17 @@ abstract class SelectionBasedPluginModelAction<C extends JComponent> extends Dum
       myUninstallButton.putValue(Action.NAME, presentation.getText());
     }
 
+    public void setOptions(List<AnAction> options) {
+      button.setOptions(options);
+    }
+
+    public void setText(@Nls String text) {
+      button.getAction().putValue(Action.NAME, text);
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
       myCurrentAction.actionPerformed(AnActionEvent.createFromDataContext("", null, DataContext.EMPTY_CONTEXT));
-    }
-  }
-
-  private static final class OptionButton extends JBOptionButton {
-    private final JButton myBaseline = new JButton();
-
-    OptionButton() {
-      super(null, null);
-
-      setAddSeparator(false);
-      setSelectFirstItem(false);
-      setPopupBackgroundColor(UIUtil.getListBackground());
-      setShowPopupYOffset(-2);
-
-      setPopupHandler(popup -> {
-        Dimension size = new Dimension(popup.getSize());
-        Insets insets = getInsets();
-        int oldWidth = size.width;
-        int newWidth = getWidth() - insets.left - insets.right;
-        if (oldWidth <= newWidth || newWidth / (double)oldWidth > 0.85) {
-          size.width = newWidth;
-        }
-        popup.setSize(size);
-        return null;
-      });
-    }
-
-    @Override
-    public int getBaseline(int width, int height) {
-      myBaseline.setText(getText());
-      myBaseline.setSize(getSize());
-      return myBaseline.getBaseline(width, height);
     }
   }
 }

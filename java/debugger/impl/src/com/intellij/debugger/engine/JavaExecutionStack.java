@@ -149,7 +149,7 @@ public class JavaExecutionStack extends XExecutionStack {
   }
 
   public @NotNull List<XStackFrame> createStackFrames(@NotNull StackFrameProxyImpl stackFrameProxy) {
-    return createFrames(new StackFrameDescriptorImpl(stackFrameProxy, myTracker));
+    return createFrames(new StackFrameDescriptorImpl(myTracker, stackFrameProxy));
   }
 
   private @NotNull CompletableFuture<List<XStackFrame>> createStackFramesAsync(@NotNull StackFrameProxyImpl stackFrameProxy) {
@@ -296,6 +296,9 @@ public class JavaExecutionStack extends XExecutionStack {
       flushHiddenFrames();
       myAdded += frames.size();
       myContainer.addStackFrames(frames, last);
+      if (last) {
+        myTracker.finish();
+      }
     }
 
     private boolean addFrameIfNeeded(XStackFrame frame, boolean last) {

@@ -9,6 +9,7 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
+    "//platform/core-api:core",
     "//platform/core-impl",
     "//platform/util-class-loader:util-classLoader",
     "//platform/diagnostic",
@@ -16,6 +17,7 @@ jvm_library(
     "//platform/util-ex",
     "//platform/platform-impl/bootstrap",
     "//platform/util/xmlDom",
+    "//platform/runtime/product",
   ]
 )
 ### auto-generated section `build intellij.platform.plugins.testFramework` end

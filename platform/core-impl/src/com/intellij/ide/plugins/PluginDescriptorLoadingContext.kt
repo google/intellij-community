@@ -5,7 +5,7 @@ import com.intellij.core.CoreBundle
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorBuilder
-import com.intellij.platform.plugins.parser.impl.ReadModuleContext
+import com.intellij.platform.plugins.parser.impl.PluginDescriptorReaderContext
 import com.intellij.platform.plugins.parser.impl.elements.OS
 import com.intellij.util.xml.dom.XmlInterner
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
@@ -22,10 +22,10 @@ import java.util.function.Supplier
 @ApiStatus.Internal
 class PluginDescriptorLoadingContext(
   private val getBuildNumberForDefaultDescriptorVersion: () -> BuildNumber = { PluginManagerCore.buildNumber },
-  override val isMissingIncludeIgnored: Boolean = false,
+  private val isMissingIncludeIgnored: Boolean = false,
   @JvmField val isMissingSubDescriptorIgnored: Boolean = false,
   checkOptionalConfigFileUniqueness: Boolean = false
-) : AutoCloseable, ReadModuleContext {
+) : AutoCloseable {
   // synchronization will ruin parallel loading, so, string pool is local for thread
   private val threadLocalXmlFactory = ThreadLocal.withInitial(Supplier {
     val factory = MyXmlInterner()
@@ -36,10 +36,12 @@ class PluginDescriptorLoadingContext(
 
   private val toDispose = ConcurrentLinkedQueue<Array<MyXmlInterner?>>()
 
-  override val interner: XmlInterner
+  private val interner: XmlInterner
     get() = threadLocalXmlFactory.get()[0]!!
 
-  override val elementOsFilter: (OS) -> Boolean = { it.convert().isSuitableForOs() }
+  private val elementOsFilter: (OS) -> Boolean = { it.convert().isSuitableForOs() }
+
+  val readContext: PluginDescriptorReaderContext = ReaderContext()
 
   @Volatile
   private var defaultVersion: String? = null
@@ -93,6 +95,15 @@ class PluginDescriptorLoadingContext(
     for (ref in toDispose) {
       ref[0] = null
     }
+  }
+
+  private inner class ReaderContext : PluginDescriptorReaderContext {
+    override val interner: XmlInterner
+      get() = this@PluginDescriptorLoadingContext.interner
+    override val elementOsFilter: (OS) -> Boolean
+      get() = this@PluginDescriptorLoadingContext.elementOsFilter
+    override val isMissingIncludeIgnored: Boolean
+      get() = this@PluginDescriptorLoadingContext.isMissingIncludeIgnored
   }
 }
 

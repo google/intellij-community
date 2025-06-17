@@ -15,6 +15,8 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//java/openapi:java",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//jps/model-api:model",
     "//platform/util/jdom",
@@ -25,10 +27,7 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/workspace/jps",
   ],
-  exports = [
-    "//platform/workspace/storage",
-    "//platform/workspace/jps",
-  ],
+  exports = ["//platform/workspace/jps"],
   runtime_deps = [":java-compiler_resources"]
 )
 ### auto-generated section `build intellij.java.compiler` end

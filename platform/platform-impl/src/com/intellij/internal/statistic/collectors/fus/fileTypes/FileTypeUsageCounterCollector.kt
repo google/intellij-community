@@ -1,18 +1,15 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.internal.statistic.collectors.fus.fileTypes
 
-import com.intellij.ide.fileTemplates.FileTemplate
+import  com.intellij.ide.fileTemplates.FileTemplate
 import com.intellij.ide.fileTemplates.FileTemplateManager
 import com.intellij.ide.fileTemplates.PluginBundledTemplate
 import com.intellij.internal.statistic.eventLog.EventLogGroup
-import com.intellij.internal.statistic.eventLog.events.EventField
-import com.intellij.internal.statistic.eventLog.events.EventFields
+import com.intellij.internal.statistic.eventLog.events.*
 import com.intellij.internal.statistic.eventLog.events.EventFields.Boolean
 import com.intellij.internal.statistic.eventLog.events.EventFields.Class
 import com.intellij.internal.statistic.eventLog.events.EventFields.Enum
 import com.intellij.internal.statistic.eventLog.events.EventFields.StringValidatedByCustomRule
-import com.intellij.internal.statistic.eventLog.events.EventPair
-import com.intellij.internal.statistic.eventLog.events.VarargEventId
 import com.intellij.internal.statistic.service.fus.collectors.CounterUsagesCollector
 import com.intellij.internal.statistic.utils.getPluginInfo
 import com.intellij.internal.statistic.utils.getPluginInfoByDescriptor
@@ -23,7 +20,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorComposite
-import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.FileTypeManager   
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.DumbService.Companion.isDumb
@@ -45,14 +42,17 @@ private val LOG = Logger.getInstance(FileTypeUsageCounterCollector::class.java)
 object FileTypeUsageCounterCollector : CounterUsagesCollector() {
   override fun getGroup(): EventLogGroup = GROUP
 
-  private val GROUP = EventLogGroup("file.types.usage", 74)
+  private val GROUP = EventLogGroup("file.types.usage", 75)
 
   private val FILE_EDITOR = Class("file_editor")
   private val SCHEMA: EventField<String?> = StringValidatedByCustomRule("schema", FileTypeSchemaValidator::class.java)
   private val IS_WRITABLE: EventField<Boolean> = Boolean("is_writable")
   private val IS_PREVIEW_TAB: EventField<Boolean> = Boolean("is_preview_tab")
-  private val INCOMPLETE_DEPENDENCIES_MODE = Enum("incomplete_dependencies_mode",
-                                                  DependenciesState::class.java)
+  private val INCOMPLETE_DEPENDENCIES_MODE = Enum("incomplete_dependencies_mode", DependenciesState::class.java)
+  private val FILE_EXTENSION: StringEventField = StringValidatedByCustomRule(
+    "file_extension",
+    FileExtensionValidationRule::class.java
+  )
 
   const val FILE_NAME_PATTERN: String = "file_name_pattern"
   const val FILE_TEMPLATE_NAME: String = "file_template_name"
@@ -63,7 +63,8 @@ object FileTypeUsageCounterCollector : CounterUsagesCollector() {
                                                                                      BundledFileTemplateValidationRule::class.java)
 
   private fun registerFileTypeEvent(eventId: String, vararg extraFields: EventField<*>?): VarargEventId {
-    val baseFields = arrayOf<EventField<*>?>(EventFields.PluginInfoFromInstance, EventFields.FileType, EventFields.AnonymizedPath, SCHEMA)
+    val baseFields = arrayOf<EventField<*>?>(EventFields.PluginInfoFromInstance, EventFields.FileType, EventFields.AnonymizedPath,
+                                             SCHEMA, FILE_EXTENSION)
     return GROUP.registerVarargEvent(eventId, *ArrayUtil.mergeArrays<EventField<*>?>(baseFields, extraFields))
   }
 
@@ -195,7 +196,8 @@ object FileTypeUsageCounterCollector : CounterUsagesCollector() {
       EventFields.PluginInfoFromInstance.with(fileType),
       EventFields.FileType.with(fileType),
       EventFields.AnonymizedPath.with(file.getPath()),
-      SCHEMA.with(findSchema(project, file))
+      SCHEMA.with(findSchema(project, file)),
+      FILE_EXTENSION.with(file.extension)
     )
 
     if (!withWritable) return data

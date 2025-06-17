@@ -8,8 +8,10 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.project.Project
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.isPosix
 import com.intellij.platform.eel.path.EelPath
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
@@ -19,10 +21,12 @@ import java.nio.file.spi.FileSystemProvider
 /**
  * A service that is responsible for mapping between instances of [EelPath] and [Path]
  */
+@ApiStatus.Internal
 interface EelNioBridgeService {
 
   companion object {
     @JvmStatic
+    @RequiresBlockingContext
     fun getInstanceSync(): EelNioBridgeService = ApplicationManager.getApplication().service()
 
     @JvmStatic
@@ -70,6 +74,7 @@ interface EelNioBridgeService {
  * @throws IllegalArgumentException if the Eel API for [this] does not have a corresponding [java.nio.file.FileSystem]
  */
 @Throws(IllegalArgumentException::class)
+@ApiStatus.Internal
 fun EelPath.asNioPath(): Path =
   asNioPath(null)
 
@@ -79,6 +84,7 @@ fun EelPath.asNioPath(): Path =
  * This function helps to choose the proper root according to the base path of the project.
  */
 @Throws(IllegalArgumentException::class)
+@ApiStatus.Internal
 fun EelPath.asNioPath(project: Project?): Path {
   return asNioPathOrNull(project)
          ?: throw IllegalArgumentException("Could not convert $this to nio.Path: the corresponding provider for $descriptor is not registered in ${EelNioBridgeService::class.simpleName}")
@@ -89,9 +95,11 @@ fun EelPath.asNioPath(project: Project?): Path {
  * but they have different string representation, and some functionality is confused when `wsl.localhost` and `wsl$` are confused.
  * This function helps to choose the proper root according to the base path of the project.
  */
+@ApiStatus.Internal
 fun EelPath.asNioPathOrNull(): Path? =
   asNioPathOrNull(null)
 
+@ApiStatus.Internal
 fun EelPath.asNioPathOrNull(project: Project?): Path? {
   if (descriptor === LocalEelDescriptor) {
     return Path.of(toString())
@@ -155,6 +163,7 @@ private fun asNioPathOrNullImpl(basePath: Path?, eelRoots: Collection<Path>, sou
  * It can happen if [this] belongs to a [java.nio.file.FileSystem] that was not registered as a backend of `MultiRoutingFileSystemProvider`
  */
 @Throws(IllegalArgumentException::class)
+@ApiStatus.Internal
 fun Path.asEelPath(): EelPath {
   if (fileSystem != FileSystems.getDefault()) {
     throw IllegalArgumentException("Could not convert $this to EelPath: the path does not belong to the default NIO FileSystem")
@@ -163,7 +172,7 @@ fun Path.asEelPath(): EelPath {
   val descriptor = service.tryGetEelDescriptor(this) ?: return EelPath.parse(toString(), LocalEelDescriptor)
   val root = service.tryGetNioRoots(descriptor)?.firstOrNull { this.startsWith(it) } ?: error("unreachable") // since the descriptor is not null, the root should be as well
   val relative = root.relativize(this)
-  if (descriptor.platform is EelPlatform.Posix) {
+  if (descriptor.osFamily.isPosix) {
     return relative.fold(EelPath.parse("/", descriptor), { path, part -> path.resolve(part.toString()) })
   }
   else {
@@ -171,6 +180,7 @@ fun Path.asEelPath(): EelPath {
   }
 }
 
+@ApiStatus.Internal
 fun EelDescriptor.routingPrefixes(): Set<Path> {
   return EelNioBridgeService.getInstanceSync().tryGetNioRoots(this)
          ?: throw IllegalArgumentException("Failure of obtaining prefix: could not convert $this to EelPath. The path does not belong to the default NIO FileSystem")

@@ -6,12 +6,11 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.OrderEntry;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.EmptyQuery;
 import com.intellij.util.Query;
+import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexEx;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Set;
@@ -30,22 +29,13 @@ public abstract class DirectoryIndex {
     return project.getService(DirectoryIndex.class);
   }
 
-  public abstract @NotNull
-  Query<VirtualFile> getDirectoriesByPackageName(@NotNull String packageName, boolean includeLibrarySources);
-
   /**
-   * @return a query producing single file source root files which correspond to {@code packageName}.
+   * @deprecated use {@link WorkspaceFileIndexEx#getDirectoriesByPackageName(String, boolean)}}
    */
-  @ApiStatus.Experimental
-  public @NotNull Query<VirtualFile> getFilesByPackageName(@NotNull String packageName) {
+  @Deprecated
+  public @NotNull Query<VirtualFile> getDirectoriesByPackageName(@NotNull String packageName, boolean includeLibrarySources) {
     return EmptyQuery.getEmptyQuery();
   }
-
-  public Query<VirtualFile> getDirectoriesByPackageName(@NotNull String packageName, @NotNull GlobalSearchScope scope) {
-    return getDirectoriesByPackageName(packageName, true).filtering(scope::contains);
-  }
-
-  public abstract @Nullable String getPackageName(@NotNull VirtualFile fileOrDir);
 
   public abstract @NotNull List<OrderEntry> getOrderEntries(@NotNull VirtualFile fileOrDir);
 

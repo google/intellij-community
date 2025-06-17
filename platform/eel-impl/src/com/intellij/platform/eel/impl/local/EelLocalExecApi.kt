@@ -15,9 +15,12 @@ import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.util.EnvironmentUtil
 import com.pty4j.PtyProcess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.io.File
 import java.io.IOException
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import kotlin.io.path.*
 
@@ -28,9 +31,9 @@ class EelLocalExecPosixApi : EelExecPosixApi {
   ): EelPosixProcess {
     val process = executeImpl(generatedBuilder)
     return if (process is PtyProcess)
-      LocalEelPosixProcess(process, process::setWinSize)
+      LocalEelPosixProcess.create(process, process::setWinSize)
     else
-      LocalEelPosixProcess(process, null)
+      LocalEelPosixProcess.create(process, null)
   }
 
   override val descriptor: EelDescriptor = LocalEelDescriptor
@@ -39,6 +42,10 @@ class EelLocalExecPosixApi : EelExecPosixApi {
 
   override suspend fun findExeFilesInPath(binaryName: String): List<EelPath> =
     findExeFilesInPath(binaryName, LOG)
+
+  override suspend fun createExternalCli(options: EelExecApi.ExternalCliOptions): EelExecApi.ExternalCliEntrypoint {
+    TODO("Not yet implemented")
+  }
 
   private companion object {
     val LOG = logger<EelLocalExecPosixApi>()
@@ -52,9 +59,9 @@ class EelLocalExecWindowsApi : EelExecWindowsApi {
   ): EelWindowsProcess {
     val process = executeImpl(generatedBuilder)
     return if (process is PtyProcess)
-      LocalEelWindowsProcess(process, process::setWinSize)
+      LocalEelWindowsProcess.create(process, process::setWinSize)
     else
-      LocalEelWindowsProcess(process, null)
+      LocalEelWindowsProcess.create(process, null)
   }
 
   override val descriptor: EelDescriptor = LocalEelDescriptor
@@ -63,6 +70,10 @@ class EelLocalExecWindowsApi : EelExecWindowsApi {
 
   override suspend fun findExeFilesInPath(binaryName: String): List<EelPath> =
     findExeFilesInPath(binaryName, LOG)
+
+  override suspend fun createExternalCli(options: EelExecApi.ExternalCliOptions): EelExecApi.ExternalCliEntrypoint {
+    TODO("Not yet implemented")
+  }
 
   private companion object {
     val LOG = logger<EelLocalExecWindowsApi>()
@@ -75,7 +86,10 @@ class EelLocalExecWindowsApi : EelExecWindowsApi {
 private val errorPattern = Regex(".*error=(-?[0-9]{1,9}),.*")
 
 private fun executeImpl(builder: EelExecApi.ExecuteProcessOptions): Process {
-  val pty = builder.ptyOrStdErrSettings
+  val pty = builder.run {
+    require(interactionOptions == null || ptyOrStdErrSettings == null)
+    interactionOptions ?: (ptyOrStdErrSettings as EelExecApi.InteractionOptions?)
+  }
 
   try {
     // Inherit env vars because lack of `PATH` might break things
@@ -129,7 +143,7 @@ private fun executeImpl(builder: EelExecApi.ExecuteProcessOptions): Process {
 }
 
 
-private suspend fun findExeFilesInPath(binaryName: String, logger: Logger): List<EelPath> {
+private suspend fun findExeFilesInPath(binaryName: String, logger: Logger): List<EelPath> = withContext(Dispatchers.IO) {
   val result = if (binaryName.contains('/') || binaryName.contains('\\')) {
     val absolutePath = Path(binaryName)
     if (!absolutePath.isAbsolute) {
@@ -145,8 +159,8 @@ private suspend fun findExeFilesInPath(binaryName: String, logger: Logger): List
     }
   }
   else {
-    val pathEnvVarValue = PathEnvironmentVariableUtil.getPathVariableValue() // TODO Wrap into Dispatchers.IO?
-    val pathDirs = pathEnvVarValue?.let { getPathDirs(pathEnvVarValue) }?.map { Path(it) }.orEmpty()
+    val pathEnvVarValue = PathEnvironmentVariableUtil.getPathVariableValue()
+    val pathDirs = pathEnvVarValue?.let { getPathDirs(pathEnvVarValue) }?.mapNotNull { toPath(it, logger) }.orEmpty()
     val names = mutableListOf(binaryName)
     if (SystemInfo.isWindows) {
       names.addAll(PathEnvironmentVariableUtil.getWindowsExecutableFileExtensions().map { ext -> binaryName + ext })
@@ -164,5 +178,14 @@ private suspend fun findExeFilesInPath(binaryName: String, logger: Logger): List
       }
     }
   }
-  return result.map { EelPath.parse(it.absolutePathString(), LocalEelDescriptor) }
+  return@withContext result.map { EelPath.parse(it.absolutePathString(), LocalEelDescriptor) }
 }
+
+private fun toPath(pathStr: String, log: Logger): Path? =
+  try {
+    Path(pathStr)
+  }
+  catch (e: InvalidPathException) {
+    log.info("skipping $pathStr", e)
+    null
+  }

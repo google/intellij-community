@@ -21,6 +21,11 @@ import com.intellij.xdebugger.impl.rpc.toTextRange
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicReference
+
+internal enum class RegistrationStatus {
+  NOT_STARTED, IN_PROGRESS, REGISTERED, DEREGISTERED
+}
 
 internal class FrontendXLineBreakpointProxy(
   project: Project,
@@ -36,6 +41,8 @@ internal class FrontendXLineBreakpointProxy(
 
   private val lineBreakpointInfo: XLineBreakpointInfo
     get() = _state.value.lineBreakpointInfo!!
+
+  internal val registrationInLineManagerStatus = AtomicReference(RegistrationStatus.NOT_STARTED)
 
   override fun isTemporary(): Boolean {
     return lineBreakpointInfo.isTemporary
@@ -90,13 +97,13 @@ internal class FrontendXLineBreakpointProxy(
   }
 
   override fun setLine(line: Int) {
-    return setLine(line, true)
+    return setLine(line, visualLineMightBeChanged = true)
   }
 
-  fun setLine(line: Int, visualLineMightBeChanged: Boolean) {
-    if (getLine() != line) {
+  private fun setLine(line: Int, visualLineMightBeChanged: Boolean) {
+    val oldLine = getLine()
+    if (oldLine != line) {
       // TODO IJPL-185322 support type.lineShouldBeChanged()
-      val oldLine = getLine()
       updateLineBreakpointState { it.copy(line = line) }
       lineSourcePosition = null
       if (visualLineMightBeChanged) {
@@ -112,6 +119,13 @@ internal class FrontendXLineBreakpointProxy(
 
       project.service<FrontendXBreakpointProjectCoroutineService>().cs.launch {
         XBreakpointApi.getInstance().setLine(id, line)
+      }
+    }
+    else {
+      // offset in file might change, pass reset to backend
+      lineSourcePosition = null
+      project.service<FrontendXBreakpointProjectCoroutineService>().cs.launch {
+        XBreakpointApi.getInstance().updatePosition(id)
       }
     }
   }

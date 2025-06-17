@@ -35,7 +35,6 @@ import com.intellij.project.stateStore
 import com.intellij.psi.*
 import com.intellij.psi.impl.DebugUtil
 import com.intellij.psi.impl.PsiManagerEx
-import com.intellij.psi.impl.PsiManagerImpl
 import com.intellij.psi.impl.PsiTreeChangeEventImpl
 import com.intellij.util.FileContentUtilCore
 import one.util.streamex.StreamEx
@@ -58,12 +57,12 @@ class PsiVFSListener internal constructor(private val project: Project) {
   }
 
   private fun fileCreated(vFile: VirtualFile) {
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       val parent = vFile.parent
       val parentDir = getCachedDirectory(parent)
       if (parentDir == null) {
         handleVfsChangeWithoutPsi(vFile)
-        return@ExternalChangeAction
+        return@externalChangeAction
       }
 
       val item = if (vFile.isDirectory) fileManager.findDirectory(vFile) else fileManager.findFile(vFile)
@@ -81,12 +80,12 @@ class PsiVFSListener internal constructor(private val project: Project) {
     val vFile = event.file
 
     val parent = vFile.parent
-    // do not notify listeners if parent directory was never accessed via PSI
+    // do not notify listeners if the parent directory was never accessed via PSI
     val parentDir = getCachedDirectory(parent) ?: return
 
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       val item = (if (vFile.isDirectory) fileManager.findDirectory(vFile) else fileManager.getCachedPsiFile(vFile))
-                 ?: return@ExternalChangeAction
+                 ?: return@externalChangeAction
       val treeEvent = PsiTreeChangeEventImpl(manager)
       treeEvent.parent = parentDir
       treeEvent.child = item
@@ -125,7 +124,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
       }
       val parentDir = getCachedDirectory(parent)
       if (element != null && parentDir != null) {
-        ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+        ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
           val treeEvent = PsiTreeChangeEventImpl(manager)
           treeEvent.parent = parentDir
           treeEvent.child = element
@@ -150,17 +149,17 @@ class PsiVFSListener internal constructor(private val project: Project) {
 
     val parent = vFile.parent
     val parentDir = if (viewProvider != null && parent != null) fileManager.findDirectory(parent) else getCachedDirectory(parent)
-    // do not notifyListeners event if parent directory was never accessed via PSI
+    // do not notifyListeners event if the parent directory was never accessed via PSI
     if (parent != null && parentDir == null) {
       return
     }
 
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       val treeEvent = PsiTreeChangeEventImpl(manager)
       treeEvent.parent = parentDir
       if (propertyName == VirtualFile.PROP_NAME) {
         if (parentDir == null) {
-          return@ExternalChangeAction
+          return@externalChangeAction
         }
 
         val newName = event.newValue as String
@@ -214,7 +213,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
       }
       else if (propertyName == VirtualFile.PROP_WRITABLE) {
         // todo IJPL-339 implement proper event for multiple files
-        val psiFile = fileManager.getCachedPsiFileInner(vFile, anyContext()) ?: return@ExternalChangeAction
+        val psiFile = fileManager.getCachedPsiFileInner(vFile, anyContext()) ?: return@externalChangeAction
         treeEvent.element = psiFile
         treeEvent.propertyName = PsiTreeChangeEvent.PROP_WRITABLE
         treeEvent.oldValue = event.oldValue
@@ -261,7 +260,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
     }
 
     val fileTypeManager = FileTypeManager.getInstance()
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       val treeEvent = PsiTreeChangeEventImpl(manager)
       treeEvent.parent = parentDir
       when (propertyName) {
@@ -329,7 +328,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
         }
         VirtualFile.PROP_WRITABLE -> {
           if (oldPsiFile == null) {
-            return@ExternalChangeAction
+            return@externalChangeAction
           }
 
           treeEvent.element = oldPsiFile
@@ -340,7 +339,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
         }
         VirtualFile.PROP_ENCODING -> {
           if (oldPsiFile == null) {
-            return@ExternalChangeAction
+            return@externalChangeAction
           }
 
           treeEvent.element = oldPsiFile
@@ -362,7 +361,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
       return
     }
 
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       val treeEvent = PsiTreeChangeEventImpl(manager)
       val isExcluded = vFile.isDirectory && Registry.`is`("ide.hide.excluded.files") && myProjectRootManager.fileIndex.isExcluded(vFile)
       if (oldParentDir != null && !isExcluded) {
@@ -449,7 +448,7 @@ class PsiVFSListener internal constructor(private val project: Project) {
         continue
       }
 
-      ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+      ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
         val treeEvent = PsiTreeChangeEventImpl(manager)
         if (oldElement == null) {
           fileManager.setViewProvider(vFile, newViewProvider)
@@ -590,11 +589,11 @@ internal class PsiVFSModuleRootListener(private val listenerProject: Project) : 
     }
 
     LOG.trace { "Event is not caused by file types change" }
-    ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+    ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
       depthCounter++
       LOG.trace { "depthCounter increased $depthCounter" }
       if (depthCounter > 1) {
-        return@ExternalChangeAction
+        return@externalChangeAction
       }
 
       val psiManager = PsiManagerEx.getInstanceEx(listenerProject)
@@ -616,12 +615,12 @@ internal class PsiVFSModuleRootListener(private val listenerProject: Project) : 
 
     LOG.trace { "Event is not caused by file types change" }
     ApplicationManager.getApplication().runWriteAction(
-      ExternalChangeAction {
+      ExternalChangeActionUtil.externalChangeAction {
         depthCounter--
         LOG.trace { "depthCounter decreased $depthCounter" }
         assert(depthCounter >= 0) { "unbalanced `beforeRootsChange`/`rootsChanged`: $depthCounter" }
         if (depthCounter > 0) {
-          return@ExternalChangeAction
+          return@externalChangeAction
         }
 
         DebugUtil.performPsiModification<RuntimeException>(null) { fileManager.possiblyInvalidatePhysicalPsi() }
@@ -643,7 +642,7 @@ private class MyFileDocumentManagerListener(private val project: Project) : File
       project.service<PsiVFSListener>().handleVfsChangeWithoutPsi(file)
     }
     else {
-      ApplicationManager.getApplication().runWriteAction(ExternalChangeAction {
+      ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction {
         if (FileDocumentManagerImpl.recomputeFileTypeIfNecessary(file)) {
           fileManager.forceReload(file)
         }
@@ -657,7 +656,7 @@ private class MyFileDocumentManagerListener(private val project: Project) : File
   override fun fileContentReloaded(file: VirtualFile, document: Document) {
     val psiFile = fileManager.findCachedViewProvider(file)
     if (file.isValid && psiFile != null && file.isTooLarge() && psiFile !is PsiLargeFile) {
-      ApplicationManager.getApplication().runWriteAction(ExternalChangeAction { fileManager.reloadPsiAfterTextChange(psiFile, file) })
+      ApplicationManager.getApplication().runWriteAction(ExternalChangeActionUtil.externalChangeAction { fileManager.reloadPsiAfterTextChange(psiFile, file) })
     }
   }
 }
@@ -695,6 +694,9 @@ private fun installGlobalListener() {
 }
 
 private class PsiVfsInitProjectActivity : InitProjectActivity {
+  override val isParallelExecution: Boolean
+    get() = true
+
   override suspend fun run(project: Project) {
     val connection = project.messageBus.simpleConnect()
 
@@ -738,7 +740,7 @@ private class PsiVfsAdditionalLibraryRootListener(project: Project) : Additional
     libraryNameForDebug: String
   ) {
     ApplicationManager.getApplication().runWriteAction(
-      ExternalChangeAction {
+      ExternalChangeActionUtil.externalChangeAction {
         var treeEvent = PsiTreeChangeEventImpl(psiManager)
         treeEvent.propertyName = PsiTreeChangeEvent.PROP_ROOTS
         psiManager.beforePropertyChange(treeEvent)

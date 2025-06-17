@@ -2,14 +2,14 @@
 package git4idea.remoteApi
 
 import com.intellij.dvcs.repo.Repository
+import com.intellij.ide.vfs.rpcId
 import com.intellij.openapi.components.service
 import com.intellij.vcs.git.shared.ref.GitCurrentRef
 import com.intellij.vcs.git.shared.ref.GitFavoriteRefs
-import com.intellij.vcs.git.shared.ref.GitReferencesSet
 import com.intellij.vcs.git.shared.repo.GitHash
 import com.intellij.vcs.git.shared.repo.GitOperationState
-import com.intellij.vcs.git.shared.repo.GitRepositoryState
 import com.intellij.vcs.git.shared.rpc.GitRepositoryDto
+import com.intellij.vcs.git.shared.rpc.GitRepositoryStateDto
 import com.intellij.vcsUtil.VcsUtil
 import git4idea.GitStandardRemoteBranch
 import git4idea.branch.GitBranchType
@@ -25,23 +25,23 @@ internal object GitRepositoryToDtoConverter {
       repositoryId = repository.rpcId,
       shortName = VcsUtil.getShortVcsRootName(repository.project, repository.root),
       state = convertRepositoryState(repository),
-      favoriteRefs = collectFavorites(repository)
+      favoriteRefs = collectFavorites(repository),
+      root = repository.root.rpcId(),
     )
   }
 
-  fun convertRepositoryState(repository: GitRepository): GitRepositoryState {
-    val refsSet = GitReferencesSet(
-      repository.info.localBranchesWithHashes.keys,
-      repository.info.remoteBranchesWithHashes.keys.filterIsInstance<GitStandardRemoteBranch>().toSet(),
-      repository.tagHolder.getTags().keys,
-    )
-    return GitRepositoryState(
+  fun convertRepositoryState(repository: GitRepository): GitRepositoryStateDto {
+    val repoInfo = repository.info
+
+    return GitRepositoryStateDto(
       currentRef = GitCurrentRef.wrap(GitRefUtil.getCurrentReference(repository)),
       revision = repository.currentRevision?.let { GitHash(it) },
-      refs = refsSet,
+      localBranches = repoInfo.localBranchesWithHashes.keys,
+      remoteBranches = repoInfo.remoteBranchesWithHashes.keys.filterIsInstance<GitStandardRemoteBranch>().toSet(),
+      tags = repository.tagHolder.getTags().keys,
       recentBranches = repository.branches.recentCheckoutBranches,
       operationState = convertOperationState(repository),
-      trackingInfo = convertTrackingInfo(repository.info.branchTrackInfosMap)
+      trackingInfo = convertTrackingInfo(repoInfo.branchTrackInfosMap)
     )
   }
 

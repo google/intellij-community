@@ -36,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.intellij.modcommand.ModCommand.error;
@@ -257,6 +258,7 @@ final class PsiUpdateImpl {
     private @NotNull TextRange mySelection;
     private final List<ModHighlight.HighlightInfo> myHighlightInfos = new ArrayList<>();
     private final List<ModStartTemplate.TemplateField> myTemplateFields = new ArrayList<>();
+    private @NotNull Function<? super @NotNull PsiFile, ? extends @NotNull ModCommand> myTemplateFinishFunction = f -> nop();
     private @Nullable ModStartRename myRenameSymbol;
     private final List<ModUpdateReferences> myTrackedDeclarations = new ArrayList<>();
     private boolean myPositionUpdated = false;
@@ -399,6 +401,14 @@ final class PsiUpdateImpl {
       return TextRange.create(range);
     }
 
+    private static @NotNull TextRange templateRange(@NotNull TextRange elementRange, @Nullable TextRange rangeInElement) {
+      if (rangeInElement == null) return elementRange;
+      int start = rangeInElement.getStartOffset();
+
+      int templateStartOffset = elementRange.getStartOffset() + start;
+      return TextRange.from(templateStartOffset, rangeInElement.getLength());
+    }
+
     @Override
     public void select(@NotNull TextRange range) {
       myPositionUpdated = true;
@@ -430,25 +440,35 @@ final class PsiUpdateImpl {
       return new ModTemplateBuilder() {
         @Override
         public @NotNull ModTemplateBuilder field(@NotNull PsiElement element, @NotNull Expression expression) {
-          return createField(element, null, expression);
+          return createField(element, null, expression, null);
         }
 
         @Override
         public @NotNull ModTemplateBuilder field(@NotNull PsiElement element, @NotNull String varName, @NotNull Expression expression) {
-          return createField(element, varName, expression);
+          return createField(element, varName, expression, null);
         }
 
-        private @NotNull ModTemplateBuilder createField(@NotNull PsiElement element, @Nullable String varName, @NotNull Expression expression) {
+        @Override
+        public @NotNull ModTemplateBuilder field(@NotNull PsiElement element,
+                                                 @NotNull TextRange rangeInElement,
+                                                 @NotNull String varName,
+                                                 @NotNull Expression expression) {
+          return createField(element, varName, expression, rangeInElement);
+        }
+
+        private @NotNull ModTemplateBuilder createField(@NotNull PsiElement element, @Nullable String varName, @NotNull Expression expression,
+                                                        @Nullable TextRange rangeInElement) {
           TextRange elementRange = getRange(element);
           if (elementRange == null) {
             throw new IllegalStateException("Unable to restore element for template");
           }
-          TextRange range = mapRange(elementRange);
+          TextRange rangeForTemplate = templateRange(elementRange, rangeInElement);
+          TextRange range = mapRange(rangeForTemplate);
           Result result = expression.calculateResult(new DummyContext(range, element));
           myTemplateFields.add(new ModStartTemplate.ExpressionField(range, varName, expression));
           if (result != null) {
             FileTracker tracker = requireNonNull(myTracker); // guarded by getRange call
-            tracker.myDocument.replaceString(elementRange.getStartOffset(), elementRange.getEndOffset(), result.toString());
+            tracker.myDocument.replaceString(rangeForTemplate.getStartOffset(), rangeForTemplate.getEndOffset(), result.toString());
           }
           return this;
         }
@@ -471,6 +491,15 @@ final class PsiUpdateImpl {
         public @NotNull ModTemplateBuilder finishAt(int offset) {
           TextRange range = mapRange(TextRange.create(offset, offset));
           myTemplateFields.add(new ModStartTemplate.EndField(range));
+          return this;
+        }
+
+        @Override
+        public @NotNull ModTemplateBuilder onTemplateFinished(@NotNull Function<? super @NotNull PsiFile, ? extends @NotNull ModCommand> templateFinishFunction) {
+          if (myTemplateFields.isEmpty()) {
+            throw new IllegalStateException("Template was not created");
+          }
+          myTemplateFinishFunction = templateFinishFunction;
           return this;
         }
       };
@@ -698,7 +727,7 @@ final class PsiUpdateImpl {
 
     private @NotNull ModCommand getTemplateCommand() {
       if (myTemplateFields.isEmpty()) return nop();
-      return new ModStartTemplate(navigationFile(), myTemplateFields, f -> nop());
+      return new ModStartTemplate(navigationFile(), myTemplateFields, myTemplateFinishFunction);
     }
 
     private class DummyContext implements ExpressionContext {

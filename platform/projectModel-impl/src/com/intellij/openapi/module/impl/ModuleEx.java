@@ -7,14 +7,9 @@ import org.jetbrains.annotations.NotNull;
 
 @ApiStatus.Internal
 public interface ModuleEx extends Module {
-  default void init() {
-  }
-
   default void markAsLoaded() {
   }
 
   default void rename(@NotNull String newName, boolean notifyStorage) {
   }
-
-  void clearScopesCache();
 }

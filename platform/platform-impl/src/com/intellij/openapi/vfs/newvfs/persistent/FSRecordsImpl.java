@@ -133,8 +133,8 @@ public final class FSRecordsImpl implements Closeable {
     else {
       error.addSuppressed(records.alreadyClosedException());
     }
-    if (error instanceof IOException) {
-      throw new UncheckedIOException((IOException)error);
+    if (error instanceof IOException ioException) {
+      throw new UncheckedIOException(ioException);
     }
     ExceptionUtil.rethrow(error);
   };
@@ -592,7 +592,8 @@ public final class FSRecordsImpl implements Closeable {
     }
   }
 
-  int findOrCreateRootRecord(@NotNull String rootUrl) {
+  @VisibleForTesting
+  public int findOrCreateRootRecord(@NotNull String rootUrl) {
     checkNotClosed();
 
     //use 'update' lock even though 'read' lock would be enough -- but we don't have 'hierarchy read lock'
@@ -611,7 +612,8 @@ public final class FSRecordsImpl implements Closeable {
     }
   }
 
-  void forEachRoot(@NotNull ObjIntConsumer<? super String> rootConsumer) {
+  @VisibleForTesting
+  public void forEachRoot(@NotNull ObjIntConsumer<? super String> rootConsumer) {
     forEachRoot((rootId, rootUrlId) -> {
       String rootUrl = getNameByNameId(rootUrlId);
       rootConsumer.accept(rootUrl, rootId);
@@ -619,7 +621,8 @@ public final class FSRecordsImpl implements Closeable {
     });
   }
 
-  void forEachRoot(@NotNull PersistentFSTreeAccessor.RootsConsumer rootConsumer) {
+  @VisibleForTesting
+  public void forEachRoot(@NotNull PersistentFSTreeAccessor.RootsConsumer rootConsumer) {
     checkNotClosed();
 
     try {
@@ -1686,6 +1689,17 @@ public final class FSRecordsImpl implements Closeable {
                               @Nullable Throwable cause) {
     checkNotClosed();
     connection.scheduleVFSRebuild(diagnosticMessage, cause);
+  }
+
+  /**
+   * Mark VFS to defragment on next restart.
+   * Currently, defragmentation implementation == rebuild.
+   * The difference between this method and {@linkplain #scheduleRebuild(String, Throwable)} is that this method is not about
+   * 'rebuild VFS because it is corrupted', but 'defragment VFS because it may contain al lot of garbage' -- this is why there
+   * is no 'message' nor 'errorCause' parameters.
+   */
+  public void scheduleDefragmentation() throws IOException {
+    connection.scheduleDefragmentation();
   }
 
   /**

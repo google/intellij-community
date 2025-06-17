@@ -2,9 +2,7 @@
 package com.intellij.tools.build.bazel.jvmIncBuilder.impl;
 
 import com.intellij.tools.build.bazel.jvmIncBuilder.*;
-import com.intellij.tools.build.bazel.jvmIncBuilder.runner.CompilerDataSink;
-import com.intellij.tools.build.bazel.jvmIncBuilder.runner.CompilerRunner;
-import com.intellij.tools.build.bazel.jvmIncBuilder.runner.OutputSink;
+import com.intellij.tools.build.bazel.jvmIncBuilder.runner.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,7 +20,6 @@ import javax.tools.Diagnostic;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 import static org.jetbrains.jps.util.Iterators.*;
@@ -43,12 +40,14 @@ public class JavaCompilerRunner implements CompilerRunner {
 
   private final BuildContext myContext;
   private final List<String> myOptions;
+  private final StorageManager myStorageManager;
   private final ModulePath myModulePath;
   private final Iterable<File> myClassPath;
 
   public JavaCompilerRunner(BuildContext context, StorageManager storageManager) {
     myContext = context;
     myOptions = getFilteredOptions(context);
+    myStorageManager = storageManager;
     NodeSourcePathMapper pathMapper = context.getPathMapper();
 
     Collection<File> classpath = collect(map(context.getBinaryDependencies().getElements(), ns -> pathMapper.toPath(ns).toFile()), new ArrayList<>()); 
@@ -96,7 +95,7 @@ public class JavaCompilerRunner implements CompilerRunner {
   // todo: implement JavaCompilerToolExtension to listen to javac constants and registering them into outputConsumer
   // todo: install javac ast listener and consume data like in JpsReferenceDependenciesRegistrar
   @Override
-  public ExitCode compile(Iterable<NodeSource> sources, Iterable<NodeSource> deletedSources, DiagnosticSink diagnosticSink, OutputSink outSink) {
+  public ExitCode compile(Iterable<NodeSource> sources, Iterable<NodeSource> deletedSources, DiagnosticSink diagnosticSink, OutputSink outSink) throws Exception {
     NodeSourcePathMapper pathMapper = myContext.getPathMapper();
     OutputCollector outCollector = new OutputCollector(this, pathMapper, diagnosticSink, outSink);
     JavacCompilerTool javacTool = new JavacCompilerTool();
@@ -111,15 +110,27 @@ public class JavaCompilerRunner implements CompilerRunner {
     logCompiledFiles(myContext, sources);
 
     // todo: revise command line options to ensure correct compilation
-    final boolean compileOk = JavacMain.compile(
-      myOptions,
-      map(sources, ns -> pathMapper.toPath(ns).toFile()),
-      myClassPath, platformCp, myModulePath, upgradeModulePath, sourcePath,
-      outputDir, outCollector, outCollector,
-      myContext::isCanceled, javacTool, new FileDataProvider(outSink)
-    );
+    try {
+      final boolean compileOk = JavacMain.compile(
+        myOptions,
+        map(sources, ns -> pathMapper.toPath(ns).toFile()),
+        myClassPath, platformCp, myModulePath, upgradeModulePath, sourcePath,
+        outputDir, outCollector, outCollector,
+        myContext::isCanceled, javacTool, new FileDataProvider(outSink)
+      );
 
-    return compileOk ? ExitCode.OK : ExitCode.ERROR;
+      if (outCollector.hasErrors()) {
+        diagnosticSink.report(Message.create(this, Message.Kind.INFO, "Compilation finished with errors. Compiler options used: " + myOptions));
+      }
+
+      return compileOk ? ExitCode.OK : ExitCode.ERROR;
+    }
+    finally {
+      ZipOutputBuilder outputBuilder = myStorageManager.getCompositeOutputBuilder();
+      for (String generatedSourcesPath : outSink.getGeneratedOutputPaths(OutputOrigin.Kind.java, OutputFile.Kind.source)) {
+        outputBuilder.deleteEntry(generatedSourcesPath); // for now, remove generated sources from the resulting artifact
+      }
+    }
   }
 
   /** @noinspection ConstantValue*/
@@ -135,6 +146,7 @@ public class JavaCompilerRunner implements CompilerRunner {
     private final DiagnosticSink myDiagnosticSink;
     private final OutputSink myOutSink;
     private final @NotNull NodeSourcePathMapper myPathMapper;
+    private boolean myHasErrors;
 
     OutputCollector(JavaCompilerRunner owner, @NotNull NodeSourcePathMapper pathMapper, DiagnosticSink diagnosticSink, OutputSink outSink) {
       myOwner = owner;
@@ -145,10 +157,10 @@ public class JavaCompilerRunner implements CompilerRunner {
 
     @Override
     public void save(@NotNull OutputFileObject javacOutput) {
-      OutputSink.OutputFile.Kind kind =
-        javacOutput.getKind() == JavaFileObject.Kind.CLASS? OutputSink.OutputFile.Kind.bytecode:
-        javacOutput.getKind() == JavaFileObject.Kind.SOURCE? OutputSink.OutputFile.Kind.source :
-        OutputSink.OutputFile.Kind.other;
+      OutputFile.Kind kind =
+        javacOutput.getKind() == JavaFileObject.Kind.CLASS? OutputFile.Kind.bytecode:
+        javacOutput.getKind() == JavaFileObject.Kind.SOURCE? OutputFile.Kind.source :
+        OutputFile.Kind.other;
       
       byte[] bytes;
       BinaryContent binContent = javacOutput.getContent();
@@ -162,7 +174,7 @@ public class JavaCompilerRunner implements CompilerRunner {
 
       myOutSink.addFile(
         new OutputFileImpl(javacOutput.getRelativePath(), kind, bytes, javacOutput.isGenerated()),
-        collect(map(javacOutput.getSourceFiles(), myPathMapper::toNodeSource), new ArrayList<>())
+        OutputOrigin.create(OutputOrigin.Kind.java, collect(map(javacOutput.getSourceFiles(), myPathMapper::toNodeSource), new ArrayList<>()))
       );
     }
     @Override
@@ -239,26 +251,33 @@ public class JavaCompilerRunner implements CompilerRunner {
       // empty
     }
 
+    public boolean hasErrors() {
+      return myHasErrors;
+    }
+
     @Override
     public void report(Diagnostic<? extends JavaFileObject> diagnostic) {
+      if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+        myHasErrors = true;
+      }
       String message = diagnostic.getMessage(Locale.ENGLISH);
       StringBuilder msgBuilder = new StringBuilder(message);
       JavaFileObject source = diagnostic.getSource();
       if (source != null) {
-        msgBuilder.append("\n").append(source.getName());
+        msgBuilder.append("\n\t").append(source.getName());
         if (diagnostic.getPosition() != Diagnostic.NOPOS) {
           msgBuilder.append(" (").append(diagnostic.getLineNumber()).append(":").append(diagnostic.getColumnNumber()).append(")");
           try {
-            int start = (int) diagnostic.getStartPosition();
-            int end = (int) diagnostic.getEndPosition();
-            if (end > start) {
+            int start = (int)(diagnostic.getStartPosition());
+            int end = (int)(diagnostic.getEndPosition());
+            if (start >= 0 && end > start) {
               CharSequence charContent = source.getCharContent(true);
               if (end < charContent.length()) {
-                msgBuilder.append("\ncode: \"").append(charContent.subSequence(start, end)).append("\"");
+                msgBuilder.append("\n\tcode: \"").append(charContent.subSequence(start, end)).append("\"");
               }
             }
           }
-          catch (IOException ignored) {
+          catch (Throwable ignored) {
           }
         }
       }
@@ -275,9 +294,9 @@ public class JavaCompilerRunner implements CompilerRunner {
   }
 
   private static class FileDataProvider implements InputFileDataProvider {
-    private final OutputSink myOutSink;
+    private final OutputExplorer myOutSink;
 
-    FileDataProvider(OutputSink outSink) {
+    FileDataProvider(OutputExplorer outSink) {
       myOutSink = outSink;
     }
 
@@ -340,4 +359,5 @@ public class JavaCompilerRunner implements CompilerRunner {
     }
     return options;
   }
+
 }

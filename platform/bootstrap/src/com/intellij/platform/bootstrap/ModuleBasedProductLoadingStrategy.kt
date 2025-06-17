@@ -57,9 +57,19 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     get() = currentMode.id
 
   override fun addMainModuleGroupToClassPath(bootstrapClassLoader: ClassLoader) {
-    val mainGroupClassPath = productModules.mainModuleGroup.includedModules.flatMapTo(LinkedHashSet()) {
-      it.moduleDescriptor.resourceRootPaths
+    fun collectDependencies(module: RuntimeModuleDescriptor, result: MutableSet<RuntimeModuleDescriptor>) {
+      if (result.add(module)) {
+        module.dependencies.forEach { collectDependencies(it, result) }
+      }
     }
+    
+    val embeddedModulesWithDependencies = LinkedHashSet<RuntimeModuleDescriptor>()
+    for (module in productModules.mainModuleGroup.includedModules) {
+      if (module.loadingRule == RuntimeModuleLoadingRule.EMBEDDED) {
+        collectDependencies(module.moduleDescriptor, embeddedModulesWithDependencies)
+      }
+    }
+    val mainGroupClassPath = embeddedModulesWithDependencies.flatMapTo(LinkedHashSet()) { it.resourceRootPaths }
     val classPath = (bootstrapClassLoader as PathClassLoader).classPath
     logger<ModuleBasedProductLoadingStrategy>().info("New classpath roots:\n${(mainGroupClassPath - classPath.baseUrls.toSet()).joinToString("\n")}")
     classPath.addFiles(mainGroupClassPath)
@@ -77,10 +87,16 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
   ): Deferred<List<DiscoveredPluginsList>> {
     val platformPrefix = PlatformUtils.getPlatformPrefix()
     val isInDevServerMode = AppMode.isDevServer()
-    val pathResolver = ClassPathXmlPathResolver(mainClassLoader, isRunningFromSources = isRunningFromSources && !isInDevServerMode)
-    val useCoreClassLoader = pathResolver.isRunningFromSources ||
-                             platformPrefix.startsWith("CodeServer") ||
+    val isRunningFromSourcesWithoutDevBuild = isRunningFromSources && !isInDevServerMode
+    val classpathPathResolver = ClassPathXmlPathResolver(mainClassLoader, isRunningFromSourcesWithoutDevBuild = isRunningFromSourcesWithoutDevBuild)
+    val useCoreClassLoader = platformPrefix.startsWith("CodeServer") ||
                              java.lang.Boolean.getBoolean("idea.force.use.core.classloader")
+    val pathResolver = if (isRunningFromSourcesWithoutDevBuild) {
+      RunningFromSourceModuleBasedPathResolver(moduleRepository, fallbackResolver = classpathPathResolver)
+    }
+    else {
+      classpathPathResolver
+    }
     val (corePlugin, _) = scope.loadCorePlugin(platformPrefix, isInDevServerMode, isUnitTestMode, isRunningFromSources, loadingContext, pathResolver, useCoreClassLoader, mainClassLoader)
     val custom = loadCustomPluginDescriptors(scope, customPluginDir, loadingContext, zipPool)
     val bundled = loadBundledPluginDescriptors(scope, loadingContext, zipPool)
@@ -132,7 +148,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     if (!Files.isDirectory(customPluginDir)) {
       return CompletableDeferred(DiscoveredPluginsList(emptyList(), PluginsSourceContext.Custom))
     }
-    val deferredDescriptors = ArrayList<Deferred<IdeaPluginDescriptorImpl?>>()
+    val deferredDescriptors = ArrayList<Deferred<PluginMainDescriptor?>>()
     Files.newDirectoryStream(customPluginDir).use { dirStream ->
       val additionalRepositoryPaths = ArrayList<Path>()
       dirStream.forEach { file ->
@@ -158,7 +174,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
   private fun loadPluginDescriptorsFromAdditionalRepositories(scope: CoroutineScope,
                                                               repositoryPaths: List<Path>,
                                                               context: PluginDescriptorLoadingContext,
-                                                              zipFilePool: ZipEntryResolverPool): Collection<Deferred<IdeaPluginDescriptorImpl?>> {
+                                                              zipFilePool: ZipEntryResolverPool): Collection<Deferred<PluginMainDescriptor?>> {
     val repositoriesByPaths = scope.async {
       val repositoriesByPaths = repositoryPaths.associateWith {
         try {
@@ -216,7 +232,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     mainGroupResourceRootSet: Set<Path>,
     isBundled: Boolean,
     pluginDir: Path?,
-  ): IdeaPluginDescriptorImpl? {
+  ): PluginMainDescriptor? {
     val mainResourceRoot = pluginModuleGroup.mainModule.resourceRootPaths.singleOrNull()
     if (mainResourceRoot == null) {
       thisLogger().warn(
@@ -243,13 +259,10 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
       val resolver = ModuleBasedPluginXmlPathResolver(includedModules, pluginModuleGroup.optionalModuleIds, fallbackResolver)
       loadDescriptorFromDir(mainResourceRoot, context, zipFilePool, resolver, isBundled = isBundled, pluginDir = pluginDir)
         .also { descriptor ->
-          descriptor?.content?.modules?.forEach { module ->
-            val requireDescriptor = module.requireDescriptor()
-            if (requireDescriptor.packagePrefix == null) {
-              val moduleName = requireDescriptor.moduleName
-              if (moduleName != null) {
-                requireDescriptor.jarFiles = moduleRepository.getModule(RuntimeModuleId.module(moduleName)).resourceRootPaths
-              }
+          descriptor?.contentModules?.forEach { module ->
+            if (module.packagePrefix == null) {
+              val moduleName = module.moduleName
+              module.jarFiles = moduleRepository.getModule(RuntimeModuleId.module(moduleName)).resourceRootPaths
             }
           }
         }
@@ -262,9 +275,9 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
       val pluginDir = pluginDir ?: mainResourceRoot.parent.parent
       loadDescriptorFromJar(mainResourceRoot, context, zipFilePool, pathResolver, isBundled = isBundled, pluginDir = pluginDir)
     }
-    val modulesWithJarFiles = descriptor?.content?.modules?.flatMap { moduleItem ->
-      val jarFiles = moduleItem.requireDescriptor().jarFiles
-      if (moduleItem.loadingRule != ModuleLoadingRule.EMBEDDED && jarFiles != null) jarFiles else emptyList()
+    val modulesWithJarFiles = descriptor?.contentModules?.flatMap { moduleItem ->
+      val jarFiles = moduleItem.jarFiles
+      if (moduleItem.moduleLoadingRule != ModuleLoadingRule.EMBEDDED && jarFiles != null) jarFiles else emptyList()
     }
     descriptor?.jarFiles = allResourceRootsList.filter { modulesWithJarFiles == null || it !in modulesWithJarFiles }
     return descriptor

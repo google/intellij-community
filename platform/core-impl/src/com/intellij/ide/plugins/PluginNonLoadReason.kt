@@ -184,7 +184,7 @@ class PluginPackagePrefixConflict(
             "Their respective modules '${module.moduleId}' and '${conflictingModule.moduleId}' declare the same package prefix"
   override val shouldNotifyUser: Boolean = true
 
-  private val IdeaPluginDescriptorImpl.moduleId: String get() = moduleName ?: pluginId.idString
+  private val IdeaPluginDescriptorImpl.moduleId: String get() = contentModuleName ?: pluginId.idString
 }
 
 @ApiStatus.Internal
@@ -243,4 +243,19 @@ class PluginDependencyIsNotInstalled(
     get() = CoreBundle.message("plugin.loading.error.short.depends.on.not.installed.plugin", dependencyNameOrId)
   override val logMessage: @NonNls String
     get() = "Plugin '${plugin.name}' (${plugin.pluginId}) has dependency on '${dependencyNameOrId}' which is not installed"
+}
+
+@ApiStatus.Internal
+class PluginHasDuplicateContentModuleDeclaration(
+  override val plugin: IdeaPluginDescriptor,
+  val moduleId: String,
+): PluginNonLoadReason {
+  override val detailedMessage: @NlsContexts.DetailedDescription String
+    get() = CoreBundle.message("plugin.loading.error.long.content.modules.are.invalid.duplicate.module", plugin.name, moduleId)
+  override val shortMessage: @NlsContexts.Label String
+    get() = CoreBundle.message("plugin.loading.error.short.content.modules.are.invalid.duplicate.module", plugin.name)
+  override val logMessage: @NonNls String
+    get() = "Plugin '${plugin.name}' (${plugin.pluginId}) has duplicate declaration of content module '$moduleId'"
+  override val shouldNotifyUser: Boolean
+    get() = true
 }

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.jetbrains.python.PythonBinaryKt.PYTHON_VERSION_ARG;
 import static com.jetbrains.python.sdk.flavors.PySdkFlavorUtilKt.getFileExecutionError;
 import static com.jetbrains.python.sdk.flavors.PySdkFlavorUtilKt.getFileExecutionErrorOnEdt;
 import static com.jetbrains.python.venvReader.ResolveUtilKt.tryResolvePath;
@@ -65,12 +66,6 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
 
   private static final Pattern VERSION_RE = Pattern.compile("(Python \\S+).*");
   private static final Logger LOG = Logger.getInstance(PythonSdkFlavor.class);
-  /**
-   * <code>
-   * python --version
-   * </code>
-   */
-  public static final String PYTHON_VERSION_ARG = "--version";
 
 
   /**
@@ -99,7 +94,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
   /**
    * Flavors that are aware of some system pythons must return them there.
    */
-  @RequiresBackgroundThread
+  @RequiresBackgroundThread(generateAssertion = false)
   protected @NotNull Collection<@NotNull Path> suggestLocalHomePathsImpl(final @Nullable Module module,
                                                                          final @Nullable UserDataHolder context) {
     return Collections.emptyList();
@@ -108,7 +103,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
   /**
    * On local targets some flavors could be detected. It returns a path to python interpreters for such cases.
    */
-  @RequiresBackgroundThread
+  @RequiresBackgroundThread(generateAssertion = false)
   public final @NotNull Collection<@NotNull Path> suggestLocalHomePaths(final @Nullable Module module,
                                                                         final @Nullable UserDataHolder context) {
     return suggestLocalHomePathsImpl(module, context).stream().filter(path -> {

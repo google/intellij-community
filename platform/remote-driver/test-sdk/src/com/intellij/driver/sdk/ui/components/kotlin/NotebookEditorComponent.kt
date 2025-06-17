@@ -1,6 +1,6 @@
 package com.intellij.driver.sdk.ui.components.kotlin
 
-import com.intellij.driver.sdk.invokeAction
+import com.intellij.driver.sdk.invokeActionWithRetries
 import com.intellij.driver.sdk.step
 import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.components.ComponentData
@@ -15,8 +15,10 @@ import com.intellij.driver.sdk.ui.components.elements.NotebookTableOutputUi
 import com.intellij.driver.sdk.ui.pasteText
 import com.intellij.driver.sdk.ui.ui
 import com.intellij.driver.sdk.waitFor
+import com.intellij.driver.sdk.waitForCodeAnalysis
 import org.intellij.lang.annotations.Language
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -31,6 +33,15 @@ fun Finder.notebookEditor(@Language("xpath") xpath: String? = null): NotebookEdi
 fun Finder.notebookEditor(action: NotebookEditorUiComponent.() -> Unit) {
   return notebookEditor().action()
 }
+
+fun NotebookEditorUiComponent.waitForHighlighting() {
+  driver.waitForCodeAnalysis(file = editor.getVirtualFile())
+}
+
+typealias CellSelector = (List<UiComponent>) -> UiComponent
+
+val FirstCell: CellSelector = { it.first() }
+val LastCell: CellSelector = { it.last() }
 
 
 class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComponent(data) {
@@ -54,15 +65,15 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
       else -> super.editorComponent
     }
 
-  fun addCodeCell(): Unit = addCellBelow.click()
+  fun addEmptyCodeCell(): Unit = addCellBelow.click()
 
   fun addCodeCell(text: String) {
-    addCodeCell()
+    addEmptyCodeCell()
     driver.ui.pasteText(text)
   }
 
-  fun addMarkdownCell(content: String) = driver.run {
-    invokeAction("NotebookInsertMarkdownCellAction")
+  fun addMarkdownCell(content: String) {
+    driver.invokeActionWithRetries("NotebookInsertMarkdownCellAction")
     driver.ui.pasteText(content)
   }
 
@@ -90,6 +101,28 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
         it.getParent().x { contains(byAttribute("defaulticon", "greenCheckmark.svg")) }.present()
       }
     }
+  }
+
+  fun clickOnCell(cellSelector: CellSelector) {
+    val cellEditors = notebookCellEditors
+    val cell = cellSelector(cellEditors)
+    cell.click()
+  }
+
+  fun typeInCell(
+    cellSelector: CellSelector,
+    text: String,
+    delayBetweenChars: Duration = 50.milliseconds,
+  ) {
+    clickOnCell(cellSelector)
+    keyboard {
+      typeText(text, delayBetweenChars.inWholeMilliseconds)
+    }
+  }
+
+  fun pasteToCell(cellSelector: CellSelector, text: String) {
+    clickOnCell(cellSelector)
+    driver.ui.pasteText(text)
   }
 
 

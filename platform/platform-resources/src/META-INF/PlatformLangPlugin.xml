@@ -35,19 +35,6 @@
   <xi:include href="/META-INF/Inspect.xml">
     <xi:fallback/>
   </xi:include>
-  <xi:include href="/META-INF/WebSymbols.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/WebSymbolsExtensionPoints.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/xml.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/PlatformWarmup.xml">
-    <xi:fallback/>
-  </xi:include>
 
   <xi:include href="/META-INF/IdeCore.xml"/>
   <xi:include href="/META-INF/PlatformExtensionPoints.xml"/>
@@ -162,10 +149,6 @@
     <xi:fallback/>
   </xi:include>
 
-  <xi:include href="/META-INF/ml.xml">
-    <xi:fallback/>
-  </xi:include>
-
   <xi:include href="/META-INF/xdebugger.xml">
     <xi:fallback/>
   </xi:include>
@@ -180,9 +163,6 @@
     <xi:fallback/>
   </xi:include>
   <xi:include href="/META-INF/duplicates-analysis.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/tasks.xml">
     <xi:fallback/>
   </xi:include>
 

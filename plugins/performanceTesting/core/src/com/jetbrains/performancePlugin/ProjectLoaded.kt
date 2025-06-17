@@ -16,13 +16,11 @@ import com.intellij.internal.performanceTests.ProjectInitializationDiagnosticSer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
-import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.impl.CoreProgressManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.DumbService.Companion.isDumb
@@ -33,6 +31,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
 import com.intellij.platform.diagnostic.startUpPerformanceReporter.StartUpPerformanceReporter.Companion.logStats
 import com.intellij.platform.eel.provider.EelInitialization
+import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.tools.ide.starter.bus.EventsBus
@@ -76,7 +75,6 @@ private fun getTestFile(): Path {
 }
 
 private object ProjectLoadedService {
-
   @JvmField
   var scriptStarted = false
 
@@ -98,28 +96,26 @@ private object ProjectLoadedService {
 }
 
 private fun subscribeToStopProfile() {
-  if (ApplicationManagerEx.isInIntegrationTest()) {
-    try {
-      EventsBus.subscribe("ProfileStopSubscriber") { event: StopProfilerEvent ->
-        try {
-          getCurrentProfilerHandler().stopProfiling(event.data)
-        }
-        catch (t: Throwable) {
-          LOG.info("Error stop profiling", t)
-        }
+  try {
+    EventsBus.subscribe("ProfileStopSubscriber") { event: StopProfilerEvent ->
+      try {
+        getCurrentProfilerHandler().stopProfiling(event.data)
+      }
+      catch (t: Throwable) {
+        LOG.info("Error stop profiling", t)
       }
     }
-    catch (connectException: ConnectException) {
-      // Some integration tests don't start event bus server. e.g com.jetbrains.rdct.cwm.distributed.connectionTypes.LocalRelayTest
-      LOG.info("Subscription to stop profiling failed", connectException)
-    }
+  }
+  catch (connectException: ConnectException) {
+    // Some integration tests don't start event bus server. e.g com.jetbrains.rdct.cwm.distributed.connectionTypes.LocalRelayTest
+    LOG.info("Subscription to stop profiling failed", connectException)
   }
 }
 
 private fun runOnProjectInit(project: Project) {
   if (System.getProperty("ide.performance.screenshot") != null) {
-    (ProjectLoadedService.registerScreenshotTaking(System.getProperty("ide.performance.screenshot"),
-                                                   (project as ComponentManagerEx).getCoroutineScope()))
+    val coroutineScope = project.service<CoreUiCoroutineScopeHolder>().coroutineScope
+    (ProjectLoadedService.registerScreenshotTaking(System.getProperty("ide.performance.screenshot"), coroutineScope))
     LOG.info("Option ide.performance.screenshot is initialized, screenshots will be captured")
   }
 
@@ -135,8 +131,10 @@ private fun runOnProjectInit(project: Project) {
   LOG.info("Start Execution")
   PerformanceTestSpan.startSpan()
 
-  ApplicationManager.getApplication().executeOnPooledThread {
-    subscribeToStopProfile()
+  if (ApplicationManagerEx.isInIntegrationTest()) {
+    project.service<CoreUiCoroutineScopeHolder>().coroutineScope.launch {
+      subscribeToStopProfile()
+    }
   }
 
   val profilerSettings = initializeProfilerSettingsForIndexing()
@@ -164,10 +162,11 @@ private fun runOnProjectInit(project: Project) {
 }
 
 private class PerformancePluginInitProjectActivity : InitProjectActivity {
+  override val isParallelExecution: Boolean
+    get() = true
+
   override suspend fun run(project: Project) {
-    blockingContext {
-      runOnProjectInit(project)
-    }
+    runOnProjectInit(project)
   }
 }
 
@@ -350,7 +349,7 @@ private fun reportScriptError(errorMessage: AbstractMessage) {
     if (causeMessage.isNullOrEmpty()) {
       val throwableMessage = getNonEmptyThrowableMessage(throwable)
       val index = throwableMessage.indexOf("\tat ")
-      causeMessage = if (index == -1) throwableMessage else throwableMessage.substring(0, index)
+      causeMessage = if (index == -1) throwableMessage else throwableMessage.take(index)
     }
   }
   val scriptErrorsDir = Path.of(PathManager.getLogPath(), "errors")
@@ -404,7 +403,7 @@ private fun reportScriptError(errorMessage: AbstractMessage) {
 private fun addSuffixBeforeExtension(fileName: String, suffix: String): String {
   val lastDotIndex = fileName.lastIndexOf('.')
   return if (lastDotIndex != -1) {
-    fileName.substring(0, lastDotIndex) + suffix + fileName.substring(lastDotIndex)
+    fileName.take(lastDotIndex) + suffix + fileName.substring(lastDotIndex)
   } else {
     fileName + suffix
   }

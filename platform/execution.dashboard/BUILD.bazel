@@ -13,10 +13,12 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/core-api:core",
     "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
     "//platform/lang-impl",
     "//platform/execution-impl",
+    "//platform/projectModel-api:projectModel",
     "//platform/statistics",
     "//platform/platform-impl:ide-impl",
     "@lib//:fastutil-min",

@@ -5,7 +5,9 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.ide.actions.searcheverywhere.ExtendedInfo
 import com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoComponent
+import com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTriggerCollector
 import com.intellij.ide.ui.laf.darcula.ui.TextFieldWithPopupHandlerUI
+import com.intellij.internal.statistic.eventLog.events.EventFields
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
@@ -20,6 +22,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.searchEverywhere.SeActionItemPresentation
 import com.intellij.platform.searchEverywhere.SeTargetItemPresentation
 import com.intellij.platform.searchEverywhere.SeTextSearchItemPresentation
+import com.intellij.platform.searchEverywhere.frontend.AutoToggleAction
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.files.SeTargetItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.text.SeTextSearchItemPresentationRenderer
@@ -49,13 +52,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.BorderLayout
-import java.awt.Point
 import java.awt.event.*
 import java.util.function.Supplier
 import javax.swing.*
 import javax.swing.event.ListSelectionEvent
 import javax.swing.text.Document
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalCoroutinesApi::class)
 @Internal
@@ -63,7 +66,9 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
   val preferableFocusedComponent: JComponent get() = textField
   val searchFieldDocument: Document get() = textField.document
 
-  private val headerPane: SePopupHeaderPane = SePopupHeaderPane(vm.tabVms.map { it.name }, vm.currentTabIndex, vm.coroutineScope)
+  private val headerPane: SePopupHeaderPane = SePopupHeaderPane(
+    project, vm.tabVms.map { SePopupHeaderPane.Tab(it) }, vm.currentTabIndex, vm.coroutineScope
+  )
   private val textField: SeTextField = SeTextField()
 
   private val resultListModel = SeResultListModel { resultList.selectionModel }
@@ -143,10 +148,19 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
             withContext(Dispatchers.EDT) {
               SeLog.log(SeLog.THROTTLING) { "Throttled flow completed" }
               resultListModel.removeLoadingItem()
+
               if (!resultListModel.isValid) resultListModel.reset()
+
               if (resultListModel.isEmpty) {
                 textField.setSearchInProgress(false)
                 updateEmptyStatus()
+              }
+            }
+          }.onEmpty {
+            withContext(Dispatchers.EDT) {
+              val action = vm.currentTab.getSearchEverywhereToggleAction()
+              if (!textField.text.isEmpty() && (action as? AutoToggleAction)?.autoToggle(true) ?: false) {
+                headerPane.updateToolbarActions()
               }
             }
           }.collect { event ->
@@ -175,6 +189,14 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
         val filterEditor = it.filterEditor.getValue()
         withContext(Dispatchers.EDT) {
           headerPane.setFilterPresentation(filterEditor?.getPresentation())
+        }
+      }
+    }
+
+    vm.coroutineScope.launch {
+      vm.deferredTabVms.collect { tabVm ->
+        withContext(Dispatchers.EDT) {
+          headerPane.addTab(SePopupHeaderPane.Tab(tabVm))
         }
       }
     }
@@ -214,7 +236,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
   }
 
   private fun indexToFreezeFromListOffset(): Int =
-    resultList.locationToIndex(Point(0, resultList.visibleRect.y)) + DEFAULT_FROZEN_COUNT
+    (resultList.visibleRect.y.toDouble() / JBUI.CurrentTheme.List.rowHeight()).roundToInt() + DEFAULT_FROZEN_COUNT
 
   private fun createListPane(resultList: JBList<*>): JScrollPane {
     val resultsScroll: JScrollPane = object : JBScrollPane(resultList) {
@@ -284,13 +306,23 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
   }
 
   private suspend fun elementsSelected(indexes: IntArray, modifiers: Int) {
+    var nonItemDataCount = 0
+
+    // Calculate items with indexes considering some non-item rows on top (for example, notification row).
+    // The index is necessary for event logging
     val itemDataList = indexes.map {
-      resultListModel[it]
-    }.mapNotNull {
-      (it as? SeResultListItemRow)?.item
+      it to resultListModel[it]
+    }.mapNotNull { (originalIndex, row) ->
+      if (row is SeResultListItemRow) {
+        (originalIndex - nonItemDataCount) to row.item
+      }
+      else {
+        nonItemDataCount++
+        null
+      }
     }
 
-    if (vm.itemsSelected(itemDataList, modifiers)) {
+    if (vm.itemsSelected(itemDataList, nonItemDataCount == 0, modifiers)) {
       closePopup()
     }
     else {
@@ -341,12 +373,14 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
 
     ScrollingUtil.redirectExpandSelection(resultList, textField)
 
-    val nextTabAction: (AnActionEvent) -> Unit = { _ ->
+    val nextTabAction: (AnActionEvent) -> Unit = { e ->
       vm.selectNextTab()
+      logTabSwitchedEvent(e)
       updateExtendedInfoContainer()
     }
-    val prevTabAction: (AnActionEvent) -> Unit = { _ ->
+    val prevTabAction: (AnActionEvent) -> Unit = { e ->
       vm.selectPreviousTab()
+      logTabSwitchedEvent(e)
       updateExtendedInfoContainer()
     }
 
@@ -356,19 +390,17 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     registerAction(IdeActions.ACTION_PREVIOUS_TAB, prevTabAction)
     registerAction(IdeActions.ACTION_SWITCHER) { e ->
       if (e.inputEvent?.isShiftDown == true) {
-        prevTabAction
+        prevTabAction(e)
       }
       else {
-        nextTabAction
+        nextTabAction(e)
       }
     }
     registerAction(SeActions.NAVIGATE_TO_NEXT_GROUP) { _ ->
       shiftSelectedIndexAndEnsureIsVisible(1)
-      vm.usageLogger.groupNavigate()
     }
     registerAction(SeActions.NAVIGATE_TO_PREV_GROUP) { _ ->
       shiftSelectedIndexAndEnsureIsVisible(-1)
-      vm.usageLogger.groupNavigate()
     }
 
     val escape = ActionManager.getInstance().getAction("EditorEscape")
@@ -531,6 +563,13 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
         resultList.emptyText.appendText(text, attrs, listener)
       }
     }
+  }
+
+  private fun logTabSwitchedEvent(e: AnActionEvent) {
+    SearchEverywhereUsageTriggerCollector.TAB_SWITCHED.log(project,
+                                                           SearchEverywhereUsageTriggerCollector.CONTRIBUTOR_ID_FIELD.with(vm.currentTab.tabId),
+                                                           EventFields.InputEventByAnAction.with(e),
+                                                           SearchEverywhereUsageTriggerCollector.IS_SPLIT.with(true))
   }
 
   override fun uiDataSnapshot(sink: DataSink) {

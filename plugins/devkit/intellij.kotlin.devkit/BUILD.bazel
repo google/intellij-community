@@ -4,6 +4,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
+  context_receivers = True,
   opt_in = [
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
@@ -24,6 +25,8 @@ jvm_library(
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/indexing-api:indexing",
+    "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//platform/util",
     "//platform/core-api:core",
@@ -33,6 +36,7 @@ jvm_library(
     "//java/java-psi-api:psi",
     "//xml/dom-openapi:dom",
     "//xml/xml-psi-api:psi",
+    "//xml/xml-analysis-api:analysis",
     "//java/java-analysis-api:analysis",
     "//plugins/kotlin/code-insight/intentions-shared:kotlin-code-insight-intentions-shared",
     "//plugins/kotlin/code-insight/utils",
@@ -49,6 +53,8 @@ jvm_library(
     "//plugins/kotlin/base/indices",
     "//plugins/kotlin/uast/uast-kotlin-base",
     "//platform/lang-impl",
+    "//plugins/kotlin/code-insight/impl-base",
+    "//platform/eel",
   ],
   runtime_deps = [":kotlin-devkit_resources"]
 )

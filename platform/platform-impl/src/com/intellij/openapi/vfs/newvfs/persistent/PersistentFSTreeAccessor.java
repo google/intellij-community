@@ -2,6 +2,7 @@
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.io.FileTooBigException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.ChildInfoImpl;
 import com.intellij.openapi.vfs.newvfs.FileAttribute;
@@ -10,10 +11,7 @@ import com.intellij.openapi.vfs.newvfs.events.ChildInfo;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.SystemProperties;
-import com.intellij.util.io.CorruptedException;
-import com.intellij.util.io.DataEnumerator;
-import com.intellij.util.io.DataInputOutputUtil;
-import com.intellij.util.io.DataOutputStream;
+import com.intellij.util.io.*;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -128,36 +126,6 @@ public class PersistentFSTreeAccessor {
     return attributeAccessor.hasAttributePage(fileId, CHILDREN_ATTR);
   }
 
-  int @NotNull [] listRoots() throws IOException {
-    //Roots in VFS are quite special:
-    // The root record itself (in connection.records) is just a normal file record, with parentId=NULL_ID,
-    // and nameId=names.enumerate(root name).
-    //
-    // But all roots are _also_ stored as a CHILDREN attribute of special SUPER_ROOT record with reserved id=1.
-    // That specific CHILDREN attribute format is different from an ordinary CHILDREN attribute format: it stores
-    // both rootIds and root_Url_Ids (both as diff-compressed VARINTs). The thing is: rootUrl != rootName.
-    // E.g. for local Linux fs root: name="/", url="file:"
-    //
-    // We use rootUrl in method findOrCreateRootRecord(rootUrl) -- this is how we uniquely identify root on
-    // an actual filesystem -- i.e. we assume rootUrl is a unique way for identify fs node.
-    try (DataInputStream input = attributeAccessor.readAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      if (input == null) return ArrayUtilRt.EMPTY_INT_ARRAY;
-
-      PersistentFSRecordsStorage records = connection.records();
-      int maxID = records.maxAllocatedID();
-
-      int count = DataInputOutputUtil.readINT(input);
-      int[] roots = ArrayUtil.newIntArray(count);
-      int prevId = 0;
-      for (int i = 0; i < count; i++) {
-        DataInputOutputUtil.readINT(input); // Name
-        prevId = roots[i] = DataInputOutputUtil.readINT(input) + prevId; // Id
-        checkChildIdValid(SUPER_ROOT_ID, prevId, i, maxID);
-      }
-      return roots;
-    }
-  }
-
   /**
    * @return array if children fileIds for the given fileId
    * MAYBE rename to childrenIds()?
@@ -203,57 +171,136 @@ public class PersistentFSTreeAccessor {
     }
   }
 
-  int findOrCreateRootRecord(@NotNull String rootUrl) throws IOException {
-    PersistentFSConnection connection = this.connection;
+  //Threading: all the root accessing/modifying methods are called under the record/hierarchy lock in FSRecordsImpl.
+  // The fields could be updated in cacheRoots() while being called under _read_ lock -- but this is fine, since
+  // the underlying source of truth is the attribute, which could be modified only under write lock, so concurrent
+  // execution of cacheRoots() is harmless -- it just creates few useless duplicated arrays.
 
-    int rootUrlId = connection.names().tryEnumerate(rootUrl);
+  /** sorted (target for binary search) */
+  protected int[] rootsUrlIds = null;
+  /** not sorted */
+  protected int[] rootsIds = null;
 
-    int[] rootUrls = ArrayUtilRt.EMPTY_INT_ARRAY;
-    int[] rootIds = ArrayUtilRt.EMPTY_INT_ARRAY;
-    try (DataInputStream input = attributeAccessor.readAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      if (input != null) {
-        int rootsCount = DataInputOutputUtil.readINT(input);
-        if (rootsCount < 0) {
-          throw new IOException("SUPER_ROOT.CHILDREN attribute is corrupted: roots count(=" + rootsCount + ") must be >=0");
-        }
-        rootUrls = ArrayUtil.newIntArray(rootsCount);
-        rootIds = ArrayUtil.newIntArray(rootsCount);
-        int prevRootId = 0;
-        int prevUrlId = 0;
+  final int @NotNull [] listRoots() throws IOException {
+    ensureRootsCached();
+    return rootsIds;
+  }
 
-        for (int i = 0; i < rootsCount; i++) {
-          int urlId = DataInputOutputUtil.readINT(input) + prevUrlId;
-          int rootId = DataInputOutputUtil.readINT(input) + prevRootId;
-          if (urlId == rootUrlId) {
-            checkChildIdValid(SUPER_ROOT_ID, rootId, i, connection.records().maxAllocatedID());
-            return rootId;
-          }
-
-          prevUrlId = rootUrls[i] = urlId;
-          prevRootId = rootIds[i] = rootId;
-        }
-      }
+  protected void ensureRootsCached() throws IOException {
+    if (rootsIds == null || rootsUrlIds == null) {
+      cacheRoots();
     }
+  }
 
-    rootUrlId = connection.names().enumerate(rootUrl);
+  protected void cacheRoots() throws IOException {
+    //Roots in VFS are quite special:
+    // The root record itself (in connection.records) is just a normal file record, with parentId=NULL_ID,
+    // and nameId=names.enumerate(root name).
+    //
+    // But all roots are _also_ stored as a CHILDREN attribute of special SUPER_ROOT record with reserved id=1.
+    // That specific CHILDREN attribute format is different from an ordinary CHILDREN attribute format: it stores
+    // both rootIds and root_Url_Ids (both as diff-compressed VARINTs). The thing is: rootUrl != rootName.
+    // E.g. for local Linux fs root: name="/", url="file:"
+    //
+    // We use rootUrl in method findOrCreateRootRecord(rootUrl) -- this is how we uniquely identify root on
+    // an actual filesystem -- i.e. we assume rootUrl is a unique way for identify fs node.
+
+    try (DataInputStream input = attributeAccessor.readAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
+      if (input == null) {
+        this.rootsIds = ArrayUtil.EMPTY_INT_ARRAY;
+        this.rootsUrlIds = ArrayUtil.EMPTY_INT_ARRAY;
+        return;
+      }
+
+      int maxAllocatedID = connection.records().maxAllocatedID();
+      int rootsCount = DataInputOutputUtil.readINT(input);
+      if (rootsCount < 0) {
+        throw new IOException("SUPER_ROOT.CHILDREN attribute is corrupted: roots count(=" + rootsCount + ") must be >=0");
+      }
+      int[] rootsUrlIds = ArrayUtil.newIntArray(rootsCount);
+      int[] rootsIds = ArrayUtil.newIntArray(rootsCount);
+
+      int prevUrlId = 0;
+      int prevRootId = 0;
+      for (int i = 0; i < rootsCount; i++) {
+        int diffUrlId = DataInputOutputUtil.readINT(input);
+        int diffRootId = DataInputOutputUtil.readINT(input);
+
+        if (diffUrlId <= 0) {//'cos urlIds array must be sorted
+          throw new CorruptedException("SUPER_ROOT.CHILDREN attribute is corrupted: diffUrlId[" + i + "](=" + diffUrlId + ") must be >0");
+        }
+
+        int urlId = diffUrlId + prevUrlId;
+        int rootId = diffRootId + prevRootId;
+
+        checkChildIdValid(SUPER_ROOT_ID, rootId, i, maxAllocatedID);
+
+        rootsUrlIds[i] = urlId;
+        rootsIds[i] = rootId;
+
+        prevUrlId = urlId;
+        prevRootId = rootId;
+      }
+      this.rootsIds = rootsIds;
+      this.rootsUrlIds = rootsUrlIds;
+    }
+  }
+
+  final int findOrCreateRootRecord(@NotNull String rootUrl) throws IOException {
+    ensureRootsCached();
+
+    PersistentFSConnection connection = this.connection;
+    DataEnumeratorEx<String> names = connection.names();
+
+    int rootUrlId = names.enumerate(rootUrl);
+    int rootIndex = Arrays.binarySearch(rootsUrlIds, rootUrlId);
+    if (rootIndex >= 0) {
+      return rootsIds[rootIndex];
+    }
+    int insertionIndex = -rootIndex - 1;
+    int newRootFileId = recordAccessor.createRecord(Collections.emptyList());
+    rootsUrlIds = ArrayUtil.insert(rootsUrlIds, insertionIndex, rootUrlId);
+    rootsIds = ArrayUtil.insert(rootsIds, insertionIndex, newRootFileId);
 
     try (DataOutputStream output = attributeAccessor.writeAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      int newRootFileId = recordAccessor.createRecord(Collections.emptyList());
-
-      int index = Arrays.binarySearch(rootIds, newRootFileId);
-      if (index >= 0) {
-        throw new AssertionError("Newly allocated newRootFileId(=" + newRootFileId + ") already exists in root record: " +
-                                 "rootIds(=" + Arrays.toString(rootIds) + "), rootUrls(=" + Arrays.toString(rootUrls) + "), " +
-                                 "rootUrl(=" + rootUrl + "), rootUrlId(=" + rootUrlId + ")");
-      }
-      rootIds = ArrayUtil.insert(rootIds, -index - 1, newRootFileId);
-      rootUrls = ArrayUtil.insert(rootUrls, -index - 1, rootUrlId);
-
-      saveNameIdSequenceWithDeltas(rootUrls, rootIds, output);
+      saveUrlAndFileIdsAsDiffCompressed(rootsUrlIds, rootsIds, output);
       //RC: we should assign connection.records.setNameId(newRootFileId, root_Name_Id), but we don't
-      //    have rootNameId here -- we have only rootUrlId. Actually, rootNameId is assigned to the root
-      //    in a PersistentFSImpl.findRoot() method
+      //    have rootNameId here -- we have only rootUrlId. So, rootNameId is assigned to the root
+      //    in a PersistentFSImpl.findRoot() method, up the stack
       return newRootFileId;
+    }
+    catch (FileTooBigException e) {
+      //expect FileTooBigException to be thrown from AttributeStorage
+      throw new FileTooBigException(
+        "Can't add new root (#" + newRootFileId + ", url=[" + rootUrl + "], urlId=" + rootUrlId + ") to the VFS: " +
+        "too many roots already (= " + rootsIds.length + ")",
+        e
+      );
+    }
+  }
+
+  /**
+   * Deletes the rootId entry from the roots catalog. The file-record itself is not deleted!
+   *
+   * @throws IOException if the rootId is not found in the roots catalog.
+   */
+  final void deleteRootRecord(int rootId) throws IOException {
+    if (fsRootDataLoader != null) {
+      fsRootDataLoader.deleteRootRecord(getRootsStoragePath(fsRootDataLoader), rootId);
+    }
+
+    ensureRootsCached();
+
+    int index = ArrayUtil.find(rootsIds, rootId);
+    if (index < 0) {
+      throw new IOException("No root[#" + rootId + "] entry found among roots " + Arrays.toString(rootsIds));
+    }
+
+    rootsUrlIds = ArrayUtil.remove(rootsUrlIds, index);
+    rootsIds = ArrayUtil.remove(rootsIds, index);
+
+    try (DataOutputStream output = attributeAccessor.writeAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
+      saveUrlAndFileIdsAsDiffCompressed(rootsUrlIds, rootsIds, output);
     }
   }
 
@@ -261,27 +308,14 @@ public class PersistentFSTreeAccessor {
    * Supplies all the roots into rootConsumer, along with appropriate rootUrlId.
    * Iteration could be interrupted early by returning false from the {@link RootsConsumer#processRoot(int, int)} method
    */
-  void forEachRoot(@NotNull RootsConsumer rootConsumer) throws IOException {
-    try (DataInputStream input = attributeAccessor.readAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      if (input != null) {
-        int count = DataInputOutputUtil.readINT(input);
-        if (count < 0) {
-          throw new IOException("SUPER_ROOT.CHILDREN attribute is corrupted: roots count(=" + count + ") must be >=0");
-        }
-        int prevId = 0;
-        int prevUrlId = 0;
-
-        for (int i = 0; i < count; i++) {
-          int rootUrlId = DataInputOutputUtil.readINT(input) + prevUrlId;
-          int rootId = DataInputOutputUtil.readINT(input) + prevId;
-          prevUrlId = rootUrlId;
-          prevId = rootId;
-
-          boolean continueProcessing = rootConsumer.processRoot(rootId, rootUrlId);
-          if (!continueProcessing) {
-            return;
-          }
-        }
+  final void forEachRoot(@NotNull RootsConsumer rootConsumer) throws IOException {
+    ensureRootsCached();
+    for (int i = 0; i < rootsIds.length; i++) {
+      int rootId = rootsIds[i];
+      int rootUrlId = rootsUrlIds[i];
+      boolean continueProcessing = rootConsumer.processRoot(rootId, rootUrlId);
+      if (!continueProcessing) {
+        return;
       }
     }
   }
@@ -307,40 +341,6 @@ public class PersistentFSTreeAccessor {
     }
   }
 
-  void deleteRootRecord(int fileId) throws IOException {
-    if (fsRootDataLoader != null) {
-      fsRootDataLoader.deleteRootRecord(getRootsStoragePath(fsRootDataLoader), fileId);
-    }
-
-    int[] names;
-    int[] ids;
-    try (DataInputStream input = attributeAccessor.readAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      assert input != null;
-      int count = DataInputOutputUtil.readINT(input);
-
-      names = ArrayUtil.newIntArray(count);
-      ids = ArrayUtil.newIntArray(count);
-      int prevId = 0;
-      int prevNameId = 0;
-      for (int i = 0; i < count; i++) {
-        names[i] = DataInputOutputUtil.readINT(input) + prevNameId;
-        ids[i] = DataInputOutputUtil.readINT(input) + prevId;
-        prevId = ids[i];
-        prevNameId = names[i];
-      }
-    }
-
-    int index = ArrayUtil.find(ids, fileId);
-    assert index >= 0;
-
-    names = ArrayUtil.remove(names, index);
-    ids = ArrayUtil.remove(ids, index);
-
-    try (DataOutputStream output = attributeAccessor.writeAttribute(SUPER_ROOT_ID, CHILDREN_ATTR)) {
-      saveNameIdSequenceWithDeltas(names, ids, output);
-    }
-  }
-
   void ensureLoaded() throws IOException {
     if (fsRootDataLoader != null) {
       fsRootDataLoader.ensureLoaded(getRootsStoragePath(fsRootDataLoader));
@@ -349,15 +349,37 @@ public class PersistentFSTreeAccessor {
     connection.enumerateAttributeId(CHILDREN_ATTR.getId()); // trigger writing / loading of vfs attribute ids in top level write action
   }
 
-  static void saveNameIdSequenceWithDeltas(int[] names, int[] ids, DataOutputStream output) throws IOException {
-    DataInputOutputUtil.writeINT(output, names.length);
-    int prevId = 0;
-    int prevNameId = 0;
-    for (int i = 0; i < names.length; i++) {
-      DataInputOutputUtil.writeINT(output, names[i] - prevNameId);
-      DataInputOutputUtil.writeINT(output, ids[i] - prevId);
-      prevId = ids[i];
-      prevNameId = names[i];
+  /**
+   * Serializes urlIds and fileIds sorted arrays into output stream, in diff-compressed format:
+   * <pre>
+   * {urlIds.length: varint} ({urlId[i]-urlId[i-1]: varint}, {fileId[i]-fileId[i-1]: varint})*
+   * </pre>
+   * Both urlIds and fileIds must be sorted, same length, and without duplicates -- otherwise {@link IllegalStateException} is thrown
+   */
+  private static void saveUrlAndFileIdsAsDiffCompressed(int[] urlIds,
+                                                        int[] fileIds,
+                                                        @NotNull DataOutputStream output) throws IOException {
+    if (urlIds.length != fileIds.length) {
+      throw new IllegalArgumentException("urlIds.length(=" + urlIds.length + ") != fileIds.length(=" + fileIds.length + ")");
+    }
+    DataInputOutputUtil.writeINT(output, urlIds.length);
+    int prevUrlId = 0;
+    int prevFileId = 0;
+    for (int i = 0; i < urlIds.length; i++) {
+      int urlId = urlIds[i];
+      int fileId = fileIds[i];
+      int diffUrlId = urlId - prevUrlId;
+      int diffFileId = fileId - prevFileId;
+      if (diffUrlId <= 0) {
+        throw new IllegalStateException(
+          "urlIds are not sorted: urlIds[" + i + "](=" + urlId + ") <= urlIds[" + (i - 1) + "](=" + prevUrlId + "), " +
+          "urlIds: " + Arrays.toString(urlIds)
+        );
+      }
+      DataInputOutputUtil.writeINT(output, diffUrlId);
+      DataInputOutputUtil.writeINT(output, diffFileId);
+      prevFileId = fileId;
+      prevUrlId = urlId;
     }
   }
 
@@ -388,7 +410,8 @@ public class PersistentFSTreeAccessor {
     }
   }
 
-  interface RootsConsumer {
+  @ApiStatus.Internal
+  public interface RootsConsumer {
     boolean processRoot(int rootFileId, int rootUrlId);
   }
 }

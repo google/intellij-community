@@ -11,7 +11,7 @@ import com.intellij.platform.plugins.parser.impl.XIncludeLoader
 import com.intellij.platform.plugins.parser.impl.elements.ContentElement
 import com.intellij.platform.plugins.parser.impl.elements.DependenciesElement
 import com.intellij.platform.plugins.parser.impl.elements.ModuleLoadingRule
-import com.intellij.platform.plugins.testFramework.ValidationReadModuleContext
+import com.intellij.platform.plugins.testFramework.ValidationPluginDescriptorReaderContext
 import com.intellij.project.IntelliJProjectConfiguration
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.junit5.NamedFailure
@@ -24,7 +24,6 @@ import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.model.module.JpsModuleSourceRoot
-import org.opentest4j.MultipleFailuresError
 import java.io.StringWriter
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -80,6 +79,9 @@ fun validatePluginModel(projectPath: Path, validationOptions: PluginValidationOp
   return validatePluginModel(project, projectPath, validationOptions)
 }
 
+/**
+ * Runs [PluginModelValidator] on the specified [project] and returns the result.
+ */
 fun validatePluginModel(project: JpsProject, projectHomePath: Path,
                         validationOptions: PluginValidationOptions = PluginValidationOptions()): PluginValidationResult {
   return PluginModelValidator(project, projectHomePath, validationOptions).validate()
@@ -124,6 +126,12 @@ class PluginValidationResult internal constructor(
   }
 }
 
+/**
+ * Performs checks of plugin and module descriptors in the source code of [project].
+ * The checks don't depend on the layout of plugins and don't require all modules to be compiled.
+ * There is [com.intellij.platform.buildScripts.testFramework.pluginModel.PluginDependenciesValidator] which checks dependencies of plugin
+ * modules.
+ */
 class PluginModelValidator(
   private val project: JpsProject,
   private val projectHomePath: Path,
@@ -274,19 +282,16 @@ class PluginModelValidator(
       checkDependencies(descriptor.dependencies, pluginInfo, pluginInfo, moduleNameToInfo, sourceModuleNameToFileInfo,
                         registeredContentModules)
 
-      // in the end, after processing content and dependencies
-      if (validationOptions.reportDependsTagInPluginXmlWithPackageAttribute && pluginInfo.packageName != null) {
-        descriptor.depends.firstOrNull { !it.isOptional }?.let {
-          reportError(
-            "The old format should not be used for a plugin with the specified package prefix (${pluginInfo.packageName}), but `depends` tag is used." +
-            " Please use the new format (see https://github.com/JetBrains/intellij-community/blob/master/docs/plugin.md#the-dependencies-element)",
-            pluginInfo.sourceModule,
-            mapOf(
-              "descriptorFile" to pluginInfo.descriptorFile,
-              "depends" to it,
-            ),
-          )
-        }
+      val duplicateContentModules = pluginInfo.content.groupBy { it.name }.filter { it.value.size > 1 }.keys
+      if (duplicateContentModules.isNotEmpty()) {
+        reportError(
+          "Plugin '${pluginInfo.pluginId}' has duplicated content modules declarations: ${duplicateContentModules.joinToString()}",
+          pluginInfo.sourceModule,
+          mapOf(
+            "descriptorFile" to pluginInfo.descriptorFile,
+            "duplicateContentModules" to duplicateContentModules.joinToString(),
+          ),
+        )
       }
 
       for (contentModuleInfo in pluginInfo.content) {
@@ -310,9 +315,44 @@ class PluginModelValidator(
           )
         }
       }
+
+      // in the end, after processing content and dependencies
+      checkDepends(pluginInfo, descriptor)
     }
 
     return PluginValidationResult(_errors, pluginIdToInfo)
+  }
+
+  private fun checkDepends(
+    pluginInfo: ModuleInfo,
+    descriptor: RawPluginDescriptor,
+  ) {
+    val dependsPerTarget = descriptor.depends.groupBy { it.pluginId }
+    for ((target, depends) in dependsPerTarget.filter { (_, depends) -> depends.any { it.isOptional } && depends.any { !it.isOptional } }) {
+      if (pluginInfo.sourceModule.name in setOf("intellij.android.plugin.descriptor", "intellij.rider.plugins.android")) continue
+      reportError(
+        message = "Both optional and strict <depends> found targeting the plugin '${target}'.",
+        sourceModule = pluginInfo.sourceModule,
+        params = mapOf(
+          "descriptorFile" to pluginInfo.descriptorFile,
+          "depends" to depends,
+        )
+      )
+    }
+
+    if (validationOptions.reportDependsTagInPluginXmlWithPackageAttribute && pluginInfo.packageName != null) {
+      descriptor.depends.firstOrNull { !it.isOptional }?.let {
+        reportError(
+          "The old format should not be used for a plugin with the specified package prefix (${pluginInfo.packageName}), but `depends` tag is used." +
+          " Please use the new format (see https://github.com/JetBrains/intellij-community/blob/master/docs/plugin.md#the-dependencies-element)",
+          pluginInfo.sourceModule,
+          mapOf(
+            "descriptorFile" to pluginInfo.descriptorFile,
+            "depends" to it,
+          ),
+        )
+      }
+    }
   }
 
   private fun checkDependencies(
@@ -485,14 +525,24 @@ class PluginModelValidator(
         }
       }
 
-      if (moduleDescriptor.contentModules.isNotEmpty()) {
-        registerError(
-          "Module cannot define content",
-          mapOf(
-            "referencedDescriptorFile" to moduleInfo.descriptorFile
-          )
+      checkContentModuleUnexpectedElements(moduleDescriptor, referencingModuleInfo.sourceModule, moduleInfo)
+    }
+  }
+
+  // TODO same for depends
+  private fun checkContentModuleUnexpectedElements(
+    moduleDescriptor: RawPluginDescriptor,
+    sourceModule: JpsModule,
+    moduleInfo: ModuleInfo,
+  ) {
+    ContentModuleDescriptor.reportContentModuleUnexpectedElements(moduleDescriptor) {
+      reportError(
+        "Element '$it' has no effect in a content module descriptor",
+        sourceModule,
+        mapOf(
+          "referencedDescriptorFile" to moduleInfo.descriptorFile
         )
-      }
+      )
     }
   }
 
@@ -664,7 +714,7 @@ class PluginModelValidator(
     if (!file.exists()) return null
     
     val xmlInput = createNonCoalescingXmlStreamReader(file.inputStream(), file.pathString)
-    val rawPluginDescriptor = PluginDescriptorFromXmlStreamConsumer(ValidationReadModuleContext, xIncludeLoader).let {
+    val rawPluginDescriptor = PluginDescriptorFromXmlStreamConsumer(ValidationPluginDescriptorReaderContext, xIncludeLoader).let {
       it.consume(xmlInput)
       it.build()
     }

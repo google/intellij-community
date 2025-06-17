@@ -61,13 +61,17 @@ private class AddLocalInterpreterAction(
   private val onSdkCreated: Consumer<Sdk>,
 ) : AnAction(PyBundle.messagePointer("python.sdk.action.add.local.interpreter.text"), AllIcons.Nodes.HomeFolder), DumbAware {
   override fun actionPerformed(e: AnActionEvent) {
-    val dialogPresenter = PythonAddLocalInterpreterPresenter(moduleOrProject, errorSink = ShowingMessageErrorSync).apply {
-      // Model provides flow, but we need to call Consumer
-      sdkCreatedFlow.oneShotConsumer(onSdkCreated)
-    }
-    PythonAddLocalInterpreterDialog(dialogPresenter).show()
-    return
+    addLocalInterpreter(moduleOrProject, onSdkCreated)
   }
+}
+
+@ApiStatus.Internal
+fun addLocalInterpreter(moduleOrProject: ModuleOrProject, onSdkCreated: Consumer<Sdk>) {
+  val dialogPresenter = PythonAddLocalInterpreterPresenter(moduleOrProject, errorSink = ShowingMessageErrorSync).apply {
+    // Model provides flow, but we need to call Consumer
+    sdkCreatedFlow.oneShotConsumer(onSdkCreated)
+  }
+  PythonAddLocalInterpreterDialog(dialogPresenter).show()
 }
 
 private class AddInterpreterOnTargetAction(
@@ -82,7 +86,7 @@ private class AddInterpreterOnTargetAction(
       val model = PyConfigurableInterpreterList.getInstance(project).model
       val sdk = (wizard.currentStepObject as? TargetCustomToolWizardStep)?.customTool as? Sdk
       if (sdk != null) {
-        PythonNewInterpreterAddedCollector.logPythonNewInterpreterAdded(sdk)
+        PythonNewInterpreterAddedCollector.logPythonNewInterpreterAdded(sdk, isPreviouslyConfigured = true)
         if (model.findSdk(sdk.name) == null) {
           model.addSdk(sdk)
           model.apply()

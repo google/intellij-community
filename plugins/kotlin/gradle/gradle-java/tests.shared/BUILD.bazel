@@ -14,8 +14,14 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/gradle:gradle-tests_test_lib",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
+    "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/external-system-impl:externalSystem-impl",
+    "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//java/execution/impl",
@@ -87,6 +93,8 @@ jvm_library(
     "//plugins/kotlin/base/test:test_test_lib",
     "//java/openapi:java",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.shared:kotlin-gradle-scripting-shared",
+    "//plugins/kotlin/base/scripting.k1",
+    "//plugins/kotlin/base/scripting.k1:scripting.k1_test_lib",
   ]
 )
 

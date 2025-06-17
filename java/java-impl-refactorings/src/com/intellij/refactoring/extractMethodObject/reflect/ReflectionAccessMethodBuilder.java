@@ -107,7 +107,7 @@ public class ReflectionAccessMethodBuilder {
 
       String name = "p" + i; // To avoid confusion with local variables, the real parameter names are not used.
 
-      if (requiresObjectType(parameterType) || jvmType.arrayDimension > 0) {
+      if (requiresObjectType(parameterType)) {
         myParameters.add(new ParameterInfo(CommonClassNames.JAVA_LANG_OBJECT, name, jvmType));
       }
       else {
@@ -120,6 +120,12 @@ public class ReflectionAccessMethodBuilder {
   }
 
   private static boolean requiresObjectType(PsiType type) {
+    if (type instanceof PsiEllipsisType) {
+      return false;
+    }
+    if (type instanceof PsiArrayType) {
+      return true;
+    }
     PsiClass psiClass = PsiTypesUtil.getPsiClass(type);
     return psiClass != null && (psiClass.isRecord() || psiClass.isEnum());
   }
@@ -189,13 +195,11 @@ public class ReflectionAccessMethodBuilder {
   private static abstract class MyMemberAccessor implements MyBodyProvider {
     abstract String getMemberLookupExpression();
     abstract String getClassLookupExpression();
-    abstract String getAccessExpression();
+    abstract String getReturnExpression(String returnType);
     abstract String getMemberType();
 
     @Override
     public String createBody(String returnType) {
-      String returnExpression =
-        ("void".equals(returnType) ? "member." : "return (" + returnType + ")member.") + getAccessExpression();
       return "  java.lang.Class<?> klass = " + getClassLookupExpression() + ";\n" +
              "  " + getMemberType() + " member = null;\n" +
              "  int interfaceNumber = -1;\n" +
@@ -219,7 +223,7 @@ public class ReflectionAccessMethodBuilder {
              "    }\n" +
              "  }\n" +
              "  member.setAccessible(true);\n" +
-             "  " + returnExpression + ";\n";
+             "  " + getReturnExpression(returnType) + ";\n";
     }
   }
 
@@ -248,8 +252,10 @@ public class ReflectionAccessMethodBuilder {
     }
 
     @Override
-    public String getAccessExpression() {
-      return FieldAccessType.GET.equals(myAccessType) ? "get(object)" : "set(object, value)";
+    String getReturnExpression(String returnType) {
+      return FieldAccessType.GET.equals(myAccessType)
+             ? "return (" + returnType + ")member.get(object)"
+             : "member.set(object, value); \n return value";
     }
 
     @Override
@@ -297,8 +303,9 @@ public class ReflectionAccessMethodBuilder {
     }
 
     @Override
-    public String getAccessExpression() {
-      return "invoke" + parametersStringForInvoke();
+    String getReturnExpression(String returnType) {
+      String invokeString = "member.invoke" + parametersStringForInvoke();
+      return "void".equals(returnType) ? invokeString : "return (" + returnType + ")" + invokeString;
     }
   }
 
@@ -321,8 +328,8 @@ public class ReflectionAccessMethodBuilder {
     }
 
     @Override
-    public String getAccessExpression() {
-      return "newInstance" + parametersStringForInvoke();
+    String getReturnExpression(String returnType) {
+      return "return (" + returnType + ")member.newInstance" + parametersStringForInvoke();
     }
 
     @Override

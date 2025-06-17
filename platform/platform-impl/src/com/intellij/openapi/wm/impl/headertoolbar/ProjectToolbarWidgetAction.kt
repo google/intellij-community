@@ -3,6 +3,7 @@ package com.intellij.openapi.wm.impl.headertoolbar
 
 import com.intellij.icons.AllIcons
 import com.intellij.ide.*
+import com.intellij.ide.RecentProjectsManager.RecentProjectsChange
 import com.intellij.ide.impl.ProjectUtilCore
 import com.intellij.ide.plugins.newui.ListPluginComponent
 import com.intellij.openapi.actionSystem.*
@@ -18,13 +19,11 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.wm.impl.ExpandableComboAction
-import com.intellij.openapi.wm.impl.LEFT_ICONS_KEY
 import com.intellij.openapi.wm.impl.ToolbarComboButton
-import com.intellij.openapi.wm.impl.ToolbarComboButtonModel
-import com.intellij.ui.ClientProperty
-import com.intellij.ui.GroupHeaderSeparator
-import com.intellij.ui.IdeUICustomization
+import com.intellij.ui.*
+import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.components.panels.NonOpaquePanel
+import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.AlignY
 import com.intellij.ui.dsl.builder.EmptySpacingConfiguration
 import com.intellij.ui.dsl.builder.panel
@@ -32,13 +31,19 @@ import com.intellij.ui.dsl.gridLayout.UnscaledGaps
 import com.intellij.ui.popup.ActionPopupOptions
 import com.intellij.ui.popup.ActionPopupStep
 import com.intellij.ui.popup.PopupFactoryImpl
+import com.intellij.ui.popup.list.ListPopupImpl
 import com.intellij.ui.popup.list.ListPopupModel
 import com.intellij.ui.popup.list.SelectablePanel
 import com.intellij.ui.util.maximumWidth
 import com.intellij.util.IconUtil
+import com.intellij.util.application
 import com.intellij.util.ui.*
 import com.intellij.util.ui.accessibility.AccessibleContextUtil
 import kotlinx.coroutines.awaitCancellation
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.Nls
+import org.jetbrains.annotations.NonNls
+import org.jetbrains.annotations.SystemIndependent
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.ComponentAdapter
@@ -57,12 +62,19 @@ private val projectKey = Key.create<Project>("project-widget-project")
 internal class DefaultOpenProjectSelectionPredicateSupplier : OpenProjectSelectionPredicateSupplier {
   override fun getPredicate(): Predicate<AnAction> {
     val openProjects = ProjectUtilCore.getOpenProjects()
-    val paths = openProjects.map { it.basePath }
-    return Predicate { action -> (action as? ReopenProjectAction)?.projectPath in paths }
+    val paths: List<@SystemIndependent @NonNls String?> = openProjects.map { it.basePath }
+    return Predicate { action ->
+      when (action) {
+        is ReopenProjectAction -> action.projectPath in paths
+        is ProjectToolbarWidgetPresentable -> action.status?.isOpened == true
+        else -> false
+      }
+    }
   }
 }
 
-class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
+@ApiStatus.Internal
+open class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
 
   override fun createPopup(event: AnActionEvent): JBPopup? {
     val step = createStep(createActionGroup(event), event.dataContext)
@@ -88,17 +100,6 @@ class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
     }
   }
 
-  override fun createToolbarComboButton(model: ToolbarComboButtonModel): ToolbarComboButton {
-    return object : ToolbarComboButton(model) {
-      override fun updateFromPresentation(presentation: Presentation) {
-        super.updateFromPresentation(presentation)
-        // Doesn't work for remdev because it uses BackendToolbarComboButton, maybe this should be a client property as well?
-        // Or just make it the default?
-        betweenIconsGap = 9
-      }
-    }
-  }
-
   override fun updateCustomComponent(component: JComponent, presentation: Presentation) {
     super.updateCustomComponent(component, presentation)
 
@@ -114,14 +115,24 @@ class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
     e.presentation.description = FileUtil.getLocationRelativeToUserHome(project?.guessProjectDir()?.path) ?: projectName
     e.presentation.putClientProperty(projectKey, project)
     val icons = buildList {
-      UpdatesInfoProviderManager.getInstance().getUpdateIcons().let { addAll(it) }
+      UpdatesInfoProviderManager.getInstance().getUpdateIcons().let { updateIcons ->
+        for (icon in updateIcons) {
+          if (isNotEmpty()) addGap()
+          add(icon)
+        }
+      }
 
       val customizer = ProjectWindowCustomizerService.getInstance()
       if (project != null && customizer.isAvailable()) {
+        if (isNotEmpty()) addGap()
         add(customizer.getProjectIcon(project))
       }
     }
-    e.presentation.putClientProperty(LEFT_ICONS_KEY, icons)
+    e.presentation.icon = when (icons.size) {
+      0 -> null
+      1 -> icons.single()
+      else -> IconManager.getInstance().createRowIcon(*icons.toTypedArray())
+    }
   }
 
   private fun createPopup(it: Project, step: ListPopupStep<PopupFactoryImpl.ActionItem>): ListPopup {
@@ -144,6 +155,16 @@ class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
 
     val result = JBPopupFactory.getInstance().createListPopup(it, step, renderer)
 
+    if (result is ListPopupImpl) {
+      ClientProperty.put(result.list, AnimatedIcon.ANIMATION_IN_RENDERER_ALLOWED, true)
+
+      application.messageBus.connect(result).subscribe(RecentProjectsManager.RECENT_PROJECTS_CHANGE_TOPIC, object : RecentProjectsChange {
+        override fun change() {
+          result.list.repaint()
+        }
+      })
+    }
+
     return result
   }
 
@@ -161,7 +182,7 @@ class ProjectToolbarWidgetAction : ExpandableComboAction(), DumbAware {
     val group = ActionManager.getInstance().getAction("ProjectWidget.Actions") as ActionGroup
     result.addAll(group.getChildren(initEvent).asList())
     val openProjectsPredicate = OpenProjectSelectionPredicateSupplier.getInstance().getPredicate()
-    val actionsMap = RecentProjectListActionProvider.getInstance().getActions()
+    val actionsMap = RecentProjectListActionProvider.getInstance().getActions(initEvent.project)
       .asSequence()
       .take(MAX_RECENT_COUNT)
       .groupBy { openProjectsPredicate.test(it) }
@@ -294,29 +315,51 @@ private class ProjectWidgetRenderer : ListCellRenderer<PopupFactoryImpl.ActionIt
     val content = panel {
       customizeSpacingConfiguration(EmptySpacingConfiguration()) {
         row {
+          val rowGaps = UnscaledGaps(bottom = 2, top = 2)
+
           icon(IconUtil.downscaleIconToSize(action.projectIcon, userScaledProjectIconSize(), userScaledProjectIconSize()))
             .align(AlignY.TOP)
-            .customize(UnscaledGaps(right = 8))
+            .customize(rowGaps.copy(right = 8))
 
           panel {
-            val textGaps = UnscaledGaps(bottom = 4, top = 4)
             row {
               nameLbl = label(action.projectNameToDisplay)
-                .customize(textGaps.copy(top = 0))
+                .customize(rowGaps)
                 .applyToComponent {
                   foreground = if (isSelected) NamedColorUtil.getListSelectionForeground(true) else UIUtil.getListForeground()
                 }.component
+
+              val projectStatus = action.status
+              if (projectStatus?.statusText != null) {
+                label(projectStatus.statusText)
+                  .customize(rowGaps.copy(left = 4, right = 8))
+                  .applyToComponent {
+                    font = JBFont.smallOrNewUiMedium()
+                    foreground = UIUtil.getLabelInfoForeground()
+                  }
+              }
+
+              if (projectStatus?.progressText != null) {
+                panel {
+                  row {
+                    label(projectStatus.progressText)
+                      .align(AlignY.CENTER)
+                      .applyToComponent {
+                        icon = AnimatedIcon.Default.INSTANCE
+                        font = JBFont.smallOrNewUiMedium()
+                      }
+                  }
+                }
+                  .align(AlignX.RIGHT)
+              }
             }
             val providerPath = action.providerPathToDisplay
             if (providerPath != null) {
               row {
-                icon(action.providerIcon ?: AllIcons.Nodes.Console)
-                  .align(AlignY.CENTER)
-                  .customize(customGaps = UnscaledGaps(right = 5))
                 providerPathLbl = label(providerPath)
-                  .customize(textGaps)
-                  .align(AlignY.CENTER)
+                  .customize(rowGaps)
                   .applyToComponent {
+                    icon = action.providerIcon ?: AllIcons.Welcome.RecentProjects.RemoteProject
                     font = JBFont.smallOrNewUiMedium()
                     foreground = UIUtil.getLabelInfoForeground()
                   }.component
@@ -326,7 +369,7 @@ private class ProjectWidgetRenderer : ListCellRenderer<PopupFactoryImpl.ActionIt
             if (projectPathToDisplay != null) {
               row {
                 projectPathLbl = label(projectPathToDisplay)
-                  .customize(textGaps)
+                  .customize(rowGaps)
                   .applyToComponent {
                     font = JBFont.smallOrNewUiMedium()
                     foreground = UIUtil.getLabelInfoForeground()
@@ -336,19 +379,32 @@ private class ProjectWidgetRenderer : ListCellRenderer<PopupFactoryImpl.ActionIt
             action.branchName?.let {
               row {
                 label(it)
-                  .customize(textGaps)
+                  .customize(rowGaps)
                   .applyToComponent {
-                    icon = AllIcons.Vcs.Branch
+                    icon = IconUtil.colorize(AllIcons.Vcs.Branch, UIUtil.getLabelInfoForeground(), keepGray = false, keepBrightness = false)
                     font = JBFont.smallOrNewUiMedium()
                     foreground = UIUtil.getLabelInfoForeground()
                   }.component
               }
             }
           }
+
+          val hasSubstep = value.isEnabled && action is ActionGroup && !value.isSubstepSuppressed
+          if (hasSubstep) {
+            panel {
+              row {
+                val arrow = if (isSelected) AllIcons.Icons.Ide.MenuArrowSelected else AllIcons.Icons.Ide.MenuArrow
+                icon(arrow)
+                  .customize(rowGaps.copy(left = 6))
+              }
+            }
+              .align(AlignX.RIGHT)
+              .align(AlignY.TOP)
+          }
         }
       }
     }.apply {
-      border = JBUI.Borders.empty(8, 0)
+      border = JBUI.Borders.empty(6, 0)
       isOpaque = false
     }
 
@@ -392,6 +448,7 @@ private fun createSeparator(separator: ListSeparator, hideLine: Boolean): JCompo
 }
 
 
+@JvmDefaultWithCompatibility
 interface ProjectToolbarWidgetPresentable {
   val projectNameToDisplay: @NlsSafe String
   val providerPathToDisplay: @NlsSafe String? get() = null
@@ -400,4 +457,25 @@ interface ProjectToolbarWidgetPresentable {
   val projectIcon: Icon
   val providerIcon: Icon?
   val activationTimestamp: Long?
+
+  @get:ApiStatus.Internal
+  val status: ProjectStatus? get() = null
+
+  /**
+   * Combined info to be used, when only a single-line-label is applicable.
+   */
+  val nameToDisplayAsText: @NlsSafe String get() = projectNameToDisplay
 }
+
+@ApiStatus.Internal
+class ProjectStatus(
+  val isOpened: Boolean,
+  val statusText: @Nls String?,
+  val progressText: @Nls String?,
+)
+
+private fun MutableList<in Icon>.addGap() {
+  add(EmptyIcon.create(BETWEEN_ICONS_GAP, 1))
+}
+
+private const val BETWEEN_ICONS_GAP = 9

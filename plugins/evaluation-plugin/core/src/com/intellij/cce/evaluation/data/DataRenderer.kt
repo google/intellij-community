@@ -23,6 +23,14 @@ sealed interface DataRenderer<in T> {
     override val serialName: String = "inline_double"
   }
 
+  data object InlineInt : DataRenderer<Int> {
+    override val serialName: String = "inline_int"
+  }
+
+  data object ClickableLink : DataRenderer<String> {
+    override val serialName: String = "clickable_link"
+  }
+
   data class Text(val wrapping: Boolean = false, val showEmpty: Boolean = false) : DataRenderer<String> {
     override val serialName: String = "text"
     override fun skip(value: String): Boolean = !showEmpty && value.isBlank()
@@ -30,6 +38,10 @@ sealed interface DataRenderer<in T> {
 
   data object Lines : DataRenderer<List<String>> {
     override val serialName: String = "lines"
+  }
+
+  data object Snippets : DataRenderer<List<String>> {
+    override val serialName: String = "snippets"
   }
 
   data object TextDiff : DataRenderer<TextUpdate> {
@@ -50,13 +62,20 @@ sealed interface DataRenderer<in T> {
         "inline_boolean" -> InlineBoolean
         "inline_long" -> InlineLong
         "inline_double" -> InlineDouble
+        "inline_int" -> InlineInt
+        "clickable_link" -> ClickableLink
         "text" -> context?.deserialize(json, Text::class.java)
         "lines" -> Lines
         "text_diff" -> TextDiff
+        "snippets" -> Snippets
         else -> throw IllegalArgumentException("Unknown type: $type")
       }
     }
   }
+}
+
+interface HasDescription {
+  val descriptionText: String
 }
 
 interface TextUpdate {
@@ -70,4 +89,6 @@ interface TextUpdate {
   private class Impl(override val originalText: String, override val updatedText: String) : TextUpdate
 }
 
-data class FileUpdate(val filePath: String, override val originalText: String, override val updatedText: String) : TextUpdate
+data class FileUpdate(val filePath: String, override val originalText: String, override val updatedText: String) : TextUpdate, HasDescription {
+  override val descriptionText: String = filePath
+}

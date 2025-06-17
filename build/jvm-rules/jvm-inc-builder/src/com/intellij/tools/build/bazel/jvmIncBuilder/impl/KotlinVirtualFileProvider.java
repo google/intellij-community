@@ -16,14 +16,18 @@ public class KotlinVirtualFileProvider {
   }
 
   public void findVfsChildren(@NotNull String parentName, @NotNull Consumer<String> dirConsumer, @NotNull Consumer<String> consumer) {
-    outputSink.list(parentName, false).forEach(path -> {
+    for (String path : outputSink.list(parentName, false)) {
       if (ZipOutputBuilder.isDirectoryName(path)) {
-        dirConsumer.accept(path);
+        // dirConsumer expects directory name
+        int begin = parentName.isEmpty()? 0 : parentName.length() + 1;
+        int end = path.length() - 1;
+        dirConsumer.accept(path.substring(begin, end));
       }
       else {
+        // file consumer expects file path
         consumer.accept(path);
       }
-    });
+    }
   }
 
   public int getSize(@NotNull String relativePath) {

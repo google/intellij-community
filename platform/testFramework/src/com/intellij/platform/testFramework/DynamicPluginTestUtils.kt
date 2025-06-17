@@ -1,77 +1,61 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework
 
-import com.intellij.ide.plugins.DynamicPlugins
-import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
-import com.intellij.ide.plugins.PluginDescriptorLoadingContext
-import com.intellij.ide.plugins.PluginInitializationContext
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.ide.plugins.loadDescriptorFromFileOrDirInTests
+import com.intellij.ide.plugins.*
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.platform.testFramework.plugins.*
 import com.intellij.testFramework.IndexingTestUtil
 import org.assertj.core.api.Assertions.assertThat
-import java.nio.file.Files
 import java.nio.file.Path
 
-@JvmOverloads
-fun loadAndInitDescriptorInTest(
-  dir: Path,
-  isBundled: Boolean = false,
-  disabledPlugins: Set<String> = emptySet(),
-): IdeaPluginDescriptorImpl {
-  assertThat(dir).exists()
-  PluginManagerCore.getAndClearPluginLoadingErrors()
+internal val StubBuildNumber: BuildNumber get() = BuildNumber.fromString("2042.42")!!
 
-  val buildNumber = BuildNumber.fromString("2042.42")!!
-  val loadingContext = PluginDescriptorLoadingContext(
-    getBuildNumberForDefaultDescriptorVersion = { buildNumber }
-  )
-  val initContext = PluginInitializationContext.buildForTest(
-    essentialPlugins = emptySet(),
-    disabledPlugins = disabledPlugins.mapTo(LinkedHashSet(), PluginId::getId),
-    expiredPlugins = emptySet(),
-    brokenPluginVersions = emptyMap(),
-    getProductBuildNumber = { buildNumber },
-    requirePlatformAliasDependencyForLegacyPlugins = false,
-    checkEssentialPlugins = false,
-    explicitPluginSubsetToLoad = null,
-    disablePluginLoadingCompletely = false,
-  )
+internal val StubPluginDescriptorLoadingContext: PluginDescriptorLoadingContext get() = PluginDescriptorLoadingContext(
+  getBuildNumberForDefaultDescriptorVersion = { StubBuildNumber }
+)
+
+@JvmOverloads
+fun loadDescriptorInTest(
+  fileOrDir: Path,
+  isBundled: Boolean = false,
+  loadingContext: PluginDescriptorLoadingContext = StubPluginDescriptorLoadingContext
+): PluginMainDescriptor {
+  assertThat(fileOrDir).exists()
+  PluginManagerCore.getAndClearPluginLoadingErrors()
   val result = loadDescriptorFromFileOrDirInTests(
-    file = dir,
+    file = fileOrDir,
     loadingContext = loadingContext,
     isBundled = isBundled,
   )
   if (result == null) {
     assertThat(PluginManagerCore.getAndClearPluginLoadingErrors()).isNotEmpty()
-    throw AssertionError("Cannot load plugin from $dir")
+    throw AssertionError("Cannot load plugin from $fileOrDir")
   }
-  result.initialize(context = initContext)
   return result
 }
 
 @JvmOverloads
 fun loadExtensionWithText(extensionTag: String, ns: String = "com.intellij"): Disposable {
   return loadPluginWithText(
-    pluginBuilder = PluginBuilder.withModulesLang().extensions(extensionTag, ns),
-    path = FileUtil.createTempDirectory("test", "test", true).toPath(),
+    pluginSpec = plugin {
+      dependsIntellijModulesLang()
+      extensions(extensionTag, ns)
+    },
+    pluginsDir = FileUtil.createTempDirectory("test", "test", true).toPath(),
   ).also {
     IndexingTestUtil.waitUntilIndexesAreReadyInAllOpenedProjects()
   }
 }
 
 fun loadPluginWithText(
-  pluginBuilder: PluginBuilder,
-  path: Path,
-  disabledPlugins: Set<String> = emptySet(),
+  pluginSpec: PluginSpec,
+  pluginsDir: Path,
 ): Disposable {
-  val descriptor = loadAndInitDescriptorInTest(
-    pluginBuilder = pluginBuilder,
-    rootPath = path,
-    disabledPlugins = disabledPlugins,
+  val descriptor = loadDescriptorInTest(
+    pluginSpec = pluginSpec,
+    pluginsDir = pluginsDir,
   )
   assertThat(DynamicPlugins.checkCanUnloadWithoutRestart(descriptor)).isNull()
   try {
@@ -90,24 +74,12 @@ fun loadPluginWithText(
   }
 }
 
-fun loadAndInitDescriptorInTest(
-  pluginBuilder: PluginBuilder,
-  rootPath: Path,
-  disabledPlugins: Set<String> = emptySet(),
-  useTempDir: Boolean = false,
-): IdeaPluginDescriptorImpl {
-  val path = if (useTempDir)
-    Files.createTempDirectory(rootPath, null)
-  else
-    rootPath
-
-  val pluginDirectory = path.resolve("plugin")
-  pluginBuilder.build(pluginDirectory)
-
-  return loadAndInitDescriptorInTest(
-    dir = pluginDirectory,
-    disabledPlugins = disabledPlugins,
-  )
+fun loadDescriptorInTest(
+  pluginSpec: PluginSpec,
+  pluginsDir: Path
+): PluginMainDescriptor {
+  val path = pluginSpec.buildDistribution(pluginsDir)
+  return loadDescriptorInTest(fileOrDir = path)
 }
 
 fun setPluginClassLoaderForMainAndSubPlugins(rootDescriptor: IdeaPluginDescriptorImpl, classLoader: ClassLoader?) {

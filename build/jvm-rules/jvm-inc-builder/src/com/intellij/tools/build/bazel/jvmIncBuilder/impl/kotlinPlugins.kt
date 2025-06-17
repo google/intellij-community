@@ -3,12 +3,12 @@ package com.intellij.tools.build.bazel.jvmIncBuilder.impl
 
 import androidx.compose.compiler.plugins.kotlin.ComposeCommandLineProcessor
 import androidx.compose.compiler.plugins.kotlin.ComposePluginRegistrar
+import org.jetbrains.kotlin.backend.common.output.OutputFileCollection
 import org.jetbrains.kotlin.cli.jvm.plugins.PluginCliParser.RegisteredPluginInfo
-import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
-import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
-import org.jetbrains.kotlin.compiler.plugin.PluginProcessingException
+import org.jetbrains.kotlin.compiler.plugin.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.jvm.abi.JvmAbiCommandLineProcessor
+import org.jetbrains.kotlin.jvm.abi.JvmAbiComponentRegistrar
 import org.jetbrains.kotlin.util.ServiceLoaderLite
 import org.jetbrains.kotlinx.serialization.compiler.extensions.SerializationComponentRegistrar
 import org.jetbrains.kotlinx.serialization.compiler.extensions.SerializationPluginOptions
@@ -17,14 +17,13 @@ import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.net.URLClassLoader
 import java.nio.file.Path
-import kotlin.collections.iterator
-import kotlin.getValue
 
 
 @OptIn(ExperimentalCompilerApi::class)
 fun configurePlugins(
   pluginIdToPluginClasspath: Map<String, String>,
   workingDir: Path,
+  abiConsumer: ((OutputFileCollection) -> Unit)?,
   consumer: (RegisteredPluginInfo) -> Unit,
 ) {
   for ((id, paths) in pluginIdToPluginClasspath) {
@@ -63,6 +62,23 @@ fun configurePlugins(
       }
     }
   }
+
+  if (abiConsumer != null) {
+    val jvmAbiCommandLineProcessor = JvmAbiCommandLineProcessor()
+    val pluginId = jvmAbiCommandLineProcessor.pluginId
+    consumer(RegisteredPluginInfo(
+      componentRegistrar = null,
+      compilerPluginRegistrar = JvmAbiComponentRegistrar(abiConsumer),
+      commandLineProcessor = jvmAbiCommandLineProcessor,
+      pluginOptions = listOf(
+        CliOptionValue(pluginId, JvmAbiCommandLineProcessor.OUTPUT_PATH_OPTION.optionName, ""), // Placeholder to satisfy the "required option" condition. The output is collected into memory
+        CliOptionValue(pluginId, JvmAbiCommandLineProcessor.REMOVE_DATA_CLASS_COPY_IF_CONSTRUCTOR_IS_PRIVATE_OPTION.optionName, "true"),
+        CliOptionValue(pluginId, JvmAbiCommandLineProcessor.REMOVE_PRIVATE_CLASSES_OPTION.optionName, "true"),
+        CliOptionValue(pluginId, JvmAbiCommandLineProcessor.REMOVE_DEBUG_INFO_OPTION.optionName, "true"),
+      )
+    ))
+  }
+
 }
 
 @OptIn(ExperimentalCompilerApi::class)
@@ -109,11 +125,16 @@ private class CompilerPluginProvider {
       registrar = "com.jetbrains.rhizomedb.plugin.RhizomedbComponentRegistrar",
       commandLineProcessor = "com.jetbrains.rhizomedb.plugin.RhizomedbCommandLineProcessor",
     )
+    private val rpc by getConstructor(
+      registrar = "com.jetbrains.fleet.rpc.plugin.RpcComponentRegistrar",
+      commandLineProcessor = "com.jetbrains.fleet.rpc.plugin.RpcCommandLineProcessor",
+    )
 
     fun provide(id: String): RegisteredPluginInfo {
       return when (id) {
         "jetbrains.fleet.expects-compiler-plugin" -> createPluginInfo(expects)
         "org.jetbrains.fleet.rhizomedb-compiler-plugin" -> createPluginInfo(rhizomeDb)
+        "com.jetbrains.fleet.rpc-compiler-plugin" -> createPluginInfo(rpc)
         else -> throw IllegalArgumentException("plugin requires classpath: $id")
       }
     }

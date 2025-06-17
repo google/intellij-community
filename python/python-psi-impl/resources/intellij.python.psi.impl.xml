@@ -1,6 +1,7 @@
 <idea-plugin>
   <dependencies>
     <module name="intellij.python.psi"/>
+    <module name="intellij.python.community.helpersLocator"/>
   </dependencies>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -71,10 +72,6 @@
     <lang.elementManipulator forClass="com.jetbrains.python.psi.PyKeywordPattern"
                              implementationClass="com.jetbrains.python.psi.impl.references.PyKeywordPatternManipulator"/>
     <lang.parserDefinition language="Python" implementationClass="com.jetbrains.python.PythonParserDefinition"/>
-
-    <lang.lineWrapStrategy language="Python" implementationClass="com.jetbrains.python.formatter.PyLineWrapPositionStrategy"/>
-
-    <lang.commenter language="Python" implementationClass="com.jetbrains.python.PythonCommenter"/>
 
     <!-- PyFunctionTypeAnnotation -->
     <lang.parserDefinition language="PyFunctionTypeComment"
@@ -509,6 +506,9 @@
     <extensionPoint qualifiedName="Pythonid.customDecoratorStubType"
                     interface="com.jetbrains.python.psi.impl.stubs.PyCustomDecoratorStubType"
                     dynamic="true"/>
+    <extensionPoint qualifiedName="Pythonid.implicitAsyncContext"
+                    interface="com.jetbrains.python.validation.PyImplicitAsyncContextProvider"
+                    dynamic="true"/>
 
     <extensionPoint qualifiedName="Pythonid.visitorFilter"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
@@ -529,9 +529,6 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="Pythonid.pyiStubSuppressor"
                     interface="com.jetbrains.python.pyi.PyiStubSuppressor"
-                    dynamic="true"/>
-    <extensionPoint qualifiedName="com.jetbrains.python.pythonHelpersLocator"
-                    interface="com.jetbrains.python.PythonHelpersLocator"
                     dynamic="true"/>
   </extensionPoints>
 
@@ -568,11 +565,6 @@
     <!-- IPython -->
     <pyReferenceResolveProvider implementation="com.jetbrains.python.psi.resolve.PyIPythonBuiltinReferenceResolveProvider"/>
 
-    <!-- User skeletons -->
-    <pyModuleMembersProvider implementation="com.jetbrains.python.codeInsight.userSkeletons.PyUserSkeletonsModuleMembersProvider"/>
-    <pyClassMembersProvider implementation="com.jetbrains.python.codeInsight.userSkeletons.PyUserSkeletonsClassMembersProvider"/>
-    <typeProvider implementation="com.jetbrains.python.codeInsight.userSkeletons.PyUserSkeletonsTypeProvider"/>
-
     <pyReferenceResolveProvider implementation="com.jetbrains.python.psi.resolve.PythonBuiltinReferenceResolveProvider"/>
     <pyReferenceResolveProvider implementation="com.jetbrains.python.psi.resolve.PythonOverridingBuiltinReferenceResolveProvider"/>
 
@@ -588,7 +580,6 @@
     <typeProvider implementation="com.jetbrains.python.numpy.codeInsight.NumpyDocStringTypeProvider"
                   order="before pythonDocstringTypeProvider"/>
     <pyClassMembersProvider implementation="com.jetbrains.python.numpy.codeInsight.NumpyClassMembersProvider"/>
-    <pyModuleMembersProvider implementation="com.jetbrains.python.numpy.codeInsight.NumpyModuleMembersProvider"/>
     <resolveResultRater implementation="com.jetbrains.python.numpy.codeInsight.NumpyResolveRater"/>
     <pyiStubSuppressor implementation="com.jetbrains.python.numpy.codeInsight.NumpyPyiStubsSuppressor"/>
 
@@ -610,14 +601,13 @@
     <pyModuleMembersProvider implementation="com.jetbrains.python.codeInsight.stdlib.PyStdlibOverridingModuleMembersProvider"/>
     <typeCheckerExtension implementation="com.jetbrains.python.codeInsight.stdlib.PyDataclassInstanceProtocolTypeCheckerExtension"/>
 
+    <implicitAsyncContext implementation="com.jetbrains.python.validation.PyDevConsoleAsyncContextProvider"/>
+
     <!-- TensorFlow -->
     <importResolver implementation="com.jetbrains.python.tensorFlow.PyTensorFlowImportResolver"/>
     <pyModuleMembersProvider implementation="com.jetbrains.python.tensorFlow.PyTensorFlowModuleMembersProvider"/>
     <pyiStubSuppressor implementation="com.jetbrains.python.tensorFlow.TensorflowPyiStubsSuppressor"/>
   </extensions>
 
-  <extensions defaultExtensionNs="com.jetbrains.python">
-    <pythonHelpersLocator implementation="com.jetbrains.python.PythonHelpersLocatorDefault" />
-  </extensions>
 
 </idea-plugin>

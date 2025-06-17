@@ -6,7 +6,9 @@ package com.intellij.platform.eel
 
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.EelTunnelsApi.Connection
+import com.intellij.platform.eel.path.EelPath
 import kotlinx.coroutines.channels.SendChannel
+import org.jetbrains.annotations.ApiStatus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -34,6 +36,7 @@ import kotlin.time.Duration.Companion.seconds
  * One should not forget to invoke [Connection.close] when the connection is not needed.
  */
 @GeneratedBuilder.Result
+@ApiStatus.Internal
 fun EelTunnelsApi.getAcceptorForRemotePort(): EelTunnelsApiHelpers.GetAcceptorForRemotePort =
   EelTunnelsApiHelpers.GetAcceptorForRemotePort(
     owner = this,
@@ -65,16 +68,29 @@ fun EelTunnelsApi.getAcceptorForRemotePort(): EelTunnelsApiHelpers.GetAcceptorFo
  * To configure a socket before connection use [configureSocketBeforeConnection]. After that, use [Connection.configureSocket]
  */
 @GeneratedBuilder.Result
+@ApiStatus.Experimental
 fun EelTunnelsApi.getConnectionToRemotePort(): EelTunnelsApiHelpers.GetConnectionToRemotePort =
   EelTunnelsApiHelpers.GetConnectionToRemotePort(
     owner = this,
   )
 
+/**
+ * See [listenOnUnixSocket] that accepts [EelPath] parameter for full documentation.
+ */
+@GeneratedBuilder.Result
+@ApiStatus.Experimental
+fun EelTunnelsApi.listenOnUnixSocket(): EelTunnelsApiHelpers.ListenOnUnixSocket =
+  EelTunnelsApiHelpers.ListenOnUnixSocket(
+    owner = this,
+  )
+
+@ApiStatus.Experimental
 object EelTunnelsApiHelpers {
   /**
    * Create it via [com.intellij.platform.eel.EelTunnelsApi.getAcceptorForRemotePort].
    */
   @GeneratedBuilder.Result
+  @ApiStatus.Internal
   class GetAcceptorForRemotePort(
     private val owner: EelTunnelsApi,
   ) : OwnedBuilder<EelTunnelsApi.ConnectionAcceptor> {
@@ -92,10 +108,12 @@ object EelTunnelsApiHelpers {
       this.configureServerSocket = arg
     }
 
+    @ApiStatus.Experimental
     fun hostname(arg: String): GetAcceptorForRemotePort = apply {
       this.hostname = arg
     }
 
+    @ApiStatus.Experimental
     fun port(arg: UShort): GetAcceptorForRemotePort = apply {
       this.port = arg
     }
@@ -103,6 +121,7 @@ object EelTunnelsApiHelpers {
     /**
      * @see [Builder.preferIPv4]
      */
+    @ApiStatus.Experimental
     fun protocolPreference(arg: EelIpPreference): GetAcceptorForRemotePort = apply {
       this.protocolPreference = arg
     }
@@ -119,6 +138,7 @@ object EelTunnelsApiHelpers {
     /**
      * @see [Builder.connectionTimeout]
      */
+    @ApiStatus.Experimental
     fun timeout(arg: Duration): GetAcceptorForRemotePort = apply {
       this.timeout = arg
     }
@@ -128,6 +148,7 @@ object EelTunnelsApiHelpers {
      * with an instance of [com.intellij.platform.eel.EelTunnelsApi.GetAcceptorForRemotePort].
      */
     @Throws(EelConnectionError::class)
+    @ThrowsChecked(EelConnectionError::class)
     override suspend fun eelIt(): EelTunnelsApi.ConnectionAcceptor =
       owner.getAcceptorForRemotePort(
         GetAcceptorForRemotePortImpl(
@@ -144,6 +165,7 @@ object EelTunnelsApiHelpers {
    * Create it via [com.intellij.platform.eel.EelTunnelsApi.getConnectionToRemotePort].
    */
   @GeneratedBuilder.Result
+  @ApiStatus.Experimental
   class GetConnectionToRemotePort(
     private val owner: EelTunnelsApi,
   ) : OwnedBuilder<Connection> {
@@ -157,15 +179,18 @@ object EelTunnelsApiHelpers {
 
     private var timeout: Duration = 10.seconds
 
+    @ApiStatus.Internal
     fun configureSocketBeforeConnection(arg: @ExtensionFunctionType Function1<ConfigurableClientSocket, Unit>): GetConnectionToRemotePort =
       apply {
         this.configureSocketBeforeConnection = arg
       }
 
+    @ApiStatus.Experimental
     fun hostname(arg: String): GetConnectionToRemotePort = apply {
       this.hostname = arg
     }
 
+    @ApiStatus.Experimental
     fun port(arg: UShort): GetConnectionToRemotePort = apply {
       this.port = arg
     }
@@ -173,6 +198,7 @@ object EelTunnelsApiHelpers {
     /**
      * @see [Builder.preferIPv4]
      */
+    @ApiStatus.Experimental
     fun protocolPreference(arg: EelIpPreference): GetConnectionToRemotePort = apply {
       this.protocolPreference = arg
     }
@@ -189,6 +215,7 @@ object EelTunnelsApiHelpers {
     /**
      * @see [Builder.connectionTimeout]
      */
+    @ApiStatus.Experimental
     fun timeout(arg: Duration): GetConnectionToRemotePort = apply {
       this.timeout = arg
     }
@@ -198,6 +225,7 @@ object EelTunnelsApiHelpers {
      * with an instance of [com.intellij.platform.eel.EelTunnelsApi.GetConnectionToRemotePortArgs].
      */
     @Throws(EelConnectionError::class)
+    @ThrowsChecked(EelConnectionError::class)
     override suspend fun eelIt(): Connection =
       owner.getConnectionToRemotePort(
         GetConnectionToRemotePortArgsImpl(
@@ -206,6 +234,46 @@ object EelTunnelsApiHelpers {
           port = port,
           protocolPreference = protocolPreference,
           timeout = timeout,
+        )
+      )
+  }
+
+  /**
+   * Create it via [com.intellij.platform.eel.EelTunnelsApi.listenOnUnixSocket].
+   */
+  @GeneratedBuilder.Result
+  @ApiStatus.Experimental
+  class ListenOnUnixSocket(
+    private val owner: EelTunnelsApi,
+  ) : OwnedBuilder<EelTunnelsApi.ListenOnUnixSocketResult> {
+    private var parentDirectory: EelPath? = null
+
+    private var prefix: String = ""
+
+    private var suffix: String = ""
+
+    fun parentDirectory(arg: EelPath?): ListenOnUnixSocket = apply {
+      this.parentDirectory = arg
+    }
+
+    fun prefix(arg: String): ListenOnUnixSocket = apply {
+      this.prefix = arg
+    }
+
+    fun suffix(arg: String): ListenOnUnixSocket = apply {
+      this.suffix = arg
+    }
+
+    /**
+     * Complete the builder and call [com.intellij.platform.eel.EelTunnelsApi.listenOnUnixSocket]
+     * with an instance of [com.intellij.platform.eel.EelTunnelsApi.ListenOnUnixSocketTemporaryPathOptions].
+     */
+    override suspend fun eelIt(): EelTunnelsApi.ListenOnUnixSocketResult =
+      owner.listenOnUnixSocket(
+        ListenOnUnixSocketTemporaryPathOptionsImpl(
+          parentDirectory = parentDirectory,
+          prefix = prefix,
+          suffix = suffix,
         )
       )
   }

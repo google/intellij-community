@@ -310,6 +310,9 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
           }
           IdentifierHighlighterPassFactory.waitForIdentifierHighlighting(editor);
           waitForLazyQuickFixesUnderCaret(psiFile, editor);
+          NonBlockingReadActionImpl.waitForAsyncTaskCompletion();//auto-imports use non-blocking read actions to compute imports
+          NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+
           UIUtil.dispatchAllInvocationEvents();
           Segment focusModeRange = (editor instanceof EditorImpl) ? ((EditorImpl)editor).getFocusModeRange() : null;
           int startOffset = focusModeRange != null ? focusModeRange.getStartOffset() : 0;
@@ -707,7 +710,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   }
 
   @Override
-  public @NotNull List<IntentionAction> getAvailableIntentions(String @NotNull ... filePaths) {
+  public @NotNull @Unmodifiable List<IntentionAction> getAvailableIntentions(String @NotNull ... filePaths) {
     if (filePaths.length > 0) {
       configureByFilesInner(filePaths);
     }
@@ -1031,7 +1034,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   }
 
   @Override
-  public @NotNull Collection<Usage> testFindUsagesUsingAction(String @NotNull ... fileNames) {
+  public @NotNull @Unmodifiable Collection<Usage> testFindUsagesUsingAction(String @NotNull ... fileNames) {
     assertInitialized();
     if (fileNames.length > 0) { // don't change configured files if already configured
       configureByFiles(fileNames);

@@ -3,7 +3,6 @@ package com.intellij.codeInsight.completion.commands.impl
 
 import com.intellij.codeInsight.completion.command.*
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
-import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.idea.ActionsBundle
 import com.intellij.lang.ContextAwareActionHandler
@@ -18,8 +17,9 @@ import com.intellij.refactoring.JavaRefactoringActionHandlerFactory
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.actions.IntroduceVariableAction
 import org.jetbrains.annotations.Nls
-import javax.swing.Icon
+import java.util.Locale.getDefault
 
+//disabled because there is a conflict
 internal class JavaIntroduceVariableCommandProvider : CommandProvider {
   override fun getCommands(context: CommandCompletionProviderContext): List<CompletionCommand> {
     val editor = context.editor
@@ -40,14 +40,12 @@ internal class JavaIntroduceVariableCommandProvider : CommandProvider {
 }
 
 internal class JavaIntroduceVariableCommand : CompletionCommand(), CompletionCommandWithPreview {
-  override val name: String
-    get() = "Introduce variable"
+  override val synonyms: List<String>
+    get() = listOf("Introduce variable")
 
-  override val i18nName: @Nls String
-    get() = RefactoringBundle.message("introduce.variable.title")
-
-  override val icon: Icon
-    get() = AllIcons.Nodes.Variable
+  @Suppress("HardCodedStringLiteral")
+  override val presentableName: @Nls String
+    get() = RefactoringBundle.message("introduce.variable.title").lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }
 
   override fun execute(offset: Int, psiFile: PsiFile, editor: Editor?) {
     val action = IntroduceVariableAction()
@@ -60,7 +58,7 @@ internal class JavaIntroduceVariableCommand : CompletionCommand(), CompletionCom
     ActionUtil.performAction(action, event)
   }
 
-  override fun getPreview(): IntentionPreviewInfo? {
+  override fun getPreview(): IntentionPreviewInfo {
     return IntentionPreviewInfo.Html(ActionsBundle.message("action.IntroduceVariable.description"))
   }
 }

@@ -1,8 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel.path
 
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.directorySeparators
 
 internal class ArrayListEelAbsolutePath private constructor(
@@ -136,9 +136,9 @@ internal class ArrayListEelAbsolutePath private constructor(
     fun build(parts: List<String>, descriptor: EelDescriptor): EelPath {
       require(parts.isNotEmpty()) { "Can't build an absolute path from no path parts" }
 
-      val windowsRoot = when (descriptor.platform) {
-        is EelPlatform.Windows -> findAbsoluteUncPath(parts.first(), descriptor) ?: findAbsoluteTraditionalDosPath(parts.first(), descriptor)
-        is EelPlatform.Posix -> null
+      val windowsRoot = when (descriptor.osFamily) {
+        EelOsFamily.Windows -> findAbsoluteUncPath(parts.first(), descriptor) ?: findAbsoluteTraditionalDosPath(parts.first(), descriptor)
+        EelOsFamily.Posix -> null
       }
       when (windowsRoot) {
         null -> {
@@ -170,9 +170,9 @@ internal class ArrayListEelAbsolutePath private constructor(
 
     @Throws(EelPathException::class)
     fun parseOrNull(raw: String, descriptor: EelDescriptor): ArrayListEelAbsolutePath? =
-      when (descriptor.platform) {
-        is EelPlatform.Windows -> findAbsoluteUncPath(raw, descriptor) ?: findAbsoluteTraditionalDosPath(raw, descriptor)
-        is EelPlatform.Posix -> findAbsoluteUnixPath(raw, descriptor)
+      when (descriptor.osFamily) {
+        EelOsFamily.Windows -> findAbsoluteUncPath(raw, descriptor) ?: findAbsoluteTraditionalDosPath(raw, descriptor)
+        EelOsFamily.Posix -> findAbsoluteUnixPath(raw, descriptor)
       }
 
     /** https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats#unc-paths */

@@ -7,9 +7,9 @@ import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.eel.EelPlatform
 import com.intellij.platform.eel.fs.createTemporaryDirectory
 import com.intellij.platform.eel.fs.createTemporaryFile
+import com.intellij.platform.eel.isWindows
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
@@ -19,7 +19,6 @@ import com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalConten
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.ApiStatus.Internal
 import java.io.IOException
 import java.net.URI
 import java.nio.ByteBuffer
@@ -39,13 +38,30 @@ object EelPathUtils {
   private val LOG = com.intellij.openapi.diagnostic.logger<EelPathUtils>()
 
   /**
-   * Determines whether [path] correponds to the local Eel
+   * **Obsolete – avoid it in new code.**
+   *
+   * Exposes an implementation detail (whether a given *[Path]* is stored on a _local_ or _remote_ Eel),
+   * encouraging code that behaves differently for the two cases and therefore becomes **machine-dependent**.
+   * New APIs are designed so that callers do **not** have to know where a file physically resides.
+   *
+   * @return `true` if *path* is located in the local Eel.
    */
+  @ApiStatus.Obsolete
   @JvmStatic
   fun isPathLocal(path: Path): Boolean {
     return path.getEelDescriptor() == LocalEelDescriptor
   }
 
+  /**
+   * **Obsolete – avoid it in new code.**
+   *
+   * Although positioned one level higher than *isPathLocal*, this helper still bakes in the same
+   * local-vs-remote distinction, tying callers to a specific execution environment and reducing the
+   * portability of higher-level logic.
+   *
+   * @return `true` when the project's default Eel target is local.
+   */
+  @ApiStatus.Obsolete
   @JvmStatic
   fun isProjectLocal(project: Project): Boolean {
     val projectFilePath = project.projectFilePath ?: return true
@@ -53,26 +69,28 @@ object EelPathUtils {
   }
 
   @JvmStatic
+  @RequiresBackgroundThread(generateAssertion = false)
   fun createTemporaryFile(project: Project?, prefix: String = "", suffix: String = "", deleteOnExit: Boolean = true): Path {
     if (project == null || isProjectLocal(project)) {
       return Files.createTempFile(prefix, suffix)
     }
     val projectFilePath = project.projectFilePath ?: return Files.createTempFile(prefix, suffix)
     return runBlockingMaybeCancellable {
-      val eel = Path.of(projectFilePath).getEelDescriptor().upgrade()
+      val eel = Path.of(projectFilePath).getEelDescriptor().toEelApi()
       val file = eel.fs.createTemporaryFile().suffix(suffix).prefix(prefix).deleteOnExit(deleteOnExit).getOrThrowFileSystemException()
       file.asNioPath()
     }
   }
 
   @JvmStatic
+  @RequiresBackgroundThread(generateAssertion = false)
   fun createTemporaryDirectory(project: Project?, prefix: String = ""): Path {
     if (project == null || isProjectLocal(project)) {
       return Files.createTempDirectory(prefix)
     }
     val projectFilePath = project.projectFilePath ?: return Files.createTempDirectory(prefix)
     return runBlockingMaybeCancellable {
-      val eel = Path.of(projectFilePath).getEelDescriptor().upgrade()
+      val eel = Path.of(projectFilePath).getEelDescriptor().toEelApi()
       createTemporaryDirectory(eel, prefix)
     }
   }
@@ -89,6 +107,7 @@ object EelPathUtils {
   }
 
   @JvmStatic
+  @RequiresBackgroundThread(generateAssertion = false)
   fun renderAsEelPath(path: Path): String {
     val eelPath = path.asEelPath()
     if (eelPath.descriptor == LocalEelDescriptor) {
@@ -131,7 +150,7 @@ object EelPathUtils {
     }
     val root = eelPath.root.toString().replace('\\', '/')
     // see sun.nio.fs.WindowsUriSupport#toUri(java.lang.String, boolean, boolean)
-    val trailing = if (eelPath.descriptor.platform is EelPlatform.Windows) "/" else ""
+    val trailing = if (eelPath.descriptor.osFamily.isWindows) "/" else ""
     return URI("file", null, trailing + root + eelPath.parts.joinToString("/"), null, null)
   }
 
@@ -211,7 +230,7 @@ object EelPathUtils {
         }
 
         runBlockingMaybeCancellable {
-          service<TransferredContentHolder>().transferIfNeeded(target.descriptor.upgrade(), source, fileAttributesStrategy)
+          service<TransferredContentHolder>().transferIfNeeded(target.descriptor.toEelApi(), source, fileAttributesStrategy)
         }
       }
       is TransferTarget.Explicit -> {
@@ -404,13 +423,13 @@ object EelPathUtils {
     // usually eel is already initialized to this moment
     @Suppress("RAW_RUN_BLOCKING")
     val api = runBlocking {
-      descriptor.upgrade()
+      descriptor.toEelApi()
     }
     val someEelPath = api.fs.user.home
     return someEelPath.asNioPath()
   }
 
-  @Internal
+  @ApiStatus.Internal
   @RequiresBackgroundThread
   fun walkingTransfer(sourceRoot: Path, targetRoot: Path, removeSource: Boolean, copyAttributes: Boolean) {
     val fileAttributesStrategy = if (copyAttributes) FileTransferAttributesStrategy.Copy else FileTransferAttributesStrategy.Skip
@@ -489,7 +508,7 @@ object EelPathUtils {
                   throw err
                 }
               }
-              source.fileSystem.provider().newDirectoryStream(source, { true }).use { children ->
+              source.fileSystem.provider().newDirectoryStream(source) { true }.use { children ->
                 traversalStack.addAll(children.toList().asReversed().map { TraversalRecord.Pending(it) })
               }
             }
@@ -640,7 +659,7 @@ object EelPathUtils {
       // TODO It's ineffective for IjentNioFS, because there are 6 consequential system calls.
       to.setPermissions(from.permissions() + requirePermissions)
       runCatching<UnsupportedOperationException>(
-        { to.setOwner(from.owner()) },
+        { to.owner = from.owner() },
         { to.setGroup(from.group()) }
       )
     }

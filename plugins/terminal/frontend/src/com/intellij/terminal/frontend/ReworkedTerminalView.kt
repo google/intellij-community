@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.terminal.frontend
 
+import com.intellij.codeInsight.completion.CompletionPhase
 import com.intellij.codeInsight.highlighting.BackgroundHighlightingUtil
 import com.intellij.find.SearchReplaceComponent
 import com.intellij.openapi.Disposable
@@ -115,6 +116,7 @@ internal class ReworkedTerminalView(
       sessionModel,
       encodingManager,
       terminalInput,
+      typeAhead = null,
       coroutineScope.childScope("TerminalAlternateBufferModel"),
       scrollingModel = null,
       fusCursorPaintingListener,
@@ -130,6 +132,7 @@ internal class ReworkedTerminalView(
     scrollingModel = TerminalOutputScrollingModelImpl(outputEditor, outputModel, sessionModel, coroutineScope.childScope("TerminalOutputScrollingModel"))
     outputEditor.putUserData(TerminalOutputScrollingModel.KEY, scrollingModel)
 
+    val typeAhead = TerminalTypeAhead(outputModel)
     configureOutputEditor(
       project,
       editor = outputEditor,
@@ -138,6 +141,7 @@ internal class ReworkedTerminalView(
       sessionModel,
       encodingManager,
       terminalInput,
+      typeAhead,
       coroutineScope.childScope("TerminalOutputModel"),
       scrollingModel,
       fusCursorPaintingListener,
@@ -145,11 +149,14 @@ internal class ReworkedTerminalView(
       withTopAndBottomInsets = true,
     )
 
+    outputEditor.putUserData(TerminalSessionModel.KEY, sessionModel)
     terminalSearchController = TerminalSearchController(project)
 
     blocksModel = TerminalBlocksModelImpl(outputEditor.document)
     TerminalBlocksDecorator(outputEditor, blocksModel, scrollingModel, coroutineScope.childScope("TerminalBlocksDecorator"))
     outputEditor.putUserData(TerminalBlocksModel.KEY, blocksModel)
+
+    outputEditor.putUserData(CompletionPhase.CUSTOM_CODE_COMPLETION_ACTION_ID, "Terminal.CommandCompletion")
 
     val fusActivity = FrontendLatencyService.getInstance().startFrontendOutputActivity(
       outputEditor = outputEditor as EditorImpl,
@@ -166,6 +173,7 @@ internal class ReworkedTerminalView(
       coroutineScope.childScope("TerminalSessionController"),
       fusActivity,
     )
+    controller.addShellIntegrationListener(this, typeAhead)
 
     sessionFuture.thenAccept { session ->
       controller.handleEvents(session)
@@ -281,6 +289,7 @@ internal class ReworkedTerminalView(
     sessionModel: TerminalSessionModel,
     encodingManager: TerminalKeyEncodingManager,
     terminalInput: TerminalInput,
+    typeAhead: TerminalTypeAhead?,
     coroutineScope: CoroutineScope,
     scrollingModel: TerminalOutputScrollingModel?,
     fusCursorPainterListener: TerminalFusCursorPainterListener?,
@@ -321,18 +330,20 @@ internal class ReworkedTerminalView(
       addTopAndBottomInsets(editor)
     }
 
-    val eventsHandler = TerminalEventsHandlerImpl(sessionModel, editor, encodingManager, terminalInput, settings, scrollingModel, model)
+    val eventsHandler = TerminalEventsHandlerImpl(sessionModel, editor, encodingManager, terminalInput, settings, scrollingModel, model, typeAhead)
     setupKeyEventDispatcher(editor, settings, eventsHandler, parentDisposable)
     setupMouseListener(editor, sessionModel, settings, eventsHandler, parentDisposable)
 
     TerminalOutputEditorInputMethodSupport(
       editor,
-      sendInputString = { text -> terminalInput.sendString(text) },
+      coroutineScope = coroutineScope.childScope("TerminalInputMethodSupport"),
       getCaretPosition = {
         val offset = model.cursorOffsetState.value
         editor.offsetToLogicalPosition(offset)
-      }
-    ).install(parentDisposable)
+      },
+      cursorOffsetFlow = model.cursorOffsetState,
+      sendInputString = { text -> terminalInput.sendString(text) },
+    )
 
     CopyOnSelectionHandler.install(editor, settings)
 

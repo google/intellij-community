@@ -4,7 +4,6 @@ package git4idea.repo
 import com.intellij.dvcs.DvcsUtil
 import com.intellij.dvcs.repo.Repository
 import com.intellij.dvcs.repo.RepositoryImpl
-import com.intellij.ide.vfs.rpcId
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -41,8 +40,6 @@ class GitRepositoryImpl private constructor(
   private val gitDir: VirtualFile,
   parentDisposable: Disposable,
 ) : RepositoryImpl(project, rootDir, parentDisposable), GitRepository {
-  private val rpcId = RepositoryId(projectId = project.projectId(), rootPath = root.rpcId())
-
   private val vcs = GitVcs.getInstance(project)
 
   private val repositoryFiles = GitRepositoryFiles.createInstance(rootDir, gitDir)
@@ -219,13 +216,14 @@ class GitRepositoryImpl private constructor(
   }
 
   override fun getRpcId(): RepositoryId {
-    return rpcId
+    return RepositoryId(projectId = project.projectId(), rootPath = root.path)
   }
 
   companion object {
     private val LOG = Logger.getInstance(GitRepositoryImpl::class.java)
 
     @JvmStatic
+    @ApiStatus.ScheduledForRemoval
     @Deprecated("Use {@link GitRepositoryManager#getRepositoryForRoot} to obtain an instance of a Git repository.")
     fun getInstance(
       root: VirtualFile,
@@ -278,6 +276,7 @@ class GitRepositoryImpl private constructor(
         val updater = GitRepositoryUpdater(this, this.repositoryFiles)
         updater.installListeners()
         notifyIfRepoChanged(this, null, initialRepoInfo)
+        tagHolder.reload()
         this.untrackedFilesHolder.invalidate()
         this.resolvedConflictsFilesHolder.invalidate()
       }

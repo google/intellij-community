@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.completion.impl.k2.contributors
 
 import com.intellij.codeInsight.completion.InsertHandler
@@ -9,10 +9,12 @@ import com.intellij.psi.util.parentOfType
 import com.intellij.psi.util.startOffset
 import com.intellij.util.containers.sequenceOfNotNull
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaCompletionCandidateChecker
 import org.jetbrains.kotlin.analysis.api.components.KaCompletionExtensionCandidateChecker
 import org.jetbrains.kotlin.analysis.api.components.KaExtensionApplicabilityResult
+import org.jetbrains.kotlin.analysis.api.impl.base.components.KaBaseIllegalPsiException
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
@@ -26,7 +28,6 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.codeinsight.utils.singleReturnExpressionOrNull
-import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters
 import org.jetbrains.kotlin.idea.completion.doPostponedOperationsAndUnblockDocument
 import org.jetbrains.kotlin.idea.completion.impl.k2.LookupElementSink
 import org.jetbrains.kotlin.idea.completion.impl.k2.checkers.KtCompletionExtensionCandidateChecker
@@ -48,20 +49,14 @@ import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.yieldIfNotNull
 
 internal sealed class FirTrailingFunctionParameterNameCompletionContributorBase<C : KotlinRawPositionContext>(
-    parameters: KotlinFirCompletionParameters,
     sink: LookupElementSink,
     priority: Int = 0,
-) : FirCompletionContributorBase<C>(parameters, sink, priority) {
+) : FirCompletionContributorBase<C>(sink, priority) {
 
     class All(
-        parameters: KotlinFirCompletionParameters,
         sink: LookupElementSink,
         priority: Int = 0,
-    ) : FirTrailingFunctionParameterNameCompletionContributorBase<KotlinExpressionNameReferencePositionContext>(
-        parameters,
-        sink,
-        priority,
-    ) {
+    ) : FirTrailingFunctionParameterNameCompletionContributorBase<KotlinExpressionNameReferencePositionContext>(sink, priority) {
 
         context(KaSession)
         override fun complete(
@@ -85,10 +80,9 @@ internal sealed class FirTrailingFunctionParameterNameCompletionContributorBase<
     }
 
     class Missing(
-        parameters: KotlinFirCompletionParameters,
         sink: LookupElementSink,
         priority: Int = 0,
-    ) : FirTrailingFunctionParameterNameCompletionContributorBase<KotlinSimpleParameterPositionContext>(parameters, sink, priority) {
+    ) : FirTrailingFunctionParameterNameCompletionContributorBase<KotlinSimpleParameterPositionContext>(sink, priority) {
 
         context(KaSession)
         override fun complete(
@@ -417,9 +411,13 @@ private fun createExtensionCandidateChecker(
         .firstStatement as? KtNameReferenceExpression
         ?: return null
 
-    return KtCompletionExtensionCandidateChecker.create(
-        originalFile = codeFragment,
-        nameExpression = nameExpression,
-        explicitReceiver = nameExpression,
-    )
+    // FIXME: KTIJ-34273
+    @OptIn(KaImplementationDetail::class)
+    return KaBaseIllegalPsiException.allowIllegalPsiAccess {
+        KtCompletionExtensionCandidateChecker.create(
+            originalFile = codeFragment,
+            nameExpression = nameExpression,
+            explicitReceiver = nameExpression,
+        )
+    }
 }

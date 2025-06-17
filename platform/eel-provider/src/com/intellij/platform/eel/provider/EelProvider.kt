@@ -11,18 +11,20 @@ import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.eel.*
-import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.provider.utils.toEelArch
 import com.intellij.platform.util.coroutines.forEachConcurrent
-import com.intellij.util.system.CpuArch
 import com.intellij.util.system.OS
 import kotlinx.coroutines.CancellationException
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.NonNls
 import java.nio.file.Path
 
+@ApiStatus.Experimental
 interface LocalWindowsEelApi : LocalEelApi, EelWindowsApi
+
+@ApiStatus.Experimental
 interface LocalPosixEelApi : LocalEelApi, EelPosixApi
 
+@ApiStatus.Internal
 object EelInitialization {
   private val logger = logger<EelInitialization>()
 
@@ -53,6 +55,7 @@ object EelInitialization {
   }
 }
 
+@ApiStatus.Experimental
 fun Path.getEelDescriptor(): EelDescriptor {
   return EelNioBridgeService.getInstanceSync().tryGetEelDescriptor(this) ?: LocalEelDescriptor
 }
@@ -61,6 +64,7 @@ fun Path.getEelDescriptor(): EelDescriptor {
  * Retrieves [EelDescriptor] for the environment where [this] is located.
  * If the project is not the real one (i.e., it is default or not backed by a real file), then [LocalEelDescriptor] will be returned.
  */
+@ApiStatus.Experimental
 fun Project.getEelDescriptor(): EelDescriptor {
   val filePath = projectFilePath
   if (filePath == null) {
@@ -75,34 +79,38 @@ fun Project.getEelDescriptor(): EelDescriptor {
   return Path.of(filePath).getEelDescriptor()
 }
 
+@get:ApiStatus.Experimental
 val localEel: LocalEelApi by lazy {
   if (SystemInfo.isWindows) ApplicationManager.getApplication().service<LocalWindowsEelApi>() else ApplicationManager.getApplication().service<LocalPosixEelApi>()
 }
 
-fun EelDescriptor.upgradeBlocking(): EelApi {
+@Deprecated("Use toEelApiBlocking() instead", ReplaceWith("toEelApiBlocking()"))
+@ApiStatus.Internal
+fun EelDescriptor.upgradeBlocking(): EelApi = toEelApiBlocking()
+
+@ApiStatus.Experimental
+fun EelDescriptor.toEelApiBlocking(): EelApi {
   if (this === LocalEelDescriptor) return localEel
-  return runBlockingMaybeCancellable { upgrade() }
+  return runBlockingMaybeCancellable { toEelApi() }
 }
 
+@ApiStatus.Experimental
 data object LocalEelDescriptor : EelDescriptor {
   private val LOG = logger<LocalEelDescriptor>()
+  override val userReadableDescription: @NonNls String = "Local: ${System.getProperty("os.name")}"
 
-  override val platform: EelPlatform by lazy {
-    val arch = CpuArch.CURRENT.toEelArch()
-
+  override val osFamily: EelOsFamily by lazy {
     when {
-      SystemInfo.isWindows -> EelPlatform.Windows(arch)
-      SystemInfo.isMac -> EelPlatform.Darwin(arch)
-      SystemInfo.isLinux -> EelPlatform.Linux(arch)
-      SystemInfo.isFreeBSD -> EelPlatform.FreeBSD(arch)
+      SystemInfo.isWindows -> EelOsFamily.Windows
+      SystemInfo.isMac || SystemInfo.isLinux || SystemInfo.isFreeBSD -> EelOsFamily.Posix
       else -> {
         LOG.info("Eel is not supported on current platform")
-        EelPlatform.Linux(arch)
+        EelOsFamily.Posix
       }
     }
   }
 
-  override suspend fun upgrade(): EelApi {
+  override suspend fun toEelApi(): EelApi {
     return localEel
   }
 }
@@ -123,6 +131,7 @@ interface EelProvider {
   suspend fun tryInitialize(path: String)
 }
 
+@ApiStatus.Internal
 fun EelApi.systemOs(): OS {
   return when (platform) {
     is EelPlatform.Linux -> OS.Linux

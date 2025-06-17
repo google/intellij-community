@@ -121,11 +121,6 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
-        @TestMetadata("script.kts")
-        public void testScript() throws Exception {
-            runTest("../../idea/tests/testData/highlighterMetaInfo/focusMode/script.kts");
-        }
-
         @TestMetadata("SimpleClass.kt")
         public void testSimpleClass() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/focusMode/SimpleClass.kt");
@@ -279,6 +274,11 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
             runTest("../../idea/tests/testData/highlighterMetaInfo/smartCasts/ImplicitAndExplicit_properties.kt");
         }
 
+        @TestMetadata("Implicit_intersection.kt")
+        public void testImplicit_intersection() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/smartCasts/Implicit_intersection.kt");
+        }
+
         @TestMetadata("Implicit_stable.kt")
         public void testImplicit_stable() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/smartCasts/Implicit_stable.kt");
@@ -411,11 +411,6 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
         @TestMetadata("PropertiesWithPropertyDeclarationsInDumbMode.kt")
         public void testPropertiesWithPropertyDeclarationsInDumbMode() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/PropertiesWithPropertyDeclarationsInDumbMode.kt");
-        }
-
-        @TestMetadata("script.kts")
-        public void testScript() throws Exception {
-            runTest("../../idea/tests/testData/highlighterMetaInfo/script.kts");
         }
 
         @TestMetadata("Suspend.kt")

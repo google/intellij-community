@@ -291,11 +291,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("testData/inspections/replaceCallWithComparison/inspectionData/inspections.test");
         }
 
-        @TestMetadata("replaceRangeToWithUntil/inspectionData/inspections.test")
-        public void testReplaceRangeToWithUntil_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspections/replaceRangeToWithUntil/inspectionData/inspections.test");
-        }
-
         @TestMetadata("sealedSubClassCanBeObject/inspectionData/inspections.test")
         public void testSealedSubClassCanBeObject_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspections/sealedSubClassCanBeObject/inspectionData/inspections.test");
@@ -314,11 +309,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("unusedEquals/inspectionData/inspections.test")
         public void testUnusedEquals_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspections/unusedEquals/inspectionData/inspections.test");
-        }
-
-        @TestMetadata("unusedImport/inspectionData/inspections.test")
-        public void testUnusedImport_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspections/unusedImport/inspectionData/inspections.test");
         }
 
         @TestMetadata("unusedLambdaExpressionBody/inspectionData/inspections.test")

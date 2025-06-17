@@ -9,15 +9,15 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.util.progress.reportSequentialProgress
 import com.intellij.python.community.execService.ExecOptions
 import com.intellij.python.community.execService.ExecService
-import com.intellij.python.community.execService.WhatToExec
+import com.intellij.python.community.execService.execGetStdout
 import com.intellij.python.community.impl.poetry.poetryPath
 import com.intellij.util.SystemProperties
 import com.jetbrains.python.PyBundle
-import com.jetbrains.python.errorProcessing.asKotlinResult
-import com.jetbrains.python.onFailure
+import com.jetbrains.python.errorProcessing.PyResult
+import com.jetbrains.python.getOrNull
+import com.jetbrains.python.isSuccess
 import com.jetbrains.python.packaging.PyPackage
 import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.PyRequirementParser
@@ -36,31 +36,33 @@ import io.github.z4kn4fein.semver.toVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.SystemDependent
 import org.jetbrains.annotations.SystemIndependent
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.pathString
+import kotlin.time.Duration.Companion.minutes
 
 /**
  *  This source code is edited by @koxudaxi Koudai Aono <koxudaxi@gmail.com>
  */
 private const val REPLACE_PYTHON_VERSION = """import re,sys;f=open("pyproject.toml", "r+");orig=f.read();f.seek(0);f.write(re.sub(r"(python = \"\^)[^\"]+(\")", "\g<1>"+'.'.join(str(v) for v in sys.version_info[:2])+"\g<2>", orig))"""
-private val poetryNotFoundException: Throwable = Throwable(PyBundle.message("python.sdk.poetry.execution.exception.no.poetry.message"))
+private val poetryNotFoundException: @Nls String = PyBundle.message("python.sdk.poetry.execution.exception.no.poetry.message")
 private val VERSION_2 = "2.0.0".toVersion()
 
 @Internal
-suspend fun runPoetry(projectPath: Path?, vararg args: String): Result<String> {
-  val executable = getPoetryExecutable().getOrElse { return Result.failure(it) }
-  return runExecutableWithProgress(executable, projectPath, *args).asKotlinResult()
+suspend fun runPoetry(projectPath: Path?, vararg args: String): PyResult<String> {
+  val executable = getPoetryExecutable().getOr { return it }
+  return runExecutableWithProgress(executable, projectPath, 10.minutes, *args)
 }
 
 
 /**
  * Detects the poetry executable in `$PATH`.
  */
-internal suspend fun detectPoetryExecutable(): Result<Path> {
+internal suspend fun detectPoetryExecutable(): PyResult<Path> {
   val name = when {
     SystemInfo.isWindows -> "poetry.bat"
     else -> "poetry"
@@ -71,16 +73,16 @@ internal suspend fun detectPoetryExecutable(): Result<Path> {
       Path.of(homePath, ".poetry", "bin", name).takeIf { it.exists() }
     }
   }
-  return executablePath?.let { Result.success(it) } ?: Result.failure(poetryNotFoundException)
+  return executablePath?.let { PyResult.success(it) } ?: PyResult.localizedError(poetryNotFoundException)
 }
 
 /**
  * Returns the configured poetry executable or detects it automatically.
  */
 @Internal
-suspend fun getPoetryExecutable(): Result<Path> = withContext(Dispatchers.IO) {
+suspend fun getPoetryExecutable(): PyResult<Path> = withContext(Dispatchers.IO) {
   PropertiesComponent.getInstance().poetryPath?.let { Path.of(it) }?.takeIf { it.exists() }
-}?.let { Result.success(it) } ?: detectPoetryExecutable()
+}?.let { PyResult.success(it) } ?: detectPoetryExecutable()
 
 @Internal
 suspend fun validatePoetryExecutable(poetryExecutable: Path?): ValidationInfo? = withContext(Dispatchers.IO) {
@@ -95,16 +97,10 @@ suspend fun validatePoetryExecutable(poetryExecutable: Path?): ValidationInfo? =
  * 2. `poetry [args]`
  */
 @Internal
-suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): Result<String> {
-  val projectPath = sdk.associatedModulePath?.let { Path.of(it) } ?: return Result.failure(poetryNotFoundException) // Choose a correct sdk
-  return reportSequentialProgress(2) { reporter ->
-    reporter.itemStep {
-      runPoetry(projectPath, "env", "use", sdk.homePath!!)
-    }
-    reporter.itemStep {
-      runPoetry(projectPath, *args)
-    }
-  }
+suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): PyResult<String> {
+  val projectPath = sdk.associatedModulePath?.let { Path.of(it) } ?: return PyResult.localizedError(poetryNotFoundException) // Choose a correct sdk
+  runPoetry(projectPath, "env", "use", sdk.homePath!!)
+  return runPoetry(projectPath, *args)
 }
 
 
@@ -114,13 +110,11 @@ suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): Result<String> {
  * @return the path to the poetry environment.
  */
 @Internal
-suspend fun setupPoetry(projectPath: Path, python: String?, installPackages: Boolean, init: Boolean): Result<@SystemDependent String> {
+suspend fun setupPoetry(projectPath: Path, python: String?, installPackages: Boolean, init: Boolean): PyResult<@SystemDependent String> {
   if (init) {
     runPoetry(projectPath, *listOf("init", "-n").toTypedArray())
     if (python != null) { // Replace a python version in toml
-      ExecService().execGetStdout(WhatToExec.Binary(Path.of(python)), listOf("-c", REPLACE_PYTHON_VERSION), ExecOptions(workingDirectory = projectPath)).onFailure {
-        return Result.failure(Exception(it.message))
-      }
+      ExecService().execGetStdout(Path.of(python), listOf("-c", REPLACE_PYTHON_VERSION), ExecOptions(workingDirectory = projectPath)).getOr { return it }
     }
   }
   when {
@@ -154,25 +148,31 @@ suspend fun getPythonExecutable(homePath: String): String = withContext(Dispatch
 
 /**
  * Installs a Python package using Poetry.
- * Runs `poetry add [pkg] [extraArgs]`
+ * Runs `poetry add [packages] [extraArgs]`
  *
- * @param [pkg] The name of the package to be installed.
+ * @param [packages] The name of the package to be installed.
  * @param [extraArgs] Additional arguments to pass to the Poetry add command.
  */
 @Internal
-suspend fun poetryInstallPackage(sdk: Sdk, pkg: String, extraArgs: List<String>): Result<String> {
-  val args = listOf("add", pkg) + extraArgs
+suspend fun poetryInstallPackage(sdk: Sdk, packages: List<String>, extraArgs: List<String>): PyResult<String> {
+  val args = listOf("add") + packages + extraArgs
   return runPoetryWithSdk(sdk, *args.toTypedArray())
 }
 
 /**
  * Uninstalls a Python package using Poetry.
- * Runs `poetry remove [pkg]`
+ * Runs `poetry remove [packages]`
  *
- * @param [pkg] The name of the package to be uninstalled.
+ * @param [packages] The name of the package to be uninstalled.
  */
 @Internal
-suspend fun poetryUninstallPackage(sdk: Sdk, pkg: String): Result<String> = runPoetryWithSdk(sdk, "remove", pkg)
+suspend fun poetryRemovePackage(sdk: Sdk, vararg packages: String): PyResult<String> = runPoetryWithSdk(sdk, "remove", *packages)
+
+@Internal
+suspend fun poetryUninstallPackage(sdk: Sdk, vararg packages: String): PyResult<String> {
+  val args = listOf("run", "pip", "uninstall", "-y", *packages)
+  return runPoetryWithSdk(sdk, *args.toTypedArray())
+}
 
 @Internal
 fun parsePoetryShow(input: String): List<PythonPackage> {
@@ -188,31 +188,25 @@ fun parsePoetryShow(input: String): List<PythonPackage> {
 }
 
 @Internal
-suspend fun poetryShowOutdated(sdk: Sdk): Result<Map<String, PythonOutdatedPackage>> {
-  val output = runPoetryWithSdk(sdk, "show", "--outdated").getOrElse {
-    return Result.failure(it)
-  }
+suspend fun poetryShowOutdated(sdk: Sdk): PyResult<Map<String, PythonOutdatedPackage>> {
+  val output = runPoetryWithSdk(sdk, "show", "--outdated").getOr { return it }
 
-  return parsePoetryShowOutdated(output).let { Result.success(it) }
+  return parsePoetryShowOutdated(output).let { PyResult.success(it) }
 }
 
 @Internal
-suspend fun poetryListPackages(sdk: Sdk): Result<Pair<List<PyPackage>, List<PyRequirement>>> {
+suspend fun poetryListPackages(sdk: Sdk): PyResult<Pair<List<PyPackage>, List<PyRequirement>>> {
   val version = getPoetryVersion()?.toVersion()
 
   // Ensure that the lock file is up to date.
   if (!Registry.get("python.poetry.list.packages.without.lock").asBoolean() && !checkLock(sdk, version)) {
-    fixLock(sdk, version).getOrElse {
-      return Result.failure(it)
-    }
+    fixLock(sdk, version).getOr { return it }
   }
 
-  val output = runPoetryWithSdk(sdk, "install", "--dry-run", "--no-root").getOrElse {
-    return Result.failure(it)
-  }
+  val output = runPoetryWithSdk(sdk, "install", "--dry-run", "--no-root").getOr { return it }
 
   return parsePoetryInstallDryRun(output).let {
-    Result.success(it)
+    PyResult.success(it)
   }
 }
 
@@ -230,7 +224,7 @@ suspend fun checkLock(sdk: Sdk, version: Version?): Boolean {
 }
 
 @Internal
-suspend fun fixLock(sdk: Sdk, version: Version?): Result<String> {
+suspend fun fixLock(sdk: Sdk, version: Version?): PyResult<String> {
   if (version == null || version >= VERSION_2) {
     return runPoetryWithSdk(sdk, "lock")
   }

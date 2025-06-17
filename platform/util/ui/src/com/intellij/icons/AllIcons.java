@@ -452,6 +452,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Hprof = load("fileTypes/hprof.svg", 2107471584, 0);
     /** 16x16 */ public static final @NotNull Icon Htaccess = load("fileTypes/htaccess.svg", -1026396371, 0);
     /** 16x16 */ public static final @NotNull Icon Html = load("expui/fileTypes/html.svg", "fileTypes/html.svg", 944305592, 0);
+    /** 16x16 */ public static final @NotNull Icon Http = load("expui/fileTypes/http.svg", "fileTypes/http.svg", -990310078, 0);
     /** 16x16 */ public static final @NotNull Icon I18n = load("expui/fileTypes/i18n.svg", "fileTypes/i18n.svg", 1594775427, 0);
     /** 16x16 */ public static final @NotNull Icon Idl = load("expui/fileTypes/idl.svg", "fileTypes/idl.svg", 1130770662, 0);
     /** 16x16 */ public static final @NotNull Icon Image = load("expui/fileTypes/image.svg", "fileTypes/image.svg", -266191706, 0);
@@ -540,6 +541,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon HideToolWindow = load("expui/general/hide.svg", "general/hideToolWindow.svg", -24888126, 2);
     /** 16x16 */ public static final @NotNull Icon History = load("expui/general/history.svg", -1313586434, 2);
     /** 16x16 */ public static final @NotNull Icon ImplementingMethod = load("expui/general/showToImplement.svg", "general/implementingMethod.svg", -286814761, 1);
+    /** 16x16 */ public static final @NotNull Icon IndentDetected = load("expui/general/indentDetected.svg", 1513743707, 2);
     /** 16x16 */ public static final @NotNull Icon Information = load("expui/status/info.svg", "general/information.svg", 45152184, 0);
     /** 32x32 */ public static final @NotNull Icon InformationDialog = load("expui/general/informationDialog.svg", "general/informationDialog.svg", -143059635, 0);
     /** 16x16 */ public static final @NotNull Icon InheritedMethod = load("expui/hierarchy/classHierarchy.svg", "general/inheritedMethod.svg", 2120980341, 0);
@@ -704,6 +706,7 @@ public class AllIcons {
     /** 14x14 */ public static final @NotNull Icon ExternalLinkArrowWhite = load("expui/ide/externalLinkWhite.svg", "ide/externalLinkArrowWhite.svg", 555726287, 0);
     /** 16x16 */ public static final @NotNull Icon FatalErrorRead = load("expui/status/errorOutline.svg", "ide/fatalError-read.svg", -2061937514, 2);
     /** 16x16 */ public static final @NotNull Icon FatalError = load("expui/status/error.svg", "ide/fatalError.svg", -1290263519, 2);
+    /** 16x16 */ public static final @NotNull Icon Feedback = load("ide/feedback.svg", -1579460810, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRating = load("expui/ide/feedbackRating.svg", "ide/feedbackRating.svg", 2100656760, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRatingFocused = load("expui/ide/feedbackRatingFocused.svg", "ide/feedbackRatingFocused.svg", -49762505, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRatingFocusedOn = load("expui/ide/feedbackRatingFocusedOn.svg", "ide/feedbackRatingFocusedOn.svg", 1557121691, 2);
@@ -1190,10 +1193,6 @@ public class AllIcons {
     /** 12x12 */ public static final @NotNull Icon Rec = load("expui/profiler/rec.svg", "profiler/rec.svg", 204716318, 2);
   }
 
-  public static final class Promo {
-    /** 14x14 */ public static final @NotNull Icon JavaDuke = load("promo/javaDuke.svg", 820578884, 2);
-  }
-
   public static final class Providers {
     /** 16x16 */ public static final @NotNull Icon ActiveMQ = load("providers/activeMQ.svg", -1202590345, 0);
     /** 16x16 */ public static final @NotNull Icon Apache = load("providers/apache.svg", 1920166272, 2);
@@ -1525,6 +1524,7 @@ public class AllIcons {
     /** 24x24 */ public static final @NotNull Icon OpenSelected = load("welcome/openSelected.svg", -720655450, 0);
 
     public static final class RecentProjects {
+      /** 16x16 */ public static final @NotNull Icon RemoteProject = load("welcome/recentProjects/remoteProject.svg", 1948055625, 2);
       /** 10x10 */ public static final @NotNull Icon RemoveHover = load("welcome/recentProjects/remove-hover.svg", -1249716707, 2);
       /** 10x10 */ public static final @NotNull Icon Remove = load("welcome/recentProjects/remove.svg", -1427151265, 2);
       /** 10x10 */ public static final @NotNull Icon RemoveDisabledHover = load("welcome/recentProjects/removeDisabled-hover.svg", -1439591680, 2);

@@ -4,7 +4,6 @@ import com.intellij.cce.evaluable.ChunkHelper
 import com.intellij.cce.evaluation.EvaluationChunk
 import com.intellij.cce.evaluation.SimpleFileEnvironment
 import com.intellij.cce.interpreter.*
-import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readLines
@@ -18,7 +17,11 @@ class CsvEnvironment(
 
   override val preparationDescription: String = "Checking that CSV file exists"
 
-  override fun checkFile(datasetPath: Path) {
+  override fun initialize(datasetContext: DatasetContext) {
+    super.initialize(datasetContext)
+
+    val datasetPath = datasetContext.path(datasetRef)
+
     require(datasetPath.extension == "csv") {
       "Csv dataset should have the appropriate extension: $datasetRef"
     }
@@ -30,7 +33,7 @@ class CsvEnvironment(
 
   override fun sessionCount(datasetContext: DatasetContext): Int = datasetContext.path(datasetRef).readLines().size - 1
 
-  override fun chunks(datasetContext: DatasetContext): Iterator<EvaluationChunk> {
+  override fun chunks(datasetContext: DatasetContext): Sequence<EvaluationChunk> {
     val lines = datasetContext.path(datasetRef).readLines()
     val names = lines.first().split(',').map { it.trim() }
     val rows = lines.subList(1, lines.size).asSequence()
@@ -42,7 +45,7 @@ class CsvEnvironment(
         target to features
       }
 
-    return ChunkHelper(chunkSize, datasetRef.name).chunks(rows) { props ->
+    return ChunkHelper(datasetRef).chunks(chunkSize, rows) { props ->
       val (target, features) = props.value
       val call = callFeature(target, props.offset, features)
       ChunkHelper.Result(

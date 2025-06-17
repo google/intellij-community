@@ -15,7 +15,9 @@ jvm_library(
   deps = [
     "@lib//:kotlinx-coroutines-core",
     "@lib//:kotlin-stdlib",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/projectModel-api:projectModel",
     "//platform/util:util-ui",
     "//platform/diagnostic",
     "//platform/core-ui",

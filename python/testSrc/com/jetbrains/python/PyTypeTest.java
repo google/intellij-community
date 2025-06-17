@@ -1225,15 +1225,6 @@ public class PyTypeTest extends PyTestCase {
              expr = f3(42)""");
   }
 
-  // PY-8836
-  public void testNumpyArrayIntMultiplicationType() {
-    doMultiFileTest("ndarray",
-                    """
-                      import numpy as np
-                      expr = np.ones(10) * 2
-                      """);
-  }
-
   // PY-9439
   public void testNumpyArrayType() {
     doMultiFileTest("ndarray",
@@ -1721,24 +1712,24 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-8473
   public void testCopyDotCopy() {
-    doMultiFileTest("A",
-                    """
-                      import copy
-                      class A(object):
-                          pass
-                      expr = copy.copy(A())
-                      """);
+    doTest("A",
+           """
+             import copy
+             class A(object):
+                 pass
+             expr = copy.copy(A())
+             """);
   }
 
   // PY-8473
   public void testCopyDotDeepCopy() {
-    doMultiFileTest("A",
-                    """
-                      import copy
-                      class A(object):
-                          pass
-                      expr = copy.deepcopy(A())
-                      """);
+    doTest("A",
+           """
+             import copy
+             class A(object):
+                 pass
+             expr = copy.deepcopy(A())
+             """);
   }
 
   // PY-21083
@@ -2564,7 +2555,7 @@ public class PyTypeTest extends PyTestCase {
           final List<PyClassLikeType> superClassTypes = ((PyClassType)type).getSuperClassTypes(context);
           assertEquals(1, superClassTypes.size());
 
-          assertInstanceOf(superClassTypes.get(0), PyNamedTupleType.class);
+          assertInstanceOf(superClassTypes.get(0), PyClassTypeImpl.class);
         }
       }
     );
@@ -2882,12 +2873,9 @@ public class PyTypeTest extends PyTestCase {
     );
   }
 
+  // PY-80436
   public void testEllipsis() {
-    runWithLanguageLevel(
-      LanguageLevel.PYTHON34,
-      () -> doTest("Any",
-                   "expr = ...")
-    );
+    doTest("ellipsis", "expr = Ellipsis");
   }
 
   // PY-25751
@@ -4163,6 +4151,19 @@ public class PyTypeTest extends PyTestCase {
     );
   }
 
+  // PY-79330
+  public void testTypeHintedEnumItemValueAttribute2() {
+    runWithLanguageLevel(
+      LanguageLevel.getLatest(),
+      () -> doTest("() -> Any", // Should be 'Any' PY-71603
+                   """
+                     from enum import Enum
+                     
+                     def f(p: Enum):
+                         expr = p.value""")
+    );
+  }
+
   // PY-54503
   public void testImportedEnumGetItemResultValueAttribute() {
     myFixture.copyDirectoryToProject(TEST_DIRECTORY + getTestName(false), "");
@@ -4172,7 +4173,7 @@ public class PyTypeTest extends PyTestCase {
                                               expr = MyEnum['ONE'].value""");
     assertNotNull(expr);
     TypeEvalContext codeAnalysisContext = TypeEvalContext.codeAnalysis(expr.getProject(), expr.getContainingFile());
-    assertType("Any", expr, codeAnalysisContext);
+    assertType("int", expr, codeAnalysisContext);
     assertProjectFilesNotParsed(codeAnalysisContext);
 
     TypeEvalContext userInitiatedContext = TypeEvalContext.userInitiated(expr.getProject(), expr.getContainingFile());

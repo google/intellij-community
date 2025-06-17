@@ -25,7 +25,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.CeProcessCanceledException
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.Key
@@ -177,7 +176,10 @@ internal class ActionUpdater @JvmOverloads constructor(
           var traceCookie: ThreadDumpService.Cookie? = null
           try {
             Triple({ ProhibitAWTEvents.start(operationName) },
-                   { IdeEventQueue.getInstance().threadingSupport.prohibitWriteActionsInside() },
+                   {
+                     val result = IdeEventQueue.getInstance().threadingSupport.prohibitWriteActionsInside()
+                     AutoCloseable { result() }
+                   },
                    { threadDumpService.start(100, 50, 5, Thread.currentThread()) }).use { _, _, cookie ->
               traceCookie = cookie
               ourInEDTActionOperationStack = prevStack.prepend(operationName)
@@ -301,11 +303,9 @@ internal class ActionUpdater @JvmOverloads constructor(
     val event = createActionEvent(opElement, updatedPresentations[group] ?: initialBgtPresentation(group))
     return try {
       retryOnAwaitSharedData(opElement, maxAwaitSharedDataRetries) {
-        blockingContext { // no data-context hence no RA, just blockingContext
-          val spanBuilder = Utils.getTracer(true).spanBuilder(opElement.operationName)
-          spanBuilder.use {
-            group.postProcessVisibleChildren(event, result)
-          }
+        val spanBuilder = Utils.getTracer(true).spanBuilder(opElement.operationName)
+        spanBuilder.use {
+          group.postProcessVisibleChildren(event, result)
         }
       }
     }

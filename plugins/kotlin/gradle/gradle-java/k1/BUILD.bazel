@@ -64,6 +64,9 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
+    "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
     "//platform/external-system-impl:externalSystem-tests_test_lib",
     "@lib//:kotlinc-kotlin-compiler-fe10",
@@ -72,6 +75,7 @@ jvm_library(
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
     "//java/openapi:java",
     "//jps/model-api:model",
+    "//platform/projectModel-api:projectModel",
     "//platform/testRunner",
     "//platform/testRunner:testRunner_test_lib",
     "//platform/testFramework",
@@ -139,6 +143,9 @@ jvm_library(
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/gradle/gradle-java/tests.shared:tests.shared_test_lib",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.shared:kotlin-gradle-scripting-shared",
+    "//plugins/kotlin/base/scripting.k1",
+    "//plugins/kotlin/base/scripting.k1:scripting.k1_test_lib",
+    "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k1:kotlin-gradle-scripting-k1",
   ],
   runtime_deps = [":k1_resources"]
 )

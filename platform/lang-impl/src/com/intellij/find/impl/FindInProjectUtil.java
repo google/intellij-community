@@ -98,6 +98,7 @@ public final class FindInProjectUtil {
 
     if (psiElement instanceof PsiDirectory) {
       directoryName = ((PsiDirectory)psiElement).getVirtualFile().getPresentableUrl();
+      if (directoryName.isEmpty()) directoryName = null;
     }
 
     if (directoryName == null && psiElement instanceof PsiDirectoryContainer) {
@@ -586,6 +587,10 @@ public final class FindInProjectUtil {
       }
     }
     outSourceRoots.addAll(otherSourceRoots);
+  }
+
+  public static @NotNull GlobalSearchScope getGlobalSearchScope(@NotNull Project project, @NotNull FindModel findModel) {
+    return GlobalSearchScopeUtil.toGlobalSearchScope(getScopeFromModel(project, findModel), project);
   }
 
   static @NotNull SearchScope getScopeFromModel(@NotNull Project project, @NotNull FindModel findModel) {

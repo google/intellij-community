@@ -7,6 +7,7 @@ import com.intellij.lang.LangBundle
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.backgroundWriteAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.IntelliJProjectUtil.isIntelliJPlatformProject
 import com.intellij.openapi.project.Project
@@ -45,10 +46,10 @@ internal fun isActionEnabled(dc: DataContext): Boolean {
   return !ProjectFileIndex.getInstance(project).isInSource(virtualFile)
 }
 
-internal suspend fun askForModuleName(project: Project): @Nls String {
+internal suspend fun askForModuleName(project: Project, suggestedNamePrefix: String): @Nls String {
   val contentPanel = NewItemSimplePopupPanel()
   val nameField: JTextField = contentPanel.textField
-  nameField.text = "intellij."
+  nameField.text = suggestedNamePrefix
   val popup: JBPopup = NewItemPopupUtil.createNewItemPopup(message("scaffolding.new.ij.module"), contentPanel, nameField)
   return suspendCancellableCoroutine { continuation ->
     contentPanel.applyAction = Consumer { event: InputEvent? ->
@@ -76,9 +77,35 @@ internal suspend fun askForModuleName(project: Project): @Nls String {
   }
 }
 
+internal suspend fun suggestModuleNamePrefix(parentDir: VirtualFile, project: Project): String {
+  return readAction {
+    val fileIndex = ProjectFileIndex.getInstance(project)
+    val parentContentRoot = fileIndex.getContentRootForFile(parentDir)
+    if (parentContentRoot == parentDir) {
+      val module = fileIndex.getModuleForFile(parentContentRoot)
+      if (module != null) {
+        return@readAction "${module.name.removeSuffix(".plugin").removeSuffix(".main").removeSuffix(".core")}."
+      }
+    }
+    if (parentDir.isDirectory) {
+      val siblingModuleNames = parentDir.children
+        .asSequence()
+        .filter { fileIndex.getContentRootForFile(it) == it }
+        .mapNotNull { fileIndex.getModuleForFile(it)?.name }
+      val commonPrefix = siblingModuleNames.reduceOrNull { acc, item -> acc.commonPrefixWith(item) } ?: ""
+      val suggestion = commonPrefix.substringBeforeLast('.', "")
+      if (suggestion.isNotEmpty()) {
+        return@readAction "$suggestion."
+      }
+    }
+    "intellij."
+  }
+}
+
 internal suspend fun createIjModule(vRoot: VirtualFile, moduleName: String) {
   val project = instance<Project>()
-  val files = prepareFiles(vRoot.toNioPath(), moduleName)
+  val directoryName = computeDirectoryNameForModule(moduleName, vRoot, project)
+  val files = prepareFiles(vRoot.toNioPath(), moduleName, directoryName)
   val vFiles = files.toVFiles()
                ?: return // TODO remove when failed
   backgroundWriteAction {
@@ -96,8 +123,20 @@ internal suspend fun createIjModule(vRoot: VirtualFile, moduleName: String) {
   project.scheduleSave() // to write changes in modules.xml to the disk
 }
 
-private suspend fun prepareFiles(root: Path, moduleName: String): ModuleFiles = withContext(Dispatchers.IO) {
-  val moduleRoot = root.resolve(moduleName).createDirectories()
+private suspend fun computeDirectoryNameForModule(moduleName: String, parentDir: VirtualFile, project: Project): String {
+  return withContext(Dispatchers.IO) {
+    readAction {
+      val fileIndex = ProjectFileIndex.getInstance(project)
+      val parentDirectoryNames = generateSequence(parentDir) { it.parent }
+        .takeWhile { it.parent != null && fileIndex.isInProjectOrExcluded(it.parent) }
+        .mapTo(HashSet()) { it.name }
+      moduleName.split('.').dropWhile { it in parentDirectoryNames || it == "intellij" }.joinToString(".")
+    }
+  }
+}
+
+private suspend fun prepareFiles(root: Path, moduleName: String, directoryName: String): ModuleFiles = withContext(Dispatchers.IO) {
+  val moduleRoot = root.resolve(directoryName).createDirectories()
   val src = moduleRoot.resolve("src").createDirectories().also { src ->
     src.resolve(".keep").createFile() // empty file so that `src` exists in git
   }

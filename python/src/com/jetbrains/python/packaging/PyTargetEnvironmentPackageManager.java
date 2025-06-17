@@ -22,11 +22,11 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.python.community.helpersLocator.PythonHelpersLocator;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.HelperPackage;
 import com.jetbrains.python.PySdkBundle;
 import com.jetbrains.python.PythonHelper;
-import com.jetbrains.python.PythonHelpersLocator;
 import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.run.PythonExecution;
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory;
@@ -48,9 +48,10 @@ import java.util.*;
 /**
  * @deprecated TODO: explain
  */
+@SuppressWarnings("ALL")
 @Deprecated(forRemoval = true)
 @ApiStatus.Internal
-public final class PyTargetEnvironmentPackageManager extends PyPackageManagerImplBase {
+public abstract class PyTargetEnvironmentPackageManager extends PyPackageManagerImplBase {
   private static final Logger LOG = Logger.getInstance(PyTargetEnvironmentPackageManager.class);
 
   @Override
@@ -64,7 +65,7 @@ public final class PyTargetEnvironmentPackageManager extends PyPackageManagerImp
     getPythonProcessResult(pythonExecution, true, true, helpersAwareTargetRequest.getTargetEnvironmentRequest());
   }
 
-  PyTargetEnvironmentPackageManager(final @NotNull Sdk sdk) {
+  public PyTargetEnvironmentPackageManager(final @NotNull Sdk sdk) {
     super(sdk);
   }
 

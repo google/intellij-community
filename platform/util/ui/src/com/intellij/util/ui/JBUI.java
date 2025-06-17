@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.ui;
 
 import com.intellij.icons.AllIcons;
@@ -1053,6 +1053,10 @@ public final class JBUI {
           return "StatusBar.Breadcrumbs.navBarInsets";
         }
       }
+
+      public interface Progresses {
+        Color COUNTER = JBColor.namedColor("ProgressBar.counterColor", new JBColor(0x3574F0, 0x3574F0));
+      }
     }
 
     public static final class TextField {
@@ -1063,7 +1067,7 @@ public final class JBUI {
 
     public static final class ToolWindow {
       public static @NotNull Color background() {
-        return JBColor.namedColor("ToolWindow.background");
+        return JBColor.namedColor("ToolWindow.background", JBColor.PanelBackground);
       }
 
       public static @NotNull Color stripeBackground() {
@@ -1928,11 +1932,11 @@ public final class JBUI {
     public static final class Tooltip {
       public static final JBValue CORNER_RADIUS = new JBValue.UIInteger("ToolTip.borderCornerRadius", 4);
 
-      private static final @NotNull Color SEPARATOR_COLOR = JBColor.namedColor("Tooltip.separatorColor", 0xd1d1d1, 0x545658);
-      private static final @NotNull Color FOREGROUND = JBColor.namedColor("Tooltip.foreground", new JBColor(Gray.x00, Gray.xBF));
-      private static final @NotNull Color BACKGROUND = JBColor.namedColor("Tooltip.background", new JBColor(Gray.xF2, new Color(0x3c3f41)));
+      private static final @NotNull Color SEPARATOR_COLOR = JBColor.namedColor("ToolTip.separatorColor", 0xd1d1d1, 0x545658);
+      private static final @NotNull Color FOREGROUND = JBColor.namedColor("ToolTip.foreground", new JBColor(Gray.x00, Gray.xBF));
+      private static final @NotNull Color BACKGROUND = JBColor.namedColor("ToolTip.background", new JBColor(Gray.xF2, new Color(0x3c3f41)));
       private static final @NotNull Color GRAYED_FOREGROUND =
-        JBColor.namedColor("Tooltip.grayedForeground", new JBColor(
+        JBColor.namedColor("ToolTip.grayedForeground", new JBColor(
           JBColor.namedColor("ColorPalette.Gray7", Gray.x90),
           JBColor.namedColor("ColorPalette.Gray8", Gray.x90))
         );

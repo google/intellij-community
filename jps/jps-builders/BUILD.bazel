@@ -34,7 +34,6 @@ jvm_library(
     "@lib//:jps-javac-extension",
     "@rules_jvm//jps-builders-6:build-javac-rt",
     "//platform/tracing:tracing-rt",
-    "//platform/runtime/repository",
     "//platform/util/zip",
     "@rules_jvm//dependency-graph",
     "@lib//:caffeine",
@@ -46,6 +45,7 @@ jvm_library(
     "@lib//:maven-resolver-provider",
     "@lib//:http-client",
     "@lib//:kotlin-metadata",
+    "@lib//:kotlinx-coroutines-core",
   ],
   exports = [
     "@lib//:maven-resolver-provider",
@@ -79,10 +79,12 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/core-api:core",
     "//jps/jps-builders:build",
     "@rules_jvm//dependency-graph",
     "//java/testFramework",
     "//jps/model-api:model",
+    "//jps/model-serialization",
     "//jps/model-impl:model-tests_test_lib",
     "//jps/model-serialization:model-serialization-tests_test_lib",
     "//platform/testFramework",

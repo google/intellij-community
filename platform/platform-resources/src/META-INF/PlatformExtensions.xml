@@ -7,12 +7,6 @@
       headlessImplementation="com.intellij.platform.diagnostic.startUpPerformanceReporter.HeadlessStartUpPerformanceService"
     />
 
-    <applicationService
-      serviceInterface="com.intellij.ide.plugins.PluginUtil"
-      serviceImplementation="com.intellij.ide.plugins.PluginUtilModernImpl"
-      overrides="true"
-    />
-
     <errorHandler implementation="com.intellij.diagnostic.ITNReporter"/>
     <appStarter id="save" implementation="com.intellij.openapi.application.SaveStarter"/>
     <appStarter id="exit" implementation="com.intellij.openapi.application.ExitStarter"/>
@@ -181,15 +175,24 @@
                  restartRequired="false"
                  description="Set initial Linux tty size to 100x100 for WSL processes not attached to Windows PTY (workaround for https://github.com/microsoft/WSL/issues/10701)"
                  defaultValue="true"/>
+    <registryKey key="reworked.plugin.manager.enabled"
+                 restartRequired="false"
+                 description="Enable reworked 'Preferences | Plugins' settings."
+                 defaultValue="false"/>
     <experimentalFeature id="ide.redesigned.inspector" percentOfUsers="0">
       <description>
         Enable new inspection widget experiment
       </description>
     </experimentalFeature>
-    <registryKey key="ide.welcome.screen.branch.name"
-                 restartRequired="true"
-                 description="Show current branch names for recent projects"
-                 defaultValue="true"/>
+
+    <experimentalFeature id="ide.one.island.theme" percentOfUsers="25">
+      <description>Enable One Island UI theme</description>
+    </experimentalFeature>
+
+    <experimentalFeature id="ide.many.islands.theme" percentOfUsers="25">
+      <description>Enable Many Islands UI theme</description>
+    </experimentalFeature>
+
     <applicationService serviceInterface="com.intellij.execution.wsl.WslDistributionManager"
                         serviceImplementation="com.intellij.execution.wsl.WslDistributionManagerImpl"/>
     <applicationService serviceInterface="com.intellij.execution.wsl.WslIjentAvailabilityService"
@@ -445,6 +448,10 @@
     <editorActionHandler action="EditorPageDown" id="combinedDiffPageDown" order="last"
                          implementationClass="com.intellij.diff.tools.combined.CombinedDiffEditorPageDownHandler"/>
 
+    <applicationService serviceInterface="com.intellij.openapi.application.impl.WriteActionPresenceService"
+                        serviceImplementation="com.intellij.openapi.application.impl.WriteActionPresenceServiceImpl"/>
+
+
     <applicationService serviceInterface="com.intellij.openapi.editor.ScrollPositionCalculator"
                         serviceImplementation="com.intellij.openapi.editor.impl.ScrollPositionCalculatorImpl"/>
 
@@ -585,6 +592,8 @@
     <applicationService serviceInterface="com.intellij.openapi.fileEditor.FileNavigator"
                         serviceImplementation="com.intellij.openapi.fileEditor.FileNavigatorImpl"/>
 
+    <applicationService serviceImplementation="com.intellij.platform.ProjectGeneratorManager" preload="notHeadless"/>
+
     <projectService serviceInterface="com.intellij.openapi.vfs.ReadonlyStatusHandler"
                     serviceImplementation="com.intellij.openapi.vcs.readOnlyHandler.ReadonlyStatusHandlerImpl"/>
     <projectService serviceInterface="com.intellij.openapi.startup.StartupManager"
@@ -695,12 +704,13 @@
     <themeProvider id="JetBrainsHighContrastTheme" path="/themes/HighContrast.theme.json"/>
     <bundledColorScheme id="High contrast" path="themes/highContrastScheme.xml"/>
 
-    <themeProvider id="One Island Light" path="/themes/islands/OneIslandLight.theme.json" targetUi="island"/>
-    <themeProvider id="One Island Darker" path="/themes/islands/OneIslandDarker.theme.json" targetUi="island"/>
-    <themeProvider id="One Island Darkest" path="/themes/islands/OneIslandDarkest.theme.json" targetUi="island"/>
+    <themeProvider id="One Island Light" path="/themes/islands/OneIslandLight.theme.json" targetUi="island" restartRequired="true"/>
 
-    <themeProvider id="Many Islands Darker" path="/themes/islands/ManyIslandsDarker.theme.json" targetUi="islands"/>
-    <themeProvider id="Many Islands Light" path="/themes/islands/ManyIslandsLight.theme.json" targetUi="islands"/>
+    <themeProvider id="One Island Dark" path="/themes/islands/OneIslandDark.theme.json" targetUi="island" restartRequired="true"/>
+    <bundledColorScheme id="Island Dark" path="/themes/islands/IslandSchemeDark.xml"/>
+
+    <themeProvider id="Many Islands Dark" path="/themes/islands/ManyIslandsDark.theme.json" targetUi="islands" restartRequired="true"/>
+    <themeProvider id="Many Islands Light" path="/themes/islands/ManyIslandsLight.theme.json" targetUi="islands" restartRequired="true"/>
 
     <themeMetadataProvider path="/themes/metadata/IntelliJPlatform.themeMetadata.json"/>
     <themeMetadataProvider path="/themes/metadata/JDK.themeMetadata.json"/>
@@ -749,9 +759,6 @@
                              treeRenderer="com.intellij.ide.plugins.PluginManagerConfigurableTreeRenderer"
                              bundle="messages.IdeBundle"
                              key="title.plugins"/>
-    <applicationConfigurable parentId="preferences.general" instance="com.intellij.util.net.HttpProxyConfigurable" id="http.proxy"
-                             bundle="messages.IdeBundle"
-                             key="http.proxy.configurable"/>
 
     <applicationConfigurable parentId="preferences.general" instance="com.intellij.ide.gdpr.ConsentConfigurable" id="consents"
                              bundle="messages.IdeBundle"
@@ -762,14 +769,18 @@
                              bundle="messages.IdeBundle"
                              key="date.time.format.configurable"/>
 
-    <applicationConfigurable groupId="tools"
-                             bundle="messages.UIBundle"
-                             key="configurable.CertificateConfigurable.display.name"
-                             id="http.certificates" instance="com.intellij.util.net.ssl.CertificateConfigurable"/>
+    <applicationConfigurable parentId="preferences.general" instance="com.intellij.util.net.HttpProxyConfigurable" id="http.proxy"
+                             bundle="messages.IdeBundle"
+                             key="http.proxy.configurable"/>
 
     <applicationConfigurable parentId="preferences.general" instance="com.intellij.ide.ui.LanguageAndRegionConfigurable"
                              id="preferences.language.and.region"
                              key="title.language.and.region" bundle="messages.IdeBundle"/>
+
+    <applicationConfigurable parentId="preferences.general"
+                             bundle="messages.UIBundle"
+                             key="configurable.CertificateConfigurable.display.name"
+                             id="http.certificates" instance="com.intellij.util.net.ssl.CertificateConfigurable"/>
 
     <fileType name="ARCHIVE" implementationClass="com.intellij.ide.highlighter.ArchiveFileType" fieldName="INSTANCE"
               extensions="ane;apk;ear;egg;jar;swc;war;zip"/>
@@ -855,9 +866,6 @@
     <applicationService serviceInterface="com.intellij.openapi.editor.EditorFactory"
                         serviceImplementation="com.intellij.openapi.editor.impl.EditorFactoryImpl" preload="notHeadless"/>
 
-    <applicationService serviceInterface="com.intellij.openapi.editor.impl.zombie.ZombieOriginRecipeBook"
-                        serviceImplementation="com.intellij.openapi.editor.impl.zombie.ZombieOriginRecipeBookImpl"
-                        preload="notHeadless"/>
     <applicationService serviceImplementation="com.intellij.openapi.editor.ClientEditorManager"
                         client="all"/>
 
@@ -929,8 +937,8 @@
     <config.inlaySettingsProvider implementation="com.intellij.codeInsight.hints.settings.providers.ParameterInlaySettingsProvider"/>
     <config.inlaySettingsProvider implementation="com.intellij.codeInsight.hints.settings.providers.NewInlaySettingsProvider"/>
 
-    <applicationService serviceInterface="com.intellij.internal.statistic.eventLog.StatisticsRegionUrlMapperService"
-                        serviceImplementation="com.intellij.internal.statistic.StatisticsRegionUrlMapperServiceImpl" preload="notLightEdit"/>
+    <applicationService serviceInterface="com.intellij.internal.statistic.eventLog.StatisticsRegionSettingsService"
+                        serviceImplementation="com.intellij.internal.statistic.StatisticsRegionSettingsServiceImpl" preload="notLightEdit"/>
     <statistics.validation.customValidationRule
       implementation="com.intellij.configurationStore.statistic.eventLog.SettingsComponentNameValidator"/>
     <statistics.validation.customValidationRuleFactory implementation="com.intellij.configurationStore.statistic.eventLog.SettingsValueValidatorFactory"/>
@@ -985,6 +993,8 @@
 
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.internal.statistic.collectors.fus.fileTypes.FileTypeUsageCounterCollector"/>
+    <statistics.counterUsagesCollector
+      implementationClass="com.intellij.internal.statistic.eventLog.LogSystemCollector"/>
     <statistics.validation.customValidationRule
       implementation="com.intellij.internal.statistic.collectors.fus.fileTypes.FileNamePatternCustomValidationRule"/>
     <statistics.validation.customValidationRule
@@ -1047,6 +1057,7 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.ide.MnemonicUsageCollector"/>
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.diagnostic.UILatencyLogger"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.progress.impl.fus.FreezeUiUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.notification.impl.NotificationsEventLogGroup"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.featureStatistics.FeatureUsageTrackerImpl$ProductivityUsageCollector"/>
@@ -1112,6 +1123,7 @@
 
     <vfs.local.pluggableFileWatcher implementation="com.intellij.openapi.vfs.impl.local.NativeFileWatcherImpl"/>
     <vfs.local.pluggableFileWatcher implementation="com.intellij.openapi.vfs.impl.wsl.WslFileWatcher"/>
+    <vfs.local.pluggableFileWatcher implementation="com.intellij.openapi.vfs.impl.eel.EelFileWatcher"/>
 
     <virtualFileSystem key="dummy" implementationClass="com.intellij.openapi.vfs.ex.dummy.DummyFileSystem"/>
     <virtualFileSystem key="http" implementationClass="com.intellij.openapi.vfs.impl.http.HttpFileSystemImpl"/>
@@ -1779,6 +1791,7 @@
     <backgroundPostStartupActivity implementation="com.intellij.diagnostic.opentelemetry.JVMStatsToOTelReporter"/>
 
     <applicationActivity implementation="com.intellij.openapi.vfs.newvfs.persistent.VFSHealthCheckServiceStarter"/>
+    <applicationActivity implementation="com.intellij.openapi.vfs.newvfs.persistent.VFSDefragmentationChecker"/>
     <applicationActivity implementation="com.intellij.diagnostic.JVMResponsivenessMonitorStarter"/>
     <applicationActivity implementation="com.intellij.openapi.application.impl.WriteActionLoggerApplicationActivity"/>
 
@@ -1907,9 +1920,7 @@
     <applicationService serviceImplementation="com.intellij.openapi.wm.impl.customFrameDecorations.frameButtons.LinuxIconThemeConfiguration" headlessImplementation=""
                         preload="notHeadless" os="linux"/>
 
-    <projectServiceInitializer.essential
-      implementation="com.intellij.execution.eel.EelProjectServiceInitializer"
-      order="before moduleBridgeLoaderService"/>
+    <projectPreInit implementation="com.intellij.execution.eel.EelProjectPreInit" order="before moduleBridgeLoaderService"/>
     <applicationActivity implementation="com.intellij.ide.SwingTooltipManagerCustomizer"/>
     <registryKey key="rhizome.progress"
                  defaultValue="true"
@@ -1923,6 +1934,15 @@
     <registryKey key="ide.idle.memory.cleaner.delay"
                  defaultValue="5000"
                  description="A delay in milliseconds between the IDE becoming idle and the memory cleaning being performed"/>
+    <registryKey key="progresses.show.counter.icon.instead.of.show.link"
+                 defaultValue="false"
+                 description="Progresses would be shown with an icon with their number in status bar instead of Show All link"/>
+    <registryKey key="progresses.support.secondary.progresses"
+                 defaultValue="false"
+                 description="Support option to avoid showing some progresses in status bar fully, only in popup and progress count. Needs `progresses.show.counter.icon.instead.of.show.link` enabled."/>
+
+   <usagePresentationProvider implementation="com.intellij.find.impl.UsageInfo2UsageAdapterPresentationProvider"/>
+
     <pluginRepositoryAuthProvider implementation="com.intellij.ide.plugins.auth.EnvironmentVariablePluginRepositoryAuthProvider" />
     <applicationService serviceInterface="com.intellij.auth.GenericAuthService"
                         serviceImplementation="com.intellij.auth.LocalGenericAuthService"
@@ -1936,6 +1956,9 @@
     <applicationService serviceInterface="com.intellij.platform.ide.provisioner.ProvisionerCompanyBrandingProvider"
                         serviceImplementation="com.intellij.platform.ide.provisioner.DefaultProvisionerCompanyBrandingProvider"/>
 
+    <applicationService serviceInterface="com.intellij.openapi.vfs.FileIdAdapter"
+                        serviceImplementation="com.intellij.openapi.vfs.impl.FileIdAdapterImpl"
+                        preload="notHeadless"/>
     <applicationService serviceImplementation="com.intellij.openapi.vfs.impl.FilePermissionManagerImpl"
                         serviceInterface="com.intellij.openapi.vfs.impl.FilePermissionManager"
                         client="all"/>
@@ -1944,10 +1967,12 @@
                         serviceInterface="com.intellij.platform.ide.core.permissions.impl.IdePermissionManager"
                         client="owner"/>
 
+    <applicationService serviceImplementation="com.intellij.ide.impl.UndoRemoteBehaviorService"/>
+
     <diagnostic.specialPathsProvider implementation="com.intellij.diagnostic.specialPaths.ProjectSpecialPathsProvider"/>
     <diagnostic.specialPathsProvider implementation="com.intellij.diagnostic.specialPaths.ApplicationSpecialPathsProvider"/>
 
-    <editor.rd.localSupport filetype="PLAIN_TEXT"/>
+    <!--<editor.rd.localSupport filetype="PLAIN_TEXT"/> IJPL-189393 -->
   </extensions>
 
   <applicationListeners>

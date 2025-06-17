@@ -15,6 +15,8 @@ jvm_library(
   deps = [
     "//java/java-psi-api:psi",
     "//java/java-psi-impl:psi-impl",
+    "//platform/util/concurrency",
+    "//platform/core-api:core",
     "//platform/indexing-api:indexing",
     "//platform/indexing-impl",
     "//jps/model-api:model",
@@ -32,8 +34,6 @@ jvm_library(
     "//java/java-psi-impl:psi-impl",
     "//platform/indexing-api:indexing",
     "//platform/indexing-impl",
-    "//platform/projectModel-api:projectModel",
-    "//java/java-indexing-api:indexing",
   ],
   runtime_deps = [":indexing-impl_resources"]
 )

@@ -9,7 +9,6 @@ import com.intellij.internal.statistic.eventLog.events.EventPair
 import com.intellij.internal.statistic.service.fus.collectors.ApplicationUsagesCollector
 import com.intellij.internal.statistic.service.fus.collectors.CounterUsagesCollector
 import com.intellij.internal.statistic.service.fus.collectors.ProjectUsagesCollector
-import com.intellij.internal.statistic.utils.StatisticsUtil.roundToPowerOfTwo
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
@@ -57,29 +56,29 @@ object GitLabStatistics {
 
   private val PROJECT_METRICS_MR_STATISTICS_ALL = PROJECT_METRICS_GROUP.registerEvent(
     "mr.statistics.all",
-    EventFields.Int("value", description = "Total number of MRs in project (rounded up to the first power of 2)."),
+    EventFields.RoundedInt("value", description = "Total number of MRs in project (rounded up to the first power of 2)."),
     description = "#MR statistics: open."
   )
   private val PROJECT_METRICS_MR_STATISTICS_OPEN = PROJECT_METRICS_GROUP.registerEvent(
     "mr.statistics.open",
-    EventFields.Int("value", description = "Total number of open MRs in project (rounded up to the first power of 2)."),
+    EventFields.RoundedInt("value", description = "Total number of open MRs in project (rounded up to the first power of 2)."),
     description = "#MR statistics: open."
   )
   private val PROJECT_METRICS_MR_STATISTICS_OPEN_AUTHOR = PROJECT_METRICS_GROUP.registerEvent(
     "mr.statistics.open.author",
-    EventFields.Int("value",
+    EventFields.RoundedInt("value",
                     description = "Total number of open MRs in project authored by the current user (rounded up to the first power of 2)."),
     description = "#MR statistics: open > author."
   )
   private val PROJECT_METRICS_MR_STATISTICS_OPEN_ASSIGNEE = PROJECT_METRICS_GROUP.registerEvent(
     "mr.statistics.open.assignee",
-    EventFields.Int("value",
+    EventFields.RoundedInt("value",
                     description = "Total number of open MRs in project assigned to the current user (rounded up to the first power of 2)."),
     description = "#MR statistics: open > assignee."
   )
   private val PROJECT_METRICS_MR_STATISTICS_OPEN_REVIEW_ASSIGNED = PROJECT_METRICS_GROUP.registerEvent(
     "mr.statistics.open.reviewer",
-    EventFields.Int("value",
+    EventFields.RoundedInt("value",
                     description = "Total number of open MRs in project assigned to the current user as reviewer (rounded up to the first power of 2)."),
     description = "#MR statistics: open > reviewer."
   )
@@ -92,18 +91,18 @@ object GitLabStatistics {
       val metrics = metricsLoader.getMetrics() ?: return emptySet()
 
       return setOfNotNull(
-        PROJECT_METRICS_MR_STATISTICS_ALL.metric(roundToPowerOfTwo(metrics.allMRCount.count)),
-        PROJECT_METRICS_MR_STATISTICS_OPEN.metric(roundToPowerOfTwo(metrics.openMRCount.count)),
-        PROJECT_METRICS_MR_STATISTICS_OPEN_AUTHOR.metric(roundToPowerOfTwo(metrics.openAuthoredMRCount.count)),
-        PROJECT_METRICS_MR_STATISTICS_OPEN_ASSIGNEE.metric(roundToPowerOfTwo(metrics.openAssignedMRCount.count)),
-        PROJECT_METRICS_MR_STATISTICS_OPEN_REVIEW_ASSIGNED.metric(roundToPowerOfTwo(metrics.openReviewAssignedMRCount.count)),
+        PROJECT_METRICS_MR_STATISTICS_ALL.metric(metrics.allMRCount.count),
+        PROJECT_METRICS_MR_STATISTICS_OPEN.metric(metrics.openMRCount.count),
+        PROJECT_METRICS_MR_STATISTICS_OPEN_AUTHOR.metric(metrics.openAuthoredMRCount.count),
+        PROJECT_METRICS_MR_STATISTICS_OPEN_ASSIGNEE.metric(metrics.openAssignedMRCount.count),
+        PROJECT_METRICS_MR_STATISTICS_OPEN_REVIEW_ASSIGNED.metric(metrics.openReviewAssignedMRCount.count),
       )
     }
   }
   //endregion
 
   //region Counters
-  private val COUNTERS_GROUP = EventLogGroup("vcs.gitlab.counters", version = 24)
+  private val COUNTERS_GROUP = EventLogGroup("vcs.gitlab.counters", version = 25)
 
   /**
    * Server metadata was fetched
@@ -330,6 +329,7 @@ enum class GitLabApiRequestName {
   REST_GET_PROJECT_IS_FORKED,
   REST_GET_PROJECT_NAMESPACE,
   REST_GET_PROJECT_USERS,
+  REST_CREATE_PROJECT,
   REST_GET_COMMIT,
   REST_GET_COMMIT_DIFF,
   REST_GET_MERGE_REQUEST_DIFF,
@@ -363,6 +363,8 @@ enum class GitLabApiRequestName {
   GQL_GET_PROJECT_IS_FORKED,
   GQL_GET_MEMBER_PROJECTS_FOR_CLONE,
   GQL_GET_MEMBER_PROJECTS_FOR_SNIPPETS,
+  GQL_GET_MEMBER_NAMESPACES,
+  GQL_GET_MEMBER_NAMESPACES_OLD,
   GQL_TOGGLE_MERGE_REQUEST_DISCUSSION_RESOLVE,
   GQL_AWARD_EMOJI_TOGGLE,
   GQL_CREATE_NOTE,
@@ -394,6 +396,8 @@ enum class GitLabApiRequestName {
       GitLabGQLQuery.GET_PROJECT_IS_FORKED -> GQL_GET_PROJECT_IS_FORKED
       GitLabGQLQuery.GET_MEMBER_PROJECTS_FOR_CLONE -> GQL_GET_MEMBER_PROJECTS_FOR_CLONE
       GitLabGQLQuery.GET_MEMBER_PROJECTS_FOR_SNIPPETS -> GQL_GET_MEMBER_PROJECTS_FOR_SNIPPETS
+      GitLabGQLQuery.GET_MEMBER_NAMESPACES -> GQL_GET_MEMBER_NAMESPACES
+      GitLabGQLQuery.GET_MEMBER_NAMESPACES_OLD -> GQL_GET_MEMBER_NAMESPACES_OLD
       GitLabGQLQuery.TOGGLE_MERGE_REQUEST_DISCUSSION_RESOLVE -> GQL_TOGGLE_MERGE_REQUEST_DISCUSSION_RESOLVE
       GitLabGQLQuery.AWARD_EMOJI_TOGGLE -> GQL_AWARD_EMOJI_TOGGLE
       GitLabGQLQuery.CREATE_NOTE -> GQL_CREATE_NOTE

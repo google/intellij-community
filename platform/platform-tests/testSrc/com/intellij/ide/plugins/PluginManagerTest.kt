@@ -10,15 +10,18 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.IoTestUtil
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorBuilder
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorFromXmlStreamConsumer
-import com.intellij.platform.plugins.parser.impl.ReadModuleContext
+import com.intellij.platform.plugins.parser.impl.PluginDescriptorReaderContext
 import com.intellij.platform.plugins.parser.impl.XIncludeLoader.LoadedXIncludeReference
 import com.intellij.platform.plugins.parser.impl.consume
-import com.intellij.platform.testFramework.loadAndInitDescriptorInTest
+import com.intellij.platform.plugins.parser.impl.elements.OS
+import com.intellij.platform.runtime.product.ProductMode
+import com.intellij.platform.testFramework.loadDescriptorInTest
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.rules.TempDirectory
 import com.intellij.util.TriConsumer
+import com.intellij.util.xml.dom.NoOpXmlInterner
 import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xml.dom.readXmlAsModel
 import org.assertj.core.api.Assertions
@@ -189,7 +192,7 @@ class PluginManagerTest {
   @Test
   fun testModulePluginIdContract() {
     val pluginsPath = Path.of(PlatformTestUtil.getPlatformTestDataPath(), "plugins", "withModules")
-    val descriptorBundled = loadAndInitDescriptorInTest(pluginsPath, true)
+    val descriptorBundled = loadDescriptorInTest(pluginsPath, true)
     val pluginSet = PluginSetBuilder(mutableSetOf(descriptorBundled)).createPluginSetWithEnabledModulesMap()
 
     val moduleId = PluginId.getId("foo.bar")
@@ -200,8 +203,8 @@ class PluginManagerTest {
   @Test
   fun testIdentifyPreInstalledPlugins() {
     val pluginsPath = Path.of(PlatformTestUtil.getPlatformTestDataPath(), "plugins", "updatedBundled")
-    val bundled = loadAndInitDescriptorInTest(pluginsPath.resolve("bundled"), true)
-    val updated = loadAndInitDescriptorInTest(pluginsPath.resolve("updated"))
+    val bundled = loadDescriptorInTest(pluginsPath.resolve("bundled"), true)
+    val updated = loadDescriptorInTest(pluginsPath.resolve("updated"))
     val expectedPluginId = updated.getPluginId()
     Assert.assertEquals(expectedPluginId, bundled.getPluginId())
 
@@ -243,6 +246,7 @@ class PluginManagerTest {
           checkEssentialPlugins = false,
           explicitPluginSubsetToLoad = null,
           disablePluginLoadingCompletely = false,
+          currentProductModeId = ProductMode.MONOLITH.id,
         )
       )
       Assert.assertTrue("Plugin should be pre installed", loadingResult.shadowedBundledIds.contains(expectedPluginId))
@@ -255,7 +259,7 @@ class PluginManagerTest {
       val text = StringBuilder()
       for (descriptor in loadPluginResult.pluginSet.getEnabledModules()) {
         text.append(if (descriptor.isEnabled()) "+ " else "  ").append(descriptor.getPluginId().idString)
-        if (descriptor.moduleName != null) {
+        if (descriptor is ContentModuleDescriptor) {
           text.append(" | ").append(descriptor.moduleName)
         }
         text.append('\n')
@@ -276,7 +280,7 @@ class PluginManagerTest {
     }
 
     private fun checkCompatibility(ideVersion: String?, sinceBuild: String?, untilBuild: String?): PluginNonLoadReason? {
-      val desc = object : TestIdeaPluginDescriptorEx() {
+      val desc = object : TestIdeaPluginDescriptor() {
         override fun getPluginId(): PluginId = PluginId.getId("test")
         override fun getName(): @NlsSafe String? = pluginId.idString
         override fun getSinceBuild(): @NlsSafe String? = sinceBuild
@@ -288,7 +292,7 @@ class PluginManagerTest {
     }
 
     private fun checkCompatibility(platformId: String): Boolean {
-      val desc = object : TestIdeaPluginDescriptorEx() {
+      val desc = object : TestIdeaPluginDescriptor() {
         override fun getPluginId(): PluginId = PluginId.getId("test")
         override fun getName(): @NlsSafe String? = pluginId.idString
         override fun getSinceBuild(): @NlsSafe String? = null
@@ -326,6 +330,7 @@ class PluginManagerTest {
         checkEssentialPlugins = false,
         explicitPluginSubsetToLoad = null,
         disablePluginLoadingCompletely = false,
+        currentProductModeId = ProductMode.MONOLITH.id,
       )
       val root = readXmlAsModel(Files.newInputStream(file))
       val autoGenerateModuleDescriptor = Ref<Boolean>(false)
@@ -339,7 +344,7 @@ class PluginManagerTest {
         }
       }
 
-      val list = ArrayList<IdeaPluginDescriptorImpl>()
+      val list = ArrayList<PluginMainDescriptor>()
       for (element in root.children) {
         if (element.name != "idea-plugin") {
           continue
@@ -395,13 +400,13 @@ class PluginManagerTest {
       override fun loadXIncludeReference(dataLoader: DataLoader, path: String): LoadedXIncludeReference? = throw UnsupportedOperationException()
 
       override fun resolvePath(
-        readContext: ReadModuleContext,
+        readContext: PluginDescriptorReaderContext,
         dataLoader: DataLoader,
         relativePath: String,
       ): PluginDescriptorBuilder {
         for (child in root.children) {
           if (child.name == "config-file-idea-plugin") {
-            val url = child.getAttributeValue("url")!!
+            val url = child.getAttributeValue("descriptor-url")!!
             if (url.endsWith("/$relativePath")) {
               try {
                 val reader = PluginDescriptorFromXmlStreamConsumer(readContext, this.toXIncludeLoader(dataLoader))
@@ -418,7 +423,7 @@ class PluginManagerTest {
       }
 
       override fun resolveModuleFile(
-        readContext: ReadModuleContext,
+        readContext: PluginDescriptorReaderContext,
         dataLoader: DataLoader,
         path: String,
       ): PluginDescriptorBuilder {
@@ -461,5 +466,20 @@ class PluginManagerTest {
       }
       writer.writeEndElement()
     }
+  }
+}
+
+private fun readModuleDescriptorForTest(input: ByteArray): PluginDescriptorBuilder {
+  return PluginDescriptorFromXmlStreamConsumer(readContext = object : PluginDescriptorReaderContext {
+    override val interner = NoOpXmlInterner
+    override val isMissingIncludeIgnored = false
+    override val elementOsFilter: (OS) -> Boolean
+      get() = { it.convert().isSuitableForOs() }
+  }, xIncludeLoader = PluginXmlPathResolver.DEFAULT_PATH_RESOLVER.toXIncludeLoader(object : DataLoader {
+    override fun load(path: String, pluginDescriptorSourceOnly: Boolean) = throw UnsupportedOperationException()
+    override fun toString() = ""
+  })).let {
+    it.consume(input, null)
+    it.getBuilder()
   }
 }

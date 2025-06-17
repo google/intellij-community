@@ -20,8 +20,13 @@ jvm_library(
   deps = [
     "//plugins/maven",
     "//plugins/maven/testFramework",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
+    "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/external-system-impl:externalSystem-impl",
     "//jps/model-api:model",
+    "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//platform/structure-view-impl:structureView-impl",
     "//platform/testFramework",
@@ -62,6 +67,7 @@ jvm_library(
     "@lib//:kotlin-reflect",
     "@lib//:kotlinx-serialization-core",
     "//platform/statistics/testFramework",
+    "//xml/xml-psi-api:psi",
     "//platform/xdebugger-api:debugger",
   ],
   runtime_deps = [":maven-tests_test_resources"]

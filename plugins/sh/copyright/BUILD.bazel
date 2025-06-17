@@ -14,6 +14,8 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//plugins/copyright",
+    "//platform/core-api:core",
+    "//platform/projectModel-api:projectModel",
     "//platform/util",
     "//plugins/sh/core",
     "//platform/core-impl",
@@ -31,6 +33,8 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/core-api:core",
+    "//platform/projectModel-api:projectModel",
     "//plugins/sh",
     "//plugins/copyright",
     "//plugins/copyright:copyright_test_lib",

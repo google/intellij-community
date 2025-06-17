@@ -5,11 +5,13 @@
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.EelTunnelsApi.GetAcceptorForRemotePort
+import org.jetbrains.annotations.ApiStatus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 
 @GeneratedBuilder.Result
+@ApiStatus.Internal
 class GetAcceptorForRemotePortBuilder() {
   private var configureServerSocket: @ExtensionFunctionType Function1<ConfigurableSocket, Unit> = {}
 
@@ -25,10 +27,12 @@ class GetAcceptorForRemotePortBuilder() {
     this.configureServerSocket = arg
   }
 
+  @ApiStatus.Experimental
   fun hostname(arg: String): GetAcceptorForRemotePortBuilder = apply {
     this.hostname = arg
   }
 
+  @ApiStatus.Experimental
   fun port(arg: UShort): GetAcceptorForRemotePortBuilder = apply {
     this.port = arg
   }
@@ -36,6 +40,7 @@ class GetAcceptorForRemotePortBuilder() {
   /**
    * @see [Builder.preferIPv4]
    */
+  @ApiStatus.Experimental
   fun protocolPreference(arg: EelIpPreference): GetAcceptorForRemotePortBuilder = apply {
     this.protocolPreference = arg
   }
@@ -52,6 +57,7 @@ class GetAcceptorForRemotePortBuilder() {
   /**
    * @see [Builder.connectionTimeout]
    */
+  @ApiStatus.Experimental
   fun timeout(arg: Duration): GetAcceptorForRemotePortBuilder = apply {
     this.timeout = arg
   }

@@ -264,8 +264,19 @@ class KotlinFirChangeSignatureTest :
         receiverParameterInfo = parameterInfo
     }
 
+    fun testFromContextParameterClassFunctionToReceiver1() = doTest {
+        val parameterInfo = newParameters[0]
+        parameterInfo.isContextParameter = false
+        receiverParameterInfo = parameterInfo
+    }
+
+    fun testFromContextParameterToParameter() = doTest {
+        val parameterInfo = newParameters[0]
+        parameterInfo.isContextParameter = false
+    }
+
     fun testDeleteUsedContextParameter() = doTestConflict {
-        removeParameter(0)
+        removeContextParameter(0)
     }
 
     fun testChangingTypeOfContextParameter() = doTest {
@@ -286,6 +297,10 @@ class KotlinFirChangeSignatureTest :
 
     fun testContextParameterInDeepHierarchy() = doTest {
       newParameters[0].isContextParameter = false
+    }
+
+    fun testConvertToContextParameterInDeepHierarchy() = doTest {
+      newParameters[1].isContextParameter = true
     }
 
     fun testFromContextParameterNormalParameterConflict() = doTest {

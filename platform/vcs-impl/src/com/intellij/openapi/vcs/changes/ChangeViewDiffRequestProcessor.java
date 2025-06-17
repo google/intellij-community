@@ -68,7 +68,7 @@ public abstract class ChangeViewDiffRequestProcessor extends CacheDiffRequestPro
   /**
    * @deprecated Use {@link #iterateSelectedChanges()}
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   @ApiStatus.OverrideOnly
   public @NotNull Stream<? extends Wrapper> getSelectedChanges() {
     throw new UnsupportedOperationException();
@@ -77,7 +77,7 @@ public abstract class ChangeViewDiffRequestProcessor extends CacheDiffRequestPro
   /**
    * @deprecated Use {@link #iterateAllChanges()}
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   @ApiStatus.OverrideOnly
   public @NotNull Stream<? extends Wrapper> getAllChanges() {
     throw new UnsupportedOperationException();
@@ -414,6 +414,7 @@ public abstract class ChangeViewDiffRequestProcessor extends CacheDiffRequestPro
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
+      if (o == null) return false;
       if (getClass() != o.getClass()) return false;
 
       Wrapper wrapper = (Wrapper)o;

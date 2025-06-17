@@ -4,32 +4,12 @@ package com.intellij.openapi.application
 import org.jetbrains.annotations.ApiStatus
 
 /**
- * - `false` means that lock permits are bound only to threads
- * - `true` means that lock permits also stored in coroutine contexts
- */
-@get:ApiStatus.Internal
-val isLockStoredInContext: Boolean = System.getProperty("ide.store.lock.in.context", "true").toBoolean()
-
-/**
- * - `true` means that the IDE will use n-locks backend for read, write, and write-intent actions
- * - `false` means that the IDE will use backend with two locks
- */
-@get:ApiStatus.Internal
-val useNestedLocking: Boolean = System.getProperty("ide.nested.locking.enabled", "true").toBoolean()
-
-/**
  * - `false` means that [backgroundWriteAction] will perform write actions from a non-modal context on a background thread
  * - `true` means that [backgroundWriteAction] will perform write actions in and old way (on EDT)
  */
 @ApiStatus.Internal
-val useBackgroundWriteAction: Boolean = useNestedLocking && System.getProperty("idea.background.write.action.enabled", "true").toBoolean()
+val useBackgroundWriteAction: Boolean = System.getProperty("idea.background.write.action.enabled", "true").toBoolean()
 
-/**
- * - `false` means that IDE will be freezed on attempt to acquire a taken lock
- * - `true` means that we will show a "modal" progress indicator instead of a freeze
- */
-@ApiStatus.Internal
-val permitSuvorovProgress: Boolean = System.getProperty("ide.permit.suvorov.progress", "false").toBoolean()
 
 /**
  * - `false` means wrong action chains are ignored and not reported
@@ -39,6 +19,9 @@ val permitSuvorovProgress: Boolean = System.getProperty("ide.permit.suvorov.prog
  */
 @get:ApiStatus.Internal
 val reportInvalidActionChains: Boolean = System.getProperty("ijpl.report.invalid.action.chains", "false").toBoolean()
+
+@get:ApiStatus.Internal
+val installSuvorovProgress: Boolean = System.getProperty("ide.install.suvorov.progress", "true").toBoolean()
 
 /**
  * Represents the deadline before blocking read lock acquisition starts compensating parallelism for coroutine worker threads

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl
 
 import com.intellij.diagnostic.StartUpMeasurer
@@ -43,10 +43,12 @@ import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.measureTimeMillis
 
+private val EP_NAME: ExtensionPointName<BridgeInitializer> = ExtensionPointName("com.intellij.workspace.bridgeInitializer")
+
 @ApiStatus.Internal
 open class WorkspaceModelImpl : WorkspaceModelInternal {
-  val project: Project
-  val cs: CoroutineScope
+  private val project: Project
+  private val coroutineScope: CoroutineScope
 
   @Volatile
   var loadedFromCache: Boolean = false
@@ -85,7 +87,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
   
   constructor(project: Project, cs: CoroutineScope, storage: ImmutableEntityStorage, virtualFileUrlManager: VirtualFileUrlManager) {
     this.project = project
-    this.cs = cs
+    this.coroutineScope = cs
     this.virtualFileManager = virtualFileUrlManager
     entityStorage = VersionedEntityStorageImpl(storage)
     unloadedEntitiesStorage = VersionedEntityStorageImpl(ImmutableEntityStorage.empty())
@@ -94,7 +96,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
 
   constructor(project: Project, cs: CoroutineScope) {
     this.project = project
-    this.cs = cs
+    this.coroutineScope = cs
     this.virtualFileManager = IdeVirtualFileUrlManagerImpl(project.isCaseSensitive)
     log.debug { "Loading workspace model" }
     val start = Milliseconds.now()
@@ -387,8 +389,9 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
   fun replaceProjectModel(mainStorageReplacement: StorageReplacement, unloadStorageReplacement: StorageReplacement): Boolean {
     ThreadingAssertions.assertWriteAccess()
 
-    if (entityStorage.version != mainStorageReplacement.version ||
-        unloadedEntitiesStorage.version != unloadStorageReplacement.version) return false
+    if (entityStorage.version != mainStorageReplacement.version || unloadedEntitiesStorage.version != unloadStorageReplacement.version) {
+      return false
+    }
 
     fullReplaceProjectModelTimeMs.addMeasuredTime {
       val builder = mainStorageReplacement.builder
@@ -397,6 +400,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
 
       val unloadBuilder = unloadStorageReplacement.builder
       unloadedEntitiesStorage.replace(unloadBuilder.toSnapshot(), unloadStorageReplacement.changes, {}, ::onUnloadedEntitiesChanged)
+      log.info("Project model updated to version ${entityStorage.pointer.version}")
     }
     return true
   }
@@ -411,7 +415,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
     }
 
     initializeBridgesTimeMs.addMeasuredTime {
-      for (bridgeInitializer in BridgeInitializer.EP_NAME.extensionList) {
+      for (bridgeInitializer in EP_NAME.extensionList) {
         logErrorOnEventHandling {
           if (bridgeInitializer.isEnabled()) {
             bridgeInitializer.initializeBridges(project, change, builder)
@@ -445,7 +449,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
     }
 
     // We emit async changes before running other listeners under write action
-    cs.launch { updatesFlow.emit(change) }
+    coroutineScope.launch { updatesFlow.emit(change) }
 
     onChangedTimeMs.addMeasuredTime { // Measure only the time of WorkspaceModelChangeListener
       logErrorOnEventHandling {
@@ -507,8 +511,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
   companion object {
     private val log = logger<WorkspaceModelImpl>()
 
-    private val PRE_UPDATE_HANDLERS = ExtensionPointName.create<WorkspaceModelPreUpdateHandler>(
-      "com.intellij.workspaceModel.preUpdateHandler")
+    private val PRE_UPDATE_HANDLERS = ExtensionPointName<WorkspaceModelPreUpdateHandler>("com.intellij.workspaceModel.preUpdateHandler")
     private const val PRE_UPDATE_LOOP_BLOCK = 100
 
     private val loadingTotalTimeMs = MillisecondsMeasurer()

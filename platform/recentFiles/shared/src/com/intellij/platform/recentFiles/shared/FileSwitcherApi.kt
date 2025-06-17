@@ -34,7 +34,7 @@ sealed interface RecentFilesBackendRequest {
   val projectId: ProjectId
 
   @Serializable
-  data class FetchMetadata(val filesKind: RecentFileKind, val frontendRecentFiles: List<VirtualFileId>, override val projectId: ProjectId) : RecentFilesBackendRequest
+  data class FetchMetadata(val filesKind: RecentFileKind, val frontendRecentFiles: List<VirtualFileId>, val forceAddToModel: Boolean, override val projectId: ProjectId) : RecentFilesBackendRequest
 
   @Serializable
   data class FetchFiles(val filesKind: RecentFileKind, val frontendEditorSelectionHistory: List<VirtualFileId>, override val projectId: ProjectId) : RecentFilesBackendRequest
@@ -50,6 +50,12 @@ sealed interface RecentFilesBackendRequest {
 @Serializable
 enum class RecentFileKind {
   RECENTLY_EDITED, RECENTLY_OPENED, RECENTLY_OPENED_UNPINNED
+}
+
+@ApiStatus.Internal
+@Serializable
+enum class FileChangeKind {
+  REMOVED, ADDED, UPDATED, UPDATED_AND_PUT_ON_TOP
 }
 
 @ApiStatus.Internal
@@ -83,9 +89,6 @@ sealed interface RecentFilesEvent {
 
   @Serializable
   class AllItemsRemoved : RecentFilesEvent
-
-  @Serializable
-  class UncertainChangeOccurred: RecentFilesEvent
 }
 
 @ApiStatus.Internal

@@ -1,9 +1,22 @@
 load("@rules_java//java:defs.bzl", "java_binary")
+load("@rules_jvm//:src/jvm-args.bzl", "get_jvm_flags")
 load("//build:compiler-options.bzl", "create_kotlinc_options")
 
 create_kotlinc_options(name= "k8", jvm_target = 8)
 create_kotlinc_options(name= "k11", jvm_target = 11)
 create_kotlinc_options(name = "k17", jvm_target = 17)
+
+java_binary(
+    name = "monorepo-jvm-builder",
+    jvm_flags = get_jvm_flags([
+        "-Dkotlin.environment.keepalive=true",
+        "-Djps.use.experimental.storage=true",
+        "-XX:+HeapDumpOnOutOfMemoryError",
+    ]),
+    main_class = "org.jetbrains.bazel.jvm.worker.JvmBuildWorker",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@rules_jvm//src/jvm-builder:jvm-builder-lib", "@lib//:rhizomedb-compiler-plugin", "@lib//:expects-compiler-plugin", "@lib//:rpc-compiler-plugin"],
+)
 
 java_binary(
   name = "main_run",
@@ -206,7 +219,7 @@ java_library(
     "//plugins/evaluation-plugin/languages/java",
     "//platform/warmup",
     "//plugins/remote-control",
-    "//platform/webSymbols",
+    "//platform/polySymbols",
     "//plugins/performanceTesting/core:performanceTesting",
     "//platform/smart-update",
     "//plugins/gradle/intellij.gradle.analysis:analysis",
@@ -239,6 +252,10 @@ java_library(
     "//plugins/compose/intellij.compose.ide.plugin.resources:ide-plugin-resources",
     "//plugins/compose/intellij.compose.ide.plugin.gradleTooling:ide-plugin-gradleTooling-rt",
     "//plugins/git-modal-commit:vcs-git-commit-modal",
+    "//plugins/maven/maven-event-listener:server-eventListener",
+    "//plugins/maven/maven3-server-impl:server-m3-impl",
+    "//plugins/maven/maven36-server-impl:server-m36-impl",
+    "//plugins/maven/maven40-server-impl:server-m40",
   ]
 )
 ### auto-generated section `build intellij.idea.community.main` end

@@ -13,6 +13,7 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
+    "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
@@ -21,6 +22,7 @@ jvm_library(
     "//platform/lang-api:lang",
     "//platform/util/concurrency",
     "//platform/core-ui",
+    "//platform/projectModel-api:projectModel",
     "//platform/statistics",
     "//platform/analysis-impl",
     "//platform/recentFiles/shared:recentFiles",
@@ -36,6 +38,7 @@ jvm_library(
     "//platform/kernel/shared:kernel",
     "//platform/lang-impl",
     "//platform/platform-frontend:frontend",
+    "//platform/util",
   ],
   runtime_deps = [":frontend_resources"]
 )

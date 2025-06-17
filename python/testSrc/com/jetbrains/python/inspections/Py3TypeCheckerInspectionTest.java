@@ -2263,7 +2263,7 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                    def f(x: IntGetter):
                        pass
                    
-                   box: Box[str] = ...
+                   box: Box[str]
                    f(<warning descr="Expected type 'IntGetter', got 'Box[str]' instead">box</warning>)
                    """);
   }
@@ -2285,7 +2285,7 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                    def f(x: Getter[int]):
                        pass
                    
-                   box: Box[str] = ...
+                   box: Box[str]
                    f(<warning descr="Expected type 'Getter[int]', got 'Box[str]' instead">box</warning>)
                    """);
   }
@@ -2857,6 +2857,41 @@ def foo(param: str | int) -> TypeGuard[str]:
     doTestByText("""
                    def func(p: tuple[int, *tuple[int, ...]]):
                        v: tuple[int] = <warning>p</warning>
+                   """);
+  }
+
+  // PY-80436
+  public void testEllipsis() {
+    doTestByText("""
+                   from types import EllipsisType
+                   e: EllipsisType
+                   e = ...
+                   e = Ellipsis
+                   """);
+  }
+
+  // PY-76845
+  public void testNamedTupleCompatibleWithTuple() {
+    doTestByText("""
+                   from typing import NamedTuple
+                   
+                   class NT(NamedTuple):
+                       a: str
+                       b: int
+
+                   x: tuple[str, int] = NT("a", 1)
+                   y: tuple[str, int, str] = <warning descr="Expected type 'tuple[str, int, str]', got 'NT' instead">NT("a", 1)</warning>
+                   """);
+  }
+
+  // PY-75556
+  public void testLiteralTypeOnKwargs() {
+    doTestByText("""
+                   from typing import Literal
+                   
+                   def f(**kwargs: Literal[1]): ...
+                   f(a=1)
+                   f(<warning descr="Expected type 'Literal[1]', got 'Literal[2]' instead">a=2</warning>)
                    """);
   }
 }

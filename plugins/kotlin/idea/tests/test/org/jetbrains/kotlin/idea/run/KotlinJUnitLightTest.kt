@@ -29,14 +29,18 @@ import com.intellij.psi.PsiClassOwner
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.TestActionEvent
-import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase
 import com.intellij.util.ThreeState
 import org.jetbrains.kotlin.asJava.toLightMethods
+import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.junit.JunitKotlinTestFrameworkProvider
+import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase
 import org.jetbrains.kotlin.psi.KtFunction
 import org.junit.Assert
+import org.junit.internal.runners.JUnit38ClassRunner
+import org.junit.runner.RunWith
 
-class KotlinJUnitLightTest : LightJavaCodeInsightFixtureTestCase() {
+@RunWith(JUnit38ClassRunner::class)
+abstract class KotlinJUnitLightTest : KotlinLightCodeInsightFixtureTestCaseBase() {
     private val tempSettings: MutableSet<RunnerAndConfigurationSettings> = HashSet()
 
     @Throws(Exception::class)
@@ -52,7 +56,7 @@ class KotlinJUnitLightTest : LightJavaCodeInsightFixtureTestCase() {
             super.tearDown()
         }
     }
-    
+
     override fun setUp() {
         super.setUp()
         myFixture.addClass("package junit.framework; public class TestCase {}")
@@ -180,7 +184,7 @@ class KotlinJUnitLightTest : LightJavaCodeInsightFixtureTestCase() {
         val settings = RunnerAndConfigurationSettingsImpl(manager as RunManagerImpl, test)
         manager.addConfiguration(settings)
         tempSettings.add(settings)
-        
+
         val element = file.findElementAt(myFixture.caretOffset)!!
 
         val location = PsiLocation(element)
@@ -209,7 +213,7 @@ class KotlinJUnitLightTest : LightJavaCodeInsightFixtureTestCase() {
             tempSettings.add(settings)
         }
     }
-    
+
     private fun doTestClassWithMain(setupExisting: Runnable?) {
         myFixture.configureByText(
             "ATest.kt", """import org.junit.Test
@@ -246,7 +250,7 @@ fun main(args: Array<String>) {}
 
     fun testStackTraceParserAcceptsJavaStacktrace() {
         myFixture.configureByText("tests.kt",
-            """class tests : junit.framework.TestCase() {
+                                  """class tests : junit.framework.TestCase() {
   fun testMe() {
     doTest {
       assertTrue(false)
@@ -290,6 +294,8 @@ fun main(args: Array<String>) {}
     }
 
     fun `test unused beforeAll`() {
+        if (pluginMode == KotlinPluginMode.K2) return
+
         myFixture.addClass("package org.junit.jupiter.api; public @interface BeforeAll{}")
         myFixture.addClass("package kotlin.jvm; public @interface JvmStatic{}")
         myFixture.configureByText("Demo.kt", """
@@ -352,7 +358,7 @@ class DemoTest {
             package c;
             import java.lang.annotation.Retention;
             import java.lang.annotation.RetentionPolicy;
-
+            
             @org.junit.jupiter.api.Test
             @Retention(RetentionPolicy.RUNTIME)
             public @interface TestAnnotation {
@@ -361,16 +367,63 @@ class DemoTest {
 
         val file = myFixture.configureByText(
             "MyTest.kt", """
-
-            import c.TestAnnotation
+            import c.*
             import org.junit.jupiter.api.BeforeEach
 
-            class MyTest {          
+            class MyTest {
                 @BeforeEach
                 fun cleanEDTQueue() {}
 
                 @TestAnnotation
                 fun `dispatch <caret>thread`() {}
+            }
+            """.trimIndent()
+        )
+
+        val gutters = myFixture.findGuttersAtCaret()
+        Assert.assertTrue("Test method with meta-annotation should have a gutter icon", gutters.isNotEmpty())
+
+        val element = file.findElementAt(myFixture.caretOffset)!!
+        val location = PsiLocation(element)
+        val context = ConfigurationContext.createEmptyContextForLocation(location)
+        val contexts = context.configurationsFromContext
+
+        Assert.assertEquals(1, contexts?.size ?: 0)
+        val fromContext = contexts?.get(0)
+        Assert.assertTrue(fromContext?.configuration is JUnitConfiguration)
+        val configuration = fromContext?.configuration as JUnitConfiguration
+
+        Assert.assertEquals("MyTest.dispatch thread", configuration.name)
+
+        val testObject = configuration.persistentData.TEST_OBJECT
+        Assert.assertEquals(
+            "Method should be suggested to run, but $testObject was used instead",
+            JUnitConfiguration.TEST_METHOD,
+            testObject
+        )
+        Assert.assertNotNull(JunitKotlinTestFrameworkProvider.getInstance().getJavaTestEntity(element, checkMethod = true))
+    }
+
+    fun testMethodWithInnerTestAnnotationAndBeforeEach() {
+        val file = myFixture.configureByText(
+            "MyTest.kt", """
+            import org.junit.jupiter.api.Test
+            import org.junit.jupiter.api.BeforeEach
+
+            class MyTest {
+                @BeforeEach
+                fun cleanEDTQueue() {}
+
+                @Inner.Additional.TestAnnotation
+                fun `dispatch <caret>thread`() {}
+                
+                class Inner {
+                 class Additional {
+                    @Test
+                    @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.RUNTIME)
+                    annotation class TestAnnotation
+                 }
+                }
             }
             """.trimIndent()
         )

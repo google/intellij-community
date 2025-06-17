@@ -57,6 +57,7 @@ import org.jetbrains.jps.model.java.JpsJavaSdkType
 import org.jetbrains.jps.model.library.JpsOrderRootType
 import org.jetbrains.jps.model.library.sdk.JpsSdkReference
 import org.jetbrains.jps.model.module.JpsModule
+import org.jetbrains.jps.model.serialization.JpsMavenSettings.getMavenRepositoryPath
 import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService
 import org.jetbrains.jps.model.serialization.JpsPathMapper
 import org.jetbrains.jps.model.serialization.JpsProjectLoader.loadProject
@@ -327,20 +328,12 @@ class CompilationContextImpl private constructor(
 
   override fun findModule(name: String): JpsModule? = nameToModule[name.removeSuffix("._test")]
 
-  override suspend fun getModuleOutputDir(module: JpsModule, forTests: Boolean): Path {
+  override suspend fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
     val url = JpsJavaExtensionService.getInstance().getOutputUrl(/* module = */ module, /* forTests = */ forTests)
     requireNotNull(url) {
       "Output directory for ${module.name} isn't set"
     }
-    return Path.of(JpsPathUtil.urlToPath(url))
-  }
-
-  override suspend fun getModuleTestsOutputDir(module: JpsModule): Path {
-    val url = JpsJavaExtensionService.getInstance().getOutputUrl(module, true)
-    requireNotNull(url) {
-      "Output directory for ${module.name} isn't set"
-    }
-    return Path.of(JpsPathUtil.urlToPath(url))
+    return listOf(Path.of(JpsPathUtil.urlToPath(url)))
   }
 
   override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<String> {
@@ -359,8 +352,9 @@ class CompilationContextImpl private constructor(
     return org.jetbrains.intellij.build.impl.findFileInModuleSources(module, relativePath)
   }
 
-  override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String): ByteArray? {
-    val file = getModuleOutputDir(module).resolve(relativePath)
+  override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
+    @Suppress("DEPRECATION")
+    val file = getModuleOutputDir(module, forTests).resolve(relativePath)
     try {
       return Files.readAllBytes(file)
     }
@@ -416,7 +410,13 @@ private suspend fun loadProject(projectHome: Path, kotlinBinaries: KotlinBinarie
   }
 
   spanBuilder("load project").use(Dispatchers.IO) { span ->
-    pathVariablesConfiguration.addPathVariable("MAVEN_REPOSITORY", Path.of(System.getProperty("user.home"), ".m2/repository").invariantSeparatorsPathString)
+    val mavenRepositoryPath = getMavenRepositoryPath()
+    span.addEvent(
+      "Resolved local maven repository path",
+      Attributes.of(AttributeKey.stringKey("m2 repository path"), mavenRepositoryPath),
+    )
+
+    pathVariablesConfiguration.addPathVariable("MAVEN_REPOSITORY", mavenRepositoryPath)
     val pathVariables = JpsModelSerializationDataService.computeAllPathVariables(model.global)
     loadProject(model.project, pathVariables, JpsPathMapper.IDENTITY, projectHome, null, { it: Runnable -> launch(CoroutineName("loading project")) { it.run() } }, false)
     span.setAllAttributes(
@@ -560,72 +560,32 @@ internal suspend fun resolveProjectDependencies(context: CompilationContext) {
 
 @Internal
 suspend fun CompilationContext.hasModuleOutputPath(module: JpsModule, relativePath: String): Boolean {
-  val output = getModuleOutputDir(module)
-
-  val attributes = try {
-    Files.readAttributes(output, BasicFileAttributes::class.java)
-  }
-  catch (_: FileSystemException) {
-    return false
-  }
-
-  if (attributes.isDirectory) {
-    return Files.exists(output.resolve(relativePath))
-  }
-  else if (attributes.isRegularFile && output.toString().endsWith(".jar")) {
-    var found = false
-    readZipFile(output) { name, _ ->
-      if (name == relativePath) {
-        found = true
-        ZipEntryProcessorResult.STOP
-      }
-      else {
-        ZipEntryProcessorResult.CONTINUE
-      }
+  return getModuleOutputRoots(module).any { output ->
+    val attributes = try {
+      Files.readAttributes(output, BasicFileAttributes::class.java)
     }
-    return found
-  }
-  else {
-    throw IllegalStateException("Module '${module.name}' output is neither directory, nor jar $output")
-  }
-}
+    catch (_: FileSystemException) {
+      return@any false
+    }
 
-@Internal
-suspend fun CompilationContext.getModuleOutputFileContent(module: JpsModule, relativePath: String, forTests: Boolean = false): ByteArray? {
-  val output = getModuleOutputDir(module = module, forTests = forTests)
-  val attributes = try {
-    Files.readAttributes(output, BasicFileAttributes::class.java)
-  }
-  catch (_: FileSystemException) {
-    return null
-  }
-
-  if (attributes.isDirectory) {
-    val file = output.resolve(relativePath)
-    try {
-      return Files.readAllBytes(file)
+    if (attributes.isDirectory) {
+      return@any Files.exists(output.resolve(relativePath))
     }
-    catch (_: NoSuchFileException) {
-      return null
-    }
-  }
-  else if (attributes.isRegularFile && output.toString().endsWith("jar")) {
-    var content: ByteArray? = null
-    readZipFile(output) { name, dataSupplier ->
-      if (name == relativePath) {
-        val buffer = dataSupplier()
-        val array = ByteArray(buffer.remaining())
-        buffer.get(array)
-        content = array
-        ZipEntryProcessorResult.STOP
+    else if (attributes.isRegularFile && output.toString().endsWith(".jar")) {
+      var found = false
+      readZipFile(output) { name, _ ->
+        if (name == relativePath) {
+          found = true
+          ZipEntryProcessorResult.STOP
+        }
+        else {
+          ZipEntryProcessorResult.CONTINUE
+        }
       }
-      else {
-        ZipEntryProcessorResult.CONTINUE
-      }
+      return@any found
     }
-    return content
-  }
-  else {
-    throw IllegalStateException("Module '${module.name}' output is neither directory, nor jar $output")
+    else {
+      throw IllegalStateException("Module '${module.name}' output is neither directory, nor jar $output")
+    }
   }
 }

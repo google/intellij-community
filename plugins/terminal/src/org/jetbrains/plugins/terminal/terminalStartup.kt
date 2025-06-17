@@ -7,11 +7,11 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.registry.Registry.Companion.`is`
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelExecApi
-import com.intellij.platform.eel.EelExecApi.ExecuteProcessError
 import com.intellij.platform.eel.ExecuteProcessException
+import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.spawnProcess
@@ -49,7 +49,7 @@ internal fun logCommonStartupInfo(
            ", time to process created: ${durationBetweenStartupAndConnectorCreated.toMillis()} ms")
 }
 
-@Throws(ErrnoException::class)
+@Throws(ExecuteProcessException::class)
 internal fun startProcess(
   command: List<String>,
   envs: Map<String, String>,
@@ -64,7 +64,7 @@ internal fun startProcess(
 }
 
 private suspend fun convertCommandToRemote(eelApi: EelApi, command: List<String>): List<String> {
-  if (isWslCommand(command)) {
+  if (eelApi.descriptor != LocalEelDescriptor && isWslCommand(command)) {
     val shell = eelApi.exec.fetchLoginShellEnvVariables()["SHELL"] ?: "/bin/sh"
     return listOf(shell, LocalTerminalDirectRunner.LOGIN_CLI_OPTION, LocalTerminalStartCommandBuilder.INTERACTIVE_CLI_OPTION)
   }
@@ -89,12 +89,15 @@ private suspend fun getEelApi(
     val wslDistribNameFromWorkingDirectory = WslPath.parseWindowsUncPath(workingDirectory.toString())?.distributionId
     if (wslDistribNameFromCommandline != wslDistribNameFromWorkingDirectory) {
       val wslRootPath = WSLDistribution(wslDistribNameFromCommandline).getUNCRootPath()
-      val eelApi = wslRootPath.getEelDescriptor().upgrade()
-      val userHome = runCatching { eelApi.exec.fetchLoginShellEnvVariables()["HOME"] }.getOrNull()
-      return eelApi to wslRootPath.resolve(userHome ?: ".")
+      val eelDescriptor = wslRootPath.getEelDescriptor()
+      if (eelDescriptor != LocalEelDescriptor) {
+        val eelApi = eelDescriptor.toEelApi()
+        val userHome = runCatching { eelApi.exec.fetchLoginShellEnvVariables()["HOME"] }.getOrNull()
+        return eelApi to wslRootPath.resolve(userHome ?: ".")
+      }
     }
   }
-  return workingDirectory.getEelDescriptor().upgrade() to workingDirectory
+  return workingDirectory.getEelDescriptor().toEelApi() to workingDirectory
 }
 
 private fun getWslDistributionNameFromCommand(command: List<String>): String? {
@@ -107,7 +110,7 @@ private fun getWslDistributionNameFromCommand(command: List<String>): String? {
   return null
 }
 
-@Throws(ErrnoException::class)
+@Throws(ExecuteProcessException::class)
 private suspend fun doStartProcess(
   eelApi: EelApi,
   command: List<String>,
@@ -119,18 +122,10 @@ private suspend fun doStartProcess(
     .args(command.takeLast(command.size - 1))
     .env(envs)
     .workingDirectory(workingDirectory.asEelPath())
-    .ptyOrStdErrSettings(EelExecApi.Pty(initialTermSize.columns, initialTermSize.rows, true))
-  return try {
-    execOptions.eelIt().convertToJavaProcess() as PtyProcess
-  } catch (e : ExecuteProcessException) {
-    throw ErrnoException(e)
-  }
+    .interactionOptions(EelExecApi.Pty(initialTermSize.columns, initialTermSize.rows, true))
+  return execOptions.eelIt().convertToJavaProcess() as PtyProcess
 }
 
-internal fun shouldUseEelApi(): Boolean {
-  return `is`("terminal.use.EelApi", false)
-}
-
-internal class ErrnoException(val error: ExecuteProcessException): Exception(error.message)
+internal fun shouldUseEelApi(): Boolean = Registry.`is`("terminal.use.EelApi", true)
 
 private val log: Logger = logger<AbstractTerminalRunner<*>>()

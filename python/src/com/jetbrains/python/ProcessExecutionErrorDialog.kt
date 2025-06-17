@@ -89,6 +89,11 @@ fun showProcessExecutionErrorDialog(
 
   val formBuilder = FormBuilder()
     .addComponent(errorMessageLabel)
+    .addComponent(JButton(PyBundle.message("python.error.full.log")).apply {
+      addActionListener {
+        Messages.showErrorDialog(execError.message, PyBundle.message("python.error"))
+      }
+    })
     .addComponentFillVertically(commandOutputPanel, UIUtil.DEFAULT_VGAP)
 
   object : DialogWrapper(project) {

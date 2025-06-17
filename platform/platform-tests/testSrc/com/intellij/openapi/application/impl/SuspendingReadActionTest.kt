@@ -68,12 +68,7 @@ abstract class SuspendingReadActionTest : CancellableReadActionTests() {
           val suspendingJob = Cancellation.currentJob()!!
           assertReadActionWithoutCurrentJob(suspendingJob) // TODO consider explicitly turning off RA inside runBlockingCancellable
           withContext(Dispatchers.Default) {
-            if (isLockStoredInContext) {
-              assertNestedContext(coroutineContext.job)
-            }
-            else {
-              assertEmptyContext(coroutineContext.job)
-            }
+            assertNestedContext(coroutineContext.job)
           }
           assertReadActionWithoutCurrentJob(suspendingJob)
         }
@@ -235,17 +230,13 @@ class NonBlockingSuspendingReadActionTest : SuspendingReadActionTest() {
           throw assertThrows<CannotReadException> {
             runBlockingCancellable {
               throw assertThrows<CannotReadException> {
-                blockingContext {
-                  throw assertThrows<CannotReadException> {
-                    runBlockingCancellable {
+                throw assertThrows<CannotReadException> {
+                  runBlockingCancellable {
+                    throw assertThrows<CannotReadException> {
                       throw assertThrows<CannotReadException> {
-                        blockingContext {
-                          throw assertThrows<CannotReadException> {
-                            runBlockingCancellable {
-                              waitForPendingWrite().up()
-                              awaitCancellation()
-                            }
-                          }
+                        runBlockingCancellable {
+                          waitForPendingWrite().up()
+                          awaitCancellation()
                         }
                       }
                     }
@@ -418,7 +409,7 @@ class BlockingSuspendingReadActionTest : SuspendingReadActionTest() {
   fun `current job`(): Unit = timeoutRunBlocking {
     val coroutineJob = coroutineContext.job
     readActionBlocking {
-      assertSame(coroutineJob, Cancellation.currentJob()?.parent?.parent)
+      assertSame(coroutineJob, Cancellation.currentJob()?.parent)
     }
   }
 

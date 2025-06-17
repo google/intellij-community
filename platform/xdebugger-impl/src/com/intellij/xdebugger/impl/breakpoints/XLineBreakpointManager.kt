@@ -51,10 +51,14 @@ import com.intellij.xdebugger.impl.actions.ToggleLineBreakpointAction
 import com.intellij.xdebugger.impl.breakpoints.InlineBreakpointInlayManager.Companion.getInstance
 import com.intellij.xdebugger.impl.frame.XDebugManagerProxy
 import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
+import fleet.util.logging.logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.TestOnly
 import java.awt.event.MouseEvent
+
+private val log = logger<XLineBreakpointManager>()
 
 @Internal
 class XLineBreakpointManager(private val project: Project, coroutineScope: CoroutineScope, private val isEnabled: Boolean) {
@@ -139,11 +143,15 @@ class XLineBreakpointManager(private val project: Project, coroutineScope: Corou
     if (initUI) {
       updateBreakpointNow(breakpoint)
     }
-    myBreakpoints.putValue(breakpoint.getFile()?.url ?: breakpoint.getFileUrl(), breakpoint)
+    val fileUrl = breakpoint.getFile()?.url ?: breakpoint.getFileUrl()
+    log.info("Register line breakpoint ${breakpoint.id} ${breakpoint.javaClass.simpleName}: $fileUrl")
+    myBreakpoints.putValue(fileUrl, breakpoint)
   }
 
   fun unregisterBreakpoint(breakpoint: XLineBreakpointProxy) {
-    myBreakpoints.remove(breakpoint.getFile()?.url ?: breakpoint.getFileUrl(), breakpoint)
+    val fileUrl = breakpoint.getFile()?.url ?: breakpoint.getFileUrl()
+    val removed = myBreakpoints.remove(fileUrl, breakpoint)
+    log.info("Unregister line breakpoint ${breakpoint.id} [removed=$removed] ${breakpoint.javaClass.simpleName}: $fileUrl")
   }
 
   fun getDocumentBreakpointProxies(document: Document): Collection<XLineBreakpointProxy> {
@@ -153,6 +161,11 @@ class XLineBreakpointManager(private val project: Project, coroutineScope: Corou
 
   fun getDocumentBreakpoints(document: Document): Collection<XLineBreakpointImpl<*>> {
     return getDocumentBreakpointProxies(document).filterIsInstance<XLineBreakpointProxy.Monolith>().map { it.breakpoint }
+  }
+
+  @TestOnly
+  fun getAllBreakpoints(): Collection<XLineBreakpointProxy> {
+    return myBreakpoints.values()
   }
 
   @RequiresEdt
@@ -184,7 +197,8 @@ class XLineBreakpointManager(private val project: Project, coroutineScope: Corou
           SlowOperations.knownIssue("IJPL-162343").use {
             Triple(b.type, b.getLine(), b.getHighlightRange()?.startOffset)
           }
-        } else {
+        }
+        else {
           // We cannot show multiple breakpoints of any type at the same line.
           b.getLine()
         }
@@ -218,6 +232,7 @@ class XLineBreakpointManager(private val project: Project, coroutineScope: Corou
     }
   }
 
+  @Deprecated("Use queueBreakpointUpdateCallback(XLightLineBreakpointProxy, Runnable)")
   fun queueBreakpointUpdateCallback(breakpoint: XLineBreakpointImpl<*>?, callback: Runnable) {
     breakpointUpdateQueue.queue(object : Update(breakpoint) {
       override fun run() {

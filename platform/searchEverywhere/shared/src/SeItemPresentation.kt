@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.searchEverywhere
 
+import com.intellij.ide.ui.SerializableTextChunk
 import com.intellij.ide.ui.colors.ColorId
 import com.intellij.ide.ui.colors.color
 import com.intellij.ide.ui.colors.rpcId
@@ -12,7 +13,6 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.psi.codeStyle.MinusculeMatcher
-import com.intellij.ui.SimpleTextAttributes
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
@@ -39,7 +39,7 @@ class SeSimpleItemPresentation(
 
   constructor(iconId: IconId? = null, text: @NlsSafe String? = null, description: @NlsSafe String? = null, extendedDescription: String? = null) : this(
     iconId,
-    text?.let { SerializableTextChunk(it, null, 0) },
+    text?.let { SerializableTextChunk(it) },
     null,
     description,
     extendedDescription)
@@ -101,16 +101,16 @@ data class SeOptionActionItemPresentation(
 @ApiStatus.Internal
 @Serializable
 class SeTargetItemPresentation(
-  private val backgroundColorId: ColorId?,
-  private val iconId: IconId?,
+  private val backgroundColorId: ColorId? = null,
+  private val iconId: IconId? = null,
   val presentableText: @NlsSafe String,
-  val presentableTextMatchedRanges: List<SerializableRange>?,
-  private val presentableTextFgColorId: ColorId?,
-  val containerText: @NlsSafe String?,
-  val containerTextMatchedRanges: List<SerializableRange>?,
-  val locationText: @NlsSafe String?,
-  private val locationIconId: IconId?,
-  override val extendedDescription: @NlsSafe String?,
+  val presentableTextMatchedRanges: List<SerializableRange>? = null,
+  private val presentableTextFgColorId: ColorId? = null,
+  val containerText: @NlsSafe String? = null,
+  val containerTextMatchedRanges: List<SerializableRange>? = null,
+  val locationText: @NlsSafe String? = null,
+  private val locationIconId: IconId? = null,
+  override val extendedDescription: @NlsSafe String? = null,
 ) : SeItemPresentation {
   override val text: String get() = presentableText
 
@@ -156,12 +156,4 @@ class SeTextSearchItemPresentation(
   val fileString: @NlsSafe String,
 ) : SeItemPresentation {
   val backgroundColor: Color? get() = backgroundColorId?.color()
-}
-
-@ApiStatus.Internal
-@Serializable
-class SerializableTextChunk(val text: @NlsSafe String, val foregroundColorId: ColorId?, val fontType: Int) {
-  @Suppress("USELESS_CAST")
-  constructor(text: @NlsSafe String, attributes: SimpleTextAttributes) :
-    this(text, (attributes.fgColor as? Color)?.rpcId(), attributes.fontStyle)
 }

@@ -6,6 +6,7 @@ package org.jetbrains.intellij.build.bazel
 import com.intellij.openapi.util.NlsSafe
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
 import org.jetbrains.jps.model.JpsProject
+import org.jetbrains.jps.model.java.JavaResourceRootProperties
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootProperties
 import org.jetbrains.jps.model.java.JavaSourceRootType
@@ -88,8 +89,13 @@ internal class BazelBuildFileGenerator(
 
     var bazelBuildDir = imlDir
     while (!contentRoots.all { it.startsWith(bazelBuildDir) }) {
-      bazelBuildDir = bazelBuildDir.parent!!
+      bazelBuildDir = bazelBuildDir.parent
+                      ?: error(
+                        "Unable to find parent for all content roots above $imlDir for module ${module.name}.\n" +
+                        "content roots: ${contentRoots.joinToString(" ")}"
+                      )
     }
+
     val isCommunity = imlDir.startsWith(communityDir)
     if (isCommunity && !bazelBuildDir.startsWith(communityDir)) {
       throw IllegalStateException("Computed dir for BUILD.bazel for community module ${module.name} is not under community directory")
@@ -102,6 +108,7 @@ internal class BazelBuildFileGenerator(
     }
 
     val moduleContent = ModuleDescriptor(
+      imlFile = imlDir.resolve("${module.name}.iml"),
       module = module,
       contentRoots = contentRoots,
       bazelBuildFileDir = bazelBuildDir,
@@ -412,6 +419,9 @@ internal class BazelBuildFileGenerator(
           // https://youtrack.jetbrains.com/issue/IJI-2662/RhizomedbCommandLineProcessor-requires-output-dir-but-we-dont-have-it-for-Bazel-compilation
           //option("exported_compiler_plugins", arrayOf("@lib//:rhizomedb-plugin"))
         //}
+        else if (module.name == "fleet.rpc") {
+          option("exported_compiler_plugins", arrayOf("@lib//:rpc-plugin"))
+        }
 
         var deps = moduleList.deps.get(moduleDescriptor)
         if (deps != null && deps.provided.isNotEmpty()) {
@@ -597,6 +607,9 @@ internal class BazelBuildFileGenerator(
         if (resource.baseDirectory.isNotEmpty()) {
           option("strip_prefix", resource.baseDirectory)
         }
+        if (resource.relativeOutputPath.isNotEmpty()) {
+          option("add_prefix", resource.relativeOutputPath)
+        }
         if (hasOnlyTestResources(module)) {
           visibility(arrayOf("//visibility:public"))
         }
@@ -685,7 +698,8 @@ private fun computeResources(module: JpsModule, contentRoots: List<Path>, bazelB
     .filter { it.rootType == type }
     .map {
       val prefix = resolveRelativeToBazelBuildFileDirectory(it.path, contentRoots, bazelBuildDir, module = module).invariantSeparatorsPathString
-      ResourceDescriptor(baseDirectory = prefix, files = listOf("${if (prefix.isEmpty()) "" else "$prefix/"}**/*"))
+      val relativeOutputPath = (it.properties as JavaResourceRootProperties).relativeOutputPath
+      ResourceDescriptor(baseDirectory = prefix, files = listOf("${if (prefix.isEmpty()) "" else "$prefix/"}**/*"), relativeOutputPath = relativeOutputPath)
     }
     .toList()
 }
@@ -730,7 +744,7 @@ private fun computeExtraResourceTarget(
       }
 
       val prefix = resolveRelativeToBazelBuildFileDirectory(sourceRootDir, contentRoots, bazelBuildDir, module = module).invariantSeparatorsPathString
-      ResourceDescriptor(baseDirectory = prefix, files = listOf("$metaInfRelative/**/*"))
+      ResourceDescriptor(baseDirectory = prefix, files = listOf("$metaInfRelative/**/*"), relativeOutputPath = "")
     }
 }
 

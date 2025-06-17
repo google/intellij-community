@@ -14,7 +14,6 @@ import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.PathExecLazyValue
 import com.intellij.platform.eel.EelExecApi
-import com.intellij.platform.eel.getOrThrow
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.spawnProcess
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
@@ -157,6 +156,7 @@ object ExecUtil {
     else "quoted form of \"${arg.replace("\"", "\\\"").replace("\\", "\\\\")}\""
 
   @ApiStatus.Internal
+  @ApiStatus.ScheduledForRemoval
   @Deprecated(
     "It is an oversimplified quoting. Prefer CommandLineUtil.posixQuote instead.",
     ReplaceWith("CommandLineUtil.posixQuote(arg)", "com.intellij.execution.CommandLineUtil.posixQuote"),
@@ -221,7 +221,7 @@ object ExecUtil {
       .args(rest)
       .workingDirectory(workingDir)
       .env(env)
-      .ptyOrStdErrSettings(pty?.run { EelExecApi.Pty(initialColumns, initialRows, !consoleMode) })
+      .interactionOptions(pty?.run { EelExecApi.Pty(initialColumns, initialRows, !consoleMode) })
 
     return runBlockingMaybeCancellable {
       options.eelIt().convertToJavaProcess()

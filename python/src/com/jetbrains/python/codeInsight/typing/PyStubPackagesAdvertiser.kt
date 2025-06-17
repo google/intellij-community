@@ -15,7 +15,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
-import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.Key
@@ -40,13 +39,21 @@ private class PyStubPackagesAdvertiser : PyInspection() {
     private val FORCED = emptyMap<String, String>() // top-level package to package on PyPI
 
     // notification will be shown for packages below
-    private val CHECKED = mapOf("coincurve" to "coincurve",
-                                "docutils" to "docutils",
-                                "pika" to "pika",
+    private val CHECKED = mapOf("docutils" to "docutils",
                                 "gi" to "PyGObject",
                                 "PyQt5" to "PyQt5",
-                                "pyspark" to "pyspark",
+                                "pandas" to "pandas",
+                                "celery" to "celery",
+                                "boto3" to "boto3",
+                                "scipy" to "scipy",
                                 "traits" to "traits") // top-level package to package on PyPI, sorted by the latter
+
+    private val EXTRAS = mapOf("boto3-stubs" to "[full]")
+
+    private val IGNORE = setOf(
+      "types-boto3", // duplicate of boto3-stubs
+      "celery-stubs", // deprecated
+    )
 
     private val BALLOON_SHOWING = Key.create<Boolean>("showingStubPackagesAdvertiserBalloon")
   }
@@ -62,7 +69,7 @@ private class PyStubPackagesAdvertiser : PyInspection() {
 
   private class Visitor(private val ignoredPackages: MutableList<String>,
                         holder: ProblemsHolder,
-                        session: LocalInspectionToolSession) : PyInspectionVisitor(holder, PyInspectionVisitor.getContext(session)) {
+                        session: LocalInspectionToolSession) : PyInspectionVisitor(holder, getContext(session)) {
 
     private val BALLOON_NOTIFICATIONS
       get() = NotificationGroupManager.getInstance().getNotificationGroup("Python Stub Packages Advertiser")
@@ -103,7 +110,7 @@ private class PyStubPackagesAdvertiser : PyInspection() {
       val availablePackages = packageManagementService.allPackagesCached
       if (availablePackages.isEmpty()) return
 
-      val ignoredStubPackages = ignoredPackages.mapNotNull { packageManager.parseRequirement(it) }
+      val ignoredStubPackages = (IGNORE + ignoredPackages).mapNotNull { packageManager.parseRequirement(it) }
       val cache = ApplicationManager.getApplication().getService(PyStubPackagesAdvertiserCache::class.java).forSdk(sdk)
 
       val forcedToLoad = processForcedPackages(file, sources, module, sdk, packageManager, ignoredStubPackages, cache)
@@ -247,7 +254,7 @@ private class PyStubPackagesAdvertiser : PyInspection() {
         .flatMap { it.packages.entries.asSequence() }
         .filterNot { isIgnoredStubPackage(it.key, it.value.first, ignoredStubPackages) }
         .map {
-          pyRequirement(it.key, PyRequirementRelation.EQ, it.value.first)
+          pyRequirement(it.key, PyRequirementRelation.EQ, it.value.first, extras = EXTRAS.getOrDefault(it.key, ""))
         }
         .toList()
       if (requirements.isEmpty()) return emptyList<PyRequirement>() to emptyList()
@@ -265,7 +272,7 @@ private class PyStubPackagesAdvertiser : PyInspection() {
       val project = module.project
       val stubPkgNamesToInstall = reqs.mapTo(mutableSetOf()) { it.name }
 
-      val installationListener = object : PyPackageManagerUI.Listener {
+      object : PyPackageManagerUI.Listener {
         override fun started() {
           project.getService(PyStubPackagesInstallingStatus::class.java).markAsInstalling(stubPkgNamesToInstall)
         }
@@ -304,7 +311,7 @@ private class PyStubPackagesAdvertiser : PyInspection() {
       }
 
       val name = PyBundle.message("code.insight.stub.packages.install.requirements.fix.name", reqs.size)
-      return PyInstallRequirementsFix(name, module, sdk, reqs, args)
+      return PyInstallRequirementsFix(name, sdk, reqs, args)
     }
 
     private fun createIgnorePackagesQuickFix(reqs: List<PyRequirement>, packageManager: PyPackageManager): LocalQuickFix {

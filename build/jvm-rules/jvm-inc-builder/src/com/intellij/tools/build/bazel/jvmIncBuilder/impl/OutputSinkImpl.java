@@ -1,33 +1,36 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tools.build.bazel.jvmIncBuilder.impl;
 
-import com.intellij.compiler.instrumentation.FailSafeClassReader;
-import com.intellij.compiler.instrumentation.InstrumentationClassFinder;
-import com.intellij.compiler.instrumentation.InstrumenterClassWriter;
-import com.intellij.tools.build.bazel.jvmIncBuilder.DiagnosticSink;
-import com.intellij.tools.build.bazel.jvmIncBuilder.Message;
+import com.intellij.tools.build.bazel.jvmIncBuilder.StorageManager;
 import com.intellij.tools.build.bazel.jvmIncBuilder.ZipOutputBuilder;
-import com.intellij.tools.build.bazel.jvmIncBuilder.runner.BytecodeInstrumenter;
+import com.intellij.tools.build.bazel.jvmIncBuilder.instrumentation.FailSafeClassReader;
+import com.intellij.tools.build.bazel.jvmIncBuilder.runner.OutputFile;
+import com.intellij.tools.build.bazel.jvmIncBuilder.runner.OutputOrigin;
 import com.intellij.tools.build.bazel.jvmIncBuilder.runner.OutputSink;
 import kotlin.metadata.*;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.jps.dependency.Node;
 import org.jetbrains.jps.dependency.NodeSource;
 import org.jetbrains.jps.dependency.Usage;
 import org.jetbrains.jps.dependency.java.*;
 import org.jetbrains.jps.util.Iterators;
 import org.jetbrains.org.objectweb.asm.ClassReader;
-import org.jetbrains.org.objectweb.asm.ClassWriter;
 
+import java.io.IOException;
 import java.util.*;
 
 public class OutputSinkImpl implements OutputSink {
+
+  // Temporary put kotlin-produced bytecode into the ABI output as-is, without any instrumentation,
+  // until the issue "KT-78038 Make ABI compiler plugin output classloader-friendly" is not resolved. As soon as kotlin-produced ABI classes are made compatible with class-loaders, we can switch to using them.
+
+  public static boolean USE_KOTLIN_ABI_BYTECODE = false; // todo
+
   private static final String IMPORT_WILDCARD_SUFFIX = ".*";
-  private final DiagnosticSink myDiagnostic;
-  private final ZipOutputBuilder myOutBuilder;
-  @Nullable
-  private final AbiJarBuilder myAbiOutputBuilder;
-  private final List<BytecodeInstrumenter> myInstrumenters;
+  private final ZipOutputBuilder myOut;
+  private @Nullable final ZipOutputBuilder myAbiOut;
+  private @Nullable final ZipOutputBuilder myJavaAbiOut;
+  private final Map<OutputOrigin.Kind, Map<OutputFile.Kind, Set<String>>> myOutputsIndex = new EnumMap<>(OutputOrigin.Kind.class);
 
   // -----------------------------------------------------------
   private final Map<String, Collection<String>> myClassImportRefs = new HashMap<>();
@@ -38,104 +41,66 @@ public class OutputSinkImpl implements OutputSink {
   private final List<NodeWithSources> myNodes = new ArrayList<>();
   private final Map<NodeSource, Set<Usage>> mySelfUsages = new HashMap<>();
 
-
-  public static class NodeWithSources {
-    public final Node<?, ?> node;
-    public final Iterable<NodeSource> sources;
-
-    public NodeWithSources(Node<?, ?> node, Iterable<NodeSource> sources) {
-      this.node = node;
-      this.sources = sources;
-    }
-  }
-  
-  public OutputSinkImpl(DiagnosticSink diagnostic, ZipOutputBuilder outBuilder, @Nullable AbiJarBuilder abiOutputBuilder, List<BytecodeInstrumenter> instrumenters) {
-    myDiagnostic = diagnostic;
-    myOutBuilder = outBuilder;
-    myAbiOutputBuilder = abiOutputBuilder;
-    myInstrumenters = instrumenters;
+  public OutputSinkImpl(StorageManager sm) throws IOException {
+    myOut = sm.getOutputBuilder();
+    ZipOutputBuilderImpl abiOut = sm.getAbiOutputBuilder();
+    myAbiOut = abiOut;
+    myJavaAbiOut = abiOut != null? new JavaAbiFilter(abiOut, sm.getInstrumentationClassFinder()) : null;
   }
 
   @Override
-  public void addFile(OutputFile outFile, Iterable<NodeSource> originSources) {
+  public void addFile(OutputFile outFile, OutputOrigin origin) {
     // todo: make sure the outFile.getPath() is relative to output root
-    processAndSave(outFile, originSources);
+    processAndSave(outFile, origin);
   }
 
   @Override
-  public boolean deletePath(String path) {
-    if (myAbiOutputBuilder != null) {
-      myAbiOutputBuilder.deleteEntry(path);
-    }
-    return myOutBuilder.deleteEntry(path);
+  public Iterable<String> getGeneratedOutputPaths(OutputOrigin.Kind originKind, OutputFile.Kind outputKind) {
+    return getOutputs(originKind, outputKind);
   }
 
   @Override
   public Iterable<String> listFiles(String packageName, boolean recurse) {
     String dirName = packageName.replace('.', '/') + "/";
-    var result = recurse? Iterators.recurse(dirName, myOutBuilder::listEntries, false) : myOutBuilder.listEntries(dirName);
+    var result = recurse? Iterators.recurse(dirName, myOut::listEntries, false) : myOut.listEntries(dirName);
     return Iterators.filter(result, n -> !ZipOutputBuilder.isDirectoryName(n));
   }
 
   @Override
   public Iterable<String> list(String packageName, boolean recurse) {
     String dirName = packageName.replace('.', '/') + "/";
-    var result = recurse? Iterators.recurse(dirName, myOutBuilder::listEntries, false) : myOutBuilder.listEntries(dirName);
+    var result = recurse? Iterators.recurse(dirName, myOut::listEntries, false) : myOut.listEntries(dirName);
     return result;
   }
 
   @Override
   public byte @Nullable [] getFileContent(String path) {
-    return myOutBuilder.getContent(path);
+    return myOut.getContent(path);
   }
 
-  private void processAndSave(OutputFile outFile, Iterable<NodeSource> originSources) {
+  private void processAndSave(OutputFile outFile, OutputOrigin origin) {
+    getOutputs(origin.getKind(), outFile.getKind()).add(outFile.getPath());
     byte[] content = outFile.getContent();
-    myOutBuilder.putEntry(outFile.getPath(), content); // make file content immediately available
-    if (myAbiOutputBuilder != null) {
-      myAbiOutputBuilder.putEntry(outFile.getPath(), content);
+    // make file content immediately available so that the instrumenter ClassFinder are able to access the original version
+    myOut.putEntry(outFile.getPath(), content);
+
+    if (origin.getKind() == OutputOrigin.Kind.java && myJavaAbiOut != null) {
+      // for kotlin the ABI output is produced separately by the dedicated compiler plugin
+      myJavaAbiOut.putEntry(outFile.getPath(), content);
     }
+
+    if (!USE_KOTLIN_ABI_BYTECODE) {
+      // temporary: include kotlin-produced classes without any instrumentation
+      if (origin.getKind() == OutputOrigin.Kind.kotlin && myAbiOut != null) {
+        myAbiOut.putEntry(outFile.getPath(), content);
+      }
+    }
+
 
     if (outFile.getKind() == OutputFile.Kind.bytecode) {
       // todo: parse/instrument files and create nodes asynchronously?
-      ClassReader reader = new FailSafeClassReader(content);
-      associate(outFile.getPath(), originSources, reader, outFile.isFromGeneratedSource());
-
-      InstrumentationClassFinder finder = getInstrumentationClassFinder();
-      if (finder != null) {
-        boolean changes = false;
-        for (BytecodeInstrumenter instrumenter : myInstrumenters) {
-          try {
-            if (reader == null) {
-              reader = new FailSafeClassReader(content);
-            }
-            int version = InstrumenterClassWriter.getClassFileVersion(reader);
-            ClassWriter writer = new InstrumenterClassWriter(reader, InstrumenterClassWriter.getAsmClassWriterFlags(version), finder);
-            final byte[] instrumented = instrumenter.instrument(outFile.getPath(), reader, writer, finder);
-            if (instrumented != null) {
-              changes = true;
-              content = instrumented;
-              finder.cleanCachedData(reader.getClassName());
-              reader = null;
-            }
-          }
-          catch (Exception e) {
-            // todo: better diagnostics?
-            myDiagnostic.report(Message.error(instrumenter, e.getMessage()));
-          }
-        }
-        if (changes) {
-          myOutBuilder.putEntry(outFile.getPath(), content);
-          if (myAbiOutputBuilder != null) {
-            myAbiOutputBuilder.putEntry(outFile.getPath(), content);
-          }
-        }
-      }
+      associate(outFile.getPath(), origin.getSources(), new FailSafeClassReader(content), outFile.isFromGeneratedSource());
     }
-  }
-
-  private InstrumentationClassFinder getInstrumentationClassFinder() {
-    return null; // todo: required for the instrumentation
   }
 
   private void associate(String classFileName, Iterable<NodeSource> sources, ClassReader cr, boolean isGenerated) {
@@ -192,7 +157,8 @@ public class OutputSinkImpl implements OutputSink {
     myNodes.add(new NodeWithSources(node, sources));
   }
 
-  public List<NodeWithSources> getNodes() {
+  @Override
+  public Iterable<NodeWithSources> getNodes() {
 
     if (!myPerSourceAdditionalUsages.isEmpty()) {
       for (Map.Entry<NodeSource, Set<Usage>> entry : myPerSourceAdditionalUsages.entrySet()) {
@@ -286,4 +252,11 @@ public class OutputSinkImpl implements OutputSink {
     }
   }
 
+  private @NotNull Set<String> getOutputs(OutputOrigin.Kind originKind, OutputFile.Kind outputKind) {
+    return getOutputMap(originKind).computeIfAbsent(outputKind, k -> new HashSet<>());
+  }
+
+  private Map<OutputFile.Kind, Set<String>> getOutputMap(OutputOrigin.Kind origin) {
+    return myOutputsIndex.computeIfAbsent(origin, k -> new EnumMap<>(OutputFile.Kind.class));
+  }
 }

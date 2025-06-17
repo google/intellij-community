@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.eel
 
+import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.execution.process.UnixSignal
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.platform.eel.*
@@ -14,13 +15,17 @@ import com.intellij.platform.tests.eelHelpers.ttyAndExit.*
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
 import io.ktor.util.decodeString
+import io.mockk.coEvery
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.*
 import org.hamcrest.CoreMatchers
 import org.hamcrest.CoreMatchers.anyOf
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.*
-import java.io.IOException
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.nio.ByteBuffer
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -32,7 +37,6 @@ class EelLocalExecApiTest {
   companion object {
     private const val PTY_COLS = 42
     private const val PTY_ROWS = 24
-    private val NEW_LINES = Regex("\r?\n")
 
     private lateinit var executor: JavaMainClassExecutor
 
@@ -95,11 +99,11 @@ class EelLocalExecApiTest {
 
   private suspend fun testOutputImpl(ptyManagement: PTYManagement, exitType: ExitType) {
     val builder = executor.createBuilderToExecuteMain(localEel.exec)
-    builder.ptyOrStdErrSettings(when (ptyManagement) {
-                                  PTYManagement.NO_PTY -> null
-                                  PTYManagement.PTY_SIZE_FROM_START -> Pty(PTY_COLS, PTY_ROWS, true)
-                                  PTYManagement.PTY_RESIZE_LATER -> Pty(PTY_COLS - 1, PTY_ROWS - 1, true) // wrong tty size: will resize in the test
-                                })
+    builder.interactionOptions(when (ptyManagement) {
+                                 PTYManagement.NO_PTY -> null
+                                 PTYManagement.PTY_SIZE_FROM_START -> Pty(PTY_COLS, PTY_ROWS, true)
+                                 PTYManagement.PTY_RESIZE_LATER -> Pty(PTY_COLS - 1, PTY_ROWS - 1, true) // wrong tty size: will resize in the test
+                               })
     val process = builder.eelIt()
 
     // Resize tty
@@ -118,7 +122,8 @@ class EelLocalExecApiTest {
       }
     }
 
-    val text = ByteBuffer.allocate(8192)
+    val dirtyBuffer = ByteBuffer.allocate(8192)
+    val cleanBuffer = CleanBuffer()
     withContext(Dispatchers.Default) {
       withTimeoutOrNull(10.seconds) {
         val helloStream = if (ptyManagement == PTYManagement.NO_PTY) {
@@ -127,23 +132,30 @@ class EelLocalExecApiTest {
         else {
           process.stdout // stderr is redirected to stdout when launched with PTY
         }
-        while (helloStream.receive(text) != ReadResult.EOF) {
-          if (HELLO in text.slice(0, text.position()).decodeString()) break
+        while (helloStream.receive(dirtyBuffer) != ReadResult.EOF) {
+          cleanBuffer.add(dirtyBuffer.flip().decodeString())
+          dirtyBuffer.clear()
+          if (HELLO in cleanBuffer.getString()) {
+            break
+          }
         }
       }
-      text.limit(text.position()).rewind()
-      assertThat("No ${HELLO} reported in stderr", text.decodeString(), CoreMatchers.containsString(HELLO))
+      assertThat("No ${HELLO} reported in stderr", cleanBuffer.getString(), CoreMatchers.containsString(HELLO))
     }
 
 
     // Test tty api
-    var ttyState: TTYState? = null
-    text.clear()
-    while (ttyState == null) {
-      process.stdout.receive(text)
-      // tty might insert "\r\n", we need to remove them, hence, NEW_LINES.
-      // Schlemiel the Painter's Algorithm is OK in tests: do not use in production
-      ttyState = TTYState.deserializeIfValid(text.slice(0, text.position()).decodeString().replace(NEW_LINES, ""))
+    var ttyState: TTYState?
+    cleanBuffer.setPosEnd(HELLO)
+    while (true) {
+
+      ttyState = TTYState.deserializeIfValid(cleanBuffer.getString())
+      if (ttyState != null) {
+        break
+      }
+      process.stdout.receive(dirtyBuffer)
+      cleanBuffer.add(dirtyBuffer.flip().decodeString())
+      dirtyBuffer.clear()
     }
     when (ptyManagement) {
       PTYManagement.PTY_SIZE_FROM_START, PTYManagement.PTY_RESIZE_LATER -> {
@@ -164,6 +176,12 @@ class EelLocalExecApiTest {
       }
       launch {
         process.stderr.readAllBytesAsync(this)
+      }
+
+      if (ptyManagement == PTYManagement.PTY_RESIZE_LATER &&
+          (exitType == ExitType.INTERRUPT || exitType == ExitType.EXIT_WITH_COMMAND) &&
+          process.isWinConPtyProcess) {
+        delay(1.seconds) // workaround: wait a bit to let ConPTY apply the resize
       }
 
       // Test kill api
@@ -218,6 +236,35 @@ class EelLocalExecApiTest {
     }
   }
 
+
+  /**
+   * `PATH` variable might contain just, it must not break `[where]
+   */
+  @ParameterizedTest
+  @ValueSource(chars = ['\'', ':', ';', ' ', '\b', '\r', '\n', '"', '/', '\\', ' '])
+  fun junkInPathDoesNotBreakWhereTest(
+    junkChar: Char,
+  ): Unit = timeoutRunBlocking(10.minutes) {
+    val junkCharStr = junkChar.toString()
+
+    val (shell, _) = localEel.exec.getShell()
+    assert(localEel.exec.where(shell.fileName) != null) { "No shell found on PATH: can't check path" }
+
+    // To make sure this mocking work, we look for the shell.
+    mockkStatic(PathEnvironmentVariableUtil::class)
+    try {
+      coEvery { PathEnvironmentVariableUtil.getPathVariableValue() }.returns(junkCharStr)
+      assert(localEel.exec.where(shell.fileName) == null) { "Failed to substitute path, real path was used, we test nothing" }
+
+      // These functions shouldn't fail
+      localEel.exec.where(junkCharStr)
+      localEel.exec.where("file")
+    }
+    finally {
+      unmockkStatic(PathEnvironmentVariableUtil::class)
+    }
+  }
+
   /**
    * Reads all bytes from the channel asynchronously. Otherwise, a PTY process
    * launched with `unixOpenTtyToPreserveOutputAfterTermination=true` won't exit.
@@ -234,6 +281,9 @@ class EelLocalExecApiTest {
    * Sends [command] to the helper and flush
    */
   private suspend fun EelProcess.sendCommand(command: Command) {
-    stdin.sendWholeText(command.name + "\n")
+    stdin.sendWholeText(command.name + "\r\n") // terminal needs \r\n
   }
+
+  private val EelProcess.isWinConPtyProcess: Boolean
+    get() = this is EelWindowsProcess && convertToJavaProcess()::class.java.name == "com.pty4j.windows.conpty.WinConPtyProcess"
 }

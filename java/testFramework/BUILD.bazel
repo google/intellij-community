@@ -15,8 +15,12 @@ jvm_library(
   deps = [
     "//java/openapi:java",
     "//java/testFramework/shared",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//platform/structure-view-impl:structureView-impl",
     "//platform/util",
@@ -49,6 +53,7 @@ jvm_library(
     "//platform/backend/observation",
     "//java/debugger/shared",
     "//platform/xdebugger-testFramework:debugger-testFramework",
+    "//xml/xml-psi-api:psi",
     "//java/java-syntax:syntax",
   ],
   exports = [

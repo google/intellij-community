@@ -9,7 +9,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.provider.EelNioBridgeService
 import com.intellij.platform.eel.provider.EelProvider
 import com.intellij.platform.eel.provider.LocalEelDescriptor
@@ -23,6 +23,7 @@ import com.intellij.util.containers.forEachGuaranteed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.job
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.NonNls
 import java.net.URI
 import java.nio.file.FileSystemAlreadyExistsException
 import java.nio.file.Path
@@ -52,7 +53,7 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
   }
 
   override suspend fun tryInitialize(path: String) {
-    if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
+    if (!serviceAsync<WslIjentAvailabilityService>().useIjentForWslNioFileSystem()) {
       return
     }
 
@@ -67,7 +68,7 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
     val allWslDistributions = serviceAsync<WslDistributionManager>().installedDistributions
 
     val path = Path.of(path)
-    val service = EelNioBridgeService.getInstanceSync()
+    val service = serviceAsync<EelNioBridgeService>()
     val descriptor = service.tryGetEelDescriptor(path)
 
     if (descriptor != null && descriptor !== LocalEelDescriptor) {
@@ -92,13 +93,11 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
   private suspend fun EelNioBridgeService.registerNioWslFs(distro: WSLDistribution) {
     val descriptor = distro.getIjent().descriptor as WslEelDescriptor
     val ijentFsProvider = TracingFileSystemProvider(IjentNioFileSystemProvider.getInstance())
+    val ijentUri = URI("ijent", "wsl", "/${distro.id}", null, null)
 
     try {
       val ijentFs = IjentFailSafeFileSystemPosixApi(coroutineScope) { distro.getIjent() }
-      val fs = ijentFsProvider.newFileSystem(
-        URI("ijent", "wsl", "/${distro.id}", null, null),
-        IjentNioFileSystemProvider.newFileSystemMap(ijentFs),
-      )
+      val fs = ijentFsProvider.newFileSystem(ijentUri, IjentNioFileSystemProvider.newFileSystemMap(ijentFs))
 
       coroutineScope.coroutineContext.job.invokeOnCompletion {
         fs?.close()
@@ -110,7 +109,9 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
 
     descriptor.distribution.roots.forEachGuaranteed { localRoot ->
       register(localRoot, descriptor, descriptor.distribution.id, false, false) { underlyingProvider, _ ->
-        val fileSystemProvider = providersCache.computeIfAbsent(distro.id) {
+        val key = if (Registry.`is`("wsl.use.new.filesystem")) localRoot else distro.id
+
+        val fileSystemProvider = providersCache.computeIfAbsent(key) {
           if (Registry.`is`("wsl.use.new.filesystem")) {
             IjentEphemeralRootAwareFileSystemProvider(
               root = Path(localRoot),
@@ -129,7 +130,8 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
               // This way, various UI file trees don't start all WSL containers during loading the file system root.
               useRootDirectoriesFromOriginalFs = true,
             )
-          } else {
+          }
+          else {
             IjentWslNioFileSystemProvider(
               wslDistribution = distro,
               ijentFsProvider = ijentFsProvider,
@@ -137,7 +139,12 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
             )
           }
         }
-        val fileSystem = fileSystemProvider.getFileSystem(distro.getUNCRootPath().toUri())
+        val fileSystem = if (fileSystemProvider is IjentEphemeralRootAwareFileSystemProvider) {
+          fileSystemProvider.getFileSystem(ijentUri)
+        }
+        else {
+          fileSystemProvider.getFileSystem(distro.getUNCRootPath().toUri())
+        }
         LOG.info("Switching $distro to IJent WSL nio.FS: $fileSystem")
         fileSystem
       }
@@ -145,9 +152,12 @@ class WslEelProvider(private val coroutineScope: CoroutineScope) : EelProvider {
   }
 }
 
-data class WslEelDescriptor(val distribution: WSLDistribution, override val platform: EelPlatform) : EelDescriptor {
+data class WslEelDescriptor(val distribution: WSLDistribution) : EelDescriptor {
+  override val osFamily: EelOsFamily = EelOsFamily.Posix
 
-  override suspend fun upgrade(): EelApi {
+  override val userReadableDescription: @NonNls String = "WSL: ${distribution.presentableName}"
+
+  override suspend fun toEelApi(): EelApi {
     return distribution.getIjent()
   }
 

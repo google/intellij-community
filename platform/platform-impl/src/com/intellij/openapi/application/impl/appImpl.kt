@@ -2,21 +2,14 @@
 package com.intellij.openapi.application.impl
 
 import com.intellij.concurrency.ContextAwareRunnable
-import com.intellij.core.rwmutex.ReadPermit
-import com.intellij.openapi.application.ThreadingSupport
 import com.intellij.openapi.application.readLockCompensationTimeout
-import com.intellij.openapi.application.useNestedLocking
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.ThrowableComputable
-import com.intellij.openapi.util.coroutines.runSuspend
 import com.intellij.util.ThrowableRunnable
 import io.opentelemetry.api.metrics.BatchCallback
 import io.opentelemetry.api.metrics.Meter
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.internal.intellij.IntellijCoroutines
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
-import org.jetbrains.annotations.VisibleForTesting
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
@@ -87,32 +80,6 @@ internal fun rethrowExceptions(transformer: (Runnable) -> Runnable, actual: Runn
     val caughtException = exception.get()
     if (caughtException != null) {
       throw caughtException
-    }
-  }
-}
-
-@ApiStatus.Internal
-fun getGlobalThreadingSupport(): ThreadingSupport {
-  if (useNestedLocking) {
-    return NestedLocksThreadingSupport
-  }
-  else {
-    return AnyThreadWriteThreadingSupport
-  }
-}
-
-@OptIn(InternalCoroutinesApi::class)
-@VisibleForTesting
-internal fun acquireReadLockWithCompensation(action: suspend () -> ReadPermit): ReadPermit {
-  val compensationTimeout = compensationTimeout
-  return if (compensationTimeout == null) {
-    runSuspend(action)
-  }
-  else {
-    return IntellijCoroutines.runAndCompensateParallelism(compensationTimeout) {
-      runSuspend {
-        action()
-      }
     }
   }
 }

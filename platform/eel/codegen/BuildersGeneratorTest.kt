@@ -63,6 +63,7 @@ import org.jetbrains.jps.model.module.JpsLibraryDependency
 import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget.*
 import org.jetbrains.kotlin.idea.test.UseK2PluginMode
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
@@ -73,6 +74,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Optional
 import java.util.TreeSet
+import kotlin.Boolean
 import kotlin.Char
 import kotlin.OptIn
 import kotlin.Pair
@@ -82,6 +84,7 @@ import kotlin.collections.ArrayDeque
 import kotlin.collections.addAll
 import kotlin.collections.map
 import kotlin.collections.mapNotNull
+import kotlin.error
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.pathString
 import kotlin.io.path.readText
@@ -91,14 +94,24 @@ import kotlin.jvm.optionals.getOrNull
 import kotlin.let
 import kotlin.run
 import kotlin.sequences.associateWithTo
+import kotlin.sequences.filter
+import kotlin.sequences.filterIsInstance
+import kotlin.sequences.flatMap
+import kotlin.sequences.generateSequence
 import kotlin.sequences.joinToString
+import kotlin.sequences.map
+import kotlin.sequences.takeWhile
+import kotlin.sequences.toList
 import kotlin.takeIf
 import kotlin.text.Regex
+import kotlin.text.RegexOption
 import kotlin.text.buildString
+import kotlin.text.endsWith
 import kotlin.text.isBlank
 import kotlin.text.isNotEmpty
 import kotlin.text.lines
 import kotlin.text.lowercase
+import kotlin.text.matches
 import kotlin.text.orEmpty
 import kotlin.text.prependIndent
 import kotlin.text.removePrefix
@@ -331,7 +344,7 @@ class BuildersGeneratorTest {
     var genSrcDirName: Path? = null
     val ultimateProject: JpsProject = IntelliJProjectConfiguration.loadIntelliJProject(Path.of(PathManager.getHomePath()).pathString)
 
-    val libraries = mutableListOf<JpsLibrary>()
+    val libraries = mutableSetOf<JpsLibrary>()
 
     val newEelModule: Module = writeAction {
       val projectModel = ModuleManager.getInstance(tempProject).getModifiableModel()
@@ -432,7 +445,7 @@ private suspend fun fillRequests(
 private class BuilderRequest(
   val shouldCheckReturnValue: Boolean,
   val throwsAnnotation: String?,
-  val deprecatedAnnotation: String?,
+  val annotations: Collection<String>,
   val argsInterfaceFqn: String,
   val clsFqn: String,
   val methodName: String,
@@ -458,10 +471,29 @@ private fun findBuilders(psiFile: PsiFile, methods: MutableList<BuilderRequest>)
           val methodName = fn.name ?: return
           val methodCls = valueParameter.containingClass()?.fqName ?: return
 
+          val annotationsToCopyRegex = Regex("""
+            (
+            org[.]jetbrains[.]annotations[.]ApiStatus[.](Internal|Experimental|Obsolete|ScheduledForRemoval)
+            |
+            kotlin[.]Deprecated
+            )
+          """.trimIndent(), RegexOption.COMMENTS)
+
           methods += BuilderRequest(
             shouldCheckReturnValue = fn.annotationEntries.mapNotNull { it.shortName?.asString() }.contains("CheckReturnValue"),
-            deprecatedAnnotation = fn.annotationEntries.find { it.shortName?.asString() == "Deprecated" }?.text?.trim(),
-            throwsAnnotation = fn.annotationEntries.find { it.shortName?.asString() == "Throws" }?.text?.trim(),
+            annotations = generateSequence(fn, PsiElement::getParent)
+              .takeWhile { it !is PsiFile }
+              .filterIsInstance<KtAnnotated>()
+              .flatMap { it.annotationEntries }
+              .filter {
+                analyze(it) {
+                  it.typeReference?.getFqn()?.matches(annotationsToCopyRegex) == true
+                }
+              }
+              .map { it.text.trim() }
+              .toList()
+              .let(::preferInternalAnnotation),
+            throwsAnnotation = fn.annotationEntries.filter { it.shortName?.asString() in listOf("Throws", "ThrowsChecked") }.joinToString(" ") { it.text.trim() },
             argsInterfaceFqn = typeFqn,
             clsFqn = methodCls.asString(),
             methodName = methodName,
@@ -565,9 +597,26 @@ private suspend fun writeBuilderFiles(
           .sortedBy { it.name }
           .distinct()
 
-        val propertyNames = argsAllInterfaces
+        val properties = argsAllInterfaces
           .flatMap { iface -> iface.getProperties() }
-          .map { property -> property.name!! }.sortedBy { it }
+          .map { ktProperty ->
+            Property(
+              name = ktProperty.name!!,
+              annotations = ktProperty.annotationEntries
+                .filter { annotationEntry ->
+                  when (annotationEntry.useSiteTarget?.getAnnotationUseSiteTarget()) {
+                    null, ALL, FIELD, PROPERTY, PROPERTY_GETTER -> true
+                    FILE, PROPERTY_SETTER, RECEIVER, CONSTRUCTOR_PARAMETER, SETTER_PARAMETER, PROPERTY_DELEGATE_FIELD -> false
+                  }
+                }
+                .map { annotation ->
+                  annotation.renderWithFqnTypes().trim()
+                    .replace(Regex("^@[^(]+:"), "@")  // TODO I don't know how to make it clearer.
+                }
+                .let(::preferInternalAnnotation),
+            )
+          }
+          .sortedBy { it.name }
 
         for (fullTypeFqn in requiredArguments.map { it.typeFqn } + optionalArguments.map { it.typeFqn }) {
           for (singleTypeFqn in fullTypeFqn.split(Regex("[<>,?]"))) {
@@ -579,7 +628,8 @@ private suspend fun writeBuilderFiles(
           name = argsInterface.name!!,
           requiredArguments = requiredArguments,
           optionalArguments = optionalArguments,
-          propertyNames = propertyNames,
+          properties = properties,
+          annotations = preferExperimentalAnnotation(builderRequest.annotations),
         )
       }
 
@@ -612,7 +662,7 @@ private suspend fun writeBuilderFiles(
         }
 
         text += """
-        ${kdoc.renderKdoc()}@GeneratedBuilder.Result${builderRequest.deprecatedAnnotation ?: ""}
+        ${kdoc.renderKdoc()}@GeneratedBuilder.Result${builderRequest.annotations.joinToString("\n")}
         fun ${builderRequest.clsFqn}.${builderRequest.methodName}(${
           requiredArguments.joinToString("") { prop ->
             "\n${prop.name}: ${prop.typeFqn},"
@@ -624,7 +674,15 @@ private suspend fun writeBuilderFiles(
         """
       }
 
-      text += "object ${clsFqn.removePrefix("$sourcePackage.").split('.').first()}Helpers {"
+      val annotationGroups = clsBuilderRequests.map { it.annotations }
+      val annotationsForGroup = annotationGroups
+        .reduce { a, b -> a intersect b }
+        .plus(annotationGroups.flatten().filterTo(hashSetOf()) { it.endsWith(".Experimental") || it.endsWith(".Internal") })
+        .let(::preferExperimentalAnnotation)
+        .sorted()
+        .joinToString("\n")
+
+      text += "$annotationsForGroup object ${clsFqn.removePrefix("$sourcePackage.").split('.').first()}Helpers {"
 
       for (builderRequest in clsBuilderRequests) {
         val argsInterfaceInfo = argsInterfacesByFqn[builderRequest.argsInterfaceFqn]!!
@@ -633,7 +691,7 @@ private suspend fun writeBuilderFiles(
         /**
          * Create it via [${builderRequest.clsFqn}.${builderRequest.methodName}]. 
          */
-        @GeneratedBuilder.Result
+        @GeneratedBuilder.Result${builderRequest.annotations.joinToString("\n")}
         class ${builderRequest.methodName.replaceFirstChar(Char::uppercaseChar)}(
           private val owner: ${builderRequest.clsFqn}, ${
           argsInterfaceInfo.requiredArguments.joinToString("") { prop ->
@@ -647,13 +705,13 @@ private suspend fun writeBuilderFiles(
           }
         }
         ${
-          argsInterfaceInfo.propertyNames.joinToString("\n") { name ->
+          argsInterfaceInfo.properties.joinToString("\n") { property ->
             renderPropertyInBuilder(
-              tempProject,
-              name,
-              builderRequest.methodName.replaceFirstChar(Char::uppercaseChar),
-              argsInterfaceInfo.requiredArguments,
-              argsInterfaceInfo.optionalArguments,
+              tempProject = tempProject,
+              property = property,
+              builderName = builderRequest.methodName.replaceFirstChar(Char::uppercaseChar),
+              requiredArguments = argsInterfaceInfo.requiredArguments,
+              optionalArguments = argsInterfaceInfo.optionalArguments,
             )
           }
         }
@@ -665,7 +723,7 @@ private suspend fun writeBuilderFiles(
           override suspend fun eelIt(): ${builderRequest.returnTypeFqn} =
             owner.${builderRequest.methodName}(${argsInterfaceInfo.name}Impl(
             ${
-          argsInterfaceInfo.propertyNames.joinToString("\n") { name -> "$name = $name," }
+          argsInterfaceInfo.properties.map { it.name }.joinToString("\n") { name -> "$name = $name," }
         })
             )
         }
@@ -679,7 +737,7 @@ private suspend fun writeBuilderFiles(
       for ((argsInterfaceFqn, argsInterfaceInfo) in argsInterfacesByFqn) {
         text = """
         @GeneratedBuilder.Result
-        class ${argsInterfaceInfo.name}Builder${
+        ${argsInterfaceInfo.annotations.sorted().joinToString("\n")} class ${argsInterfaceInfo.name}Builder${
           argsInterfaceInfo.requiredArguments.joinToString("", "(", ")") { prop ->
             "\n${prop.kdoc.renderKdoc()}private var ${prop.name}: ${prop.typeFqn},"
           }
@@ -690,26 +748,26 @@ private suspend fun writeBuilderFiles(
           }
         }
         ${
-          argsInterfaceInfo.propertyNames.joinToString("\n") { name ->
+          argsInterfaceInfo.properties.joinToString("\n") { property ->
             renderPropertyInBuilder(
-              tempProject,
-              name,
-              "${argsInterfaceInfo.name}Builder",
-              argsInterfaceInfo.requiredArguments,
-              argsInterfaceInfo.optionalArguments,
+              tempProject = tempProject,
+              builderName = "${argsInterfaceInfo.name}Builder",
+              property = property,
+              requiredArguments = argsInterfaceInfo.requiredArguments,
+              optionalArguments = argsInterfaceInfo.optionalArguments,
             )
           }
         }
     
           fun build(): ${argsInterfaceInfo.name} =
             ${argsInterfaceInfo.name}Impl(
-            ${argsInterfaceInfo.propertyNames.joinToString("\n") { name -> "$name = $name," }}
+            ${argsInterfaceInfo.properties.map { it.name }.joinToString("\n") { name -> "$name = $name," }}
             )
         }
     
         @GeneratedBuilder.Result
         internal class ${argsInterfaceInfo.name}Impl(${
-          argsInterfaceInfo.propertyNames.joinToString("\n") { name ->
+          argsInterfaceInfo.properties.map { it.name }.joinToString("\n") { name ->
             val typeFqn =
               argsInterfaceInfo.requiredArguments.firstOrNull { it.name == name }?.typeFqn
               ?: argsInterfaceInfo.optionalArguments.first { it.name == name }.typeFqn
@@ -732,27 +790,43 @@ private suspend fun writeBuilderFiles(
   return filesContent
 }
 
+private fun preferInternalAnnotation(annotations: Collection<String>): Collection<String> {
+  val result = annotations.toMutableSet()
+  if (result.any { it.endsWith(".Internal") }) {
+    result.removeIf { it.endsWith(".Experimental") }
+  }
+  return result
+}
+
+private fun preferExperimentalAnnotation(annotations: Collection<String>): Collection<String> {
+  val result = annotations.toMutableSet()
+  if (result.any { it.endsWith(".Experimental") }) {
+    result.removeIf { it.endsWith(".Internal") }
+  }
+  return result
+}
+
 private fun renderPropertyInBuilder(
   tempProject: Project,
-  name: String,
   builderName: String,
+  property: Property,
   requiredArguments: List<RequiredArgument>,
   optionalArguments: List<OptionalArgument>,
 ): String = buildString {
   val typeFqn =
-    requiredArguments.firstOrNull { it.name == name }?.typeFqn ?: optionalArguments.first { it.name == name }.typeFqn
+    requiredArguments.firstOrNull { it.name == property.name }?.typeFqn ?: optionalArguments.first { it.name == property.name }.typeFqn
   val kdoc =
-    requiredArguments.firstOrNull { it.name == name }?.kdoc ?: optionalArguments.first { it.name == name }.kdoc
+    requiredArguments.firstOrNull { it.name == property.name }?.kdoc ?: optionalArguments.first { it.name == property.name }.kdoc
 
   append("""
-    ${kdoc.renderKdoc()}fun $name(arg: $typeFqn): $builderName = apply {
-      this.$name = arg
+    ${kdoc.renderKdoc()} ${property.annotations.joinToString("\n")} fun ${property.name}(arg: $typeFqn): $builderName = apply {
+      this.${property.name} = arg
     }""")
 
   if (typeFqn.startsWith("kotlin.collections.List<")) {
     append("""
-      ${kdoc.renderKdoc()}fun $name(vararg arg: ${typeFqn.run { substring(24, length - 1) }}): $builderName = apply {
-        this.$name = listOf(*arg)
+      ${kdoc.renderKdoc()}fun ${property.name}(vararg arg: ${typeFqn.run { substring(24, length - 1) }}): $builderName = apply {
+        this.${property.name} = listOf(*arg)
       }""")
   }
 
@@ -770,7 +844,7 @@ private fun renderPropertyInBuilder(
     for ((enumMethodName, field) in fields) {
       append("""
         ${field.docComment?.text.orEmpty()}fun $enumMethodName(): $builderName =
-          $name($typeFqn.${field.name})""")
+          ${property.name}($typeFqn.${field.name})""")
     }
   }
 }
@@ -841,9 +915,17 @@ private fun String.javaToKotlinTypes(): String =
 
 private class RequiredArgument(val name: String, val typeFqn: String, val kdoc: String)
 private class OptionalArgument(val name: String, val typeFqn: String, val kdoc: String, val body: String)
+
+private class Property(val name: String, val annotations: Collection<String>) {
+  override fun toString(): String {
+    error("oops")
+  }
+}
+
 private class ArgInterfaceInfo(
   val name: String,
   val requiredArguments: List<RequiredArgument>,
   val optionalArguments: List<OptionalArgument>,
-  val propertyNames: List<String>,
+  val properties: List<Property>,
+  val annotations: Collection<String>,
 )

@@ -14,16 +14,19 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/core-api:core",
     "//platform/kernel/shared:kernel",
     "//platform/project/shared:project",
     "//platform/platform-api:ide",
     "//platform/diff-impl",
+    "//platform/projectModel-api:projectModel",
     "//platform/util:util-ui",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
     "//platform/platform-impl/rpc",
     "//platform/diagnostic",
     "@lib//:opentelemetry",
+    "//platform/platform-impl:ide-impl",
   ],
   runtime_deps = [":shared_resources"]
 )

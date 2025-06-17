@@ -13,31 +13,30 @@ import com.intellij.platform.searchEverywhere.frontend.SeFilterEditor
 import com.intellij.platform.searchEverywhere.frontend.SeTab
 import com.intellij.platform.searchEverywhere.frontend.resultsProcessing.SeTabDelegate
 import com.intellij.platform.searchEverywhere.frontend.tabs.target.SeTargetsFilterEditor
-import com.intellij.platform.searchEverywhere.frontend.utils.SuspendLazyProperty
-import com.intellij.platform.searchEverywhere.frontend.utils.suspendLazy
+import com.intellij.platform.searchEverywhere.utils.SuspendLazyProperty
+import com.intellij.platform.searchEverywhere.utils.initAsync
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.annotations.ApiStatus.Internal
 
 @Internal
 class SeFilesTab(private val delegate: SeTabDelegate): SeTab {
   override val name: String get() = IdeBundle.message("search.everywhere.group.name.files")
   override val shortName: String get() = name
-  override val id: String get() = "FileSearchEverywhereContributor"
-  private val filterEditor : SuspendLazyProperty<SeFilterEditor> = suspendLazy { SeTargetsFilterEditor (delegate.getSearchScopesInfos().firstOrNull(), delegate.getTypeVisibilityStates()) }
+  override val id: String get() = ID
+  private val filterEditor : SuspendLazyProperty<SeFilterEditor> = initAsync(delegate.scope) {
+    SeTargetsFilterEditor (delegate.getSearchScopesInfos().firstOrNull(), delegate.getTypeVisibilityStates())
+  }
 
-  override fun getItems(params: SeParams): Flow<SeResultEvent> =
-    if (params.inputQuery.isEmpty()) emptyFlow()
-    else delegate.getItems(params)
+  override fun getItems(params: SeParams): Flow<SeResultEvent> = delegate.getItems(params)
 
-  override suspend fun getFilterEditor(): SeFilterEditor? =
+  override suspend fun getFilterEditor(): SeFilterEditor =
     filterEditor.getValue()
 
   override suspend fun itemSelected(item: SeItemData, modifiers: Int, searchText: String): Boolean {
     return delegate.itemSelected(item, modifiers, searchText)
   }
 
-  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo? {
+  override suspend fun getEmptyResultInfo(context: DataContext): SeEmptyResultInfo {
     return SeEmptyResultInfoProvider(getFilterEditor(),
                                      delegate.getProvidersIds(),
                                      delegate.canBeShownInFindResults()).getEmptyResultInfo(delegate.project, context)
@@ -45,5 +44,10 @@ class SeFilesTab(private val delegate: SeTabDelegate): SeTab {
 
   override fun dispose() {
     Disposer.dispose(delegate)
+  }
+
+  companion object {
+    @Internal
+    const val ID: String = "FileSearchEverywhereContributor"
   }
 }

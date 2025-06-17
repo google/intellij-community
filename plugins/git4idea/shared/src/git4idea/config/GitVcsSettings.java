@@ -1,10 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.config;
 
-import com.intellij.dvcs.branch.DvcsBranchInfo;
-import com.intellij.dvcs.branch.DvcsBranchSettings;
-import com.intellij.dvcs.branch.DvcsCompareSettings;
-import com.intellij.dvcs.branch.DvcsSyncSettings;
+import com.intellij.dvcs.branch.*;
 import com.intellij.openapi.components.SimplePersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
@@ -14,6 +11,7 @@ import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.Tag;
+import git4idea.fetch.GitFetchTagsMode;
 import git4idea.push.GitPushTagMode;
 import git4idea.reset.GitResetMode;
 import org.jetbrains.annotations.ApiStatus;
@@ -27,9 +25,15 @@ import java.util.Objects;
 /**
  * Git VCS settings
  * <br>
- * Note that even though settings are located in a shared module, they are synced in the backend -> frontend direction only.
- * Even though setters are visible, they should not be called on the frontend.
- * See {@link git4idea.config.GitRemoteSettingsInfoProvider} for details
+ * The settings are synchronized in both (frontend <-> backend) directions.</br>
+ * However, to propagate changes
+ * {@link com.intellij.configurationStore.StoreUtilKt#saveSettingsForRemoteDevelopment(com.intellij.openapi.components.ComponentManager)}
+ * should be called or changes should be made in the settings dialog.</br>
+ * </br>
+ * Also note that besides simple manipulations over the state entity, some setters in this class invoke listeners.
+ * In cases when such behavior is unavoidable, please use {@link GitVcsSettingsListener} and backend/client-specific implementations.
+ *
+ * @see git4idea.config.GitRemoteSettingsInfoProvider
  */
 @State(name = GitVcsSettings.SETTINGS_KEY, storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class GitVcsSettings extends SimplePersistentStateComponent<GitVcsOptions> implements DvcsSyncSettings, DvcsCompareSettings {
@@ -117,6 +121,13 @@ public final class GitVcsSettings extends SimplePersistentStateComponent<GitVcsO
   @Override
   public @NotNull Value getSyncSetting() {
     return getState().getRootSync();
+  }
+
+  /**
+   * @return true if operations should be executed on all roots
+   */
+  public boolean shouldExecuteOperationsOnAllRoots() {
+    return getSyncSetting() != DvcsSyncSettings.Value.DONT_SYNC;
   }
 
   @Override
@@ -237,6 +248,14 @@ public final class GitVcsSettings extends SimplePersistentStateComponent<GitVcsO
     getState().setPushTags(value);
   }
 
+  public @NotNull GitFetchTagsMode getFetchTagsMode() {
+    return getState().getFetchTagsMode();
+  }
+
+  public void setFetchTagsMode(@Nullable GitFetchTagsMode value) {
+    getState().setFetchTagsMode(value == null ? GitFetchTagsMode.DEFAULT : value);
+  }
+
   public boolean shouldSignOffCommit() {
     return getState().isSignOffCommit();
   }
@@ -279,6 +298,20 @@ public final class GitVcsSettings extends SimplePersistentStateComponent<GitVcsO
 
   public @NotNull DvcsBranchSettings getBranchSettings() {
     return getState().getBranchSettings();
+  }
+
+  public void setBranchGroupingSettings(@NotNull GroupingKey key, boolean state) {
+    DvcsBranchSettings branchSettings = getBranchSettings();
+
+    if (state) {
+      branchSettings.getGroupingKeyIds().add(key.getId());
+    }
+    else {
+      branchSettings.getGroupingKeyIds().remove(key.getId());
+    }
+    branchSettings.intIncrementModificationCount();
+
+    project.getMessageBus().syncPublisher(GitVcsSettingsListener.TOPIC).branchGroupingSettingsChanged(key, state);
   }
 
   public boolean shouldSetUserNameGlobally() {
@@ -356,5 +389,7 @@ public final class GitVcsSettings extends SimplePersistentStateComponent<GitVcsO
     void showTagsChanged(boolean value);
 
     void pathToGitChanged();
+
+    void branchGroupingSettingsChanged(@NotNull GroupingKey key, boolean state);
   }
 }

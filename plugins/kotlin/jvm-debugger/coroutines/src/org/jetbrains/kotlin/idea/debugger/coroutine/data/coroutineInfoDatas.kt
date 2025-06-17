@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.debugger.coroutine.data
 
 import com.intellij.debugger.engine.JavaValue
 import com.intellij.debugger.engine.SuspendContext
+import com.sun.jdi.Location
 import com.sun.jdi.ObjectReference
 import com.sun.jdi.ThreadReference
 import org.jetbrains.annotations.ApiStatus
@@ -27,7 +28,8 @@ open class CoroutineInfoData(
     val lastObservedFrame: ObjectReference?,
     val lastObservedThread: ThreadReference?,
     val debugCoroutineInfoRef: ObjectReference?,
-    private val stackFrameProvider: CoroutineStackFramesProvider?
+    private val stackFrameProvider: CoroutineStackFramesProvider?,
+    val lastObservedStackTrace: List<Location> = emptyList()
 ) {
     val name: String = name ?: DEFAULT_COROUTINE_NAME
 
@@ -100,22 +102,6 @@ open class CoroutineInfoData(
     @Deprecated("The hierarchy of parent jobs for a current coroutine is not computed anymore.")
     val jobHierarchy: List<String> by lazy { emptyList() }
 }
-
-@ApiStatus.Internal
-fun createCoroutineInfoDataFromMirror(
-    mirror: MirrorOfCoroutineInfo,
-    stackFrameProvider: CoroutineStackFramesProvider
-): CoroutineInfoData =
-    CoroutineInfoData(
-        name = mirror.context?.name,
-        id = mirror.sequenceNumber,
-        state = mirror.state,
-        dispatcher = mirror.context?.dispatcher,
-        lastObservedFrame = mirror.lastObservedFrame,
-        lastObservedThread = mirror.lastObservedThread,
-        debugCoroutineInfoRef = null,
-        stackFrameProvider = stackFrameProvider
-    )
 
 @ApiStatus.Internal
 enum class State(val state: String) {

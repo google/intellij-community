@@ -628,6 +628,50 @@ public abstract class SharedK2IntentionTestGenerated extends AbstractSharedK2Int
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../testData/intentions/convertLazyPropertyToOrdinary")
+    public static class ConvertLazyPropertyToOrdinary extends AbstractSharedK2IntentionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("comment.kt")
+        public void testComment() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/comment.kt");
+        }
+
+        @TestMetadata("multiStatement.kt")
+        public void testMultiStatement() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/multiStatement.kt");
+        }
+
+        @TestMetadata("noStatement.kt")
+        public void testNoStatement() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/noStatement.kt");
+        }
+
+        @TestMetadata("singleStatement.kt")
+        public void testSingleStatement() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/singleStatement.kt");
+        }
+
+        @TestMetadata("singleStatement2.kt")
+        public void testSingleStatement2() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/singleStatement2.kt");
+        }
+
+        @TestMetadata("var.kt")
+        public void testVar() throws Exception {
+            runTest("../testData/intentions/convertLazyPropertyToOrdinary/var.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../testData/intentions/convertLineCommentToBlockComment")
     public static class ConvertLineCommentToBlockComment extends AbstractSharedK2IntentionTest {
         @java.lang.Override
@@ -1269,6 +1313,11 @@ public abstract class SharedK2IntentionTestGenerated extends AbstractSharedK2Int
             runTest("../testData/intentions/introduceBackingProperty/lateinitVar.kt");
         }
 
+        @TestMetadata("localProperty.kt")
+        public void testLocalProperty() throws Exception {
+            runTest("../testData/intentions/introduceBackingProperty/localProperty.kt");
+        }
+
         @TestMetadata("semicolon.kt")
         public void testSemicolon() throws Exception {
             runTest("../testData/intentions/introduceBackingProperty/semicolon.kt");
@@ -1893,6 +1942,26 @@ public abstract class SharedK2IntentionTestGenerated extends AbstractSharedK2Int
         @TestMetadata("prefixPlusPlus.kt")
         public void testPrefixPlusPlus() throws Exception {
             runTest("../testData/intentions/operatorToFunction/prefixPlusPlus.kt");
+        }
+
+        @TestMetadata("withReceiverContext.kt")
+        public void testWithReceiverContext() throws Exception {
+            runTest("../testData/intentions/operatorToFunction/withReceiverContext.kt");
+        }
+
+        @TestMetadata("withReceiverContext1.kt")
+        public void testWithReceiverContext1() throws Exception {
+            runTest("../testData/intentions/operatorToFunction/withReceiverContext1.kt");
+        }
+
+        @TestMetadata("withReceiverContext2.kt")
+        public void testWithReceiverContext2() throws Exception {
+            runTest("../testData/intentions/operatorToFunction/withReceiverContext2.kt");
+        }
+
+        @TestMetadata("withReceiverContext3.kt")
+        public void testWithReceiverContext3() throws Exception {
+            runTest("../testData/intentions/operatorToFunction/withReceiverContext3.kt");
         }
     }
 

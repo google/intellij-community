@@ -22,16 +22,12 @@ import javax.swing.Icon
  * This class is marked as experimental and may change in future releases.
  */
 abstract class CompletionCommand : UserDataHolderBase() {
-  /**
-   * Represents the name which is used as a main lookup string
-   */
-  abstract val name: String
 
   /**
-   * Represents a localized, human-readable name for the command, used in tail lookup string
+   * Represents a localized, human-readable name for the command, used as a main lookup string
    */
-  abstract val i18nName: @Nls String
-  abstract val icon: Icon?
+  abstract val presentableName: @Nls String
+  open val icon: Icon? = null
 
   /**
    * Defines the priority of the command in the code completion system.
@@ -72,7 +68,7 @@ abstract class CompletionCommand : UserDataHolderBase() {
   abstract fun execute(offset: Int, psiFile: PsiFile, editor: Editor?)
 
   override fun toString(): String {
-    return "CompletionCommand(name='$name', class='${this::class.simpleName}')"
+    return "CompletionCommand(presentableName='$presentableName', class='${this::class.simpleName}')"
   }
 
 

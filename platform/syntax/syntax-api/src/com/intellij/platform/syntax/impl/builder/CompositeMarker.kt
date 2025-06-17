@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nls
 
 internal class CompositeMarker(
   markerId: Int,
-  builder: ParsingTreeBuilder,
+  builder: SyntaxTreeBuilderImpl,
 ) : ProductionMarker(markerId, builder), SyntaxTreeBuilder.Marker {
 
   lateinit var type: SyntaxElementType
@@ -37,7 +37,7 @@ internal class CompositeMarker(
   }
 
   override fun getEndOffset(): Int =
-    builder.myLexStarts[endIndex] + builder.startOffset
+    builder.lexStart(endIndex) + builder.startOffset
 
   override fun getEndTokenIndex(): Int = endIndex
 

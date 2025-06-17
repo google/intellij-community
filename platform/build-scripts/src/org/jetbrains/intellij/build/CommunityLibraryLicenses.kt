@@ -53,12 +53,8 @@ object CommunityLibraryLicenses {
 
     androidDependency("Android Studio Platform", libraryName = "studio-platform"),
 
-    LibraryLicense("ANTLR 4.9 Runtime", libraryName = "antlr4-runtime-4.9", url = "https://www.antlr.org")
-      .newBsd("https://www.antlr.org/license.html")
-      .suppliedByPersons("Terence Parr"),
-
-    LibraryLicense("ap-validation", libraryName = "ap-validation", url = "https://github.com/JetBrains/ap-validation")
-      .apache("https://github.com/JetBrains/ap-validation/blob/master/LICENSE"),
+    LibraryLicense("antlr4-runtime", libraryName = "antlr4-runtime", url = "https://github.com/antlr/antlr4")
+      .newBsd("https://github.com/antlr/antlr4/blob/dev/LICENSE.txt"),
 
     LibraryLicense(libraryName = "apache.logging.log4j.to.slf4j", url = "https://ant.apache.org/")
       .apache("https://logging.apache.org/log4j/log4j-2.2/license.html")
@@ -726,10 +722,6 @@ object CommunityLibraryLicenses {
       .eplV2("https://github.com/junit-pioneer/junit-pioneer/blob/main/LICENSE.md")
       .suppliedByPersons("Nicolai Parlog", "Matthias Bünger", "Simon Schrottner", "Mihály Verhás", "Daniel Kraus"),
 
-    LibraryLicense(libraryName = "JUnit3", url = "https://github.com/stefanbirkner/junit3")
-      .license("CPL 1.0", "https://github.com/stefanbirkner/junit3/blob/master/cpl-v10.html")
-      .suppliedByPersons("Marc Philipp", "David Saff", "Kevin Cooney", "Stefan Birkner"),
-
     LibraryLicense(libraryName = "JUnit4", url = "https://junit.org/junit4/")
       .eplV1("https://junit.org/junit4/license.html")
       .suppliedByPersons("Marc Philipp", "David Saff", "Kevin Cooney", "Stefan Birkner"),
@@ -771,10 +763,6 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/JetBrains/kotlin/blob/master/license/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
-    LibraryLicense(libraryName = "kotlin-metadata-bcv", url = "https://github.com/JetBrains/kotlin")
-      .apache("https://github.com/JetBrains/kotlin/blob/master/license/LICENSE.txt")
-      .suppliedByOrganizations(Suppliers.JETBRAINS),
-
     LibraryLicense("Kotlin Coroutines for Guava", libraryName = "kotlinx-coroutines-guava", url = "https://github.com/Kotlin/kotlinx.coroutines")
       .apache("https://github.com/Kotlin/kotlinx.coroutines/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
@@ -790,6 +778,10 @@ object CommunityLibraryLicenses {
     LibraryLicense("Kotlin library providing basic IO primitives", libraryName = "kotlinx-io-core", url = "https://github.com/Kotlin/kotlinx-io")
       .apache("https://github.com/Kotlin/kotlinx-io/blob/master/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense(name = "Kotlin Logging", libraryName = "io.github.oshai.kotlin.logging.jvm", url = "https://github.com/oshai/kotlin-logging/")
+      .apache("https://github.com/oshai/kotlin-logging/blob/master/LICENSE")
+      .suppliedByPersons("Ohad Shai"),
 
     LibraryLicense("Kotlin multiplatform / multi-format serialization", libraryName = "kotlinx-serialization-core", url = "https://github.com/Kotlin/kotlinx.serialization")
       .apache("https://github.com/Kotlin/kotlinx.serialization/blob/master/LICENSE.txt")
@@ -1132,6 +1124,12 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "Saxon-9HE", version = "9.9", url = "https://saxon.sourceforge.net/")
       .mpl2("https://www.mozilla.org/en-US/MPL/2.0/"),
 
+    LibraryLicense(name = "Schema Kenerator", libraryName = "io.github.smiley4.schema.kenerator.core", url = "https://github.com/SMILEY4/schema-kenerator",
+                   additionalLibraryNames = listOf(
+                     "io.github.smiley4.schema.kenerator.jsonschema",
+                     "io.github.smiley4.schema.kenerator.serialization",))
+      .apache("https://github.com/SMILEY4/schema-kenerator/blob/develop/LICENSE"),
+
     LibraryLicense("setuptools", version = "44.1.1", attachedTo = "intellij.python", url = "https://setuptools.pypa.io/")
       .mit("https://github.com/pypa/setuptools/blob/main/LICENSE"),
 
@@ -1333,12 +1331,16 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("ai.grazie.emb"),
     jetbrainsLibrary("ai.grazie.nlp.detect"),
     jetbrainsLibrary("ai.grazie.nlp.encoder.bert.uncased"),
-    jetbrainsLibrary("ai.grazie.nlp.langs"),
     jetbrainsLibrary("ai.grazie.spell.gec.engine.local"),
     jetbrainsLibrary("ai.grazie.spell.hunspell.en"),
     jetbrainsLibrary("ai.grazie.utils.lucene.lt.compatibility"),
     jetbrainsLibrary("change-reminder-prediction-model"),
     jetbrainsLibrary("cloud-config-client"),
+    jetbrainsLibrary("com.jetbrains.fus.reporting.ap.validation"),
+    jetbrainsLibrary("com.jetbrains.fus.reporting.configuration"),
+    jetbrainsLibrary("com.jetbrains.fus.reporting.connection.client"),
+    jetbrainsLibrary("com.jetbrains.fus.reporting.model"),
+    jetbrainsLibrary("com.jetbrains.fus.reporting.serialization.kotlin"),
     jetbrainsLibrary("completion-log-events"),
     jetbrainsLibrary("completion-performance-kotlin"),
     jetbrainsLibrary("completion-ranking-cpp-exp"),
@@ -1379,11 +1381,15 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("intellij.remoterobot.remote.fixtures"),
     jetbrainsLibrary("intellij.remoterobot.robot.server.core"),
     jetbrainsLibrary("jetbrains.compose.hot.reload.gradle.idea"),
+    jetbrainsLibrary("jetbrains.fullLine.mlapi.ml.api"),
+    jetbrainsLibrary("jetbrains.fullLine.mlapi.ml.tools"),
+    jetbrainsLibrary("jetbrains.fus.reporting.ap.validation"),
     jetbrainsLibrary("jetbrains.intellij.deps.rwmutex.idea"),
     jetbrainsLibrary("jetbrains.kotlin.compose.compiler.plugin"),
     jetbrainsLibrary("jetbrains.llm.mlapi.catboost.shadow.need.slf4j"),
     jetbrainsLibrary("jetbrains.llm.mlapi.ml.api"),
     jetbrainsLibrary("jetbrains.llm.mlapi.ml.tools"),
+    jetbrainsLibrary("jetbrains.ml.completion.trigger_model_kotlin_cloud"),
     jetbrainsLibrary("jetbrains.ml.models.jetenry.inline.prompt.detection.model"),
     jetbrainsLibrary("jetbrains.ml.models.python.imports.ranking.model"),
     jetbrainsLibrary("jetbrains.mlapi.ml.api"),

@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl
 
-import com.intellij.codeInspection.options.OptPane.tab
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.filters.HyperlinkInfo
@@ -127,11 +126,13 @@ class XDebugSessionImpl @JvmOverloads constructor(
   private var myRunContentDescriptor: RunContentDescriptor? = null
   val sessionData: XDebugSessionData
   private val myActiveNonLineBreakpointAndPositionFlow = MutableStateFlow<Pair<XBreakpoint<*>, XSourcePosition?>?>(null)
-  private val myPausedEvents = MutableSharedFlow<XDebugSessionPausedInfo>(extraBufferCapacity = 1)
+  private val myPausedEvents = MutableSharedFlow<XDebugSessionPausedInfo>(replay = 1, extraBufferCapacity = 1)
   private val myDispatcher = EventDispatcher.create<XDebugSessionListener>(XDebugSessionListener::class.java)
   private val myProject: Project = debuggerManager.project
 
-  val executionEnvironment: ExecutionEnvironment? = environment
+  private val executionEnvironment: ExecutionEnvironment? = environment
+  override fun getExecutionEnvironment(): ExecutionEnvironment? = executionEnvironment
+
   private val myStopped = MutableStateFlow<Boolean>(false)
   private val myReadOnly = MutableStateFlow<Boolean>(false)
   private val myShowToolWindowOnSuspendOnly: Boolean = showToolWindowOnSuspendOnly
@@ -448,6 +449,9 @@ class XDebugSessionImpl @JvmOverloads constructor(
     return myDebugProcess is XMixedModeCombinedDebugProcess
   }
 
+  /**
+   * TODO When we move to RD-first approach, @RequiresEdt requirements in [XDebuggerManager] can be removed
+   */
   private fun initSessionTab(contentToReuse: RunContentDescriptor?, shouldShowTab: Boolean) {
     val forceNewDebuggerUi = debugProcess.forceShowNewDebuggerUi()
     val withFramesCustomization = debugProcess.allowFramesViewCustomization()
@@ -791,7 +795,9 @@ class XDebugSessionImpl @JvmOverloads constructor(
       myDispatcher.getMulticaster().stackFrameChanged()
     }
 
-    activateSession(frameChanged)
+    if (myDebuggerManager.currentSession == this) {
+      activateSession(frameChanged)
+    }
   }
 
   fun activateSession(forceUpdateExecutionPosition: Boolean) {
@@ -1052,7 +1058,7 @@ class XDebugSessionImpl @JvmOverloads constructor(
     positionReached(suspendContext, false)
   }
 
-  fun positionReached(suspendContext: XSuspendContext, attract: Boolean) {
+  override fun positionReached(suspendContext: XSuspendContext, attract: Boolean) {
     clearActiveNonLineBreakpoint()
     positionReachedInternal(suspendContext, attract)
   }
@@ -1147,14 +1153,6 @@ class XDebugSessionImpl @JvmOverloads constructor(
     else {
       processHandler.destroyProcess()
     }
-  }
-
-  override fun reportError(message: String) {
-    reportMessage(message, MessageType.ERROR)
-  }
-
-  override fun reportMessage(message: String, type: MessageType) {
-    reportMessage(message, type, null)
   }
 
   override fun reportMessage(message: String, type: MessageType, listener: HyperlinkListener?) {

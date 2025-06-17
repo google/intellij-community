@@ -208,7 +208,7 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
     }
     jitWatcher.checkJitState()
     LOG.trace("Scheduling EDT sample")
-    val latencyMs = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    val latencyMs = withContext(Dispatchers.ui(UiDispatcherKind.STRICT) + ModalityState.any().asContextElement()) {
       LOG.trace("Processing EDT sample")
       TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - current)
     }
@@ -594,11 +594,13 @@ private fun collectCrashInfo(pid: String, lastModified: Long): CrashInfo? {
   val osCrashContent = runCatching {
     if (!SystemInfoRt.isMac) return@runCatching null
     for (reportsDir in MacOSDiagnosticReportDirectories) {
-      val reportFiles = Path.of(reportsDir).useDirectoryEntries { entries -> entries
+      val reportFiles = Path.of(reportsDir)
+        .takeIf(Files::isDirectory)
+        ?.useDirectoryEntries { entries -> entries
         .filter { it.name.endsWith(".ips") && it.isRegularFile() && it.getLastModifiedTime().toMillis() > lastModified }
         .toList()
       }
-      val osCrashContent = reportFiles.firstNotNullOfOrNull { file ->
+      val osCrashContent = reportFiles?.firstNotNullOfOrNull { file ->
         if (file.fileSize() > CRASH_MAX_SIZE) {
           LOG.info("OS crash file $file is too big to process or report")
           return@firstNotNullOfOrNull null

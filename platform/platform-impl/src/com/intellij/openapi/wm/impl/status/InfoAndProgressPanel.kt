@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
 @file:OptIn(FlowPreview::class)
 
@@ -78,6 +78,12 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
     @JvmField
     @ApiStatus.Internal
     val FAKE_BALLOON: Any = Any()
+
+    private val showCounterInsteadOfMultiProcessLink: Boolean
+      get() = Registry.`is`("progresses.show.counter.icon.instead.of.show.link", false)
+
+    private val supportSecondaryProgresses: Boolean
+      get() = showCounterInsteadOfMultiProcessLink && Registry.`is`("progresses.support.secondary.progresses", false)
   }
 
   @ApiStatus.Internal
@@ -242,6 +248,7 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
       infos.add(info)
       val expanded = createInlineDelegate(info = info, original = original, compact = false)
       val compact = createInlineDelegate(info = info, original = original, compact = true)
+      IntegrationTestsProgressesTracker.progressStarted(original)
       getPopup().addIndicator(expanded)
       balloon.addIndicator(rootPane, compact)
       updateProgressIcon()
@@ -254,6 +261,7 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         // already finished, progress might not send another finished message
         removeProgress(expanded)
         removeProgress(compact)
+        IntegrationTestsProgressesTracker.progressStopped(original)
         return
       }
       coroutineScope.launch {
@@ -285,6 +293,7 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         return
       }
       mainPanel.removeProgress(progress, last)
+      IntegrationTestsProgressesTracker.progressStopped(original)
       coroutineScope.launch {
         runQuery()
       }
@@ -317,11 +326,18 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
   }
 
   internal fun setInlineProgressByWeight() {
-    synchronized(infos) {
+    synchronized(originals) {
       val size = infos.size
       val indexes = IntArray(size) { it }
       IntArrays.stableSort(indexes, 0, size, IntComparator { index1, index2 ->
-        infos.get(index1).statusBarIndicatorWeight - infos.get(index2).statusBarIndicatorWeight
+        val shown1 = originals.get(index1).visibleInStatusBar
+        val shown2 = originals.get(index2).visibleInStatusBar
+        if (shown1 != shown2) {
+          shown2.compareTo(shown1)
+        }
+        else {
+          infos.get(index1).statusBarIndicatorWeight - infos.get(index2).statusBarIndicatorWeight
+        }
       })
       var index = -1
       for (i in 0 until size) {
@@ -393,8 +409,10 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
                       htmlBody: @NlsContexts.PopupContent String,
                       icon: Icon?,
                       listener: HyperlinkListener?): BalloonHandler {
+    @Suppress("HardCodedStringLiteral")
+    val htmlContent = htmlBody.replace("\n", "<br>")
     val balloon = JBPopupFactory.getInstance()
-      .createHtmlTextBalloonBuilder(htmlBody.replace("\n", "<br>"),
+      .createHtmlTextBalloonBuilder(htmlContent,
                                     icon ?: type.defaultIcon,
                                     type.titleForeground,
                                     type.popupBackground,
@@ -632,13 +650,13 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
       get() = progressPanel.labelText
       set(value) {progressPanel.setLabelText(value)}
 
-    override var textValue: String?
+    override var textValue: @NlsContexts.DetailedDescription String?
       get() = progressPanel.getCommentText()
       set(value) {
         progressPanel.setCommentText(value)
       }
 
-    override var text2Value: String?
+    override var text2Value: @NlsContexts.DetailedDescription String?
       get() = super.text2Value
       set(value) {
         progressPanel.setText2(value)
@@ -696,6 +714,9 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
   internal open inner class MyProgressComponent(compact: Boolean, task: TaskInfo, progressModel: ProgressModel)
     : ProgressComponent(compact, task, progressModel), TitledIndicator {
     private var original: ProgressModel?
+    internal var addedProgressBarWidth: Int = 0
+    internal val visibleInStatusBar: Boolean
+      get() = indicatorModel.visibleInStatusBar
 
     override fun getText(): @NlsContexts.ProgressText String? {
       val text = (indicatorModel.getText() ?: "")
@@ -725,6 +746,18 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
       UIUtil.setCursor(progress, Cursor.getPredefinedCursor(Cursor.HAND_CURSOR))
       super.createCompactTextAndProgress(component)
       (progress.parent as JComponent).setBorder(JBUI.Borders.empty(0, 8, 0, 4))
+    }
+
+    override fun wrapProgress(): JComponent {
+      val progressWrapper = object : NonOpaquePanel(BorderLayout()) {
+        override fun getPreferredSize(): Dimension? {
+          val original = super.getPreferredSize()
+          original.width += addedProgressBarWidth
+          return original
+        }
+      }
+      progressWrapper.add(progress, BorderLayout.CENTER)
+      return progressWrapper
     }
 
     override fun onFinish() {
@@ -917,7 +950,6 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
 
     val progressIcon: AsyncProcessIcon = AsyncProcessIcon(host.coroutineScope)
     var indicator: MyProgressComponent? = null
-    private var processIconComponent: AsyncProcessIcon? = null
     private val multiProcessLink: ActionLink = object : ActionLink("", ActionListener { host.triggerPopupShowing() }) {
       override fun updateUI() {
         super.updateUI()
@@ -926,6 +958,7 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         }
       }
     }
+    private val counterComponent: ScalableCounterIconComponent
 
     init {
       progressIcon.setOpaque(false)
@@ -942,24 +975,35 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
       progressIcon.setBorder(JBUI.CurrentTheme.StatusBar.Widget.border())
       progressIcon.setToolTipText(ActionsBundle.message("action.ShowProcessWindow.double.click"))
 
+      counterComponent = ScalableCounterIconComponent()
+      counterComponent.addMouseListener(object : MouseAdapter() {
+        override fun mouseClicked(e: MouseEvent) {
+          host.triggerPopupShowing()
+        }
+      })
+      UIUtil.setCursor(counterComponent, Cursor.getPredefinedCursor(Cursor.HAND_CURSOR))
+
       setLayout(object : AbstractLayoutManager() {
         override fun preferredLayoutSize(parent: Container): Dimension {
           val result = Dimension()
-          if (indicator != null) {
-            val component = indicator!!.component
-            if (component.isVisible) {
+          fun addVisibleToPreferred(component: JComponent, withGap: Boolean, enforceOnInvisible: Boolean = false) {
+            if (enforceOnInvisible || component.isVisible) {
+              if (withGap && result.width > 0) {
+                result.width += gap
+              }
               val size = component.getPreferredSize()
               result.width += size.width
               result.height = max(result.height, size.height)
             }
           }
-          if (multiProcessLink.isVisible) {
-            val size = multiProcessLink.getPreferredSize()
-            result.width += (if (result.width > 0) gap else 0) + size.width
-            result.height = max(result.height, size.height)
+
+          if (indicator != null) {
+            addVisibleToPreferred(indicator!!.component, withGap = false)
           }
-          if (processIconComponent != null) {
-            result.height = max(result.height, processIconComponent!!.getPreferredSize().height)
+          val componentToAdd: JComponent = if (showCounterInsteadOfMultiProcessLink) counterComponent else multiProcessLink
+          addVisibleToPreferred(componentToAdd, withGap = true, enforceOnInvisible = true)
+          if (progressIcon.isVisible) {
+            result.height = max(result.height, progressIcon.getPreferredSize().height)
           }
           JBInsets.addTo(result, parent.insets)
           return result
@@ -967,95 +1011,145 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
 
         override fun layoutContainer(parent: Container) {
           if (indicator == null) {
-            hideProcessIcon()
+            progressIcon.isVisible = false
+            counterComponent.isVisible = false
             return
           }
+          indicator?.addedProgressBarWidth = 0
           val insets = parent.insets
           val x = insets.left
           val centerY = (parent.height + insets.top - insets.bottom) / 2
           val width = parent.width - insets.left - insets.right
           var rightX = parent.width - insets.right
           val gap = gap
-          val indicator = indicator!!.component
-          if (indicator.isVisible) {
+          val indicatorComponent = indicator!!.component
+          if (indicatorComponent.isVisible) {
             var preferredWidth = preferredLayoutSize(parent).width - insets.left - insets.right
             var indicatorSize: Dimension? = null
             if (preferredWidth > width) {
               val progressWidth2x = this@InlineProgressPanel.indicator!!.progress.getPreferredSize().width * 2
               if (width > progressWidth2x && this@InlineProgressPanel.indicator!!.textPanel.getPreferredSize().width > progressWidth2x) {
                 preferredWidth = width
-                indicatorSize = Dimension(width, indicator.getPreferredSize().height)
+                indicatorSize = Dimension(width, indicatorComponent.getPreferredSize().height)
                 if (multiProcessLink.isVisible) {
                   indicatorSize.width -= multiProcessLink.getPreferredSize().width + gap
                 }
               }
             }
             if (preferredWidth > width) {
-              indicator.setBounds(0, 0, 0, 0)
-              addProcessIcon()
-              val iconSize = processIconComponent!!.getPreferredSize()
-              preferredWidth = iconSize.width
-              if (multiProcessLink.isVisible) {
-                preferredWidth += gap + multiProcessLink.getPreferredSize().width
-              }
-              if (preferredWidth > width) {
-                if (multiProcessLink.isVisible) {
-                  multiProcessLink.setBounds(0, 0, 0, 0)
-                }
-                setBounds(processIconComponent, 0, centerY, iconSize, false)
-              }
-              else {
-                var miniWidth = true
-                if (multiProcessLink.isVisible) {
-                  rightX = setBounds(multiProcessLink, rightX, centerY, null, true) - gap
-                }
-                else if (width < 60) {
-                  rightX = 0
-                  miniWidth = false
-                }
-                setBounds(processIconComponent, rightX, centerY, iconSize, miniWidth)
-              }
-              processIconComponent!!.isVisible = true
+              layoutWithUnfittingIndicator(indicatorComponent,
+                                           initialPreferredWidth = preferredWidth,
+                                           initialRightX = rightX,
+                                           centerY = centerY)
             }
             else {
-              hideProcessIcon()
-              if (multiProcessLink.isVisible) {
-                rightX = setBounds(multiProcessLink, rightX, centerY, null, true) - gap
-              }
-              setBounds(indicator, rightX, centerY, indicatorSize, true)
+              layoutWithFittingIndicator(indicatorComponent,
+                                         initialIndicatorSize = indicatorSize,
+                                         initialRightX = rightX,
+                                         centerY = centerY)
             }
           }
           else {
-            val linkSize = multiProcessLink.getPreferredSize()
-            val preferredWidth = linkSize.width
-            if (preferredWidth > width) {
+            layoutWithoutIndicator(initialX = x, rightX = rightX, centerY = centerY)
+          }
+        }
+
+        private fun layoutWithUnfittingIndicator(indicatorComponent: JPanel, initialPreferredWidth: Int, initialRightX: Int, centerY: Int) {
+          var preferredWidth = initialPreferredWidth
+          var rightX = initialRightX
+          indicatorComponent.setBounds(0, 0, 0, 0)
+
+          if (showCounterInsteadOfMultiProcessLink && counterComponent.isVisible) {
+            progressIcon.isVisible = false
+            setBounds(counterComponent, rightX, centerY, null, true)
+            return
+          }
+          // With showCounterInsteadOfMultiProcessLink and !counterLabel.isVisible (single progress)
+          // behavior is just the same as with !showCounterInsteadOfMultiProcessLink
+
+          progressIcon.isVisible = true
+          val iconSize = progressIcon.getPreferredSize()
+          preferredWidth = iconSize.width
+          if (multiProcessLink.isVisible) {
+            preferredWidth += gap + multiProcessLink.getPreferredSize().width
+          }
+          if (preferredWidth > width) {
+            if (multiProcessLink.isVisible) {
               multiProcessLink.setBounds(0, 0, 0, 0)
-              addProcessIcon()
-              setBounds(processIconComponent, x, centerY, null, false)
-              processIconComponent!!.isVisible = true
             }
-            else {
-              hideProcessIcon()
-              setBounds(multiProcessLink, rightX, centerY, linkSize, true)
+            setBounds(progressIcon, 0, centerY, iconSize, false)
+          }
+          else {
+            var miniWidth = true
+            if (multiProcessLink.isVisible) {
+              rightX = setBounds(multiProcessLink, rightX, centerY, null, true) - gap
             }
+            else if (width < 60) {
+              rightX = 0
+              miniWidth = false
+            }
+            setBounds(progressIcon, rightX, centerY, iconSize, miniWidth)
+          }
+          progressIcon.isVisible = true
+        }
+
+        private fun layoutWithFittingIndicator(indicatorComponent: JPanel, initialIndicatorSize: Dimension?, initialRightX: Int, centerY: Int) {
+          var rightX = initialRightX
+          var indicatorSize = initialIndicatorSize
+          progressIcon.isVisible = false
+          var additionalWidth = 0
+
+          when {
+            showCounterInsteadOfMultiProcessLink && counterComponent.isVisible -> {
+              rightX = setBounds(counterComponent, rightX, centerY, null, true) - gap
+            }
+            showCounterInsteadOfMultiProcessLink /* && !counterLabel.isVisible */ -> {
+              additionalWidth = counterComponent.preferredSize.width + gap
+            }
+            multiProcessLink.isVisible /* && !showCounterInsteadOfMultiProcessLink */ -> {
+              rightX = setBounds(multiProcessLink, rightX, centerY, null, true) - gap
+            }
+            else /* !showCounterInsteadOfMultiProcessLink && !multiProcessLink.isVisible */ -> {
+              additionalWidth = multiProcessLink.preferredSize.width + gap
+            }
+          }
+
+          if (additionalWidth != 0) {
+            indicatorSize = initialIndicatorSize ?: indicatorComponent.getPreferredSize()
+            indicatorSize.width += additionalWidth
+            indicator?.addedProgressBarWidth = additionalWidth
+          }
+          setBounds(indicatorComponent, rightX, centerY, indicatorSize, true)
+        }
+
+        private fun layoutWithoutIndicator(rightX: Int, centerY: Int, initialX: Int) {
+          if (showCounterInsteadOfMultiProcessLink) {
+            progressIcon.isVisible = false
+            if (counterComponent.isVisible) {
+              setBounds(counterComponent, rightX, centerY, null, true)
+            }
+            return
+          }
+          val linkSize = multiProcessLink.getPreferredSize()
+          val preferredWidth = linkSize.width
+          if (preferredWidth > width) {
+            multiProcessLink.setBounds(0, 0, 0, 0)
+            progressIcon.isVisible = true
+            setBounds(progressIcon, initialX, centerY, null, false)
+          }
+          else {
+            progressIcon.isVisible = false
+            setBounds(multiProcessLink, rightX, centerY, linkSize, true)
           }
         }
       })
       setBorder(JBUI.Borders.empty(0, 20, 0, 4))
+      add(progressIcon)
+      progressIcon.isVisible = false
       add(multiProcessLink)
       multiProcessLink.isVisible = false
-    }
-
-    private fun addProcessIcon() {
-      if (processIconComponent == null) {
-        add(progressIcon.also { processIconComponent = it })
-      }
-    }
-
-    private fun hideProcessIcon() {
-      if (processIconComponent != null) {
-        processIconComponent!!.isVisible = false
-      }
+      add(counterComponent)
+      counterComponent.isVisible = false
     }
 
     fun updateProgress(compact: MyProgressComponent?) {
@@ -1097,17 +1191,114 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         return
       }
       val size = host.originals.size
-      indicator!!.component.isVisible = !showPopup
-      multiProcessLink.isVisible = showPopup || size > 1
-      if (showPopup) {
-        multiProcessLink.setText(IdeBundle.message("link.hide.processes", size))
+      indicator!!.component.isVisible = !showPopup && (!supportSecondaryProgresses || indicator!!.visibleInStatusBar)
+      if (showCounterInsteadOfMultiProcessLink) {
+        counterComponent.setNumber(size)
+        counterComponent.isVisible = size > 1 || (size == 1 && supportSecondaryProgresses && !host.originals[0].visibleInStatusBar)
+        multiProcessLink.isVisible = false
       }
-      else if (size > 1) {
-        multiProcessLink.setText(IdeBundle.message("link.show.all.processes", size))
+      else {
+        counterComponent.isVisible = false
+        multiProcessLink.isVisible = showPopup || size > 1
+        if (showPopup) {
+          multiProcessLink.setText(IdeBundle.message("link.hide.processes", size))
+        }
+        else if (size > 1) {
+          multiProcessLink.setText(IdeBundle.message("link.show.all.processes", size))
+        }
       }
       doLayout()
       revalidate()
       repaint()
     }
+  }
+}
+
+private class ScalableCounterIconComponent : JComponent(), UISettingsListener {
+  private val icon: CounterIcon = CounterIcon(1,
+                                              JBColor.WHITE,
+                                              JBUI.CurrentTheme.StatusBar.Progresses.COUNTER)
+
+
+  fun setNumber(value: Int) {
+    icon.number = value
+  }
+
+  override fun getPreferredSize(): Dimension {
+    val iconSize = JBUI.scale(16) //icon size
+    if (icon.number < 10) {
+      return Dimension(iconSize, iconSize)
+    }
+    val sensibleDefaultInset = JBUI.scale(3)
+    icon.setInsets(0, sensibleDefaultInset)
+    return Dimension(max(iconSize, icon.iconWidth), max(iconSize, icon.iconHeight))
+  }
+
+  override fun paintComponent(g: Graphics?) {
+    super.paintComponent(g)
+    setIconSize(width, height)
+    icon.paintIcon(this, g, 0, 0)
+  }
+
+  private fun setIconSize(width: Int, height: Int) {
+    icon.round = height
+    icon.setInsets(0)
+    val widthToAdd = max(width - icon.iconWidth, 0)
+    val heightToAdd = max(height - icon.iconHeight, 0)
+    val leftInset = widthToAdd / 2
+    val topInset = heightToAdd / 2
+    icon.setInsets(topInset, leftInset, heightToAdd - topInset, widthToAdd - leftInset)
+  }
+
+  override fun uiSettingsChanged(uiSettings: UISettings) {
+    icon.uiSettingsChanged()
+  }
+}
+
+private class CounterIcon(private val icon: TextIcon, initialNumber: Int) : Icon by icon {
+  private var lastDigitNumber: Int = 0
+  private var _number: Int = initialNumber
+  var number: Int
+    set(value) {
+      val text = value.toString()
+      if (text.length != lastDigitNumber) {
+        lastDigitNumber = text.length
+        val predefined = when (lastDigitNumber) {
+          1 -> 0..9
+          2 -> 10..99
+          3 -> 100..999
+          else -> null
+        }
+        if (predefined != null) {
+          icon.setTextsForMinimumBounds(predefined.map { it.toString() })
+        }
+      }
+      icon.text = text
+      _number = value
+    }
+    get() = _number
+
+  init {
+    icon.font = JBFont.regular()
+  }
+
+  constructor(number: Int, foreground: Color, background: Color) : this(TextIcon("", foreground, background, 0), number)
+
+  var round: Int? by icon::round
+
+  fun setInsets(top: Int, left: Int, bottom: Int, right: Int) {
+    icon.setInsets(top, left, bottom, right)
+  }
+
+  fun setInsets(topBottom: Int, leftRight: Int) {
+    icon.setInsets(topBottom, leftRight, topBottom, leftRight)
+  }
+
+  fun setInsets(all: Int) {
+    setInsets(all, all, all, all)
+  }
+
+  fun uiSettingsChanged() {
+    icon.uiSettingsChanged()
   }
 }

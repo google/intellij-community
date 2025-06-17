@@ -4,10 +4,12 @@ package com.intellij.platform.eel.fs
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.fs.EelFileSystemApi.StatError
 import com.intellij.platform.eel.path.EelPath
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.CheckReturnValue
 import java.nio.ByteBuffer
 
+@get:ApiStatus.Internal
 val EelFileSystemApi.pathSeparator: String
   get() = when (this) {
     is EelFileSystemPosixApi -> ":"
@@ -15,14 +17,17 @@ val EelFileSystemApi.pathSeparator: String
     else -> throw UnsupportedOperationException("Unsupported OS: ${this::class.java}")
   }
 
+@ApiStatus.Internal
 fun EelFileSystemApi.getPath(string: String): EelPath {
   return EelPath.parse(string, descriptor)
 }
 
+@ApiStatus.Internal
 interface LocalEelFileSystemApi : EelFileSystemApi
 
 // TODO Integrate case-(in)sensitiveness into the interface.
 
+@ApiStatus.Internal
 interface EelFileSystemApi {
 
   /**
@@ -481,35 +486,96 @@ interface EelFileSystemApi {
   }
 
   /**
-   * Sets the currently watched paths from the specified set of file paths and provides a flow of change events.
-   * NOTE: Any previously watched paths are dropped, no more watch events will be received for them.
+   * Adds the watched paths from the specified set of file paths and provides a flow of change events.
+   * A path is watched till [unwatch] method is explicitly called for it.
    *
-   * @param paths A set of paths to watch for changes.See [WatchedPath]
-   * @param options A set of file change types to monitor, such as creation, deletion, or modification.
+   * Use [WatchOptionsBuilder] to construct the watch configuration. Example:
+   * ```
+   * val flow = eel.fs.watchChanges(
+   *     WatchOptionsBuilder()
+   *         .changeTypes(setOf(EelFileSystemApi.FileChangeType.CHANGED))
+   *         .paths(setOf(eelPath))
+   *         .build())
+   * ```
+   *
+   * @param watchOptions The options to use for file watching. See [WatchOptions]
    * @return A flow emitting [PathChange] instances that indicate the path and type of change.
    *         Each path is an absolute path on the target system (container), for example, `/home/myproject/myfile.txt`
    * @throws UnsupportedOperationException if the method isn't implemented for the file system.
    */
-  suspend fun watchChanges(paths: Set<WatchedPath>, options: Set<FileChangeType>): Flow<PathChange> {
+  @Throws(UnsupportedOperationException::class)
+  suspend fun watchChanges(@GeneratedBuilder watchOptions: WatchOptions): Flow<PathChange> {
     throw UnsupportedOperationException()
   }
 
   /**
-   * Represents a change in the state of a file path in the target file system.
+   * Unregisters a previously watched path.
    *
-   * @property path The file system path where the change occurred, an absolute path on the target system.
-   * @property type The type of change that occurred. See [FileChangeType]
+   * @param unwatchOptions The options specifying the path to be unwatched. See [UnwatchOptions].
+   * @return True if the operation was successful. False if the path hadn't been previously watched or unwatch failed.
+   *
+   * @throws UnsupportedOperationException if the method isn't implemented for the file system.
    */
-  data class PathChange(val path: String, val type: FileChangeType)
+  @Throws(UnsupportedOperationException::class)
+  suspend fun unwatch(@GeneratedBuilder unwatchOptions: UnwatchOptions): Boolean {
+    throw UnsupportedOperationException()
+  }
 
   /**
-   * Represents a file system path to be monitored for changes.
+   * Represents a change detected in a specific path within the file system. It can be a change in the child directory if a recursive
+   * watch is enabled.
    *
-   * @property path The file system path to watch. NOTE: It must be an absolute path on the target system. For example, `/home/myproject` in
-   *                the container.
-   * @property recursive A flag indicating whether changes in subdirectories should also be watched.
+   * @property path The absolute path in the file system associated with the change.
+   *                For example, "/home/user/documents/file.txt".
+   * @property type The type of change that occurred. See [FileChangeType],
    */
-  data class WatchedPath(val path: String, val recursive: Boolean)
+  interface PathChange {
+    val path: String
+    val type: FileChangeType
+  }
+
+  /**
+   * Provides configurations for specifying which file paths should be monitored and what types of file system changes should be watched.
+   *
+   * @property paths The set of file paths to monitor for changes with additional watch properties. See [WatchedPath]
+   * @property changeTypes The types of file system changes to monitor. This is a set of [FileChangeType] values.
+   */
+  interface WatchOptions {
+    val paths: Set<WatchedPath> get() = emptySet()
+    val changeTypes: Set<FileChangeType> get() = emptySet()
+  }
+
+
+  /**
+   * Represents a file system path being monitored for changes.
+   *
+   * @property path The file system path being watched.
+   * @property recursive Whether the file system changes should be monitored recursively within the specified path.
+   * @see [watchChanges]
+   */
+  interface WatchedPath {
+    val path: EelPath
+    val recursive: Boolean
+
+    interface Builder {
+      fun build(): WatchedPath
+      fun recursive(boolean: Boolean): Builder
+    }
+
+    companion object {
+      fun Builder(path: EelPath): Builder = WatchedPathBuilder(path)
+    }
+  }
+
+  /**
+   * Represents the options required to unregister a previously watched path in the file system.
+   *
+   * @property path The file system path to unwatch. Must be specified as an instance of [EelPath].
+   * @see [unwatch]
+   */
+  interface UnwatchOptions {
+    val path: EelPath
+  }
 
   /**
    * Represents the type of change that can occur to a file in the file system.
@@ -522,6 +588,7 @@ interface EelFileSystemApi {
 }
 
 
+@ApiStatus.Internal
 sealed interface EelOpenedFile {
   val path: EelPath
 
@@ -655,8 +722,10 @@ sealed interface EelOpenedFile {
   interface ReaderWriter : Reader, Writer
 }
 
+@ApiStatus.Internal
 interface LocalEelFileSystemPosixApi : EelFileSystemPosixApi, LocalEelFileSystemApi
 
+@ApiStatus.Internal
 interface EelFileSystemPosixApi : EelFileSystemApi {
   override val user: EelUserPosixInfo
 
@@ -792,8 +861,10 @@ interface EelFileSystemPosixApi : EelFileSystemApi {
   }
 }
 
+@ApiStatus.Internal
 interface LocalEelFileSystemWindowsApi : EelFileSystemWindowsApi, LocalEelFileSystemApi
 
+@ApiStatus.Internal
 interface EelFileSystemWindowsApi : EelFileSystemApi {
   override val user: EelUserWindowsInfo
 
@@ -827,6 +898,7 @@ interface EelFileSystemWindowsApi : EelFileSystemApi {
 
 @CheckReturnValue
 @Deprecated("Use the method with the builder")
+@ApiStatus.Internal
 suspend fun EelFileSystemApi.changeAttributes(
   path: EelPath,
   setup: (EelFileSystemApi.ChangeAttributesOptions.Builder).() -> Unit,
@@ -837,6 +909,7 @@ suspend fun EelFileSystemApi.changeAttributes(
 
 @CheckReturnValue
 @Deprecated("Use the method with the builder")
+@ApiStatus.Internal
 suspend fun EelFileSystemApi.openForWriting(path: EelPath, setup: (EelFileSystemApi.WriteOptions.Builder).() -> Unit): EelResult<EelOpenedFile.Writer, EelFileSystemApi.FileWriterError> {
   val options = EelFileSystemApi.WriteOptions.Builder(path).apply(setup).build()
   return openForWriting(options)
@@ -844,6 +917,7 @@ suspend fun EelFileSystemApi.openForWriting(path: EelPath, setup: (EelFileSystem
 
 @CheckReturnValue
 @Deprecated("Use the method with the builder")
+@ApiStatus.Internal
 suspend fun EelFileSystemApi.copy(
   source: EelPath,
   target: EelPath,
@@ -855,6 +929,7 @@ suspend fun EelFileSystemApi.copy(
 
 @CheckReturnValue
 @Deprecated("Use the method with the builder")
+@ApiStatus.Internal
 suspend fun EelFileSystemApi.createTemporaryDirectory(setup: (EelFileSystemApi.CreateTemporaryEntryOptions.Builder).() -> Unit): EelResult<EelPath, EelFileSystemApi.CreateTemporaryEntryError> {
   val options = EelFileSystemApi.CreateTemporaryEntryOptions.Builder().apply(setup).build()
   return createTemporaryDirectory(options)

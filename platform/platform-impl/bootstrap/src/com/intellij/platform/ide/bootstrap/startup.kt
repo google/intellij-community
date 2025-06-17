@@ -207,9 +207,13 @@ fun CoroutineScope.startApplication(
     )
   }
 
+  val appStartPreparedJob = CompletableDeferred<Unit>()
+
   val pluginSetDeferred = async {
     // plugins cannot be loaded when a config import is necessary, because plugins may be added after importing
     configImportDeferred.join()
+    // AppStarter.prepareStart might need to prevent some plugins from loading
+    appStartPreparedJob.join()
 
     if (!PluginAutoUpdater.shouldSkipAutoUpdate()) {
       span("plugin auto update") {
@@ -276,8 +280,12 @@ fun CoroutineScope.startApplication(
       appStarterDeferred.await()
     }
 
+    // must be scheduled before preparing app start
+    configImportDeferred.join()
+
     withContext(mainScope.coroutineContext + CoroutineName("appStarter set")) {
       appStarter.prepareStart(args)
+      appStartPreparedJob.complete(Unit)
     }
 
     // must be scheduled before starting app
@@ -314,6 +322,7 @@ fun CoroutineScope.startApplication(
         }.getOrLogException(log)
       }
 
+      applyIslandsTheme(false)
       executeApplicationStarter(starter, args)
     }
     // no need to use a pool once started

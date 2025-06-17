@@ -7,17 +7,16 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
-import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaSubstitutor
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.k2.refactoring.findCallableMemberBySignature
+import org.jetbrains.kotlin.idea.k2.refactoring.pullUp.createSuperTypeEntryForAddition
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.KotlinMemberInfo
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.KtPsiClassWrapper
 import org.jetbrains.kotlin.idea.refactoring.pullUp.addMemberToTarget
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.types.Variance
-import java.util.concurrent.Callable
 
 internal data class MemberContext(
     val member: KtCallableDeclaration,
@@ -31,7 +30,7 @@ internal fun KaSession.createPushDownAction(
     memberInfo: KotlinMemberInfo,
     targetClass: KtClassOrObject,
     substitutor: KaSubstitutor,
-): Callable<KtNamedDeclaration>? = when (memberInfo.member) {
+): PushDownAction? = when (memberInfo.member) {
     is KtProperty, is KtNamedFunction ->
         createPushDownActionForCallableMember(
             memberInfo,
@@ -51,7 +50,7 @@ internal fun KaSession.createPushDownAction(
     else -> null
 }
 
-internal fun KaSession.findSuperTypeEntryForSymbol(
+internal fun KaSession.getSuperTypeEntryBySymbol(
     sourceClass: KtClassOrObject,
     symbol: KaClassSymbol,
 ): KtSuperTypeListEntry? = sourceClass.superTypeListEntries.firstOrNull {
@@ -64,7 +63,7 @@ private fun KaSession.createPushDownActionForCallableMember(
     memberInfo: KotlinMemberInfo,
     targetClass: KtClassOrObject,
     substitutor: KaSubstitutor,
-): Callable<KtNamedDeclaration>? {
+): PushDownAction? {
     val targetClassSymbol = targetClass.symbol as KaClassSymbol
     val member = memberInfo.member as KtCallableDeclaration
     val memberSymbol = member.symbol
@@ -82,7 +81,7 @@ private fun KaSession.createPushDownActionForCallableMember(
         memberSymbol.allOverriddenSymbols.none(),
     )
 
-    return Callable<KtNamedDeclaration> {
+    return PushDownAction {
         if (targetMember != null) {
             updateExistingCallableMember(
                 memberContext,
@@ -141,30 +140,25 @@ private fun KaSession.createPushDownActionForClassLikeMember(
     sourceClass: KtClassOrObject,
     targetClass: KtClassOrObject,
     substitutor: KaSubstitutor,
-): Callable<KtNamedDeclaration>? {
+): PushDownAction? {
     return if (memberInfo.overrides != null) {
-        val superTypeListEntry = findSuperTypeEntryForSymbol(
+        val superTypeListEntry = getSuperTypeEntryBySymbol(
             sourceClass,
             memberInfo.member.symbol as KaClassSymbol,
         ) ?: return null
 
-        val referencedType = superTypeListEntry.typeReference?.type!!
-        val referencedClass = referencedType.expandedSymbol ?: return null
+        val newSpecifier = createSuperTypeEntryForAddition(
+            superTypeListEntry,
+            targetClass,
+            substitutor,
+        ) ?: return null
 
-        val targetClassSymbol = targetClass.symbol as KaClassSymbol
-        if (targetClass.symbol == referencedClass || targetClassSymbol.isDirectSubClassOf(referencedClass)) return null
-
-        val typeInTargetClass = substitutor.substitute(referencedType)
-        if (typeInTargetClass is KaErrorType) return null
-
-        val renderedType = typeInTargetClass.render(position = Variance.INVARIANT)
-        val newSpecifier = KtPsiFactory(targetClass.project).createSuperTypeEntry(renderedType)
-        Callable<KtNamedDeclaration> {
-            targetClass.addSuperTypeListEntry(newSpecifier)
+        PushDownAction {
+            shortenReferences(targetClass.addSuperTypeListEntry(newSpecifier))
             null
         }
     } else {
-        Callable<KtNamedDeclaration> {
+        PushDownAction {
             addMemberToTarget(memberInfo.member, targetClass)
         }
     }

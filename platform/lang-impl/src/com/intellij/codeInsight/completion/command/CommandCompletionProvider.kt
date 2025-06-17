@@ -4,11 +4,11 @@ package com.intellij.codeInsight.completion.command
 import com.intellij.codeInsight.completion.*
 import com.intellij.codeInsight.completion.command.configuration.ApplicationCommandCompletionService
 import com.intellij.codeInsight.completion.impl.CamelHumpMatcher
-import com.intellij.codeInsight.completion.impl.TopPriorityLookupElement
 import com.intellij.codeInsight.completion.ml.MLWeigherUtil
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.lookup.LookupElementWeigher
+import com.intellij.icons.AllIcons.Actions.IntentionBulbGrey
 import com.intellij.icons.AllIcons.Actions.Lightning
 import com.intellij.injected.editor.DocumentWindow
 import com.intellij.injected.editor.EditorWindow
@@ -58,6 +58,7 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
     if (!ApplicationCommandCompletionService.getInstance().commandCompletionEnabled()) return
     if (parameters.completionType != CompletionType.BASIC) return
     if (parameters.position is PsiComment) return
+    if (parameters.editor.caretModel.caretCount != 1) return
     //not support injected fragment, it is not so obvious how to do it
     //it can work with errors
     if (parameters.editor is EditorWindow) return
@@ -128,9 +129,6 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
         }
       }))
 
-    val forcePrioritize = commandCompletionType is InvocationCommandType.FullSuffix &&
-                          commandCompletionFactory.forcePrioritize(parameters)
-
     // Fetch commands applicable to the position
     processCommandsForContext(commandCompletionFactory,
                               originalFile.project,
@@ -144,9 +142,6 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
       commands.forEach { command ->
         CommandCompletionCollector.shown(command::class.java, originalFile.language, commandCompletionType::class.java)
         val lookupElement = createLookupElement(command, adjustedParameters, commandCompletionFactory, prefix)
-        if (forcePrioritize) {
-          TopPriorityLookupElement.prioritizeToTopAndSelect(lookupElement)
-        }
         val customPrefixMatcher = command.customPrefixMatcher(prefix)
         if (customPrefixMatcher != null) {
           val alwaysShowMatcher = resultSet.withPrefixMatcher(customPrefixMatcher)
@@ -167,13 +162,13 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
     commandCompletionFactory: CommandCompletionFactory,
     prefix: String,
   ): LookupElement {
-    val i18nName = command.i18nName.replace("_", "").replace("...", "").replace("…", "")
+    val presentableName = command.presentableName.replace("_", "").replace("...", "").replace("…", "")
     val additionalInfo = command.additionalInfo ?: ""
-    var tailText = if (command.name.equals(i18nName, ignoreCase = true)) "" else " $i18nName"
+    var tailText = ""
     if (additionalInfo.isNotEmpty()) {
       tailText += " ($additionalInfo)"
     }
-    val lookupString = command.name.trim().let {
+    val lookupString = presentableName.trim().let {
       if (it.length > 50) {
         it.substring(0, 50) + "\u2026"
       }
@@ -182,12 +177,11 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
       }
     }
     val element: LookupElement = CommandCompletionLookupElement(LookupElementBuilder.create(lookupString)
-                                                                  .withLookupString(i18nName.trim())
                                                                   .withLookupString(lookupString)
                                                                   .withLookupStrings(command.synonyms)
                                                                   .withPresentableText(lookupString)
                                                                   .withTypeText(tailText)
-                                                                  .withIcon(command.icon ?: Lightning)
+                                                                  .withIcon(command.icon ?: IntentionBulbGrey)
                                                                   .withInsertHandler(CommandInsertHandler(command))
                                                                   .withBoldness(false),
                                                                 command,
@@ -204,7 +198,7 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
   private fun createSorter(completionParameters: CompletionParameters): CompletionSorter {
     var weigher = CompletionService.getCompletionService().emptySorter()
       .weigh(object : LookupElementWeigher("priority", true, false) {
-        override fun weigh(element: LookupElement): Comparable<*>? {
+        override fun weigh(element: LookupElement): Comparable<*> {
           if (element.`as`(CommandCompletionLookupElement::class.java) == null) return 0.0
           return element.`as`(PrioritizedLookupElement::class.java)?.priority ?: 0.0
         }
@@ -236,8 +230,9 @@ internal class CommandCompletionProvider : CompletionProvider<CompletionParamete
     for (provider in commandCompletionFactory.commandProviders(project, element.language)) {
       try {
         if (isReadOnly && !provider.supportsReadOnly()) continue
-        val commands = provider.getCommands(
-          CommandCompletionProviderContext(project, copyEditor, offset, copyFile, originalEditor, originalOffset, originalFile, isReadOnly))
+        copyEditor.caretModel.moveToOffset(offset)
+        val context = CommandCompletionProviderContext(project, copyEditor, offset, copyFile, originalEditor, originalOffset, originalFile, isReadOnly)
+        val commands = provider.getCommands(context)
         processor.process(commands)
       }
       catch (e: Exception) {
@@ -365,7 +360,7 @@ internal sealed interface InvocationCommandType {
 internal fun findActualIndex(suffix: String, text: CharSequence, offset: Int): Int {
   var indexOf = suffix.length
   if (offset > text.length || offset == 0) return 0
-  while (indexOf > 0 && offset - indexOf >= 0 && text.substring(offset - indexOf, offset) != suffix.substring(0, indexOf)) {
+  while (indexOf > 0 && offset - indexOf >= 0 && text.substring(offset - indexOf, offset) != suffix.take(indexOf)) {
     indexOf--
   }
   //try to find outside

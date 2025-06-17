@@ -3,8 +3,8 @@ package com.intellij.openapi.application.impl
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.readAndWriteAction
-import com.intellij.openapi.application.useNestedLocking
+import com.intellij.openapi.application.readAndEdtWriteAction
+import com.intellij.openapi.application.readAndBackgroundWriteAction
 import com.intellij.openapi.progress.*
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
@@ -23,7 +23,7 @@ class SuspendingReadAndWriteActionTest {
 
   @RepeatedTest(REPETITIONS)
   fun `read result`(): Unit = timeoutRunBlocking {
-    val result = readAndWriteAction {
+    val result = readAndEdtWriteAction {
       value(42)
     }
     Assertions.assertEquals(42, result)
@@ -31,7 +31,7 @@ class SuspendingReadAndWriteActionTest {
 
   @RepeatedTest(REPETITIONS)
   fun `write after read result`(): Unit = timeoutRunBlocking {
-    val result = readAndWriteAction {
+    val result = readAndEdtWriteAction {
       writeAction {
         42
       }
@@ -41,7 +41,7 @@ class SuspendingReadAndWriteActionTest {
 
   @RepeatedTest(REPETITIONS)
   fun `random result`(): Unit = timeoutRunBlocking {
-    val result = readAndWriteAction {
+    val result = readAndEdtWriteAction {
       if (Math.random() < 0.5) {
         value(42)
       } else {
@@ -71,10 +71,6 @@ class SuspendingReadAndWriteActionTest {
         Assertions.assertNotNull(Cancellation.currentJob())
         Assertions.assertNull(ProgressManager.getGlobalProgressIndicator())
         Assertions.assertFalse(application.isWriteAccessAllowed)
-        if (!useNestedLocking) {
-          // parallelization of a write lock is forbidden anyway
-          Assertions.assertTrue(application.isReadAccessAllowed)
-        }
       }
 
       fun assertReadButNoWriteActionWithCurrentJob() {
@@ -109,7 +105,7 @@ class SuspendingReadAndWriteActionTest {
 
       assertEmptyContext()
 
-      val result = readAndWriteAction {
+      val result = readAndEdtWriteAction {
         assertReadButNoWriteActionWithCurrentJob()
         runBlockingCancellable {
           assertReadButNoWriteActionWithoutCurrentJob() // TODO consider explicitly turning off RA inside runBlockingCancellable
@@ -142,7 +138,7 @@ class SuspendingReadAndWriteActionTest {
   fun `read cancellation`(): Unit = timeoutRunBlocking {
     launch {
       assertThrows<CancellationException> {
-        readAndWriteAction {
+        readAndEdtWriteAction {
           testNoExceptions()
           this@launch.coroutineContext.job.cancel()
           testExceptions()
@@ -155,7 +151,7 @@ class SuspendingReadAndWriteActionTest {
   fun `write cancellation`(): Unit = timeoutRunBlocking {
     launch {
       assertThrows<CancellationException> {
-        readAndWriteAction {
+        readAndEdtWriteAction {
           writeAction {
             testNoExceptions()
             this@launch.coroutineContext.job.cancel()
@@ -169,7 +165,7 @@ class SuspendingReadAndWriteActionTest {
   @RepeatedTest(REPETITIONS)
   fun `rethrow from read`(): Unit = timeoutRunBlocking {
     testRwRethrow {
-      readAndWriteAction {
+      readAndEdtWriteAction {
         it()
       }
     }
@@ -178,7 +174,7 @@ class SuspendingReadAndWriteActionTest {
   @RepeatedTest(REPETITIONS)
   fun `rethrow from write`(): Unit = timeoutRunBlocking {
     testRwRethrow {
-      readAndWriteAction {
+      readAndEdtWriteAction {
         writeAction {
           it()
         }
@@ -193,7 +189,7 @@ class SuspendingReadAndWriteActionTest {
       runBlockingCancellable {
         application.executeOnPooledThread {
           runBlockingMaybeCancellable {
-            readAndWriteAction {
+            readAndEdtWriteAction {
               writeAction {
                 job.complete()
                 Unit
@@ -204,5 +200,15 @@ class SuspendingReadAndWriteActionTest {
       }
     }
     job.join()
+  }
+
+  @Test
+  fun `readAndBackgroundWriteAction executes write actions on background`(): Unit = timeoutRunBlocking {
+    readAndBackgroundWriteAction {
+      writeAction {
+        Assertions.assertTrue(application.isWriteAccessAllowed)
+        Assertions.assertFalse(EDT.isCurrentThreadEdt())
+      }
+    }
   }
 }

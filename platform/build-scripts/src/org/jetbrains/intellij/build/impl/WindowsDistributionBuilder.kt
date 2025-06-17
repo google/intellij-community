@@ -2,7 +2,6 @@
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.openapi.util.SystemInfoRt
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.text.StringUtilRt
@@ -14,7 +13,6 @@ import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -24,9 +22,11 @@ import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.BuildOptions
 import org.jetbrains.intellij.build.FileSet
 import org.jetbrains.intellij.build.JvmArchitecture
+import org.jetbrains.intellij.build.LibcImpl
 import org.jetbrains.intellij.build.NativeBinaryDownloader
 import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.WindowsDistributionCustomizer
+import org.jetbrains.intellij.build.WindowsLibcImpl
 import org.jetbrains.intellij.build.executeStep
 import org.jetbrains.intellij.build.impl.OsSpecificDistributionBuilder.Companion.suffix
 import org.jetbrains.intellij.build.impl.client.createFrontendContextForLaunchers
@@ -71,6 +71,9 @@ internal class WindowsDistributionBuilder(
   override val targetOs: OsFamily
     get() = OsFamily.WINDOWS
 
+  override val targetLibcImpl: LibcImpl
+    get() = WindowsLibcImpl.DEFAULT
+
   companion object {
     private val CompareDistributionsSemaphore = Semaphore(Integer.getInteger("intellij.build.win.compare.concurrency", 1))
   }
@@ -87,7 +90,7 @@ internal class WindowsDistributionBuilder(
       copyFileToDir(NativeBinaryDownloader.getRestarter(context, OsFamily.WINDOWS, arch), distBinDir)
 
       generateBuildTxt(context, targetPath)
-      copyDistFiles(context, targetPath, OsFamily.WINDOWS, arch)
+      copyDistFiles(context, targetPath, OsFamily.WINDOWS, arch, WindowsLibcImpl.DEFAULT)
 
       Files.writeString(distBinDir.resolve(PROPERTIES_FILE_NAME), StringUtilRt.convertLineSeparators(ideaProperties!!, "\r\n"))
 
@@ -129,7 +132,7 @@ internal class WindowsDistributionBuilder(
 
   override suspend fun buildArtifacts(osAndArchSpecificDistPath: Path, arch: JvmArchitecture) {
     copyFilesForOsDistribution(osAndArchSpecificDistPath, arch)
-    val runtimeDir = context.bundledRuntime.extract(OsFamily.WINDOWS, arch)
+    val runtimeDir = context.bundledRuntime.extract(OsFamily.WINDOWS, arch, WindowsLibcImpl.DEFAULT)
 
     @Suppress("SpellCheckingInspection")
     val vcRtDll = runtimeDir.resolve("jbr/bin/msvcp140.dll")
@@ -140,7 +143,7 @@ internal class WindowsDistributionBuilder(
     }
     copyFileToDir(vcRtDll, osAndArchSpecificDistPath.resolve("bin"))
 
-    val (zipWithJbrPath, exePath) = coroutineScope {
+    val (zipWithJbrPath, exePath) = context.executeStep(spanBuilder("build Windows artefacts"), stepId = BuildOptions.WINDOWS_ARTIFACTS_STEP) {
       var zipWithJbrPath: Path? = null
       var exePath: Path? = null
 
@@ -166,12 +169,12 @@ internal class WindowsDistributionBuilder(
         val installationDirectories = listOf(context.paths.distAllDir, osAndArchSpecificDistPath, runtimeDir)
         validateProductJson(jsonText = productJsonFile.readText(), installationDirectories, installationArchives = emptyList(), context)
         launch(Dispatchers.IO + CoroutineName("build Windows ${arch.dirName} installer")) {
-          exePath = buildNsisInstaller(osAndArchSpecificDistPath, additionalDirectoryToInclude = productJsonDir, suffix(arch), customizer, runtimeDir, context)
+          exePath = buildNsisInstaller(osAndArchSpecificDistPath, additionalDirectoryToInclude = productJsonDir, suffix(arch), customizer, runtimeDir, context, arch)
         }
       }
 
       zipWithJbrPath to exePath
-    }
+    } ?: (null to null)
 
     if (zipWithJbrPath != null && exePath != null) {
       if (context.options.isInDevelopmentMode) {
@@ -390,11 +393,10 @@ internal class WindowsDistributionBuilder(
           .setAttribute("zipPath", zipPath.toString())
           .setAttribute("exePath", exePath.toString())
           .use {
-
             runProcess(args = listOf("7z", "x", "-bd", exePath.toString()), workingDir = tempExe)
             // deleting NSIS-related files that appear after manual unpacking of .exe installer and do not belong to its contents
             @Suppress("SpellCheckingInspection")
-            NioFiles.deleteRecursively(tempExe.resolve("\$PLUGINSDIR"))
+            NioFiles.deleteRecursively(tempExe.resolve($$"$PLUGINSDIR"))
             Files.deleteIfExists(tempExe.resolve("bin/Uninstall.exe.nsis"))
             Files.deleteIfExists(tempExe.resolve("bin/Uninstall.exe"))
 
@@ -421,7 +423,7 @@ internal class WindowsDistributionBuilder(
                     else if (!compareStreams(fileInExe.inputStream().buffered(FileUtilRt.MEGABYTE), zipFile.getInputStream(entry).buffered(FileUtilRt.MEGABYTE))) {
                       differ.add(entryPath.toString())
                     }
-                    FileUtil.delete(fileInExe)
+                    NioFiles.deleteRecursively(fileInExe)
                   }
                 }
             }

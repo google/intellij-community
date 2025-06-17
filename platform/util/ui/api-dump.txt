@@ -419,6 +419,7 @@ f:com.intellij.icons.AllIcons$FileTypes
 - sf:Hprof:javax.swing.Icon
 - sf:Htaccess:javax.swing.Icon
 - sf:Html:javax.swing.Icon
+- sf:Http:javax.swing.Icon
 - sf:I18n:javax.swing.Icon
 - sf:Idl:javax.swing.Icon
 - sf:Image:javax.swing.Icon
@@ -506,6 +507,7 @@ f:com.intellij.icons.AllIcons$General
 - sf:HideToolWindow:javax.swing.Icon
 - sf:History:javax.swing.Icon
 - sf:ImplementingMethod:javax.swing.Icon
+- sf:IndentDetected:javax.swing.Icon
 - sf:Information:javax.swing.Icon
 - sf:InformationDialog:javax.swing.Icon
 - sf:InheritedMethod:javax.swing.Icon
@@ -665,6 +667,7 @@ f:com.intellij.icons.AllIcons$Ide
 - sf:External_link_arrow:javax.swing.Icon
 - sf:FatalError:javax.swing.Icon
 - sf:FatalErrorRead:javax.swing.Icon
+- sf:Feedback:javax.swing.Icon
 - sf:FeedbackRating:javax.swing.Icon
 - sf:FeedbackRatingFocused:javax.swing.Icon
 - sf:FeedbackRatingFocusedOn:javax.swing.Icon
@@ -1081,9 +1084,6 @@ f:com.intellij.icons.AllIcons$Profiler
 - sf:ExpandNode:javax.swing.Icon
 - sf:Rec:javax.swing.Icon
 - <init>():V
-f:com.intellij.icons.AllIcons$Promo
-- sf:JavaDuke:javax.swing.Icon
-- <init>():V
 f:com.intellij.icons.AllIcons$Providers
 - sf:ActiveMQ:javax.swing.Icon
 - sf:Apache:javax.swing.Icon
@@ -1384,6 +1384,7 @@ f:com.intellij.icons.AllIcons$Welcome$LearnTab
 - sf:JetBrainsAcademy:javax.swing.Icon
 - <init>():V
 f:com.intellij.icons.AllIcons$Welcome$RecentProjects
+- sf:RemoteProject:javax.swing.Icon
 - sf:Remove:javax.swing.Icon
 - sf:RemoveDisabled:javax.swing.Icon
 - sf:RemoveDisabledHover:javax.swing.Icon
@@ -1583,7 +1584,7 @@ f:com.intellij.openapi.util.IconLoader
 - f:clearCacheInTests():V
 - sf:createLazy(java.util.function.Supplier):javax.swing.Icon
 - sf:deactivate():V
-- f:detachClassLoader(java.lang.ClassLoader):V
+- sf:detachClassLoader(java.lang.ClassLoader):V
 - sf:findIcon(java.lang.String):javax.swing.Icon
 - sf:findIcon(java.lang.String,java.lang.Class):javax.swing.Icon
 - sf:findIcon(java.lang.String,java.lang.Class,Z,Z):javax.swing.Icon
@@ -1667,7 +1668,8 @@ com.intellij.ui.AnchorableComponent
 - a:getAnchor():javax.swing.JComponent
 - a:setAnchor(javax.swing.JComponent):V
 com.intellij.ui.BackgroundSupplier
-- a:getElementBackground(I):java.awt.Color
+- getElementBackground(I):java.awt.Color
+- getSelectedElementBackground(I):java.awt.Color
 c:com.intellij.ui.BooleanTableCellEditor
 - javax.swing.DefaultCellEditor
 - <init>():V
@@ -2590,12 +2592,8 @@ com.intellij.ui.LightColors
 - sf:SLIGHTLY_GREEN:java.awt.Color
 - sf:YELLOW:java.awt.Color
 f:com.intellij.ui.MixedColorProducer
-- java.util.function.Supplier
 - <init>(java.awt.Color,java.awt.Color):V
-- <init>(java.awt.Color,java.awt.Color,D):V
-- get():java.awt.Color
 - produce(D):java.awt.Color
-- setMixer(D):V
 f:com.intellij.ui.MouseMovementTracker
 - <init>():V
 - isMovingTowards(java.awt.event.MouseEvent,java.awt.Rectangle):Z
@@ -2741,6 +2739,7 @@ c:com.intellij.ui.SortedListModel
 - remove(java.lang.Object):V
 - setAll(java.util.Collection):V
 - setAll(java.lang.Object[]):V
+- update(java.lang.Object):V
 f:com.intellij.ui.TableUtil
 - s:doRemoveSelectedItems(javax.swing.JTable,com.intellij.util.ui.ItemRemovable,com.intellij.ui.TableUtil$ItemChecker):Z
 - s:editCellAt(javax.swing.JTable,I,I):V
@@ -4612,6 +4611,8 @@ com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Breadcrumbs
 - s:itemInsets():com.intellij.util.ui.JBInsets
 - s:navBarInsets():java.awt.Insets
 - s:navBarInsetsKey():java.lang.String
+com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Progresses
+- sf:COUNTER:java.awt.Color
 com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Widget
 - sf:FOREGROUND:java.awt.Color
 - sf:HOVER_BACKGROUND:java.awt.Color
@@ -5297,7 +5298,6 @@ f:com.intellij.util.ui.UIUtil
 - s:getListViewportPadding():java.awt.Insets
 - s:getListViewportPadding(Z):java.awt.Insets
 - s:getLocationOnScreen(javax.swing.JComponent):java.awt.Point
-- s:getMenuFont():java.awt.Font
 - s:getMenuItemDisabledForeground():java.awt.Color
 - s:getMenuItemDisabledForegroundObject():java.lang.Object
 - s:getMultiClickInterval():I

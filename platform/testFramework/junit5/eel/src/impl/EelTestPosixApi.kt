@@ -15,6 +15,8 @@ import java.nio.file.Path
 internal class EelTestPosixApi(override val descriptor: EelTestDescriptor, fileSystem: EelUnitTestFileSystem, localPrefix: String) : EelPosixApi {
   override val userInfo: EelUserPosixInfo = EelTestPosixUserInfo(descriptor)
 
+  override val platform: EelPlatform.Posix = EelPlatform.Linux(CpuArch.CURRENT.toEelArch())
+
   override val fs: PosixNioBasedEelFileSystemApi = EelTestFileSystemPosixApi(descriptor, fileSystem)
 
   override val archive: EelArchiveApi
@@ -27,6 +29,7 @@ internal class EelTestPosixApi(override val descriptor: EelTestDescriptor, fileS
       override suspend fun spawnProcess(generatedBuilder: EelExecApi.ExecuteProcessOptions) = TODO()
       override suspend fun fetchLoginShellEnvVariables(): Map<String, String> = emptyMap()
       override suspend fun findExeFilesInPath(binaryName: String) = TODO()
+      override suspend fun createExternalCli(options: EelExecApi.ExternalCliOptions): EelExecApi.ExternalCliEntrypoint = TODO()
     }
 
 }

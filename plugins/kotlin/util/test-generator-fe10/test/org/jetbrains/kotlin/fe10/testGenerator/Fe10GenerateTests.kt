@@ -28,7 +28,7 @@ import org.jetbrains.kotlin.idea.codeInsight.generate.AbstractCodeInsightActionT
 import org.jetbrains.kotlin.idea.codeInsight.generate.AbstractGenerateHashCodeAndEqualsActionTest
 import org.jetbrains.kotlin.idea.codeInsight.generate.AbstractGenerateTestSupportMethodActionTest
 import org.jetbrains.kotlin.idea.codeInsight.generate.AbstractGenerateToStringActionTest
-import org.jetbrains.kotlin.idea.codeInsight.gradle.AbstractGradleBuildFileHighlightingTest
+import org.jetbrains.kotlin.idea.codeInsight.gradle.AbstractK1GradleBuildFileHighlightingTest
 import org.jetbrains.kotlin.idea.codeInsight.hints.*
 import org.jetbrains.kotlin.idea.codeInsight.inspections.shared.AbstractSharedK1InspectionTest
 import org.jetbrains.kotlin.idea.codeInsight.inspections.shared.AbstractSharedK1LocalInspectionTest
@@ -171,7 +171,7 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
     val excludedFirPrecondition = fun(name: String) = !name.endsWith(".fir.kt") && !name.endsWith(".fir.kts")
 
     testGroup("gradle/gradle-java/k1", category = GRADLE, testDataPath = "../../../idea/tests/testData") {
-        testClass<AbstractGradleBuildFileHighlightingTest> {
+        testClass<AbstractK1GradleBuildFileHighlightingTest> {
             model(
                 "gradle/highlighting/gradle8",
                 pattern = DIRECTORY,
@@ -607,7 +607,11 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
     testGroup("idea/tests", category = INSPECTIONS) {
         testClass<AbstractInspectionTest> {
             model("intentions", pattern = Patterns.forRegex("^(inspections\\.test)$"), flatten = true)
-            model("inspections", pattern = Patterns.forRegex("^(inspections\\.test)$"), flatten = true)
+            model("inspections", pattern = Patterns.forRegex("^(inspections\\.test)$"), flatten = true,
+                  excludedDirectories = listOf(
+                      "canConvertToMultiDollarString", // K2-only
+                  )
+            )
             model("inspectionsLocal", pattern = Patterns.forRegex("^(inspections\\.test)$"), flatten = true)
         }
 
@@ -1096,7 +1100,9 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
         }
 
         testClass<AbstractKotlinLambdasHintsProvider> {
-            model("codeInsight/hints/lambda")
+            model("codeInsight/hints/lambda", excludedDirectories = listOf(
+                "context", // K2
+            ))
         }
         testClass<AbstractKotlinValuesHintsProviderTest> {
             model("codeInsight/hints/values")
@@ -1125,7 +1131,8 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
         }
 
         testClass<AbstractMultiplatformAnalysisTest> {
-            model("multiplatform", isRecursive = false, pattern = DIRECTORY)
+            model("multiplatform", isRecursive = false, pattern = DIRECTORY, excludedDirectories = listOf("ambiguousActuals"))
+            model("multiplatform/ambiguousActuals", isRecursive = false, pattern = DIRECTORY)
         }
 
         testClass<AbstractBytecodeToolWindowTest> {
@@ -1353,7 +1360,7 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K1) {
         }
 
         testClass<AbstractJvmSmartCompletionTest> {
-            model("smart")
+            model("smart", pattern = KT_WITHOUT_FIR_PREFIX)
         }
 
         testClass<AbstractDumbCompletionTest> {

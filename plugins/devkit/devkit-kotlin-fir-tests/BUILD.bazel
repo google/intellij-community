@@ -8,7 +8,12 @@ jvm_library(
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
+    "//platform/analysis-api:analysis",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/indexing-api:indexing",
+    "//platform/projectModel-api:projectModel",
+    "//xml/xml-psi-api:psi",
     "//plugins/kotlin/code-insight/kotlin.code-insight.k2:kotlin-code-insight-k2",
     "//plugins/kotlin/code-insight/kotlin.code-insight.k2:kotlin-code-insight-k2_test_lib",
     "//plugins/devkit",
@@ -27,6 +32,8 @@ jvm_library(
     "//plugins/kotlin/fir/tests:tests_test_lib",
     "@lib//:jetbrains-annotations",
     "//plugins/devkit/devkit-kotlin-tests:kotlin-tests_test_lib",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
   ],
   runtime_deps = [
     "//plugins/kotlin:kotlin-plugin-community-main",

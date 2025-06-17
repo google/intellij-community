@@ -189,11 +189,9 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - <init>():V
 - f:execute(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):V
 - a:findTargetToRefactor(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
-- f:getI18nName():java.lang.String
-- f:getIcon():javax.swing.Icon
-- f:getName():java.lang.String
+- f:getPresentableName():java.lang.String
 - getPreview():com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
-- getSynonyms():java.util.List
+- f:getSynonyms():java.util.List
 *a:com.intellij.codeInsight.completion.command.commands.AbstractFormatCodeCompletionCommandProvider
 - com.intellij.codeInsight.completion.command.CommandProvider
 - <init>():V
@@ -214,9 +212,7 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - f:getAction():com.intellij.codeInsight.actions.CodeInsightAction
 - f:getCustomI18nName():java.lang.String
 - f:getCustomName():java.lang.String
-- getI18nName():java.lang.String
-- getIcon():javax.swing.Icon
-- getName():java.lang.String
+- getPresentableName():java.lang.String
 - f:setCustomI18nName(java.lang.String):V
 - f:setCustomName(java.lang.String):V
 *a:com.intellij.codeInsight.completion.command.commands.AbstractGoToDeclarationCompletionCommandProvider
@@ -252,6 +248,12 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
 - a:findMoveClassOffset(I,com.intellij.psi.PsiFile):java.lang.Integer
 - p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
+*a:com.intellij.codeInsight.completion.command.commands.AbstractRenameActionCommandProvider
+- com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
+- <init>():V
+- p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
+- a:findRenameOffset(I,com.intellij.psi.PsiFile):java.lang.Integer
+- p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
 *a:com.intellij.codeInsight.completion.command.commands.AbstractShowUsagesActionCompletionCommandProvider
 - com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - <init>():V
@@ -262,15 +264,14 @@ c:com.intellij.codeInsight.actions.VcsFacade
 *c:com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - com.intellij.codeInsight.completion.command.CommandProvider
 - com.intellij.openapi.project.DumbAware
-- <init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List):V
-- b:<init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List):V
+- b:<init>(java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
 - pf:createCommandWithNameIdentifier(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
 - f:getActionId():java.lang.String
 - getCommands(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):java.util.List
-- f:getI18nName():java.lang.String
 - f:getIcon():javax.swing.Icon
-- f:getName():java.lang.String
+- f:getPresentableName():java.lang.String
 - f:getPreviewText():java.lang.String
 - f:getPriority():java.lang.Integer
 - f:getSynonyms():java.util.List
@@ -281,15 +282,14 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - com.intellij.codeInsight.completion.command.CompletionCommand
 - com.intellij.codeInsight.completion.command.CompletionCommandWithPreview
 - com.intellij.openapi.project.DumbAware
-- <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List):V
-- b:<init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List):V
+- b:<init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - execute(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):V
 - f:getActionId():java.lang.String
 - getAdditionalInfo():java.lang.String
 - getHighlightInfo():com.intellij.codeInsight.completion.command.HighlightInfoLookup
-- getI18nName():java.lang.String
 - getIcon():javax.swing.Icon
-- getName():java.lang.String
+- getPresentableName():java.lang.String
 - getPreview():com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 - getPriority():java.lang.Integer
 - getSynonyms():java.util.List
@@ -409,6 +409,7 @@ f:com.intellij.codeInsight.highlighting.HighlightUsagesHandler
 - f:effectsIn(com.intellij.openapi.editor.markup.TextAttributes):com.intellij.openapi.editor.markup.TextAttributes
 *f:com.intellij.codeInsight.hints.MethodInfoExcludeListFilter
 - com.intellij.codeInsight.hints.HintInfoFilter
+- <init>(java.util.List):V
 - <init>(java.util.Set):V
 - s:forLanguage(com.intellij.lang.Language):com.intellij.codeInsight.hints.MethodInfoExcludeListFilter
 - showHint(com.intellij.codeInsight.hints.HintInfo):Z
@@ -466,6 +467,8 @@ f:com.intellij.codeInsight.highlighting.HighlightUsagesHandler
 - mouseClicked(java.awt.event.MouseEvent,java.awt.Point):V
 - mouseExited():V
 - mouseMoved(java.awt.event.MouseEvent,java.awt.Point):V
+*:com.intellij.codeInsight.intention.EventTrackingIntentionAction
+- a:suggestionShown(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):V
 *e:com.intellij.codeInsight.intention.IntentionSource
 - java.lang.Enum
 - sf:CONTEXT_ACTIONS:com.intellij.codeInsight.intention.IntentionSource
@@ -604,9 +607,14 @@ c:com.intellij.find.actions.FindUsagesAction
 - a:isVisible(com.intellij.openapi.actionSystem.DataContext,java.lang.String):com.intellij.util.ThreeState
 *:com.intellij.ide.actions.NewFileActionWithCategory
 - a:getCategory():java.lang.String
+a:com.intellij.ide.actions.searcheverywhere.AbstractEqualityProvider
+- com.intellij.ide.actions.searcheverywhere.SEResultsEqualityProvider
+- *f:compareItemsCollection(com.intellij.ide.actions.searcheverywhere.SearchEverywhereFoundElementInfo,java.util.Collection):com.intellij.ide.actions.searcheverywhere.SEResultsEqualityProvider$SEEqualElementsActionType
 *:com.intellij.ide.actions.searcheverywhere.PromoAction
 - a:getCallToAction():java.lang.String
 - a:getPromotedProductIcon():javax.swing.Icon
+com.intellij.ide.actions.searcheverywhere.SEResultsEqualityProvider
+- *:compareItemsCollection(com.intellij.ide.actions.searcheverywhere.SearchEverywhereFoundElementInfo,java.util.Collection):com.intellij.ide.actions.searcheverywhere.SEResultsEqualityProvider$SEEqualElementsActionType
 com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager
 - *a:getCurrentlyShownPopupInstance():com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
 *:com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
@@ -787,6 +795,15 @@ f:com.intellij.platform.ide.documentation.ActionsKt
 *:com.intellij.platform.ide.documentation.DocumentationBrowserFacade
 - a:getTargetPointer():com.intellij.model.Pointer
 - a:reload():V
+*f:com.intellij.psi.codeStyle.DetectableIndentSettingsModifier
+- com.intellij.psi.codeStyle.modifier.CodeStyleSettingsModifier
+- <init>():V
+- getDisablingFunction(com.intellij.openapi.project.Project):java.util.function.Consumer
+- getName():java.lang.String
+- getStatusBarUiContributor(com.intellij.psi.codeStyle.modifier.TransientCodeStyleSettings):com.intellij.psi.codeStyle.modifier.CodeStyleStatusBarUIContributor
+- mayOverrideSettingsOf(com.intellij.openapi.project.Project):Z
+- modifySettings(com.intellij.psi.codeStyle.modifier.TransientCodeStyleSettings,com.intellij.psi.PsiFile):Z
+- modifySettingsAndUiCustomization(com.intellij.psi.codeStyle.modifier.TransientCodeStyleSettings,com.intellij.psi.PsiFile):Z
 *f:com.intellij.psi.impl.source.resolve.reference.PsiReferenceUtil
 - s:findReferenceOfClass(com.intellij.psi.PsiReference,java.lang.Class):com.intellij.psi.PsiReference
 - s:unwrapMultiReference(com.intellij.psi.PsiReference):java.util.List

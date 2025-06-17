@@ -11,6 +11,7 @@ import com.intellij.searchEverywhereMl.SearchEverywhereTab
 import com.intellij.searchEverywhereMl.isEssentialContributorPredictionExperiment
 import com.intellij.searchEverywhereMl.ranking.core.model.CatBoostModelFactory
 import com.intellij.searchEverywhereMl.ranking.core.model.SearchEverywhereCatBoostBinaryClassifierModel
+import java.util.WeakHashMap
 
 
 /**
@@ -27,6 +28,8 @@ internal class SearchEverywhereEssentialContributorMlMarker : SearchEverywhereEs
     .withModelDirectory(MODEL_DIR)
     .withResourceDirectory(RESOURCE_DIR)
     .buildBinaryClassifier(TRUE_THRESHOLD)
+
+  private val contributorPredictionCache = WeakHashMap<SearchEverywhereContributor<*>, Float>()
 
   override fun isAvailable(): Boolean {
     return isActiveExperiment() && isSearchStateActive()
@@ -50,9 +53,19 @@ internal class SearchEverywhereEssentialContributorMlMarker : SearchEverywhereEs
     }
   }
 
-  override fun isContributorEssential(contributor: SearchEverywhereContributor<*>): Boolean? {
+  private fun computeProbability(contributor: SearchEverywhereContributor<*>): Float {
     val features = getFeatures(contributor).associate { it.field.name to it.data }
-    return model.predictTrue(features)
+    return model.predict(features).toFloat()
+  }
+
+  override fun isContributorEssential(contributor: SearchEverywhereContributor<*>): Boolean? {
+    return computeProbability(contributor) >= TRUE_THRESHOLD
+  }
+
+  internal fun getContributorEssentialPrediction(contributor: SearchEverywhereContributor<*>): Float? {
+    return contributorPredictionCache.getOrPut(contributor) {
+      computeProbability(contributor)
+    }
   }
 
   private fun getFeatures(contributor: SearchEverywhereContributor<*>): List<EventPair<*>> {

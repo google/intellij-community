@@ -12,6 +12,7 @@
   modules:
   - name: intellij.evaluationPlugin
   - name: intellij.tools.ide.metrics.collector
+  - name: intellij.tools.ide.util.common
   - name: intellij.evaluationPlugin.languages
     reason: <- intellij.evaluationPlugin
   - name: intellij.evaluationPlugin.core
@@ -32,6 +33,7 @@
   - name: intellij.evaluationPlugin.languages.rust
   - name: intellij.evaluationPlugin.languages.sql
   - name: intellij.evaluationPlugin.languages.terraform
+  - name: intellij.evaluationPlugin.languages.xml
   - name: intellij.evaluationPlugin.languages.yaml
   - name: intellij.evaluationPlugin.inlineCompletion
   - name: intellij.evaluationPlugin.fullLine
@@ -57,11 +59,6 @@
   - name: $MAVEN_REPOSITORY$/com/fasterxml/woodstox/woodstox-core/5/woodstox-core-5.jar
   - name: $MAVEN_REPOSITORY$/org/apache/hadoop/hadoop-mapreduce-client-core/3/hadoop-mapreduce-client-core-3.jar
   reason: <- intellij.evaluationPlugin.llm
-- name: lib/ktor-client-logging.jar
-  library: ktor-client-logging
-  files:
-  - name: $MAVEN_REPOSITORY$/io/ktor/ktor-client-logging-jvm/3/ktor-client-logging-jvm-3.jar
-  reason: <- intellij.evaluationPlugin
 - name: lib/xerial.snappy.java.jar
   library: xerial.snappy.java
   files:

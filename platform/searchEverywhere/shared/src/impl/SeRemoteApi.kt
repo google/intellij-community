@@ -31,7 +31,8 @@ interface SeRemoteApi : RemoteApi<Unit> {
   suspend fun getItems(
     projectId: ProjectId,
     sessionRef: DurableRef<SeSessionEntity>,
-    providerId: SeProviderId,
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
     params: SeParams,
     dataContextId: DataContextId?,
     requestedCountChannel: ReceiveChannel<Int>,
@@ -43,6 +44,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
     itemData: SeItemData,
     modifiers: Int,
     searchText: String,
+    isAllTab: Boolean,
   ): Boolean
 
   /**
@@ -51,23 +53,32 @@ interface SeRemoteApi : RemoteApi<Unit> {
   suspend fun canBeShownInFindResults(projectId: ProjectId,
                                       sessionRef: DurableRef<SeSessionEntity>,
                                       dataContextId: DataContextId,
-                                      providerId: SeProviderId): Boolean
+                                      providerIds: List<SeProviderId>,
+                                      isAllTab: Boolean): Boolean
+
+  suspend fun isShownInSeparateTab(projectId: ProjectId,
+                                   sessionRef: DurableRef<SeSessionEntity>,
+                                   dataContextId: DataContextId,
+                                   providerId: SeProviderId): Boolean
 
   suspend fun getAvailableProviderIds(): List<SeProviderId>
 
-  suspend fun getSearchScopesInfoForProvider(
+  suspend fun getSearchScopesInfoForProviders(
     projectId: ProjectId,
     sessionRef: DurableRef<SeSessionEntity>,
     dataContextId: DataContextId,
-    providerId: SeProviderId,
-  ): SeSearchScopesInfo?
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): Map<SeProviderId, SeSearchScopesInfo>
 
-  suspend fun getTypeVisibilityStatesForProvider(
+  suspend fun getTypeVisibilityStatesForProviders(
+    index: Int,
     projectId: ProjectId,
     sessionRef: DurableRef<SeSessionEntity>,
     dataContextId: DataContextId,
-    providerId: SeProviderId,
-  ): List<SeTypeVisibilityStatePresentation>?
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): List<SeTypeVisibilityStatePresentation>
 
   suspend fun getDisplayNameForProviders(
     projectId: ProjectId,

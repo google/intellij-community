@@ -13,12 +13,15 @@ import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.util.progress.withProgressText
+import com.intellij.python.community.execService.python.validatePythonAndGetVersion
 import com.intellij.python.community.impl.venv.createVenv
+import com.intellij.python.community.services.systemPython.SystemPython
 import com.intellij.python.community.services.systemPython.SystemPythonService
+import com.intellij.python.community.services.systemPython.createVenvFromSystemPython
 import com.jetbrains.python.*
 import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.errorProcessing.PyResult
-import com.jetbrains.python.errorProcessing.failure
+import com.jetbrains.python.errorProcessing.getOr
 import com.jetbrains.python.sdk.configurePythonSdk
 import com.jetbrains.python.sdk.createSdk
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
@@ -66,7 +69,7 @@ suspend fun createVenvAndSdk(
     val systemPythonBinary = getSystemPython(confirmInstallation = confirmInstallation, systemPythonService).getOr { return it }
     logger.info("no venv in $venvDirPath, using system python $systemPythonBinary to create venv")
     // create venv using this system python
-    venvPython = createVenv(systemPythonBinary, venvDir = venvDirPath).getOr {
+    venvPython = createVenvFromSystemPython(systemPythonBinary, venvDir = venvDirPath).getOr(PyBundle.message("action.AnActionButton.text.show.early.releases")) {
       return it
     }
   }
@@ -115,7 +118,7 @@ private suspend fun findExistingVenv(
 private suspend fun getSystemPython(
   confirmInstallation: suspend () -> Boolean,
   pythonService: SystemPythonService,
-): Result<PythonBinary, MessageError> {
+): Result<SystemPython, MessageError> {
 
 
   // First, find the latest python according to strategy
@@ -125,15 +128,14 @@ private suspend fun getSystemPython(
   if (systemPythonBinary == null) {
     // Install it
     val installer = pythonService.getInstaller()
-                    ?: return failure(PyBundle.message("project.error.install.not.supported"))
+                    ?: return PyResult.localizedError(PyBundle.message("project.error.install.not.supported"))
     if (confirmInstallation()) {
       // Install
       when (val r = installer.installLatestPython()) {
         is Result.Failure -> {
           val error = r.error
           logger.warn("Python installation failed $error")
-          return failure(
-            PyBundle.message("project.error.install.python", error))
+          return PyResult.localizedError(PyBundle.message("project.error.install.python", error))
         }
         is Result.Success -> {
           // Find the latest python again, after installation
@@ -144,10 +146,10 @@ private suspend fun getSystemPython(
   }
 
   return if (systemPythonBinary == null) {
-    return failure(PyBundle.message("project.error.all.pythons.bad"))
+    return PyResult.localizedError(PyBundle.message("project.error.all.pythons.bad"))
   }
   else {
-    Result.Success(systemPythonBinary.pythonBinary)
+    Result.Success(systemPythonBinary)
   }
 }
 

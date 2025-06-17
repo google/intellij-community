@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
 import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
@@ -33,6 +34,7 @@ import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionOptions
 import org.jetbrains.kotlin.idea.completion.lookups.ImportStrategy
 import org.jetbrains.kotlin.idea.completion.lookups.factories.ClassifierLookupObject
 import org.jetbrains.kotlin.idea.completion.lookups.factories.FunctionCallLookupObject
+import org.jetbrains.kotlin.idea.completion.lookups.factories.FunctionLookupElementFactory
 import org.jetbrains.kotlin.idea.completion.lookups.factories.KotlinFirLookupElementFactory
 import org.jetbrains.kotlin.idea.completion.weighers.CallableWeigher.callableWeight
 import org.jetbrains.kotlin.idea.completion.weighers.Weighers.applyWeighs
@@ -46,19 +48,21 @@ import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
 internal abstract class FirCompletionContributorBase<C : KotlinRawPositionContext>(
-    protected val parameters: KotlinFirCompletionParameters,
     sink: LookupElementSink,
     priority: Int,
 ) : FirCompletionContributor<C> {
+
+    protected val sink: LookupElementSink = sink
+        .withPriority(priority)
+        .withContributorClass(this@FirCompletionContributorBase.javaClass)
+
+    protected val parameters: KotlinFirCompletionParameters
+        get() = sink.parameters
 
     protected open val prefixMatcher: PrefixMatcher
         get() = sink.prefixMatcher
 
     protected val visibilityChecker = CompletionVisibilityChecker(parameters)
-
-    protected val sink: LookupElementSink = sink
-        .withPriority(priority)
-        .withContributorClass(this@FirCompletionContributorBase.javaClass)
 
     protected val originalKtFile: KtFile // todo inline
         get() = parameters.originalFile
@@ -74,23 +78,45 @@ internal abstract class FirCompletionContributorBase<C : KotlinRawPositionContex
         { name -> !name.isSpecial && prefixMatcher.prefixMatches(name.identifier) }
 
     // Prefix matcher that only matches if the completion item starts with the prefix.
-    private val startOnlyMatcher by lazy {  BetterPrefixMatcher(prefixMatcher, Int.MIN_VALUE) }
+    private val startOnlyMatcher by lazy { BetterPrefixMatcher(prefixMatcher, Int.MIN_VALUE) }
     private val startOnlyNameFilter: (Name) -> Boolean =
         { name -> !name.isSpecial && startOnlyMatcher.prefixMatches(name.identifier) }
 
     /**
      * Returns the name filter that should be used for index lookups.
-     * If the prefix is less than 3 characters, we do not use the regular [scopeNameFilter] as it will
+     * If the prefix is less than 4 characters, we do not use the regular [scopeNameFilter] as it will
      * match occurrences anywhere in the name, which might yield too many results.
      * For other cases (unless the user invokes completion multiple times), this function will return
      * the [startOnlyNameFilter] that requires a match at the start of the lookup item's lookup strings.
      */
     internal fun getIndexNameFilter(): (Name) -> Boolean {
-        return if (parameters.invocationCount >= 2 || sink.prefixMatcher.prefix.length > 2) {
+        return if (parameters.invocationCount >= 2 || sink.prefixMatcher.prefix.length > 3) {
             scopeNameFilter
         } else {
             startOnlyNameFilter
         }
+    }
+
+    context(KaSession)
+    protected fun createOperatorLookupElement(
+        context: WeighingContext,
+        signature: KaFunctionSignature<*>,
+        options: CallableInsertionOptions,
+        namedSymbol: KaNamedFunctionSymbol,
+    ): LookupElementBuilder? {
+        if (!namedSymbol.isOperator) return null
+
+        val operatorString = when (namedSymbol.name) {
+            OperatorNameConventions.GET, OperatorNameConventions.SET -> "[]"
+            OperatorNameConventions.INVOKE -> "()"
+            else -> return null
+        }
+        return KotlinFirLookupElementFactory.createBracketOperatorLookupElement(
+            operatorName = Name.identifier(operatorString),
+            signature = signature,
+            options = options,
+            expectedType = context.expectedType
+        )
     }
 
     context(KaSession)
@@ -120,25 +146,20 @@ internal abstract class FirCompletionContributorBase<C : KotlinRawPositionContex
                 expectedType = context.expectedType,
             ).let { yield(it) }
 
-            if (withTrailingLambda) {
-                KotlinFirLookupElementFactory.createCallableLookupElementWithTrailingLambda(
-                    name = shortName,
+            if (withTrailingLambda && signature is KaFunctionSignature<*>) {
+                FunctionLookupElementFactory.createLookupWithTrailingLambda(
+                    shortName = shortName,
                     signature = signature,
                     options = options,
                 )?.let { yield(it) }
             }
 
             if (namedSymbol is KaNamedFunctionSymbol &&
-                namedSymbol.isOperator &&
-                namedSymbol.name == OperatorNameConventions.GET &&
-                // Only offer the get operator after dot, not for safe access or implicit receivers
+                signature is KaFunctionSignature<*> &&
+                // Only offer bracket operators after dot, not for safe access or implicit receivers
                 parameters.position.parent?.parent is KtDotQualifiedExpression
             ) {
-                KotlinFirLookupElementFactory.createGetOperatorLookupElement(
-                    signature = signature,
-                    options = options,
-                    expectedType = context.expectedType
-                ).let { yield(it) }
+                createOperatorLookupElement(context, signature, options, namedSymbol)?.let { yield(it) }
             }
         }.map { builder ->
             if (presentableText == null) builder
@@ -172,23 +193,30 @@ internal abstract class FirCompletionContributorBase<C : KotlinRawPositionContex
 
         sink.runRemainingContributors(parameters.delegate) { completionResult ->
             val lookupElement = completionResult.lookupElement
-            val (_, importStrategy) = lookupElement.`object` as? ClassifierLookupObject
-                ?: return@runRemainingContributors
-
-            val nameToImport = when (importStrategy) {
+            val classifierLookupObject = lookupElement.`object` as? ClassifierLookupObject
+            val nameToImport = when (val importStrategy = classifierLookupObject?.importingStrategy) {
                 is ImportStrategy.AddImport -> importStrategy.nameToImport
                 is ImportStrategy.InsertFqNameAndShorten -> importStrategy.fqName
-                ImportStrategy.DoNothing -> null
-            } ?: return@runRemainingContributors
+                else -> null
+            }
+
+            if (nameToImport == null) {
+                sink.passResult(completionResult)
+                return@runRemainingContributors
+            }
 
             val expression = KtPsiFactory.contextual(explicitReceiver)
                 .createExpression(nameToImport.render() + "." + positionContext.nameExpression.text) as KtDotQualifiedExpression
 
             val receiverExpression = expression.receiverExpression as? KtDotQualifiedExpression
-                ?: return@runRemainingContributors
-
             val nameExpression = expression.selectorExpression as? KtNameReferenceExpression
-                ?: return@runRemainingContributors
+
+            if (receiverExpression == null
+                || nameExpression == null
+            ) {
+                sink.passResult(completionResult)
+                return@runRemainingContributors
+            }
 
             analyze(nameExpression) {
                 createLookupElements(

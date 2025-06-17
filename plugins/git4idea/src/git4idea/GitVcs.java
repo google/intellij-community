@@ -24,6 +24,7 @@ import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.VcsSynchronousProgressWrapper;
 import com.intellij.vcs.AnnotationProviderEx;
 import com.intellij.vcs.commit.CommitMode;
+import com.intellij.vcs.git.shared.GitDisplayName;
 import com.intellij.vcs.log.VcsUserRegistry;
 import git4idea.annotate.GitAdvancedSettingsListener;
 import git4idea.annotate.GitAnnotationProvider;
@@ -33,7 +34,6 @@ import git4idea.changes.GitCommittedChangeListProvider;
 import git4idea.changes.GitOutgoingChangesProvider;
 import git4idea.checkin.GitCheckinEnvironment;
 import git4idea.checkin.GitCommitAndPushExecutor;
-import git4idea.checkout.GitCheckoutProvider;
 import git4idea.commit.GitStagingAreaCommitMode;
 import git4idea.config.*;
 import git4idea.diff.GitDiffProvider;
@@ -59,7 +59,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
 
 import static com.intellij.util.concurrency.AppJavaExecutorUtil.executeOnPooledIoThread;
 
@@ -67,7 +66,6 @@ import static com.intellij.util.concurrency.AppJavaExecutorUtil.executeOnPooledI
  * Git VCS implementation
  */
 public final class GitVcs extends AbstractVcs {
-  public static final Supplier<@Nls String> DISPLAY_NAME = GitBundle.messagePointer("git4idea.vcs.name");
   public static final @NonNls String NAME = "Git";
   public static final @NonNls String ID = "git";
 
@@ -140,7 +138,7 @@ public final class GitVcs extends AbstractVcs {
 
   @Override
   public @NotNull String getDisplayName() {
-    return DISPLAY_NAME.get();
+    return GitDisplayName.NAME;
   }
 
   @Override
@@ -286,15 +284,6 @@ public final class GitVcs extends AbstractVcs {
     return Collections.singletonList(myProject.getService(GitCommitAndPushExecutor.class));
   }
 
-
-  /**
-   * @deprecated Use {@link GitExecutableManager#identifyVersion(String)} and {@link GitExecutableProblemsNotifier}.
-   */
-  @Deprecated(forRemoval = true)
-  public @NotNull GitExecutableValidator getExecutableValidator() {
-    return new GitExecutableValidator(myProject);
-  }
-
   @Override
   public boolean fileListenerIsSynchronous() {
     return false;
@@ -309,11 +298,6 @@ public final class GitVcs extends AbstractVcs {
         new GitIntegrationEnabler(GitVcs.this, targetDirectory).detectAndEnable();
       }
     }.queue();
-  }
-
-  @Override
-  public CheckoutProvider getCheckoutProvider() {
-    return new GitCheckoutProvider();
   }
 
   @Override
@@ -362,7 +346,7 @@ public final class GitVcs extends AbstractVcs {
   @Override
   public boolean isWithCustomShelves() {
     return GitVcsApplicationSettings.getInstance().isCombinedStashesAndShelvesTabEnabled() &&
-           GitStashContentProviderKt.isStashTabAvailable();
+           GitStashContentProviderKt.stashToolWindowRegistryOption().asBoolean();
   }
 
   @Override

@@ -9,7 +9,6 @@ import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.eel.EelExecApi
-import com.intellij.platform.eel.getOrThrow
 import com.intellij.platform.eel.provider.localEel
 import com.intellij.platform.eel.provider.utils.readWholeText
 import com.intellij.platform.eel.provider.utils.sendWholeText
@@ -43,11 +42,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.junitpioneer.jupiter.cartesian.CartesianTest
 import java.io.IOException
 import java.nio.file.Path
-import kotlin.io.path.Path
-import kotlin.io.path.exists
-import kotlin.io.path.isExecutable
-import kotlin.io.path.name
-import kotlin.io.path.pathString
+import kotlin.io.path.*
 import kotlin.time.Duration.Companion.minutes
 
 
@@ -57,7 +52,7 @@ import kotlin.time.Duration.Companion.minutes
 @PyEnvTestCaseWithConda
 class PyVirtualEnvTerminalCustomizerTest {
   private val projectFixture = projectFixture()
-  private val tempDirFixture = tempPathFixture(prefix = "some dir with spaces")
+  private val tempDirFixture = tempPathFixture(prefix = "some_path_with_underscores")
   private val moduleFixture = projectFixture.moduleFixture(tempDirFixture, addPathToSourceRoot = true)
 
   @Suppress("unused") // we need venv
@@ -113,7 +108,7 @@ class PyVirtualEnvTerminalCustomizerTest {
 
     val (pythonBinary, venvDirName) =
       if (useConda) {
-        val envDir = venvPath.resolve("some path with spaces")
+        val envDir = venvPath.resolve("some_path_with_underscores")
         val sdk = createCondaEnv(condaEnv, envDir).createSdkFromThisEnv(null, emptyList())
         sdkToDelete = sdk
         sdk.persist()
@@ -141,7 +136,7 @@ class PyVirtualEnvTerminalCustomizerTest {
       .args(args)
       .env(shellOptions.envVariables + mapOf(Pair("TERM", "dumb")))
       // Unix shells do not activate with out tty
-      .ptyOrStdErrSettings(if (SystemInfo.isWindows) null else EelExecApi.Pty(100, 100, true))
+      .interactionOptions(if (SystemInfo.isWindows) null else EelExecApi.Pty(100, 100, true))
     val process = execOptions.eelIt()
     try {
       val stderr = async {
@@ -154,13 +149,11 @@ class PyVirtualEnvTerminalCustomizerTest {
 
       // tool -- where.exe Windows, "type(1)" **nix
       // "$TOOL python" returns $PREFIX [path-to-python] $POSTFIX
-      val (locateTool, prefix, postfix) = if (SystemInfo.isWindows) {
-        Triple(PathEnvironmentVariableUtil.findInPath("where.exe")?.toString() ?: "where.exe", "", "")
+      val (locateTool, prefix) = if (SystemInfo.isWindows) {
+        Pair(PathEnvironmentVariableUtil.findInPath("where.exe")?.toString() ?: "where.exe", "")
       }
       else {
-        // zsh wraps text in ''
-        val quot = if (shellType == ShellType.ZSH) "'" else ""
-        Triple("type", "python is $quot", quot)
+        Pair("type", "python is ")
       }
       process.stdin.sendWholeText("$locateTool python\nexit\n")
       val error = stderr.await()
@@ -170,7 +163,7 @@ class PyVirtualEnvTerminalCustomizerTest {
       fileLogger().info("Output was $output")
 
       assertThat("We ran `$locateTool`, so we there should be python path", output,
-                 anyOf(hasItem(prefix + pythonBinary.pathString + postfix), hasItem(prefix + pythonBinaryReal.pathString + postfix)))
+                 anyOf(hasItem(prefix + pythonBinary.pathString), hasItem(prefix + pythonBinaryReal.pathString)))
       if (SystemInfo.isWindows) {
         assertThat("There must be a line with ($venvDirName)", output, hasItem(containsString("($venvDirName)")))
       }

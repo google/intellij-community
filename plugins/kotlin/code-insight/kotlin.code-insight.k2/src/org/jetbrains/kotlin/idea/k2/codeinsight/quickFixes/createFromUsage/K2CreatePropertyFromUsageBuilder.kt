@@ -16,6 +16,7 @@ import com.intellij.lang.jvm.actions.ExpectedTypeWithNullability
 import com.intellij.lang.jvm.types.JvmPrimitiveType
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtilRt
 import com.intellij.openapi.vfs.ReadonlyStatusHandler
@@ -246,7 +247,7 @@ object K2CreatePropertyFromUsageBuilder {
 
         private var declarationText: String = computeDeclarationText()
 
-        @OptIn(KaExperimentalApi::class)
+        @OptIn(KaExperimentalApi::class, KaAllowAnalysisOnEdt::class)
         private fun computeDeclarationText(): String {
             val container = pointer.element ?: return ""
 
@@ -270,16 +271,19 @@ object K2CreatePropertyFromUsageBuilder {
                     (request.receiverTypeString)?.let { append(it).append(".") }
                 }
                 append(request.fieldName.quoteIfNeeded())
-                append(": ")
 
-                analyze(container) {
-                    val expectedType = request.fieldType.firstOrNull()
-                    val type = when (expectedType) {
-                        is ExpectedKotlinType -> expectedType.kaType
-                        else -> (expectedType?.theType as? PsiType)?.asKaType(container)
+                allowAnalysisOnEdt {
+                    analyze(container) {
+                        val type = when (val expectedType = request.fieldType.firstOrNull()) {
+                            is ExpectedKotlinType -> expectedType.kaType
+                            else -> (expectedType?.theType as? PsiType).takeUnless { it == PsiTypes.nullType() }?.asKaType(container)
+                        }
+                        type?.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.IN_VARIANCE)
                     }
-                    type?.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.IN_VARIANCE)
-                }?.let { append(it) }
+                }?.let {
+                    append(": ")
+                    append(it)
+                }
 
                 val requestInitializer = request.initializer
                 val addInitializer =
@@ -334,6 +338,10 @@ object K2CreatePropertyFromUsageBuilder {
 
                 val declarationInContainer =
                     CreateFromUsageUtil.placeDeclarationInContainer(createdDeclaration, adjustedContainer, actualAnchor)
+                if (file == declarationInContainer.containingFile) {
+                    editor?.caretModel?.moveToOffset(declarationInContainer.textRange.endOffset)
+                    editor?.scrollingModel?.scrollToCaret(ScrollType.MAKE_VISIBLE)
+                }
                 shortenReferences(declarationInContainer)
             }
         }

@@ -28,10 +28,12 @@ import org.jetbrains.intellij.build.BuildOptions
 import org.jetbrains.intellij.build.BuildPaths.Companion.ULTIMATE_HOME
 import org.jetbrains.intellij.build.CompilationContext
 import org.jetbrains.intellij.build.CompilationTasks
+import org.jetbrains.intellij.build.LibcImpl
+import org.jetbrains.intellij.build.LinuxLibcImpl
+import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.TestingOptions
 import org.jetbrains.intellij.build.TestingTasks
 import org.jetbrains.intellij.build.causal.CausalProfilingOptions
-import org.jetbrains.intellij.build.dependencies.LinuxLibcImpl
 import org.jetbrains.intellij.build.dependencies.TeamCityHelper
 import org.jetbrains.intellij.build.io.ZipEntryProcessorResult
 import org.jetbrains.intellij.build.io.readZipFile
@@ -155,6 +157,17 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     checkOptions(mainModule)
 
     val runConfigurations = loadTestRunConfigurations()
+    if (options.validateMainModule) {
+      checkNotNull(mainModule)
+      val withModuleMismatch = runConfigurations?.filter { it.moduleName != mainModule } ?: emptyList()
+      if (withModuleMismatch.isNotEmpty()) {
+        val errorMessage = withModuleMismatch.joinToString(
+          prefix = "Run configuration module mismatch, expected '$mainModule' (set in option 'intellij.build.test.main.module'), actual:\n",
+          separator = "\n",
+        ) { "  * Run configuration: '${it.name}', module: '${it.moduleName}'" }
+        context.messages.error(errorMessage)
+      }
+    }
 
     try {
       val compilationTasks = CompilationTasks.create(context)
@@ -214,7 +227,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
       if (options.testGroups != TestingOptions.ALL_EXCLUDE_DEFINED_GROUP) {
         warnOptionIgnored(testConfigurationsOptionName, "intellij.build.test.groups")
       }
-      if (mainModule != null) {
+      if (mainModule != null && !options.validateMainModule) {
         warnOptionIgnored(testConfigurationsOptionName, "intellij.build.test.main.module")
       }
     }
@@ -224,6 +237,10 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     if (options.batchTestIncludes != null && !isRunningInBatchMode) {
       context.messages.warning(
         "'intellij.build.test.batchTest.includes' option will be ignored as other tests matching options are specified.")
+    }
+
+    if (options.validateMainModule && mainModule.isNullOrEmpty()) {
+      context.messages.error("'intellij.build.test.main.module.validate' option requires 'intellij.build.test.main.module' to be set")
     }
   }
 
@@ -283,8 +300,8 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
       for (module in context.project.modules) {
         val contentRoots = module.contentRootsList.urls
         if (!contentRoots.isEmpty() && rootExcludeCondition(Path.of(JpsPathUtil.urlToPath(contentRoots.first())))) {
-          excludedRootPaths.add(context.getModuleOutputDir(module))
-          excludedRootPaths.add(context.getModuleTestsOutputDir(module))
+          excludedRootPaths.addAll(context.getModuleOutputRoots(module))
+          excludedRootPaths.addAll(context.getModuleOutputRoots(module, forTests = true))
         }
       }
       val excludedRoots = replaceWithArchivedIfNeededLP(excludedRootPaths).filter(Files::exists).map(Path::toString)
@@ -410,11 +427,13 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     if (isBootstrapSuiteDefault && !isRunningInBatchMode) {
       //module with "com.intellij.TestAll" which output should be found in `testClasspath + modulePath`
       val testFrameworkCoreModule = context.findRequiredModule("intellij.platform.testFramework.core")
-      val testFrameworkOutput = runBlocking(Dispatchers.Default) {
-        context.getModuleOutputDir(testFrameworkCoreModule).toFile()
+      val testFrameworkCoreModuleOutputRoots = runBlocking(Dispatchers.Default) {
+        context.getModuleOutputRoots(testFrameworkCoreModule).map(Path::toFile)
       }
-      if (!testRoots.contains(testFrameworkOutput)) {
-        testRoots.addAll(context.getModuleRuntimeClasspath(testFrameworkCoreModule, false).map(::File))
+      for (testFrameworkOutput in testFrameworkCoreModuleOutputRoots) {
+        if (!testRoots.contains(testFrameworkOutput)) {
+          testRoots.addAll(context.getModuleRuntimeClasspath(testFrameworkCoreModule, false).map(::File))
+        }
       }
     }
 
@@ -727,28 +746,29 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
   }
 
   private suspend fun getTestClassesForModule(mainModule: String, filteringPattern: Pattern = Pattern.compile(".*\\.class")): List<String> {
-    val root = context.getModuleTestsOutputDir(context.findRequiredModule(mainModule))
-    val testClasses: List<String> = if (root.isRegularFile() && root.extension == "jar") {
-      val classes = ArrayList<String>()
-      val regex = filteringPattern.toRegex()
-      readZipFile(root) { name, _ ->
-        if (FileUtilRt.toSystemIndependentName(name).matches(regex)) {
-          classes.add(name)
+    val testClasses: List<String> = context.getModuleOutputRoots(context.findRequiredModule(mainModule), forTests = true).flatMap { root ->
+      if (root.isRegularFile() && root.extension == "jar") {
+        val classes = ArrayList<String>()
+        val regex = filteringPattern.toRegex()
+        readZipFile(root) { name, _ ->
+          if (FileUtilRt.toSystemIndependentName(name).matches(regex)) {
+            classes.add(name)
+          }
+          ZipEntryProcessorResult.CONTINUE
         }
-        ZipEntryProcessorResult.CONTINUE
+        classes
       }
-      classes
-    }
-    else {
-      Files.walk(root).use { stream ->
-        stream.map { FileUtilRt.toSystemIndependentName(root.relativize(it).toString()) }.filter {
-          filteringPattern.matcher(it).matches()
-        }.toList()
-      } ?: listOf()
+      else {
+        Files.walk(root).use { stream ->
+          stream.map { FileUtilRt.toSystemIndependentName(root.relativize(it).toString()) }.filter {
+            filteringPattern.matcher(it).matches()
+          }.toList()
+        } ?: listOf()
+      }
     }
 
     if (testClasses.isEmpty()) {
-      throw RuntimeException("No tests were found in $root with $filteringPattern")
+      throw RuntimeException("No tests were found in module '$mainModule' with $filteringPattern")
     }
 
     return testClasses
@@ -1132,7 +1152,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     }
     args += "-classpath"
 
-    val classpathForTests = if (LinuxLibcImpl.isLinuxMusl) {
+    val classpathForTests = if (LibcImpl.current(OsFamily.currentOs) == LinuxLibcImpl.MUSL) {
       prepareMuslClassPath(classpath)
     } else {
       classpath

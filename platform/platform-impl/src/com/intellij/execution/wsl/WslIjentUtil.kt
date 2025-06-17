@@ -16,8 +16,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.EelProcess
-import com.intellij.platform.eel.spawnProcess
 import com.intellij.platform.eel.path.EelPath
+import com.intellij.platform.eel.spawnProcess
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import com.intellij.util.suspendingLazy
@@ -120,7 +120,7 @@ fun runProcessBlocking(
 
   val exePath = FileUtil.toSystemIndependentName(args.removeFirst())
 
-  val ptyOrStdErrSettings = when {
+  val interactionOptions = when {
     ptyOptions != null -> with(ptyOptions) { EelExecApi.Pty(initialColumns, initialRows, !consoleMode) }
     processBuilder.redirectErrorStream() -> EelExecApi.RedirectStdErr
     else -> null
@@ -138,12 +138,12 @@ fun runProcessBlocking(
   ijentApi.exec.spawnProcess(exePath)
     .args(args)
     .env(explicitEnvironmentVariables)
-    .ptyOrStdErrSettings(ptyOrStdErrSettings)
+    .interactionOptions(interactionOptions)
     .workingDirectory(workingDirectory?.let { EelPath.parse(it, ijentApi.descriptor) })
     .eelIt()
     .toProcess(
       coroutineScope = scope,
-      isPty = ptyOrStdErrSettings != null,
+      isPty = interactionOptions != null,
     )
 }
 

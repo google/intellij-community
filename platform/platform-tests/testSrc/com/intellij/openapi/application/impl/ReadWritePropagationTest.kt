@@ -2,11 +2,15 @@
 package com.intellij.openapi.application.impl
 
 
-import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ApplicationListener
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
+import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.util.concurrency.Semaphore
@@ -16,7 +20,6 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.RepeatedTest
 import kotlin.test.assertFalse
 
@@ -47,18 +50,6 @@ class ReadWritePropagationTest {
     checkInheritanceViaStructureConcurrency(::readAction, { ApplicationManager.getApplication().isReadAccessAllowed })
   }
 
-  @RepeatedTest(REPETITIONS)
-  fun `write intent read action is inherited by structured concurrency`() {
-    Assumptions.assumeFalse(useNestedLocking) { "This is not the intended behavior when the lock is parallelizable" }
-    checkInheritanceViaStructureConcurrency(::writeIntentReadAction, { ApplicationManager.getApplication().isWriteIntentLockAcquired })
-  }
-
-  @RepeatedTest(REPETITIONS)
-  fun `write action is inherited by structured concurrency`() {
-    Assumptions.assumeFalse(useNestedLocking) { "This is not the intended behavior when the lock is parallelizable" }
-    checkInheritanceViaStructureConcurrency(::edtWriteAction, { ApplicationManager.getApplication().isWriteAccessAllowed })
-  }
-
   private fun checkInheritanceViaNewContext(wrapper: suspend (() -> Unit) -> Unit, checker: () -> Boolean, innerChecker: () -> Boolean = checker): Unit = timeoutRunBlocking {
     wrapper {
       assertTrue(checker())
@@ -81,14 +72,6 @@ class ReadWritePropagationTest {
     checkInheritanceViaNewContext(::readAction, { ApplicationManager.getApplication().isReadAccessAllowed })
   }
 
-  @RepeatedTest(REPETITIONS)
-  fun `write intent read action is inherited by new context`() {
-    Assumptions.assumeFalse(useNestedLocking) { "This is not the intended behavior when the lock is parallelizable" }
-    // WIL check works only on owning thread
-    checkInheritanceViaNewContext(::writeIntentReadAction,
-                                  { ApplicationManager.getApplication().isWriteIntentLockAcquired },
-                                  { ApplicationManager.getApplication().isReadAccessAllowed })
-  }
 
   private fun checkNoInheritanceViaNonStructuredConcurrency(wrapper: suspend (() -> Unit) -> Unit, checker: () -> Boolean): Unit = timeoutRunBlocking {
     wrapper {
@@ -112,18 +95,6 @@ class ReadWritePropagationTest {
   @RepeatedTest(REPETITIONS)
   fun `read action is not inherited by non-structured concurrency`() {
     checkNoInheritanceViaNonStructuredConcurrency(::readAction, { ApplicationManager.getApplication().isReadAccessAllowed })
-  }
-
-  @RepeatedTest(REPETITIONS)
-  fun `write intent read action is not inherited by non-structured concurrency`() {
-    Assumptions.assumeFalse(useNestedLocking) { "This is not the intended behavior when the lock is parallelizable" }
-    checkNoInheritanceViaNonStructuredConcurrency(::writeIntentReadAction, { ApplicationManager.getApplication().isWriteIntentLockAcquired })
-  }
-
-  @RepeatedTest(REPETITIONS)
-  fun `write action is not inherited by non-structured concurrency`() {
-    Assumptions.assumeFalse(useNestedLocking) { "This is not the intended behavior when the lock is parallelizable" }
-    checkNoInheritanceViaNonStructuredConcurrency(::edtWriteAction, { ApplicationManager.getApplication().isWriteAccessAllowed })
   }
 
   @RepeatedTest(REPETITIONS)

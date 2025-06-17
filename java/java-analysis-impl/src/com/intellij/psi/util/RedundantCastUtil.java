@@ -5,6 +5,8 @@ import com.intellij.codeInsight.ExceptionUtil;
 import com.intellij.codeInsight.NullableNotNullManager;
 import com.intellij.codeInsight.daemon.impl.analysis.JavaGenericsUtil;
 import com.intellij.java.codeserver.core.JavaPsiSwitchUtil;
+import com.intellij.java.codeserver.highlighting.JavaErrorCollector;
+import com.intellij.java.codeserver.highlighting.errors.JavaCompilationError;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Comparing;
@@ -284,7 +286,7 @@ public final class RedundantCastUtil {
           PsiExpression newQualifier = deparenthesizeExpression(newCall.getMethodExpression().getQualifierExpression());
           LOG.assertTrue(newQualifier != null);
           PsiElement oldReference = newQualifier.getCopyableUserData(RecaptureTypeMapper.SELF_REFERENCE);
-          PsiElement replace = newQualifier.replace(getInnerMostOperand(newQualifier));
+          PsiElement replace = removeCastInQualifier(newQualifier);
           replace.putCopyableUserData(RecaptureTypeMapper.SELF_REFERENCE, oldReference);
 
           final JavaResolveResult newResult = newCall.getMethodExpression().advancedResolve(false);
@@ -314,15 +316,40 @@ public final class RedundantCastUtil {
             (PsiReferenceExpression)elementFactory.createExpressionFromText(refExpression.getText(), refExpression);
           final PsiExpression newQualifier = newExpression.getQualifierExpression();
           LOG.assertTrue(newQualifier != null);
-          newQualifier.replace(getInnerMostOperand(newQualifier));
+          removeCastInQualifier(newQualifier);
 
           JavaResolveResult newResult = newExpression.advancedResolve(false);
-          return newResult.isValidResult() && oldMember.equals(newResult.getElement());
+          if (!newResult.isValidResult() || !oldMember.equals(newResult.getElement())) return false;
+          if (parent instanceof PsiReferenceExpression parentRef && !newResult.getSubstitutor().equals(resolveResult.getSubstitutor())) {
+            return isCastInReferenceQualifierRedundant(parentRef);
+          }
+          return true;
         }
       }
       catch (IncorrectOperationException ignore) {
         return false;
       }
+    }
+
+    private static PsiElement removeCastInQualifier(PsiExpression qualifier) {
+      qualifier = deparenthesizeExpression(qualifier);
+      if (qualifier instanceof PsiTypeCastExpression typeCastExpression) {
+        while (true) {
+          PsiExpression operand = deparenthesizeExpression(typeCastExpression.getOperand());
+          if (operand instanceof PsiTypeCastExpression nestedCast) {
+            typeCastExpression = nestedCast;
+            continue;
+          }
+          return operand == null ? qualifier : qualifier.replace(operand);
+        }
+      }
+      if (qualifier instanceof PsiReferenceExpression ref) {
+        PsiExpression refQualifier = ref.getQualifierExpression();
+        if (refQualifier != null) {
+          removeCastInQualifier(refQualifier);
+        }
+      }
+      return qualifier;
     }
 
     private void processCall(PsiCall expression){
@@ -387,7 +414,7 @@ public final class RedundantCastUtil {
       if (operand != null) {
         newBranchExpression = (PsiExpression)newBranchExpression.replace(operand);
         JavaResolveResult oldResult = oldCall.resolveMethodGenerics();
-        JavaResolveResult newResult = resolveNewResult(oldCall, newCall);
+        JavaResolveResult newResult = newCall.resolveMethodGenerics();
 
         if (isSameResolveResult(oldResult, newResult)) {
           addToResults((PsiTypeCastExpression)oldBranchExpression);
@@ -474,7 +501,7 @@ public final class RedundantCastUtil {
         return;
       }
       PsiExpression strippedCast = (PsiExpression)newReturnExpression.replace(castOperand);
-      PsiType newArgType = calculateNewArgType(i, resolveNewResult(oldCall, newCall), parameters);
+      PsiType newArgType = calculateNewArgType(i, newCall.resolveMethodGenerics(), parameters);
       final PsiType functionalInterfaceType = newLambdaExpression.getGroundTargetType(newArgType);
       if (originalFunctionalInterfaceType.equals(functionalInterfaceType)) {
         final PsiType castExprType = LambdaUtil.performWithTargetType(newLambdaExpression, functionalInterfaceType, () -> strippedCast.getType());
@@ -497,10 +524,14 @@ public final class RedundantCastUtil {
       PsiExpression castOperand = ((PsiTypeCastExpression)Objects.requireNonNull(deparenthesizeExpression(newArgs[i]))).getOperand();
       if (castOperand == null) return;
       newArgs[i] = (PsiExpression)newArgs[i].replace(castOperand);
+      
+      if (!errorsMatch(newCall, oldCall)) {
+        newArgs[i].replace(arg);
+        return;
+      }
 
       JavaResolveResult oldResult = oldCall.resolveMethodGenerics();
-
-      final JavaResolveResult newResult = resolveNewResult(oldCall, newCall);
+      JavaResolveResult newResult = newCall.resolveMethodGenerics();
 
       PsiMethod oldMethod = (PsiMethod)oldResult.getElement();
       LOG.assertTrue(oldMethod != null);
@@ -540,6 +571,20 @@ public final class RedundantCastUtil {
       newArgs[i].replace(arg);
     }
 
+    private static boolean errorsMatch(PsiElement updated, PsiElement original) {
+      while (!(updated instanceof PsiFile)) {
+        JavaCompilationError<?, ?> updatedError = JavaErrorCollector.findSingleError(updated);
+        JavaCompilationError<?, ?> originalError = JavaErrorCollector.findSingleError(original);
+        if ((updatedError == null) != (originalError == null)) return false;
+        if (updatedError != null) {
+          if (updatedError.kind() != originalError.kind()) return false;
+        }
+        updated = updated.getParent();
+        original = original.getParent();
+      }
+      return true;
+    }
+
     private static @Nullable PsiType calculateNewArgType(int i, JavaResolveResult newResult, PsiParameter[] parameters) {
       final boolean varargs = newResult instanceof MethodCandidateInfo info && info.isVarargs();
       final PsiType parameterType = PsiTypesUtil.getParameterType(parameters, i, varargs);
@@ -549,22 +594,6 @@ public final class RedundantCastUtil {
         newArgType = TypeConversionUtil.erasure(newArgType);
       }
       return newArgType;
-    }
-
-    private static @NotNull JavaResolveResult resolveNewResult(PsiCall oldCall, PsiCall newCall) {
-      final JavaResolveResult newResult;
-      if (newCall instanceof PsiEnumConstant) {
-        // do this manually, because PsiEnumConstantImpl.resolveMethodGenerics() will assert (no containing class for the copy)
-        final PsiEnumConstant enumConstant = (PsiEnumConstant)oldCall;
-        PsiClass containingClass = enumConstant.getContainingClass();
-        final JavaPsiFacade facade = JavaPsiFacade.getInstance(enumConstant.getProject());
-        final PsiClassType type = facade.getElementFactory().createType(Objects.requireNonNull(containingClass));
-        newResult = facade.getResolveHelper().resolveConstructor(type, Objects.requireNonNull(newCall.getArgumentList()), enumConstant);
-      }
-      else {
-        newResult = newCall.resolveMethodGenerics();
-      }
-      return newResult;
     }
 
     private static @Nullable PsiCall copyCallExpression(PsiCall expression, PsiType typeByParent) {

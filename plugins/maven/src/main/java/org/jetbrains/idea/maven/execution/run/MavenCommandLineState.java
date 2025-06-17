@@ -31,6 +31,7 @@ import com.intellij.platform.eel.EelDescriptor;
 import com.intellij.platform.eel.provider.EelProviderUtil;
 import com.intellij.platform.eel.provider.LocalEelDescriptor;
 import com.intellij.terminal.TerminalExecutionConsole;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.idea.maven.buildtool.BuildToolConsoleProcessAdapter;
@@ -57,6 +58,10 @@ import java.util.function.Function;
 
 import static org.jetbrains.idea.maven.server.MavenDistributionKt.isMaven4;
 
+/**
+ * use MavenShCommandLineState or MavenTargetShCommandLineState instead
+ */
+@ApiStatus.Obsolete
 public class MavenCommandLineState extends JavaCommandLineState implements RemoteConnectionCreator {
 
   private final MavenRunConfiguration myConfiguration;
@@ -74,7 +79,7 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
     if (eelDescriptor instanceof LocalEelDescriptor) {
       return null;
     }
-    EelApi eel = EelProviderUtil.upgradeBlocking(eelDescriptor);
+    EelApi eel = EelProviderUtil.toEelApiBlocking(eelDescriptor);
     EelTargetEnvironmentRequest.Configuration configuration = new EelTargetEnvironmentRequest.Configuration(eel);
     MavenRuntimeTargetResolver targetResolver = new MavenRuntimeTargetResolver(project, eel);
     MavenRuntimeTargetConfiguration runtimeTarget = targetResolver.resolve(myConfiguration);
@@ -154,7 +159,7 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
                                                 Function<String, String> targetFileMapper) throws ExecutionException {
     ConsoleView consoleView = createConsole(executor, processHandler, myConfiguration.getProject());
     BuildViewManager viewManager = getEnvironment().getProject().getService(BuildViewManager.class);
-    descriptor.withProcessHandler(new MavenBuildHandlerFilterSpyWrapper(processHandler, useMaven4()), null);
+    descriptor.withProcessHandler(new MavenBuildHandlerFilterSpyWrapper(processHandler, useMaven4(), false), null);
     descriptor.withExecutionEnvironment(getEnvironment());
     StartBuildEventImpl startBuildEvent = new StartBuildEventImpl(descriptor, "");
     boolean withResumeAction = MavenResumeAction.isApplicable(getEnvironment().getProject(), getJavaParameters(), myConfiguration);
@@ -190,7 +195,7 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
       buildView.attachToProcess(processHandler);
     }
     else {
-      buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, useMaven4()));
+      buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, useMaven4(), false));
     }
 
     AnAction[] actions = new AnAction[]{BuildTreeFilters.createFilteringActionsGroup(buildView)};
@@ -378,9 +383,9 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
                                                            Process process) throws ExecutionException {
     if (emulateTerminal()) {
       return new MavenKillableProcessHandler(process,
-                                                                   targetedCommandLine.getCommandPresentation(remoteEnvironment),
-                                                                   targetedCommandLine.getCharset(),
-                                                                   targetedCommandLineBuilder.getFilesToDeleteOnTermination(),
+                                             targetedCommandLine.getCommandPresentation(remoteEnvironment),
+                                             targetedCommandLine.getCharset(),
+                                             targetedCommandLineBuilder.getFilesToDeleteOnTermination(),
                                              useMaven4());
     }
     else {

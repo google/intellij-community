@@ -22,7 +22,7 @@ import org.jetbrains.annotations.VisibleForTesting
 
 internal class GitPushTagAction : GitSingleTagAction(GitBundle.messagePointer("action.Git.Push.Tag.text")) {
   override fun updateIfEnabledAndVisible(e: AnActionEvent, project: Project, repositories: List<GitRepository>, reference: GitTag) {
-    val remote = e.getData(GitBranchActionsDataKeys.REMOTE)
+    val remote = e.getData(GitPushTagsActionGroup.REMOTE_IN_REPOSITORY_KEY)
     val selectedRepo = e.getData(GitBranchActionsDataKeys.SELECTED_REPOSITORY)
     if (remote == null || selectedRepo == null) {
       e.presentation.isEnabledAndVisible = false
@@ -38,10 +38,10 @@ internal class GitPushTagAction : GitSingleTagAction(GitBundle.messagePointer("a
   }
 
   override fun actionPerformed(e: AnActionEvent, project: Project, repositories: List<GitRepository>, reference: GitTag) {
-    val remote = e.getData(GitBranchActionsDataKeys.REMOTE) ?: return
+    val remote = e.getData(GitPushTagsActionGroup.REMOTE_IN_REPOSITORY_KEY) ?: return
     val repository = e.getData(GitBranchActionsDataKeys.SELECTED_REPOSITORY) ?: return
 
-    GitDisposable.getInstance(project).childScope("Git push tags").launch {
+    GitDisposable.getInstance(project).coroutineScope.launch {
       withBackgroundProgress(project, DvcsBundle.message("push.process.pushing"), cancellable = true) {
         val pushSupport = getPushSupport(getInstance(project)) as GitPushSupport
         val pushSpec = preparePushSpec(reference, remote)

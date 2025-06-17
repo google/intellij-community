@@ -4,13 +4,17 @@ def get_jvm_flags(flags):
         # "-XX:+UseZGC",
         # "-XX:+ZGenerational",
         "-Xms4g",
-        "-Xmx16g",
+        "-Xmx20g",
         # IJ PSI cache
         "-XX:SoftRefLRUPolicyMSPerMB=50",
         # Code Cache
         "-XX:NonProfiledCodeHeapSize=512m",
         "-XX:ProfiledCodeHeapSize=512m",
         "-XX:ReservedCodeCacheSize=2048m",
+        # Prevent JVM logging warnings and errors to stdout because it breaks the protocol between Bazel and the worker process
+        "-XX:+DisplayVMOutputToStderr",
+        "-Xlog:disable",
+        "-Xlog:all=warning:stderr:uptime,level,tags",
         # Headless
         "-Djava.awt.headless=true",
         "-Dapple.awt.UIElement=true",
@@ -28,4 +32,6 @@ def get_jvm_flags(flags):
         "-Dio.netty.tryReflectionSetAccessible=true",
         # see TargetConfigurationDigestProperty.KOTLIN_VERSION - we invalidate cache if kotlinc version changed
         "-Dkotlin.jps.skip.cache.version.check=true",
+        # Set UTF-8 by default as per https://openjdk.org/jeps/400
+        "-Dfile.encoding=UTF-8",
     ] + flags

@@ -63,13 +63,12 @@
                         serviceImplementation="com.intellij.formatting.FormattingProgressTaskFactory"/>
     <applicationService serviceInterface="com.intellij.injected.editor.InjectionEditService"
                         serviceImplementation="com.intellij.codeInsight.intention.impl.InjectionEditServiceImpl"/>
+    <applicationService serviceImplementation="com.intellij.codeInsight.actions.AbstractLayoutCodeProcessorWriteInterceptor"/>
 
     <requiredForSmartModeStartupActivity implementation="com.intellij.util.indexing.ProjectFileBasedIndexStartupActivity" order="first"
                                          id="projectIndexStartup"/>
     <requiredForSmartModeStartupActivity implementation="com.intellij.util.indexing.DumbModeWhileScanningSubscriber"/>
     <initProjectActivity id="vfsStartup" implementation="com.intellij.psi.impl.file.impl.PsiVfsInitProjectActivity" order="first"/>
-
-    <initProjectActivity id="projectRootProjectActivity" implementation="com.intellij.platform.ProjectRootProjectActivity"/>
 
     <projectService serviceInterface="com.intellij.codeInsight.multiverse.ProjectModelContextBridge"
                     serviceImplementation="com.intellij.codeInsight.multiverse.ProjectModelContextBridgeImpl"/>
@@ -93,10 +92,18 @@
                  description="Check if files found during scanning are still in the project during indexing, and skip excluded files."/>
     <registryKey defaultValue="true" key="vfs.try.eel.for.content.loading"
                  description="Use specialized Eel API for working with remote filesystems. This may result in a significant performance improvement and better CPU utilization"/>
+    <registryKey defaultValue="false" description="Use EEL for file watching." key="use.eel.file.watcher" restartRequired="true"/>
     <registryKey defaultValue="true" key="cache.nulls.for.pushed.properties" restartRequired="true"
                  description="Cache null values for pushed properties to avoid reading nulls from disk every time."/>
     <registryKey defaultValue="true" key="use.workspace.file.index.to.generate.iterators" restartRequired="true"
                  description="Use WorkspaceFileIndex instead of IndexableFileIndex to generate IndexingIterators"/>
+    <registryKey defaultValue="true" key="search.in.non.indexable" restartRequired="false"
+                 description="Search files in non-indexable filesets with NonIndexableFileNavigationContributor"/>
+    <registryKey defaultValue="true"
+                 description="Enable reformat action execution on frontend in remote development"
+                 key="reformat.action.execute.on.frontend"
+                 restartRequired="false"/>
+
     <projectService serviceInterface="com.intellij.util.indexing.IndexableFilesIndex"
                     serviceImplementation="com.intellij.util.indexing.roots.IndexableFilesIndexImpl"/>
     <projectService serviceInterface="com.intellij.util.indexing.IndexingIteratorsProvider"
@@ -347,12 +354,10 @@
                     serviceImplementation="com.intellij.ide.GeneratedSourceFileChangeTrackerImpl" preload="notHeadless"/>
     <editorFactoryDocumentListener implementation="com.intellij.ide.GeneratedSourceFileChangeTrackerImpl$MyDocumentListener"/>
 
-    <moduleService serviceInterface="com.intellij.openapi.components.impl.stores.IComponentStore"
-                   serviceImplementation="com.intellij.configurationStore.ModuleStoreImpl"/>
+    <applicationService serviceInterface="com.intellij.configurationStore.ModuleStoreFactory"
+                        serviceImplementation="com.intellij.configurationStore.DefaultModuleStoreFactory"/>
 
     <moduleService serviceImplementation="com.intellij.openapi.module.impl.DeprecatedModuleOptionManager"/>
-    <moduleService serviceInterface="com.intellij.openapi.components.PathMacroManager"
-                   serviceImplementation="com.intellij.openapi.components.impl.ModulePathMacroManager"/>
 
     <applicationService serviceInterface="com.intellij.ide.scratch.ScratchFileService"
                         serviceImplementation="com.intellij.ide.scratch.ScratchFileServiceImpl"/>
@@ -667,6 +672,7 @@
 
     <searchEverywhereClassifier implementation="com.intellij.ide.actions.DefaultSearchEverywhereClassifier"/>
     <gotoFileContributor implementation="com.intellij.ide.util.gotoByName.DefaultFileNavigationContributor"/>
+    <gotoFileContributor implementation="com.intellij.ide.util.gotoByName.NonIndexableFileNavigationContributor"/>
     <gotoRelatedProvider implementation="com.intellij.ide.actions.RelatedItemLineMarkerGotoAdapter"/>
 
     <selectInTarget implementation="com.intellij.ide.impl.ProjectViewSelectInGroupTarget"/>
@@ -1092,6 +1098,9 @@
 
     <statistics.projectUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.fileTypes.FileTypeUsagesCollector"/>
     <statistics.validation.customValidationRule
+      implementation="com.intellij.internal.statistic.collectors.fus.fileTypes.FileExtensionValidationRule"/>
+
+    <statistics.validation.customValidationRule
       implementation="com.intellij.internal.statistic.collectors.fus.actions.persistence.ToolWindowCollector$ToolWindowUtilValidator"/>
     <statistics.validation.customValidationRule
       implementation="com.intellij.internal.statistic.collectors.fus.fileTypes.FileTypeUsagesCollector$ValidationRule"/>
@@ -1243,7 +1252,6 @@
 
     <applicationService serviceInterface="com.intellij.find.impl.FindPopupScopeUIProvider"
                         serviceImplementation="com.intellij.find.impl.FindPopupScopeUIProviderImpl"/>
-    <applicationService serviceImplementation="com.intellij.find.impl.FindInProjectExecutor"/>
 
     <search.optionContributor implementation="com.intellij.codeInspection.ex.InspectionSearchableOptionContributor"/>
 
@@ -1263,6 +1271,7 @@
                             order="after ReadOnlyAttribute"/>
 
     <fileIndentOptionsProvider implementation="com.intellij.psi.codeStyle.DetectableIndentOptionsProvider" order="last"/>
+    <codeStyleSettingsModifier id="com.intellij.psi.codeStyle.DetectableIndentSettingsModifier" implementation="com.intellij.psi.codeStyle.DetectableIndentSettingsModifier" order="last"/>
     <lang.formatter.restriction implementation="com.intellij.formatting.ExcludedFileFormattingRestriction"/>
 
     <editorActionHandler action="EditorEscape" implementationClass="com.intellij.refactoring.changeSignature.inplace.EscapeHandler"
@@ -1543,6 +1552,8 @@
                  description="Enable experimental support command completion" restartRequired="false"/>
     <registryKey key="ide.completion.command.enabled" defaultValue="true"
                  description="Enable experimental support command completion for internal mode" restartRequired="false"/>
+    <registryKey key="ide.completion.command.support.read.only.files" defaultValue="false"
+                 description="Enable experimental support command completion for read-only files" restartRequired="false"/>
 
     <indexableIteratorBuilderHandler implementation="com.intellij.util.indexing.roots.builders.SyntheticLibraryIndexableIteratorHandler"/>
     <indexableIteratorBuilderHandler implementation="com.intellij.util.indexing.roots.builders.ExternalEntityIndexableIteratorHandler"/>
@@ -1679,6 +1690,9 @@
                  description="Enable open in client generator action"/>
     <registryKey key="editor.show.indexing.as.analyzing" defaultValue="true"
                  description="Replaces Indexing progress with Analyzing during dumb mode"/>
+
+    <saveAndSyncHandlerListener implementation="com.intellij.codeInsight.daemon.impl.EssentialHighlightingRestarter" />
+    <experiment.abExperimentOption implementation="com.intellij.ide.util.gotoByName.FuzzyFileSearchExperimentOption"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.platform.backend">
@@ -1703,8 +1717,6 @@
   <projectListeners>
     <listener class="com.intellij.openapi.fileEditor.impl.FileEditorVirtualFileAppearanceListener"
               topic="com.intellij.ide.ui.VirtualFileAppearanceListener"/>
-    <listener class="com.intellij.codeInsight.daemon.impl.EssentialHighlightingRestarter"
-              topic="com.intellij.ide.SaveAndSyncHandlerListener" />
     <listener class="com.intellij.codeInsight.daemon.impl.DaemonFusReporter"
               topic="com.intellij.codeInsight.daemon.DaemonCodeAnalyzer$DaemonListener"/>
     <listener class="com.intellij.codeInsight.inline.completion.InlineCompletionLookupManagerListener"
@@ -1718,5 +1730,6 @@
   </projectListeners>
   <actions>
     <group id="Structure.ViewOptions" searchable="false" popup="true" icon="AllIcons.Actions.GroupBy"/>
+    <group id="Jcef.ContextMenuGroup" popup="true" text="Frontend Jcef Actions"/>
   </actions>
 </idea-plugin>

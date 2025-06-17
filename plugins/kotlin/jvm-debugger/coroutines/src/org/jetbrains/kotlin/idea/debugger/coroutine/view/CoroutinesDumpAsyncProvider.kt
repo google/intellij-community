@@ -15,6 +15,7 @@ import com.intellij.unscramble.IconsCache
 import com.intellij.unscramble.MergeableDumpItem
 import com.intellij.unscramble.MergeableToken
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.kotlin.idea.debugger.coroutine.KotlinDebuggerCoroutinesBundle
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineInfoData
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.State
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.CoroutineDebugProbesProxy
@@ -30,12 +31,10 @@ class CoroutinesDumpAsyncProvider : ThreadDumpItemsProviderFactory() {
     override fun getProvider(context: DebuggerContextImpl): ThreadDumpItemsProvider = object : ThreadDumpItemsProvider {
         override val progressText: String get() = JavaDebuggerBundle.message("thread.dump.coroutines.progress")
 
-        private val vm = context.debugProcess!!.virtualMachineProxy
-
-        private val enabled =
+        private val enabled: Boolean =
             Registry.`is`("debugger.kotlin.show.coroutines.in.threadDumpPanel") &&
                     // check that coroutines are in the project's classpath
-                    vm.classesByName("kotlinx.coroutines.debug.internal.DebugProbesImpl").isNotEmpty()
+                    context.debugProcess!!.virtualMachineProxy.classesByName("kotlinx.coroutines.debug.internal.DebugProbesImpl").isNotEmpty()
 
         override val requiresEvaluation get() = enabled
 
@@ -48,18 +47,23 @@ class CoroutinesDumpAsyncProvider : ThreadDumpItemsProviderFactory() {
     }
 }
 
-private class CoroutineDumpItem(private val info: CoroutineInfoData) : MergeableDumpItem {
+private class CoroutineDumpItem(info: CoroutineInfoData) : MergeableDumpItem {
 
     override val name: String = info.name + ":" + info.id
 
     override val stateDesc: String = " (${info.state.name.lowercase()})"
 
+    override val iconToolTip: String
+        get() = KotlinDebuggerCoroutinesBundle.message("dump.item.coroutine.tooltip")
+
+    private val dispatcher = info.dispatcher
+
     override val stackTrace: String =
         info.coroutineDescriptor + "\n" +
-                info.continuationStackFrames.joinToString(prefix = "\t", separator = "\n") { ThreadDumpAction.renderLocation(it.location) }
+                info.lastObservedStackTrace.joinToString(prefix = "\t", separator = "\n\t") { ThreadDumpAction.renderLocation(it) }
 
     override val interestLevel: Int = when {
-        info.continuationStackFrames.isEmpty() -> -10
+        info.lastObservedStackTrace.isEmpty() -> -10
         else -> stackTrace.count { it == '\n' }
     }
 
@@ -94,17 +98,17 @@ private class CoroutineDumpItem(private val info: CoroutineInfoData) : Mergeable
 
         override fun equals(other: Any?): Boolean {
             if (other !is CoroutinesMergeableToken) return false
-            val otherInfo = other.item.info
-            if (info.state != otherInfo.state) return false
-            if (info.dispatcher != otherInfo.dispatcher) return false
+            val otherItem = other.item
+            if (stateDesc != otherItem.stateDesc) return false
+            if (dispatcher != otherItem.dispatcher) return false
             if (this.comparableStackTrace != other.comparableStackTrace) return false
             return true
         }
 
         override fun hashCode(): Int {
             return Objects.hash(
-                info.state,
-                info.dispatcher,
+                stateDesc,
+                dispatcher,
                 comparableStackTrace
             )
         }

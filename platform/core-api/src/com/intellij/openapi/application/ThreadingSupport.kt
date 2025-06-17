@@ -50,26 +50,6 @@ interface ThreadingSupport {
   @ApiStatus.Internal
   fun <T> runUnlockingIntendedWrite(action: () -> T): T
 
-  /**
-   * Set a [ReadActionListener].
-   *
-   * Only one listener can be set. It is error to set second listener.
-   *
-   * @param listener the listener to set
-   */
-  @ApiStatus.Internal
-  fun setReadActionListener(listener: ReadActionListener)
-
-  /**
-   * Removes a [ReadActionListener].
-   *
-   * It is error to remove listener which was not set early.
-   *
-   * @param listener the listener to remove
-   */
-  @ApiStatus.Internal
-  fun removeReadActionListener(listener: ReadActionListener)
-
   @RequiresBlockingContext
   fun <T> runReadAction(clazz: Class<*>, action: () -> T): T
 
@@ -97,39 +77,50 @@ interface ThreadingSupport {
   /**
    * Adds a [WriteActionListener].
    *
-   * Only one listener can be set. It is error to set second listener.
-   *
    * @param listener the listener to set
    */
-  fun setWriteActionListener(listener: WriteActionListener)
+  fun addWriteActionListener(listener: WriteActionListener)
+
+  /**
+   * Removes a [WriteActionListener].
+   *
+   * It is error to remove listener which was not added early.
+   *
+   * @param listener the listener to remove
+   */
+  @ApiStatus.Internal
+  fun removeWriteActionListener(listener: WriteActionListener)
 
   /**
    * Adds a [WriteIntentReadActionListener].
    *
-   * Only one listener can be set. It is an error to set the second listener.
-   *
    * @param listener the listener to set
    */
-  fun setWriteIntentReadActionListener(listener: WriteIntentReadActionListener)
+  fun addWriteIntentReadActionListener(listener: WriteIntentReadActionListener)
 
   /**
    * Removes a [WriteIntentReadActionListener].
    *
-   * It is an error to remove the listener which was not set early.
+   * It is an error to remove the listener which was not added early.
    *
    * @param listener the listener to remove
    */
   fun removeWriteIntentReadActionListener(listener: WriteIntentReadActionListener)
 
   /**
-   * Removes a [WriteActionListener].
+   * Set a [ReadActionListener].
    *
-   * It is error to remove listener which was not set early.
+   * @param listener the listener to set
+   */
+  fun addReadActionListener(listener: ReadActionListener)
+
+  /**
+   * Removes a [ReadActionListener].
    *
    * @param listener the listener to remove
    */
   @ApiStatus.Internal
-  fun removeWriteActionListener(listener: WriteActionListener)
+  fun removeReadActionListener(listener: ReadActionListener)
 
   @RequiresBlockingContext
   fun <T> runWriteAction(clazz: Class<*>, action: () -> T): T
@@ -174,52 +165,21 @@ interface ThreadingSupport {
   fun isWriteAccessAllowed(): Boolean
 
   @Deprecated("Use `runReadAction` instead")
-  fun acquireReadActionLock(): AccessToken
+  fun acquireReadActionLock(): CleanupAction
 
   @Deprecated("Use `runWriteAction`, `WriteAction.run`, or `WriteAction.compute` instead")
-  fun acquireWriteActionLock(marker: Class<*>): AccessToken
+  fun acquireWriteActionLock(marker: Class<*>): CleanupAction
 
   /**
    * Disable write actions till token will be released.
    */
-  fun prohibitWriteActionsInside(): AccessToken
-
-  /**
-   * Adds a [LockAcquisitionListener].
-   *
-   * Only one listener can be set. It is an error to set the second listener.
-   *
-   * @param listener the listener to set
-   */
-  @ApiStatus.Internal
-  fun setLockAcquisitionListener(listener: LockAcquisitionListener)
-
-  @ApiStatus.Internal
-  // long because this is called from Java
-  fun setLockAcquisitionInterceptor(delayMillis: Long, consumer: (shouldStop: () -> Boolean) -> Unit)
+  fun prohibitWriteActionsInside(): CleanupAction
 
   @ApiStatus.Internal
   fun setWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener)
 
   @ApiStatus.Internal
   fun removeWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener)
-
-  @ApiStatus.Internal
-  fun setLegacyIndicatorProvider(provider: LegacyProgressIndicatorProvider)
-
-  @ApiStatus.Internal
-  fun removeLegacyIndicatorProvider(provider: LegacyProgressIndicatorProvider)
-
-
-  /**
-   * Removes a [LockAcquisitionListener].
-   *
-   * It is error to remove listener which was not set early.
-   *
-   * @param listener the listener to remove
-   */
-  @ApiStatus.Internal
-  fun removeLockAcquisitionListener(listener: LockAcquisitionListener)
 
   /**
    * Prevents any attempt to use R/W locks inside [action].
@@ -249,7 +209,7 @@ interface ThreadingSupport {
   fun isInsideUnlockedWriteIntentLock(): Boolean
 
   @ApiStatus.Internal
-  fun getPermitAsContextElement(baseContext: CoroutineContext, shared: Boolean): Pair<CoroutineContext, AccessToken>
+  fun getPermitAsContextElement(baseContext: CoroutineContext, shared: Boolean): Pair<CoroutineContext, CleanupAction>
 
   @ApiStatus.Internal
   fun isParallelizedReadAction(context: CoroutineContext): Boolean
@@ -298,3 +258,5 @@ interface ThreadingSupport {
    */
   fun runWhenWriteActionIsCompleted(action: () -> Unit)
 }
+
+typealias CleanupAction = () -> Unit

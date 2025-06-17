@@ -4,14 +4,13 @@ package com.intellij.codeInsight.completion.command.commands
 import com.intellij.codeInsight.actions.ReformatCodeProcessor
 import com.intellij.codeInsight.completion.command.*
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
-import com.intellij.icons.AllIcons
 import com.intellij.idea.ActionsBundle
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import org.jetbrains.annotations.Nls
-import javax.swing.Icon
+import java.util.Locale.getDefault
 
 /**
  * An abstract command designed to provide a context-specific code formatting completion action.
@@ -23,22 +22,23 @@ abstract class AbstractFormatCodeCompletionCommandProvider :
   override fun getCommands(context: CommandCompletionProviderContext): List<CompletionCommand> {
     val psiFile = context.psiFile
     if (InjectedLanguageManager.getInstance(psiFile.project).isInjectedFragment(psiFile)) return emptyList()
-    return listOf(createCommand(context))
+    val element = createCommand(context) ?: return emptyList()
+    return listOf(element)
   }
 
-  abstract fun createCommand(context: CommandCompletionProviderContext): CompletionCommand
+  abstract fun createCommand(context: CommandCompletionProviderContext): CompletionCommand?
 }
 
 abstract class AbstractFormatCodeCompletionCommand : CompletionCommand(), CompletionCommandWithPreview {
-  final override val name: String
-    get() = "Format"
+  final override val synonyms: List<String>
+    get() = listOf("Format")
 
-  final override val i18nName: @Nls String
+  @Suppress("HardCodedStringLiteral")
+  final override val presentableName: @Nls String
     get() = ActionsBundle.message("action.ReformatCode.text")
-  override val synonyms: List<String>
-    get() = listOf("Reformat")
-  final override val icon: Icon
-    get() = AllIcons.Actions.ReformatCode // Use the reformat icon
+      .replaceFirst("_", "")
+      .lowercase()
+      .replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }
 
   override fun getPreview(): IntentionPreviewInfo? {
     return IntentionPreviewInfo.Html(ActionsBundle.message("action.ReformatCode.description"))

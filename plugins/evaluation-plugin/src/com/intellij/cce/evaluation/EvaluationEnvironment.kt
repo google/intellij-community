@@ -7,7 +7,6 @@ import com.intellij.cce.evaluation.data.Binding
 import com.intellij.cce.evaluation.step.runInIntellij
 import com.intellij.cce.util.Progress
 import com.intellij.cce.workspace.EvaluationWorkspace
-import java.nio.file.Path
 
 /**
  * Environment represents resources needed for an evaluation.
@@ -20,12 +19,14 @@ interface EvaluationEnvironment : AutoCloseable {
 
   val preparationDescription: String
 
-  fun prepare(datasetContext: DatasetContext, progress: Progress)
+  fun initialize(datasetContext: DatasetContext)
+
+  fun prepareDataset(datasetContext: DatasetContext, progress: Progress)
 
   fun sessionCount(datasetContext: DatasetContext): Int
 
   // TODO should return something closeable for large files
-  fun chunks(datasetContext: DatasetContext): Iterator<EvaluationChunk>
+  fun chunks(datasetContext: DatasetContext): Sequence<EvaluationChunk>
 
   fun execute(step: EvaluationStep, workspace: EvaluationWorkspace): EvaluationWorkspace?
 
@@ -41,13 +42,11 @@ interface SimpleFileEnvironment : EvaluationEnvironment {
 
   override val preparationDescription: String get() = "Checking that dataset file is available"
 
-  fun checkFile(datasetPath: Path) {
+  override fun initialize(datasetContext: DatasetContext) {
+    datasetRef.prepare(datasetContext)
   }
 
-  override fun prepare(datasetContext: DatasetContext, progress: Progress) {
-    datasetRef.prepare(datasetContext)
-    val datasetPath = datasetContext.path(datasetRef)
-    checkFile(datasetPath)
+  override fun prepareDataset(datasetContext: DatasetContext, progress: Progress) {
   }
 
   override fun execute(step: EvaluationStep, workspace: EvaluationWorkspace): EvaluationWorkspace? =

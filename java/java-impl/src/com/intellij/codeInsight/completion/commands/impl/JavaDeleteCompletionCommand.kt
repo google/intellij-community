@@ -13,7 +13,6 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.annotations.Nls
-import javax.swing.Icon
 
 internal class JavaDeleteCompletionCommandProvider : CommandProvider {
   override fun getCommands(context: CommandCompletionProviderContext): List<CompletionCommand> {
@@ -62,13 +61,11 @@ private class JavaDeleteCompletionCommand(
   override val highlightInfo: HighlightInfoLookup?,
   private val preview: IntentionPreviewInfo,
 ) : CompletionCommand(), CompletionCommandWithPreview, DumbAware {
-  override val name: String
-    get() = "Delete element"
-  override val i18nName: @Nls String
+  override val synonyms: List<String>
+    get() = listOf("delete", "remove")
+  override val presentableName: @Nls String
     get() = JavaBundle.message("command.completion.delete.element.text")
-  override val icon: Icon?
-    get() = null
-  override val priority: Int?
+  override val priority: Int
     get() = -100
 
   override fun execute(offset: Int, psiFile: PsiFile, editor: Editor?) {
@@ -85,7 +82,7 @@ private class JavaDeleteCompletionCommand(
     }, psiFile)
   }
 
-  override fun getPreview(): IntentionPreviewInfo? {
+  override fun getPreview(): IntentionPreviewInfo {
     return preview
   }
 }

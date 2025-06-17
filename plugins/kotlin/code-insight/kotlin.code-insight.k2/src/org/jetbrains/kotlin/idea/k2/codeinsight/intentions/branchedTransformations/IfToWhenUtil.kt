@@ -2,6 +2,7 @@
 package org.jetbrains.kotlin.idea.k2.codeinsight.intentions.branchedTransformations
 
 import com.intellij.modcommand.ModPsiUpdater
+import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiRecursiveVisitor
 import com.intellij.psi.PsiWhiteSpace
@@ -18,8 +19,8 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.*
 
-fun convertIfToWhen(element: KtIfExpression, updater: ModPsiUpdater) {
-    val ifExpression = element.topmostIfExpression()
+fun convertIfToWhen(element: KtIfExpression, updater: ModPsiUpdater): KtWhenExpression {
+    val ifExpression = updater.getWritable(element.topmostIfExpression())
     val parent = ifExpression.parent
 
     val elementCommentSaver = CommentSaver(ifExpression, saveLineBreaks = true)
@@ -34,13 +35,16 @@ fun convertIfToWhen(element: KtIfExpression, updater: ModPsiUpdater) {
 
     val commentSaver = if (applyFullCommentSaver) fullCommentSaver else elementCommentSaver
 
-    val subjectedWhenExpression = analyze(element) {
-        val analysableWhenExpression =
-            org.jetbrains.kotlin.psi.KtPsiFactory(element.project).createExpressionCodeFragment(whenExpression.text, ifExpression)
-                .getContentElement() as KtWhenExpression
+    val whenExpressionInCodeFragment =
+        KtPsiFactory(element.project).createExpressionCodeFragment(whenExpression.text, ifExpression)
+            .getContentElement() as KtWhenExpression
 
-        val subject = analysableWhenExpression.getSubjectToIntroduce(false)
-        whenExpression.introduceSubjectIfPossible(subject, ifExpression)
+    // ensure comments from whenExpression are saved and won't be duplicated
+    commentSaver.elementCreatedByText(whenExpressionInCodeFragment, whenExpression, TextRange(0, whenExpression.textLength))
+
+    val subjectedWhenExpression = analyze(whenExpressionInCodeFragment) {
+        val subject = whenExpressionInCodeFragment.getSubjectToIntroduce(false)
+        whenExpressionInCodeFragment.introduceSubjectIfPossible(subject, ifExpression)
     }
 
     val result = ifExpression.replaced(subjectedWhenExpression)
@@ -58,12 +62,14 @@ fun convertIfToWhen(element: KtIfExpression, updater: ModPsiUpdater) {
     result.accept(loopJumpVisitor)
     val labelName = loopJumpVisitor.labelName
     if (loop != null && loopJumpVisitor.labelRequired && labelName != null && loop.parent !is KtLabeledExpression) {
-        val labeledLoopExpression = org.jetbrains.kotlin.psi.KtPsiFactory(result.project).createLabeledExpression(labelName)
+        val labeledLoopExpression = KtPsiFactory(result.project).createLabeledExpression(labelName)
         labeledLoopExpression.baseExpression!!.replace(loop)
 
         val replacedLabeledLoopExpression = loop.replace(labeledLoopExpression)
         replacedLabeledLoopExpression.reformat()
     }
+
+    return result
 }
 
 private fun createWhenExpression(
@@ -71,7 +77,7 @@ private fun createWhenExpression(
     toDelete: ArrayList<PsiElement>
 ): Pair<KtWhenExpression, Boolean> {
     var applyFullCommentSaver = true
-    val whenExpression = KtPsiFactory(ifExpression.project).buildExpression {
+    val whenExpression = KtPsiFactory(ifExpression.project).buildExpression(reformat = false) {
         appendFixedText("when {\n")
 
         var currentIfExpression = ifExpression
@@ -122,6 +128,17 @@ private fun createWhenExpression(
 
         appendFixedText("}")
     } as KtWhenExpression
+
+    // Ensure only entries inside when are formatted
+    // Explanation:
+    // KtPsiFactory#createExpression() creates top level property `val x = text` with expr as initializer,
+    // it leads to additional indentation of the whole `when` if reformatted.
+    // when we would build code fragments over this expression, indentation would be preserved, though the code doesn't really contain `val x`
+    val whenExpressionProperty = whenExpression.firstChild as? KtProperty
+    if (whenExpressionProperty != null) {
+        whenExpression.deleteChildRange(whenExpressionProperty, whenExpressionProperty.nextSibling)
+    }
+    whenExpression.entries.forEach { entry -> entry.reformat() }
 
     return Pair(whenExpression, applyFullCommentSaver)
 }

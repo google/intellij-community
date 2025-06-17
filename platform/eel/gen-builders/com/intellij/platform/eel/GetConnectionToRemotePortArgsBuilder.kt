@@ -5,11 +5,13 @@
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.EelTunnelsApi.GetConnectionToRemotePortArgs
+import org.jetbrains.annotations.ApiStatus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 
 @GeneratedBuilder.Result
+@ApiStatus.Experimental
 class GetConnectionToRemotePortArgsBuilder() {
   private var configureSocketBeforeConnection: @ExtensionFunctionType Function1<ConfigurableClientSocket, Unit> = {}
 
@@ -21,15 +23,18 @@ class GetConnectionToRemotePortArgsBuilder() {
 
   private var timeout: Duration = 10.seconds
 
+  @ApiStatus.Internal
   fun configureSocketBeforeConnection(arg: @ExtensionFunctionType Function1<ConfigurableClientSocket, Unit>): GetConnectionToRemotePortArgsBuilder =
     apply {
       this.configureSocketBeforeConnection = arg
     }
 
+  @ApiStatus.Experimental
   fun hostname(arg: String): GetConnectionToRemotePortArgsBuilder = apply {
     this.hostname = arg
   }
 
+  @ApiStatus.Experimental
   fun port(arg: UShort): GetConnectionToRemotePortArgsBuilder = apply {
     this.port = arg
   }
@@ -37,6 +42,7 @@ class GetConnectionToRemotePortArgsBuilder() {
   /**
    * @see [Builder.preferIPv4]
    */
+  @ApiStatus.Experimental
   fun protocolPreference(arg: EelIpPreference): GetConnectionToRemotePortArgsBuilder = apply {
     this.protocolPreference = arg
   }
@@ -53,6 +59,7 @@ class GetConnectionToRemotePortArgsBuilder() {
   /**
    * @see [Builder.connectionTimeout]
    */
+  @ApiStatus.Experimental
   fun timeout(arg: Duration): GetConnectionToRemotePortArgsBuilder = apply {
     this.timeout = arg
   }

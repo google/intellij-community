@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.usages.K2MoveRena
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.usages.K2MoveRenameUsageInfo.Companion.markInternalUsages
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.usages.OuterInstanceReferenceUsageInfo
 import org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringListener
+import org.jetbrains.kotlin.idea.refactoring.pullUp.willBeMoved
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
@@ -174,6 +175,8 @@ open class K2MoveDeclarationsRefactoringProcessor(
 
                     val declarationsToMove = moveDescriptor.source.elements
                     val listeners = declarationsToMove.associateWith { transaction.getElementListener(it) }
+                    val publisher = myProject.messageBus.syncPublisher(K2MoveDeclarationsRefactoringListener.TOPIC)
+                    publisher.beforeMove(moveDescriptor)
                     declarationsToMove.forEach { elementToMove ->
                         preprocessDeclaration(elementToMove)
                         preDeclarationMoved(elementToMove)
@@ -198,6 +201,7 @@ open class K2MoveDeclarationsRefactoringProcessor(
                         }
                         listeners[original]?.elementMoved(new)
                     }
+                    publisher.afterMove(moveDescriptor)
                     oldToNewMap.values
                 }
             }

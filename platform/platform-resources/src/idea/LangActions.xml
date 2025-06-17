@@ -1,5 +1,7 @@
 <!--suppress PluginXmlRegistrationCheck -->
 <idea-plugin>
+  <module value="com.intellij.modules.lang.actions"/>
+
   <actions>
     <action id="IncrementalSearch" class="com.intellij.codeInsight.navigation.actions.IncrementalSearchAction"/>
 
@@ -191,7 +193,7 @@
     <action id="ShowHoverInfo" class="com.intellij.openapi.editor.actions.ShowHoverInfoAction"/>
 
     <action id="ShowGutterIconsSettings" class="com.intellij.application.options.editor.GutterIconsConfigurable$ShowSettingsAction">
-      <add-to-group group-id="EditorGutterPopupMenu.Appearance" anchor="last"/>
+      <add-to-group group-id="EditorGutterPopupMenu" anchor="last"/>
       <add-to-group group-id="DocCommentGutterIconContextMenu"/>
     </action>
 

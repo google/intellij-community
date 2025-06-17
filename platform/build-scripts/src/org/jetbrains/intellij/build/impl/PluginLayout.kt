@@ -18,6 +18,7 @@ import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.CustomAssetDescriptor
 import org.jetbrains.intellij.build.JvmArchitecture
 import org.jetbrains.intellij.build.LazySource
+import org.jetbrains.intellij.build.LibcImpl
 import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.PluginBundlingRestrictions
 import org.jetbrains.intellij.build.io.copyDir
@@ -88,7 +89,7 @@ class PluginLayout(val mainModule: String, @Internal @JvmField val auto: Boolean
    * Should be `true` if the semantic versioning is enabled for the plugin in plugins.jetbrains.com.
    * Then the plugin version will be checked against [com.intellij.util.text.SemVer].
    */
-  var semanticVersioning: Boolean = false
+  var semanticVersioning: Boolean = true
     private set
 
   @JvmField
@@ -257,8 +258,8 @@ class PluginLayout(val mainModule: String, @Internal @JvmField val auto: Boolean
       }
     }
 
-    fun withGeneratedPlatformResources(os: OsFamily, arch: JvmArchitecture, generator: ResourceGenerator) {
-      val key = SupportedDistribution(os, arch)
+    fun withGeneratedPlatformResources(os: OsFamily, arch: JvmArchitecture, libc: LibcImpl, generator: ResourceGenerator) {
+      val key = SupportedDistribution(os, arch, libc)
       val newValue = layout.platformResourceGenerators[key]?.let { it + generator } ?: persistentListOf(generator)
       layout.platformResourceGenerators += key to newValue
     }
@@ -300,7 +301,9 @@ class PluginLayout(val mainModule: String, @Internal @JvmField val auto: Boolean
     /**
      * @see [PluginLayout.semanticVersioning]
      */
-    var semanticVersioning: Boolean = true
+    @Suppress("unused")
+    var semanticVersioning: Boolean
+      get() = layout.semanticVersioning
       set(value) {
         layout.semanticVersioning = value
       }
@@ -327,8 +330,8 @@ class PluginLayout(val mainModule: String, @Internal @JvmField val auto: Boolean
       }
     }
 
-    fun withPlatformBin(os: OsFamily, arch: JvmArchitecture, binPathRelativeToCommunity: String, outputPath: String, skipIfDoesntExist: Boolean = false) {
-      withGeneratedPlatformResources(os, arch) { targetDir, context ->
+    fun withPlatformBin(os: OsFamily, arch: JvmArchitecture, libc: LibcImpl, binPathRelativeToCommunity: String, outputPath: String, skipIfDoesntExist: Boolean = false) {
+      withGeneratedPlatformResources(os, arch, libc) { targetDir, context ->
         copyBinaryResource(binPathRelativeToCommunity, outputPath, skipIfDoesntExist, targetDir, context)
       }
     }
@@ -379,7 +382,7 @@ class PluginLayout(val mainModule: String, @Internal @JvmField val auto: Boolean
     }
 
     /**
-     * By default, a version of a plugin is equal to the build number of the IDE it's built with.
+     * By default, a version of a plugin is equal to [org.jetbrains.intellij.build.BuildContext.pluginBuildNumber].
      * This method allows specifying custom version evaluator.
      */
     fun withCustomVersion(versionEvaluator: PluginVersionEvaluator) {

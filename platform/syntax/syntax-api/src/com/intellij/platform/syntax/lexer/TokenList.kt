@@ -8,12 +8,17 @@ import com.intellij.platform.syntax.CancellationProvider
 import com.intellij.platform.syntax.Logger
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.platform.syntax.SyntaxElementTypeSet
+import com.intellij.platform.syntax.impl.builder.DIAGNOSTICS
 import kotlin.jvm.JvmName
 import org.jetbrains.annotations.ApiStatus
 
 /**
- * This class represents the result of lexing: text and the tokens produced from it by some lexer.
- * It allows clients to inspect all tokens at once and easily move back and forward to implement some simple lexer-based checks.
+ * This interface represents the result of lexing: text and the tokens produced from it by some lexer.
+ * It allows clients to inspect all tokens at once and move back and forward to implement some simple lexer-based checks.
+ *
+ * @see TokenList(IntArray, Array<SyntaxElementType>, int, CharSequence)
+ * @see performLexing
+ * @see tokenListLexer
  */
 @ApiStatus.Experimental
 interface TokenList {
@@ -49,8 +54,17 @@ interface TokenList {
     if (index < 0 || index >= tokenCount) return null
     return tokenizedText.subSequence(getTokenStart(index), getTokenEnd(index))
   }
+
+  fun slice(start: Int, end: Int): TokenList
+
+  fun remap(index: Int, newValue: SyntaxElementType)
 }
 
+/**
+ * Performs lexing of the given text with the given lexer.
+ *
+ * @return a TokenList representing the result of lexing
+ */
 fun performLexing(
   text: CharSequence,
   lexer: Lexer,
@@ -59,9 +73,9 @@ fun performLexing(
 ): TokenList {
   if (lexer is TokenListLexerImpl) {
     val existing = lexer.tokens
-    if (existing is TokenSequence && equal(text, existing.tokenizedText)) {
+    if (existing is TokenListImpl && equal(text, existing.tokenizedText)) {
       // prevent clients like PsiBuilder from modifying shared token types
-      return TokenSequence(
+      return TokenListImpl(
         lexStarts = existing.lexStarts,
         lexTypes = existing.lexTypes.copyOf(),
         tokenCount = existing.tokenCount,
@@ -70,16 +84,25 @@ fun performLexing(
     }
   }
   val sequence = Builder(text, lexer, cancellationProvider, logger).performLexing()
-  return sequence as TokenList
+
+  DIAGNOSTICS?.registerPass(text.length, sequence.tokenCount)
+
+  return sequence
 }
 
+/**
+ * Creates a TokenList from the given arrays.
+ */
 fun TokenList(
   lexStarts: IntArray,
   lexTypes: Array<SyntaxElementType>,
   tokenCount: Int,
   tokenizedText: CharSequence,
-): TokenList = TokenSequence(lexStarts, lexTypes, tokenCount, tokenizedText)
+): TokenList = TokenListImpl(lexStarts, lexTypes, tokenCount, tokenizedText)
 
+/**
+ * Creates an adapter from the given TokenList to [Lexer] interface.
+ */
 fun tokenListLexer(tokenList: TokenList, logger: Logger? = null): Lexer =
   TokenListLexerImpl(tokenList, logger)
 

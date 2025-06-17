@@ -31,6 +31,10 @@ public class AnonymousToInnerTest extends LightJavaCodeInsightTestCase {
     doTest("MyIterator", false);
   }
 
+  public void testGenericParametersWithGenericBounds() {
+    doTest("Inner", false);
+  }
+
   public void testInsideInterface() {  // IDEADEV-29446
     doTest("MyRunnable", true);
   }
@@ -144,6 +148,10 @@ public class AnonymousToInnerTest extends LightJavaCodeInsightTestCase {
 
   public void testOuterThisQualifier() {
     doTest("MyClass", true);
+  }
+
+  public void testChainedConstructor() {
+    doTest("Inner", true);
   }
 
   private void doTest(final String newClassName, final boolean makeStatic) {

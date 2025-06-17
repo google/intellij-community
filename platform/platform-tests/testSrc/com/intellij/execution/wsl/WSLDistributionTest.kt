@@ -15,6 +15,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.use
 import com.intellij.platform.eel.*
+import com.intellij.platform.eel.EelExecApi.ExternalCliEntrypoint
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.ijent.IjentPosixApi
 import com.intellij.platform.ijent.IjentProcessInfo
@@ -38,6 +39,7 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.cancel
+import org.jetbrains.annotations.NonNls
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -516,11 +518,14 @@ class WSLDistributionTest {
 enum class WslTestStrategy { Legacy, Ijent }
 
 private class MockIjentApi(private val adapter: GeneralCommandLine, val rootUser: Boolean) : IjentPosixApi {
+  override val platform: EelPlatform.Posix = EelPlatform.Linux(EelPlatform.Arch.Unknown)
+
   override val descriptor: EelDescriptor
     get() = object : EelDescriptor {
-      override val platform: EelPlatform = EelPlatform.Linux(EelPlatform.Arch.Unknown)
+      override val userReadableDescription: @NonNls String = "mock"
+      override val osFamily: EelOsFamily = this@MockIjentApi.platform.osFamily
 
-      override suspend fun upgrade(): EelApi {
+      override suspend fun toEelApi(): EelApi {
         throw UnsupportedOperationException()
       }
     }
@@ -561,6 +566,9 @@ private class MockIjentExecApi(private val adapter: GeneralCommandLine, private 
 
   override suspend fun fetchLoginShellEnvVariables(): Map<String, String> = mapOf("SHELL" to TEST_SHELL)
   override suspend fun findExeFilesInPath(binaryName: String): List<EelPath> = listOf(EelPath.parse("/bin/$binaryName", descriptor))
+  override suspend fun createExternalCli(options: EelExecApi.ExternalCliOptions): ExternalCliEntrypoint {
+    throw UnsupportedOperationException()
+  }
 }
 
 private val TEST_ROOT_USER_SET by lazy { Key.create<Boolean>("TEST_ROOT_USER_SET") }

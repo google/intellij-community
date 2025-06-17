@@ -10,6 +10,7 @@ import com.intellij.util.lang.PathClassLoader
 import com.intellij.util.lang.UrlClassLoader
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ import org.jetbrains.intellij.build.BuildPaths
 import org.jetbrains.intellij.build.BuildPaths.Companion.COMMUNITY_ROOT
 import org.jetbrains.intellij.build.CompilationContext
 import org.jetbrains.intellij.build.JvmArchitecture
+import org.jetbrains.intellij.build.LibcImpl
 import org.jetbrains.intellij.build.LinuxDistributionCustomizer
 import org.jetbrains.intellij.build.MacDistributionCustomizer
 import org.jetbrains.intellij.build.OsFamily
@@ -47,6 +49,7 @@ import org.jetbrains.intellij.build.generatePluginClassPath
 import org.jetbrains.intellij.build.generatePluginClassPathFromPrebuiltPluginFiles
 import org.jetbrains.intellij.build.getDevModeOrTestBuildDateInSeconds
 import org.jetbrains.intellij.build.impl.ArchivedCompilationContext
+import org.jetbrains.intellij.build.impl.BazelCompilationContext
 import org.jetbrains.intellij.build.impl.BuildContextImpl
 import org.jetbrains.intellij.build.impl.CompilationContextImpl
 import org.jetbrains.intellij.build.impl.ModuleOutputPatcher
@@ -61,6 +64,7 @@ import org.jetbrains.intellij.build.impl.createPlatformLayout
 import org.jetbrains.intellij.build.impl.generateRuntimeModuleRepositoryForDevBuild
 import org.jetbrains.intellij.build.impl.getOsDistributionBuilder
 import org.jetbrains.intellij.build.impl.getToolModules
+import org.jetbrains.intellij.build.impl.isRunningFromBazelOut
 import org.jetbrains.intellij.build.impl.layoutPlatformDistribution
 import org.jetbrains.intellij.build.impl.productInfo.PRODUCT_INFO_FILE_NAME
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
@@ -108,7 +112,9 @@ data class BuildRequest(
 
   @JvmField val buildOptionsTemplate: BuildOptions? = null,
 
-  @JvmField val tracer: Tracer? = null
+  @JvmField val tracer: Tracer? = null,
+
+  @JvmField val os: OsFamily = OsFamily.currentOs
 ) {
   override fun toString(): String =
     "BuildRequest(platformPrefix='$platformPrefix', " +
@@ -160,6 +166,10 @@ internal suspend fun buildProduct(request: BuildRequest, createProductProperties
 
   val runDir = buildDir
   val context = createBuildContext(createProductProperties, request, runDir, request.jarCacheDir, buildDir)
+  if (request.os != OsFamily.currentOs) {
+    context.options.targetOs = persistentListOf(request.os)
+    context.options.targetArch = JvmArchitecture.currentJvmArch
+  }
   compileIfNeeded(context)
 
   coroutineScope {
@@ -179,7 +189,9 @@ internal suspend fun buildProduct(request: BuildRequest, createProductProperties
         val binDir = Files.createDirectories(runDir.resolve("bin"))
         val oldFiles = Files.newDirectoryStream(binDir).use { it.toCollection(HashSet()) }
 
-        val osDistributionBuilder = getOsDistributionBuilder(OsFamily.currentOs, context)
+        val libcImpl = LibcImpl.current(request.os)
+
+        val osDistributionBuilder = getOsDistributionBuilder(request.os, libcImpl, context)
         if (osDistributionBuilder != null) {
           oldFiles.remove(osDistributionBuilder.writeVmOptions(binDir))
           // the file cannot be placed right into the distribution as it throws off home dir detection in `PathManager#getHomeDirFor`
@@ -286,7 +298,10 @@ internal suspend fun buildProduct(request: BuildRequest, createProductProperties
       // ensure plugin dist files added to the list
       pluginDistributionEntriesDeferred.await()
 
-      copyDistFiles(context = context, newDir = runDir, os = OsFamily.currentOs, arch = JvmArchitecture.currentJvmArch)
+      spanBuilder("scramble platform").use{
+        request.scrambleTool?.scramble(platformLayout.await(), context)
+      }
+      copyDistFiles(context = context, newDir = runDir, os = request.os, arch = JvmArchitecture.currentJvmArch, libcImpl = LibcImpl.current(OsFamily.currentOs))
     }
   }.invokeOnCompletion {
     // close debug logging to prevent locking of the output directory on Windows
@@ -485,6 +500,7 @@ private suspend fun createBuildContext(
         options.generateRuntimeModuleRepository = options.generateRuntimeModuleRepository && request.generateRuntimeModuleRepository
 
         buildOptionsTemplate?.let { template ->
+          options.buildNumber = template.buildNumber
           options.isInDevelopmentMode = template.isInDevelopmentMode
           options.isTestBuild = template.isTestBuild
         }
@@ -499,6 +515,7 @@ private suspend fun createBuildContext(
           artifactDir = buildDir.resolve("artifacts"),
           searchableOptionDir = request.projectDir.resolve("out/dev-data/searchable-options"),
         )
+        result.distAllDir = runDir
         Files.createDirectories(tempDir)
 
         CompilationContextImpl.createCompilationContext(
@@ -510,6 +527,7 @@ private suspend fun createBuildContext(
           customBuildPaths = result,
         )
         .let { if (options.unpackCompiledClassesArchives) it else ArchivedCompilationContext(it) }
+        .let { if (!isRunningFromBazelOut()) it else BazelCompilationContext(it) }
       }
     }
 
@@ -549,9 +567,11 @@ private suspend fun createBuildContext(
 }
 
 internal suspend fun createProductProperties(productConfiguration: ProductConfiguration, compilationContext: CompilationContext, request: BuildRequest): ProductProperties {
-  val classPathFiles = coroutineScope {
-     getBuildModules(productConfiguration).map { async { compilationContext.getModuleOutputDir(compilationContext.findRequiredModule(it)) } }.toList()
-  }.awaitAll()
+  val classPathFiles = buildList {
+    for (moduleName in getBuildModules(productConfiguration)) {
+      addAll(compilationContext.getModuleOutputRoots(compilationContext.findRequiredModule(moduleName)))
+    }
+  }
 
   val classLoader = spanBuilder("create product properties classloader").use {
     PathClassLoader(UrlClassLoader.build().files(classPathFiles).parent(BuildRequest::class.java.classLoader))

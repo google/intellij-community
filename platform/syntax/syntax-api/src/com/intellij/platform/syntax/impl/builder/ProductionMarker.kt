@@ -5,7 +5,7 @@ import com.intellij.platform.syntax.parser.SyntaxTreeBuilder
 
 internal abstract class ProductionMarker(
   val markerId: Int,
-  val builder: ParsingTreeBuilder,
+  val builder: SyntaxTreeBuilderImpl,
 ) : SyntaxTreeBuilder.Production {
 
   var startIndex: Int = -1
@@ -17,7 +17,7 @@ internal abstract class ProductionMarker(
   }
 
   final override fun getStartOffset(): Int =
-    builder.myLexStarts[getStartTokenIndex()] + builder.startOffset
+    builder.lexStart(getStartTokenIndex()) + builder.startOffset
 
   final override fun isCollapsed(): Boolean =
     builder.myOptionalData.isCollapsed(markerId)

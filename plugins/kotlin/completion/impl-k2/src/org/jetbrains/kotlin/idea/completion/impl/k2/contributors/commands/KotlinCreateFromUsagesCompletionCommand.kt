@@ -40,7 +40,6 @@ import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedElementSelector
 import org.jetbrains.kotlin.psi.stubs.elements.KtNameReferenceExpressionElementType
-import javax.swing.Icon
 
 
 internal class KotlinCreateFromUsagesCommandProvider : CommandProvider {
@@ -82,12 +81,10 @@ internal class KotlinCreateFromUsagesCompletionCommand(val ktClass: KtClass) : C
             (ktClass.symbol as? KaClassSymbol)?.memberScope?.declarations?.map { it.name?.identifier }?.filterNotNull()?.toSet()
         } ?: emptySet()
 
-    override val name: String
-        get() = "Create method from usage"
-    override val i18nName: @Nls String
+    override val synonyms: List<String>
+        get() = listOf("Create method from usage")
+    override val presentableName: @Nls String
         get() = QuickFixBundle.message("create.method.from.usage.family")
-    override val icon: Icon?
-        get() = null
 
     override fun execute(offset: Int, psiFile: PsiFile, editor: Editor?) {
         val fileDocument = psiFile.fileDocument
@@ -134,7 +131,7 @@ internal class KotlinCreateFromUsagesCompletionCommand(val ktClass: KtClass) : C
             it.javaClass.name == "org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.CreateKotlinCallableAction" &&
                     it.text.contains(KotlinBundle.message("text.member"))
         } ?: return
-        ShowIntentionActionsHandler.chooseActionAndInvoke(psiFile, editor, action, name)
+        ShowIntentionActionsHandler.chooseActionAndInvoke(psiFile, editor, action, presentableName)
     }
 
     override fun customPrefixMatcher(prefix: String): PrefixMatcher {

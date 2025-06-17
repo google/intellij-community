@@ -23,6 +23,7 @@ jvm_library(
     "@lib//:grpc-protobuf",
     "@lib//:grpc-stub",
     "@lib//:jackson-jr-objects",
+    "//platform/core-api:core",
     "//jps/model-api:model",
     "//platform/util",
     "//platform/runtime/repository",
@@ -50,6 +51,8 @@ jvm_library(
     "//platform/util/xmlDom",
     "@lib//:tc_service_messages",
     "//platform/buildData",
+    "//platform/util/zip",
+    "//platform/distribution-content:distributionContent-testFramework",
   ]
 )
 ### auto-generated section `build intellij.platform.buildScripts.testFramework` end

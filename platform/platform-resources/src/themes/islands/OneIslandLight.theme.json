@@ -31,6 +31,7 @@
   },
 
   "ui": {
+    "Island": 1,
     "Island.arc": 20,
 
     "MainWindow.background": "BackgroundDark",
@@ -67,11 +68,19 @@
 
     "EditorTabs": {
       "background": "BackgroundLight",
-      "underlinedTabBackground": "BackgroundLight",
-      "hoverBackground": "BackgroundLight",
-      "underTabsBorderColor": "BackgroundDark"
+      "underTabsBorderColor": "BackgroundDark",
+      "underlinedBorderColor": "Blue9",
+      "underlinedTabBackground": "#D4E2FFB3",
+      "inactiveUnderlinedTabBorderColor": "Gray10",
+      "inactiveUnderlinedTabBackground": "Gray12",
+      "hoverBackground": "#0000000C",
+
+      "tabInsets": "-6,8,-6,8",
+      "tabContentActionsRightInsets": "0,2,0,2"
     },
+
     "Editor.SearchField.background": "BackgroundLight",
+
     "Editor.ToolTip": {
       "background": "TooltipBackground",
       "border": "TooltipBackground"
@@ -80,6 +89,13 @@
     "Code.Block": {
       "borderColor": "BorderDark",
       "EditorPane.borderColor": "BorderDark"
+    },
+
+    "NavBar.borderColor": "BorderTransparent",
+
+    "FileColor": {
+      "Yellow": "#fcf4e1",
+      "Green": "#e6f7e8"
     },
 
     "Popup": {
@@ -113,6 +129,19 @@
     },
 
     "HelpBrowser.UserMessage.background": "#DFE1E5CC",
+
+    "RecentProject.Color1.MainToolbarGradientStart": "#f7d7cb",
+    "RecentProject.Color2.MainToolbarGradientStart": "#f5e6b8",
+    "RecentProject.Color3.MainToolbarGradientStart": "#e2f2c9",
+    "RecentProject.Color4.MainToolbarGradientStart": "#cbe4f7",
+    "RecentProject.Color5.MainToolbarGradientStart": "#d4d2fc",
+    "RecentProject.Color6.MainToolbarGradientStart": "#ecd3f5",
+    "RecentProject.Color7.MainToolbarGradientStart": "#e4d3f5",
+    "RecentProject.Color8.MainToolbarGradientStart": "#cef0e9",
+    "RecentProject.Color9.MainToolbarGradientStart": "#ceedd4",
+
+    "RecentProject.MainToolbarGradient.width": 600,
+    "RecentProject.MainToolbarGradient.height": 300,
 
     "RecentProject": {
       "Color1": {

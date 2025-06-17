@@ -25,7 +25,7 @@
   <xi:include href="jvm-debugger.xml"/>
   <xi:include href="jvm-debugger-k2.xml"/>
   <xi:include href="dep-spellchecker.xml"/>
-  <xi:include href="scripting-k2.xml"/>
+  <xi:include href="scripting-base.xml"/>
   <xi:include href="native.xml"/>
   <xi:include href="native-k2.xml"/>
   <xi:include href="facets-base.xml"/>
@@ -116,11 +116,16 @@
                             implementationClass="org.jetbrains.kotlin.idea.completion.KotlinFirCompletionContributor"/>
 
     <completion.contributor language="kotlin"
-                            order="first, after KotlinDumbCompletionContributor"
+                            order="last, before default"
                             implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.KotlinChainCompletionContributor"/>
 
     <registryKey key="kotlin.k2.chain.completion.enabled"
                  description="Allow chained completion items in Kotlin"
+                 defaultValue="true"
+                 restartRequired="true"/>
+
+    <registryKey key="kotlin.k2.smart.completion.enabled"
+                 description="Enable smart completion for Kotlin in K2 mode"
                  defaultValue="true"
                  restartRequired="true"/>
 
@@ -248,6 +253,8 @@
 
     <module name="kotlin.jvm.shared"/>
     <module name="kotlin.jvm.k2"/>
+
+    <module name="kotlin.base.scripting.k2"/>
 
     <module name="kotlin.code-insight.intentions.shared"/>
     <module name="kotlin.code-insight.inspections.shared"/>

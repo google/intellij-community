@@ -5,7 +5,6 @@ import com.intellij.concurrency.currentThreadContext
 import com.intellij.diagnostic.ThreadDumper
 import com.intellij.openapi.application.UiDispatcherKind.RELAX
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.IntellijInternalApi
@@ -158,6 +157,22 @@ sealed interface ReadAndWriteScope {
 }
 
 /**
+ * This method is renamed. Consider using [readAndEdtWriteAction].
+ */
+@Deprecated(message = "This method is renamed because it has unclear threading semantics", replaceWith = ReplaceWith("com.intellij.openapi.application.readAndEdtWriteAction(action)", "com.intellij.openapi.application.readAndEdtWriteAction"))
+suspend fun <T> readAndWriteAction(action: ReadAndWriteScope.() -> ReadResult<T>): T {
+  return constrainedReadAndWriteAction(action = action)
+}
+
+/**
+ * Same as [readAndEdtWriteAction], but invokes write actions on a background thread instead of EDT.
+ */
+@Experimental
+suspend fun <T> readAndBackgroundWriteAction(action: ReadAndWriteScope.() -> ReadResult<T>): T {
+  return readWriteActionSupport().executeReadAndWriteAction(emptyArray(), false, action)
+}
+
+/**
  * Runs given [action] under [read lock][com.intellij.openapi.application.Application.runReadAction]
  * **without** preventing write actions. If given [action] returns [write action][ReadAndWriteScope.writeAction]
  * as result, this write action will be run under [write lock][com.intellij.openapi.application.Application.runWriteAction]
@@ -165,12 +180,14 @@ sealed interface ReadAndWriteScope {
  * write action happens after the read completion but before the returned write action was able to run.
  * In other words, it's guaranteed that no other write occurs between the read action and returned write action.
  *
+ * Write actions are invoked on **EDT**.
+ *
  * See [constrainedReadAndWriteAction] for details.
  *
  * @see constrainedReadAction
  */
-suspend fun <T> readAndWriteAction(action: ReadAndWriteScope.() -> ReadResult<T>): T {
-  return constrainedReadAndWriteAction(action = action)
+suspend fun <T> readAndEdtWriteAction(action: ReadAndWriteScope.() -> ReadResult<T>): T {
+  return readWriteActionSupport().executeReadAndWriteAction(emptyArray(), true, action)
 }
 
 /**
@@ -221,7 +238,7 @@ suspend fun <T> readAndWriteAction(action: ReadAndWriteScope.() -> ReadResult<T>
  *
  */
 suspend fun <T> constrainedReadAndWriteAction(vararg constraints: ReadConstraint, action: ReadAndWriteScope.() -> ReadResult<T>): T {
-  return readWriteActionSupport().executeReadAndWriteAction(constraints, action = action)
+  return readWriteActionSupport().executeReadAndWriteAction(constraints, true, action = action)
 }
 
 /**
@@ -233,14 +250,12 @@ suspend fun <T> constrainedReadAndWriteAction(vararg constraints: ReadConstraint
  * i.e. [runWriteAction][com.intellij.openapi.application.Application.runWriteAction] call will block
  * until all currently running read actions are finished.
  *
- * @see readAndWriteAction
+ * @see readAndEdtWriteAction
  * @see com.intellij.openapi.command.writeCommandAction
  */
 suspend fun <T> edtWriteAction(action: () -> T): T {
   return withContext(Dispatchers.EDT) {
-    blockingContext {
-      ApplicationManager.getApplication().runWriteAction(Computable(action))
-    }
+    ApplicationManager.getApplication().runWriteAction(Computable(action))
   }
 }
 
@@ -256,9 +271,7 @@ suspend fun <T> edtWriteAction(action: () -> T): T {
 @Experimental
 suspend fun <T> writeAction(action: () -> T): T {
   return withContext(Dispatchers.EDT) {
-    blockingContext {
-      ApplicationManager.getApplication().runWriteAction(Computable(action))
-    }
+    ApplicationManager.getApplication().runWriteAction(Computable(action))
   }
 }
 
@@ -268,7 +281,7 @@ private object RunInBackgroundWriteActionMarker
   override val key: CoroutineContext.Key<*> get() = this
 }
 
-@Experimental
+@Internal
 @ApiStatus.Obsolete
 fun CoroutineContext.isBackgroundWriteAction(): Boolean =
   currentThreadContext()[RunInBackgroundWriteActionMarker] != null
@@ -286,11 +299,10 @@ fun CoroutineContext.isBackgroundWriteAction(): Boolean =
  * This function exists to make it possible to use it in suspending contexts
  * before the platform is ready to handle write actions differently.
  *
- * @see readAndWriteAction
+ * @see readAndBackgroundWriteAction
  * @see com.intellij.openapi.command.writeCommandAction
  */
 @Experimental
-@Internal
 suspend fun <T> backgroundWriteAction(action: () -> T): T {
   val context = if (useBackgroundWriteAction) {
     Dispatchers.Default + RunInBackgroundWriteActionMarker
@@ -343,14 +355,12 @@ ${dump.rawDump}""")
  * This function exists to make it possible to use it in suspending contexts
  * before the platform is ready to handle write actions differently.
  *
- * @see readAndWriteAction
+ * @see readAndEdtWriteAction
  * @see com.intellij.openapi.command.writeCommandAction
  */
 @Experimental
 suspend fun <T> writeIntentReadAction(action: () -> T): T {
-  return blockingContext {
-    ApplicationManager.getApplication().runWriteIntentReadAction(ThrowableComputable(action))
-  }
+  return ApplicationManager.getApplication().runWriteIntentReadAction(ThrowableComputable(action))
 }
 
 private fun readWriteActionSupport() = ApplicationManager.getApplication().getService(ReadWriteActionSupport::class.java)

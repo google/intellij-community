@@ -33,19 +33,16 @@ import com.intellij.util.ui.update.UiNotifyConnector
 import com.intellij.vcs.branch.BranchData
 import com.intellij.vcs.branch.BranchPresentation
 import com.intellij.vcs.branch.LinkedBranchDataImpl
+import com.intellij.vcs.git.shared.branch.GitBranchesMatcherWrapper
 import com.intellij.vcs.git.shared.branch.calcTooltip
+import com.intellij.vcs.git.shared.branch.tree.GitBranchesTreeUtil
 import com.intellij.vcs.git.shared.ui.GitBranchesTreeIconProvider
+import com.intellij.vcs.git.shared.ui.GitIncomingOutgoingUi
 import com.intellij.vcsUtil.VcsImplUtil
+import git4idea.config.GitVcsSettings
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
-import git4idea.ui.branch.GitBranchManager
-import git4idea.ui.branch.GitBranchesMatcherWrapper
 import git4idea.ui.branch.dashboard.BranchesDashboardActions.BranchesTreeActionGroup
-import git4idea.ui.branch.popup.createIncomingLabel
-import git4idea.ui.branch.popup.createOutgoingLabel
-import git4idea.ui.branch.popup.updateIncomingCommitLabel
-import git4idea.ui.branch.popup.updateOutgoingCommitLabel
-import git4idea.ui.branch.tree.GitBranchesTreeUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,10 +79,10 @@ internal class BranchesTreeComponent(project: Project) : DnDAwareTree() {
 
   private inner class BranchTreeCellRenderer(project: Project) : ColoredTreeCellRenderer() {
     private val repositoryManager = GitRepositoryManager.getInstance(project)
-    private val branchManager = project.service<GitBranchManager>()
+    private val settings = GitVcsSettings.getInstance(project)
 
-    private val incomingLabel = createIncomingLabel()
-    private val outgoingLabel = createOutgoingLabel()
+    private val incomingLabel = GitIncomingOutgoingUi.createIncomingLabel()
+    private val outgoingLabel = GitIncomingOutgoingUi.createOutgoingLabel()
 
     override fun customizeCellRenderer(
       tree: JTree,
@@ -116,7 +113,7 @@ internal class BranchesTreeComponent(project: Project) : DnDAwareTree() {
 
       val refInfo = (descriptor as? BranchNodeDescriptor.Ref)?.refInfo
       if (refInfo != null) {
-        val repositoryGrouping = branchManager.isGroupingEnabled(GroupingKey.GROUPING_BY_REPOSITORY)
+        val repositoryGrouping = settings.branchSettings.isGroupingEnabled(GroupingKey.GROUPING_BY_REPOSITORY)
         if (!repositoryGrouping && refInfo.repositories.size < repositoryManager.repositories.size) {
           append(" (${DvcsUtil.getShortNames(refInfo.repositories)})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         }
@@ -128,8 +125,8 @@ internal class BranchesTreeComponent(project: Project) : DnDAwareTree() {
           else null
 
         val incomingOutgoingState = refInfo.incomingOutgoingState
-        updateIncomingCommitLabel(incomingLabel, incomingOutgoingState)
-        updateOutgoingCommitLabel(outgoingLabel, incomingOutgoingState)
+        GitIncomingOutgoingUi.updateIncomingCommitLabel(incomingLabel, incomingOutgoingState)
+        GitIncomingOutgoingUi.updateOutgoingCommitLabel(outgoingLabel, incomingOutgoingState)
 
         val fontMetrics = incomingLabel.getFontMetrics(incomingLabel.font)
         incomingLabel.size = Dimension(fontMetrics.stringWidth(incomingLabel.text) + JBUI.scale(1) + incomingLabel.icon.iconWidth, fontMetrics.height)

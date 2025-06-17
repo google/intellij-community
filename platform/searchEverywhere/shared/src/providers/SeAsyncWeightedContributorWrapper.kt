@@ -17,9 +17,13 @@ class SeAsyncWeightedContributorWrapper<I: Any>(val contributor: WeightedSearchE
     progressIndicator: ProgressIndicator,
     consumer: AsyncProcessor<FoundItemDescriptor<I>>
   ) {
+    if (pattern.isEmpty() && !contributor.isEmptyPatternSupported) return
+
     contributor.fetchWeightedElements(pattern, progressIndicator) { t ->
       runBlockingCancellable {
-        SeLog.log(ITEM_EMIT) { "Provider async wrapper of ${contributor.searchProviderId} emitting: ${t.item}" }
+        SeLog.log(ITEM_EMIT) {
+          "Provider async wrapper of ${contributor.searchProviderId} emitting: ${t.item.toString().split('\n').firstOrNull()}"
+        }
         consumer.process(t)
       }
     }

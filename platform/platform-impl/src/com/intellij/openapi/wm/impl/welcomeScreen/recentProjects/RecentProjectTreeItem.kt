@@ -7,6 +7,7 @@ import com.intellij.ide.*
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.lightEdit.LightEdit
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
 import com.intellij.openapi.components.service
@@ -111,8 +112,10 @@ internal data class RecentProjectItem(
                               BitUtil.isSet(event.modifiers, ActionEvent.SHIFT_MASK) ||
                               event.place == ActionPlaces.WELCOME_SCREEN ||
                               LightEdit.owns(null)
+    val forceReuseFrame = event.place == ActionPlaces.WELCOME_SCREEN_NON_MODAL
     openProjectAndLogRecent(file, OpenProjectTask {
       this.forceOpenInNewFrame = forceOpenInNewFrame
+      this.forceReuseFrame = forceReuseFrame
       runConfigurators = true
     }, projectGroup)
   }
@@ -151,9 +154,12 @@ internal data class ProviderRecentProjectItem(
   val icon: Icon? get() = recentProject.icon
   val providerIcon: Icon? get() = recentProject.providerIcon
   val activationTimestamp: Long? get() = recentProject.activationTimestamp
+  val statusText: String? get() = recentProject.status.statusText
+  val progressText: String? get() = recentProject.status.progressText
+  val additionalActions: List<AnAction> get() = recentProject.additionalActions
 
-  fun openProject() {
-    recentProject.openProject()
+  fun openProject(actionEvent: AnActionEvent) {
+    recentProject.openProject(actionEvent)
   }
 
   fun removeFromRecent() {

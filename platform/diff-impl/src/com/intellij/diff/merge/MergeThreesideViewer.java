@@ -408,8 +408,11 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
       List<DocumentContent> contents = myMergeRequest.getContents();
       MergeRange importRange = ReadAction.compute(() -> {
         sequences.addAll(ContainerUtil.map(contents, content -> content.getDocument().getImmutableCharSequence()));
-        initPsiFiles();
-        if (getTextSettings().isAutoResolveImportConflicts()) {
+        boolean isAutoResolveImportConflicts = getTextSettings().isAutoResolveImportConflicts();
+        if (myConflictResolver.isAvailable() || isAutoResolveImportConflicts) {
+          initPsiFiles();
+        }
+        if (isAutoResolveImportConflicts) {
           boolean canImportsBeProcessedAutomatically = canImportsBeProcessedAutomatically();
           myResolveImportsPossible = canImportsBeProcessedAutomatically;
           if (canImportsBeProcessedAutomatically) {
@@ -1011,7 +1014,10 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
 
     @Override
     protected void postInstallHighlighters() {
-      if (!Registry.is("semantic.merge.recompute.after.change", false) || myEditablePsiFile == null || myProject == null) return;
+      if (!Registry.is("semantic.merge.recompute.after.change", false) ||
+          myEditablePsiFile == null ||
+          myProject == null ||
+          !myConflictResolver.isAvailable()) return;
 
       PsiDocumentManager.getInstance(myProject).commitDocument(myEditablePsiFile.getFileDocument());
       List<PsiFile> fileList = List.of(ThreeSide.LEFT.select(myPsiFiles), myEditablePsiFile, ThreeSide.RIGHT.select(myPsiFiles));

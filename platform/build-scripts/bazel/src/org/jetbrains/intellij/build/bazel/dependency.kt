@@ -86,7 +86,7 @@ internal fun generateDeps(
       }
     }
     else if (element is JpsLibraryDependency) {
-      val untypedLib = element.library!!
+      val untypedLib = element.library ?: error("library dependency '$element' from module ${module.module.name} is not resolved")
       val lib = untypedLib.asTyped(JpsRepositoryLibraryType.INSTANCE)
       if (lib == null) {
         val files = untypedLib.getPaths(JpsOrderRootType.COMPILED)
@@ -227,16 +227,36 @@ internal fun generateDeps(
       "Do not export jetbrains-jewel-markdown-laf-bridge-styling (module=$dependentModuleName})"
     }
   }
+
+  fun checkForDuplicates(listMoniker: String, list: List<String>) {
+    if (list.distinct() == list) {
+      return
+    }
+
+    val duplicates = list
+      .groupBy { it }
+      .filter { it.value.size > 1 }
+      .map { it.key }
+      .sorted()
+    error("Duplicate $listMoniker ${duplicates} for module '${module.module.name}',\ncheck ${module.imlFile}")
+  }
+
+  checkForDuplicates("bazel deps", deps)
+  checkForDuplicates("bazel associates", associates)
+  checkForDuplicates("bazel runtimeDeps", runtimeDeps)
+  checkForDuplicates("bazel exports", exports)
+  checkForDuplicates("bazel provided", provided)
+
   return ModuleDeps(deps = deps, associates = associates, runtimeDeps = runtimeDeps, exports = exports, provided = provided, plugins = plugins.toList())
 }
 
 private fun getFileMavenFileDescription(lib: JpsTypedLibrary<JpsSimpleElement<JpsMavenRepositoryLibraryDescriptor>>, jar: Path): MavenFileDescription {
   require(jar.isAbsolute) {
-    "jar path must be absolute: $jar"
+    "jar path for jps library ${lib.name} must be absolute: $jar"
   }
 
   require(jar == jar.normalize()) {
-    "jar path must not contain redundant . and .. segments: $jar"
+    "jar path for jps library ${lib.name} must not contain redundant . and .. segments: $jar"
   }
 
   val libraryDescriptor = lib.properties.data

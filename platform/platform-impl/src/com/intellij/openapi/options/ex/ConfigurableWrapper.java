@@ -307,7 +307,7 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
   public static final class CompositeWrapper extends ConfigurableWrapper implements Configurable.Composite {
 
     private Configurable[] myKids;
-    private Comparator<Configurable> myComparator;
+    private Comparator<Configurable> myComparator = COMPARATOR;
     private Predicate<? super Configurable> myFilter;
     private boolean isInitialized;
 
@@ -364,6 +364,12 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
         }
       }
       Collections.addAll(list, myKids);
+
+      if (!(getRawConfigurable() instanceof Configurable.WithEpDependencies)) {
+        // sort by default
+        list.sort(COMPARATOR);
+      }
+
       // sort configurables is needed
       for (Configurable configurable : list) {
         if (configurable instanceof Weighted) {

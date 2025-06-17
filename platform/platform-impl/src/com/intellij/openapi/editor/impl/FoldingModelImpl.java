@@ -63,6 +63,7 @@ public final class FoldingModelImpl extends InlayModel.SimpleAdapter
   private final List<FoldingListener> myListeners = ContainerUtil.createLockFreeCopyOnWriteList();
   private final Set<CustomFoldRegionImpl> myAffectedCustomRegions = new HashSet<>();
   private final AtomicBoolean myIsZombieRaised = new AtomicBoolean();
+  private final AtomicBoolean myIsAutoCreatedZombieRaised = new AtomicBoolean();
 
   private TextAttributes myFoldTextAttributes;
   private boolean myIsFoldingEnabled = true;
@@ -258,12 +259,6 @@ public final class FoldingModelImpl extends InlayModel.SimpleAdapter
     return myFoldTextAttributes;
   }
 
-  @SuppressWarnings("removal")
-  @Override
-  public void runBatchFoldingOperation(@NotNull Runnable operation, boolean moveCaret) {
-    runBatchFoldingOperation(operation, false, moveCaret, true);
-  }
-
   @Override
   public void runBatchFoldingOperation(@NotNull Runnable operation, boolean allowMovingCaret, boolean keepRelativeCaretPosition) {
     runBatchFoldingOperation(operation, !allowMovingCaret, true, keepRelativeCaretPosition);
@@ -416,6 +411,11 @@ public final class FoldingModelImpl extends InlayModel.SimpleAdapter
   @ApiStatus.Internal
   public AtomicBoolean getIsZombieRaised() {
     return myIsZombieRaised;
+  }
+
+  @ApiStatus.Internal
+  public AtomicBoolean getIsAutoCreatedZombieRaised() {
+    return myIsAutoCreatedZombieRaised;
   }
 
   void refreshSettings() {

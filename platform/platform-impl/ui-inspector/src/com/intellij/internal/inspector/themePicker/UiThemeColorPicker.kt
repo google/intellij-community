@@ -3,12 +3,13 @@ package com.intellij.internal.inspector.themePicker
 
 import com.intellij.ide.ui.RegistryBooleanOptionDescriptor
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.MouseShortcut
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeLater
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
+import com.intellij.openapi.components.*
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -25,7 +26,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.content.impl.ContentImpl
-import com.intellij.ui.dsl.builder.AlignY
+import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.listCellRenderer.listCellRenderer
 import com.intellij.util.ui.*
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.awt.*
+import java.awt.event.InputEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
@@ -45,9 +47,18 @@ import javax.swing.*
 private const val THEME_VIEWER_UI_MARKER_KEY = "ThemeColorPopupIdentity"
 private const val TOOL_WINDOW_ID = "UI Theme Color Picker"
 
+private val UPDATE_TABLE_SHORTCUT = MouseShortcut(MouseEvent.BUTTON1, InputEvent.CTRL_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK, 1)
+
+@Service(Service.Level.APP)
+@State(name = "UiThemeColorPickerState", storages = [Storage("other.xml")])
+internal class UiThemeColorPickerState : SimplePersistentStateComponent<UiThemeColorPickerState.State>(State()) {
+  class State : BaseState() {
+    var showPopup = true
+  }
+}
+
 @Service(Service.Level.APP)
 internal class UiThemeColorPicker(internal val coroutineScope: CoroutineScope) {
-  internal var showPopup = true
 
   private var disposable: Disposable? = null
 
@@ -121,7 +132,11 @@ internal class UiThemeColorPicker(internal val coroutineScope: CoroutineScope) {
     val mouseMoveListener = object : MouseMotionAdapter() {
       override fun mouseMoved(e: MouseEvent) {
         val point = RelativePoint(e)
-        if (isOurOwnUi(point)) return
+        if (isOurOwnUi(point)) {
+          currentPopup?.get()?.cancel()
+          currentPopup = null
+          return
+        }
 
         val colors = getColorsAt(point)
         showHoverPopup(colors, point)
@@ -129,7 +144,7 @@ internal class UiThemeColorPicker(internal val coroutineScope: CoroutineScope) {
     }
     val mouseClickListener = object : MouseAdapter() {
       override fun mousePressed(e: MouseEvent) {
-        if (e.isControlDown && e.isShiftDown && e.isAltDown && e.button == MouseEvent.BUTTON1) {
+        if (UPDATE_TABLE_SHORTCUT == KeymapUtil.createMouseShortcut(e)) {
           val point = RelativePoint(e)
           if (isOurOwnUi(point)) return
 
@@ -153,7 +168,7 @@ internal class UiThemeColorPicker(internal val coroutineScope: CoroutineScope) {
       oldPopup.cancel()
     }
     if (colors.isEmpty()) return
-    if (!showPopup) return
+    if (!service<UiThemeColorPickerState>().state.showPopup) return
 
     val popup = JBPopupFactory.getInstance().createComponentPopupBuilder(
       panel {
@@ -237,37 +252,46 @@ internal class UiThemeColorPickerToolWindowFactory : ToolWindowFactory, DumbAwar
     val manager = UiThemeColorPicker.getInstance()
     val panel = panel {
       row {
-        comment("Use Ctrl-Shift-Alt-Click to show colors in the Tool Window")
-      }
-      row {
-        checkBox("Show on-hover tooltip").applyToComponent {
-          isSelected = manager.showPopup
-          addItemListener { manager.showPopup = isSelected }
-        }
-      }
-      row {
-        cell(createThemeColorList())
-          .applyToComponent {
-            manager.coroutineScope.launch {
-              manager.hoverState.collectLatest { colors ->
-                model = CollectionListModel(colors)
-              }
-            }
-          }.align(AlignY.FILL)
-      }.resizableRow()
-      row {
         val editorRegistry = Registry.get("editor.color.scheme.mark.colors")
-        checkBox("Enable marker colors for EditorColorScheme IDs").applyToComponent {
-          isSelected = editorRegistry.asBoolean()
+        val mixerRegistry = Registry.get("ide.color.mixture.mark.colors")
+        checkBox("Enable color markers in runtime").applyToComponent {
+          isSelected = editorRegistry.asBoolean() && mixerRegistry.asBoolean()
+          toolTipText = "May affect IDE performance and behavior on theme changes"
           addItemListener {
             invokeLater { // swing weirdness
-              editorRegistry.setValue(isSelected)
+              if (isSelected) {
+                editorRegistry.setValue(true)
+                mixerRegistry.setValue(true)
+              }
+              else {
+                editorRegistry.resetToDefault()
+                mixerRegistry.resetToDefault()
+              }
               RegistryBooleanOptionDescriptor.suggestRestartIfNecessary(null)
             }
           }
         }
         comment("Restart required")
       }
+      row {
+        checkBox("Show on-hover tooltip").applyToComponent {
+          isSelected = service<UiThemeColorPickerState>().state.showPopup
+          addItemListener { service<UiThemeColorPickerState>().state.showPopup = isSelected }
+        }
+      }
+      row {
+        comment("Use ${KeymapUtil.getShortcutText(UPDATE_TABLE_SHORTCUT)} to show hovered colors below")
+      }
+      row {
+        scrollCell(createThemeColorList())
+          .applyToComponent {
+            manager.coroutineScope.launch {
+              manager.hoverState.collectLatest { colors ->
+                model = CollectionListModel(colors)
+              }
+            }
+          }.align(Align.FILL)
+      }.resizableRow()
     }
     panel.putClientProperty(THEME_VIEWER_UI_MARKER_KEY, true)
 

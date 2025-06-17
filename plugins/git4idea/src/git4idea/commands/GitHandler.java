@@ -90,7 +90,7 @@ public abstract class GitHandler {
                        @NotNull List<String> configParameters) {
     this(project,
          directory,
-         GitExecutableManager.getInstance().getExecutable(project),
+         GitExecutableManager.getInstance().getExecutable(project, directory.toPath()),
          command,
          configParameters);
   }
@@ -252,7 +252,7 @@ public abstract class GitHandler {
   }
 
   public void addAbsoluteFile(@NotNull File file) {
-    myCommandLine.addParameter(myExecutable.convertFilePath(file));
+    myCommandLine.addParameter(myExecutable.convertFilePath(file.toPath()));
   }
 
   /**

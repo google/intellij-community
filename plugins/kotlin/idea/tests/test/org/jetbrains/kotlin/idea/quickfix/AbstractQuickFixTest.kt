@@ -33,7 +33,7 @@ import org.jetbrains.kotlin.idea.base.test.KotlinTestHelpers
 import org.jetbrains.kotlin.idea.base.test.registerDirectiveBasedChooserOptionInterceptor
 import org.jetbrains.kotlin.idea.caches.resolve.ResolveInDispatchThreadException
 import org.jetbrains.kotlin.idea.caches.resolve.forceCheckForResolveInDispatchThreadInTests
-import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
+import org.jetbrains.kotlin.idea.core.script.k1.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
 import org.jetbrains.kotlin.idea.statistic.FilterableTestStatisticsEventLoggerProvider
 import org.jetbrains.kotlin.idea.test.*
@@ -311,7 +311,7 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
     }
 
     private fun loadScriptConfiguration(file: KtFile) {
-        ScriptConfigurationManager.getInstance(project).getConfiguration(file)
+        ScriptConfigurationManager.getInstanceSafe(project)?.getConfiguration(file)
     }
 
     private fun PsiFile.actionHint(contents: String): ActionHint {
@@ -419,7 +419,7 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
         val editor = myFixture.editor
         //DaemonCodeAnalyzerImpl.waitForUnresolvedReferencesQuickFixesUnderCaret(file, editor)
         for (highlight in highlightInfos) {
-            if (highlight.startOffset <= caretOffset && caretOffset <= highlight.endOffset) {
+            if (highlight.containsInclusive(caretOffset)) {
                 val group = highlight.problemGroup
                 if (group is SuppressableProblemGroup) {
                     val at = file.findElementAt(highlight.actualStartOffset) ?: continue

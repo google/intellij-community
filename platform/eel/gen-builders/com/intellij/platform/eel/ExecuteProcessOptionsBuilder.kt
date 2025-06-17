@@ -5,11 +5,14 @@
 package com.intellij.platform.eel
 
 import com.intellij.platform.eel.EelExecApi.ExecuteProcessOptions
+import com.intellij.platform.eel.EelExecApi.InteractionOptions
 import com.intellij.platform.eel.EelExecApi.PtyOrStdErrSettings
 import com.intellij.platform.eel.path.EelPath
+import org.jetbrains.annotations.ApiStatus
 
 
 @GeneratedBuilder.Result
+@ApiStatus.Experimental
 class ExecuteProcessOptionsBuilder(
   /**
    * An **absolute** path to the executable.
@@ -24,10 +27,13 @@ class ExecuteProcessOptionsBuilder(
 
   private var env: Map<String, String> = mapOf()
 
-  private var ptyOrStdErrSettings: PtyOrStdErrSettings? = null
+  private var interactionOptions: InteractionOptions? = null
+
+  private var ptyOrStdErrSettings: PtyOrStdErrSettings? = interactionOptions
 
   private var workingDirectory: EelPath? = null
 
+  @ApiStatus.Experimental
   fun args(arg: List<String>): ExecuteProcessOptionsBuilder = apply {
     this.args = arg
   }
@@ -41,6 +47,7 @@ class ExecuteProcessOptionsBuilder(
    * to alter some environment variables, it doesn't clear the variables from the parent. When the process should be started in an
    * environment like in a terminal, the response of [fetchLoginShellEnvVariables] should be put into [ExecuteProcessOptions.env].
    */
+  @ApiStatus.Experimental
   fun env(arg: Map<String, String>): ExecuteProcessOptionsBuilder = apply {
     this.env = arg
   }
@@ -52,6 +59,7 @@ class ExecuteProcessOptionsBuilder(
    * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
    * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
    */
+  @ApiStatus.Experimental
   fun exe(arg: String): ExecuteProcessOptionsBuilder = apply {
     this.exe = arg
   }
@@ -63,6 +71,13 @@ class ExecuteProcessOptionsBuilder(
    *
    * See `termcap(2)`, `terminfo(2)`, `ncurses(3X)` and ISBN `0937175226`.
    */
+  @ApiStatus.Experimental
+  fun interactionOptions(arg: InteractionOptions?): ExecuteProcessOptionsBuilder = apply {
+    this.interactionOptions = arg
+  }
+
+  @Deprecated("Switch to interactionOptions", replaceWith = ReplaceWith("interactionOptions"))
+  @ApiStatus.Internal
   fun ptyOrStdErrSettings(arg: PtyOrStdErrSettings?): ExecuteProcessOptionsBuilder = apply {
     this.ptyOrStdErrSettings = arg
   }
@@ -71,6 +86,7 @@ class ExecuteProcessOptionsBuilder(
    * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
    * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
    */
+  @ApiStatus.Experimental
   fun workingDirectory(arg: EelPath?): ExecuteProcessOptionsBuilder = apply {
     this.workingDirectory = arg
   }
@@ -80,6 +96,7 @@ class ExecuteProcessOptionsBuilder(
       args = args,
       env = env,
       exe = exe,
+      interactionOptions = interactionOptions,
       ptyOrStdErrSettings = ptyOrStdErrSettings,
       workingDirectory = workingDirectory,
     )
@@ -90,6 +107,7 @@ internal class ExecuteProcessOptionsImpl(
   override val args: List<String>,
   override val env: Map<String, String>,
   override val exe: String,
+  override val interactionOptions: InteractionOptions?,
   override val ptyOrStdErrSettings: PtyOrStdErrSettings?,
   override val workingDirectory: EelPath?,
 ) : ExecuteProcessOptions

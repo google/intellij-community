@@ -16,6 +16,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//platform/built-in-server-api:builtInServer",
     "//platform/built-in-server:builtInServer-impl",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-util-netty:ide-util-netty",
     "//platform/platform-impl:ide-impl",
@@ -23,6 +24,7 @@ jvm_library(
     "@lib//:netty-codec-http",
     "@lib//:gson",
     "//platform/analysis-api:analysis",
+    "//platform/projectModel-api:projectModel",
   ],
   runtime_deps = [":remote-control_resources"]
 )
@@ -36,6 +38,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//platform/built-in-server-api:builtInServer",
     "//platform/built-in-server:builtInServer-impl",
+    "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-util-netty:ide-util-netty",
     "//platform/platform-impl:ide-impl",
@@ -44,6 +47,7 @@ jvm_library(
     "@lib//:netty-codec-http",
     "@lib//:gson",
     "//platform/analysis-api:analysis",
+    "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/vcs-api:vcs",

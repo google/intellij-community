@@ -1,5 +1,6 @@
 package com.intellij.driver.sdk.ui.components.elements
 
+import com.intellij.driver.sdk.step
 import com.intellij.driver.sdk.ui.components.ComponentData
 import com.intellij.driver.sdk.ui.components.UiComponent
 import com.intellij.driver.sdk.ui.components.common.ideFrame
@@ -7,6 +8,7 @@ import com.intellij.driver.sdk.ui.pasteText
 import com.intellij.driver.sdk.ui.ui
 import com.intellij.driver.sdk.ui.xQuery
 import com.intellij.driver.sdk.waitFor
+import com.intellij.driver.sdk.withThreadDumps
 import com.intellij.openapi.util.SystemInfo
 import java.awt.event.KeyEvent
 import kotlin.time.Duration.Companion.seconds
@@ -43,7 +45,15 @@ class NotebookTableOutputUi(data: ComponentData) : UiComponent(data) {
 
   fun changePageSizeTo(n: Int) {
     if (tableView.rowCount() == n) return
-    val currentPagerText = pager.getAllTexts().first().text
+
+    step("Waiting for a page and pager to load") {
+      waitFor(timeout = 15.seconds) {
+        val currentPagerText = pager.getAllTexts().first().text
+        val rowCount = tableView.rowCount()
+        "$rowCount rows" in currentPagerText
+      }
+    }
+
     pager.click()
     driver.ideFrame {
       popup().waitOneText { it.text.contains("Custom") }.click()
@@ -56,20 +66,37 @@ class NotebookTableOutputUi(data: ComponentData) : UiComponent(data) {
       }
     }
 
-    waitFor("expect the pager text to change", 30.seconds) {
-      pager.getAllTexts().first().text != currentPagerText
+    driver.withThreadDumps(
+      folderName = "threadDumps-changePageSize",
+      fileNamePrefix = "threadDump",
+      interval = 5.seconds
+    ) {
+      waitFor("expect the pager text to change", 30.seconds) {
+        tableView.rowCount() == n
+      }
     }
   }
 
-  fun goNextPage(): Unit = goOtherPage(forward = true)
+  private enum class NavigationDirection {
+    FORWARD, BACKWARD
+  }
+  fun goNextPage(): Unit = goOtherPage(NavigationDirection.FORWARD)
+  fun goPreviousPage(): Unit = goOtherPage(NavigationDirection.BACKWARD)
 
-  fun goPreviousPage(): Unit = goOtherPage(forward = false)
-
-  private fun goOtherPage(forward: Boolean) {
-    val iconFileName = if (forward) "playForward.svg" else "playBack.svg"
+  private fun goOtherPage(direction: NavigationDirection) {
+    val iconFileName = when (direction) {
+      NavigationDirection.FORWARD -> "playForward.svg"
+      NavigationDirection.BACKWARD -> "playBack.svg"
+    }
     val button = x("//div[@myicon='$iconFileName']")
     val textBefore = tableView.getValueAt(0, 0)
-    button.waitFound(30.seconds)
+    driver.withThreadDumps(
+      "threadDumps-goOtherPage",
+      "threadDump-waiting-$iconFileName",
+      5.seconds,
+    ) {
+      button.waitFound(30.seconds)
+    }
     button.click()
     waitFor("expect the cell [0,0] doesn't contain '$textBefore' anymore") {
       tableView.getValueAt(0, 0) != textBefore

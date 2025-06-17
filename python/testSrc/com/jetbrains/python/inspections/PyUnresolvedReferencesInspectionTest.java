@@ -275,11 +275,6 @@ public class PyUnresolvedReferencesInspectionTest extends PyInspectionTestCase {
     doTest();
   }
 
-  // PY-7614
-  public void testNoseToolsDynamicMembers() {
-    doMultiFileTest("a.py");
-  }
-
   public void testDateTodayReturnType() {
     doMultiFileTest("a.py");
   }
@@ -877,6 +872,21 @@ public class PyUnresolvedReferencesInspectionTest extends PyInspectionTestCase {
                    
                    class Sub(MyGeneric[int]):
                        pass
+                   """);
+    });
+  }
+
+  // PY-76895
+  public void testForwardReferenceInTypeParameterBound() {
+    runWithLanguageLevel(LanguageLevel.PYTHON312, () -> {
+      doTestByText("""
+                   class ClassA[S: ForwardReference[int], T: "ForwardReference[str]"]:  # OK
+                       ...
+                   class ClassB[T: (ForwardReference[int], "ForwardReference[str]", bytes)]:  # OK
+                       ...
+                   class ClassC[T = ForwardReference[int], T1 = "ForwardReference[str]"]:  # OK
+                       ...
+                   class ForwardReference[T]: ...
                    """);
     });
   }

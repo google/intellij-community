@@ -12,7 +12,9 @@ import com.intellij.lang.java.parser.JavaParserUtil;
 import com.intellij.lang.java.syntax.JavaElementTypeConverterExtension;
 import com.intellij.openapi.roots.LanguageLevelProjectExtension;
 import com.intellij.openapi.roots.impl.LanguageLevelProjectExtensionImpl;
+import com.intellij.platform.syntax.LanguageSyntaxDefinition;
 import com.intellij.platform.syntax.SyntaxElementType;
+import com.intellij.platform.syntax.SyntaxElementTypeKt;
 import com.intellij.platform.syntax.parser.SyntaxTreeBuilder;
 import com.intellij.platform.syntax.psi.*;
 import com.intellij.pom.java.LanguageLevel;
@@ -66,7 +68,7 @@ public class JavaParsingTestConfigurator implements AbstractBasicJavaParsingTest
   }
 
   private static final MyIFileElementType myTestFileElementType = new MyIFileElementType();
-  private static final SyntaxElementType mySyntaxElementType = new SyntaxElementType("test.java.file");
+  private static final SyntaxElementType mySyntaxElementType = SyntaxElementTypeKt.SyntaxElementType("test.java.file");
 
   private static BasicJavaParserUtil.ParserWrapper TEST_PARSER;
   private static LanguageLevel LANGUAGE_LEVEL;

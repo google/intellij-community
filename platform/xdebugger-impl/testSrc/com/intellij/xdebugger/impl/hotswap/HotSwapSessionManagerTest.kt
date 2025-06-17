@@ -7,14 +7,16 @@ import com.intellij.mock.MockVirtualFile
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.HeavyPlatformTestCase
+import com.intellij.xdebugger.hotswap.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
   fun testCurrentSession() {
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val disposable = Disposer.newDisposable(testRootDisposable)
     assertNull(manager.currentSession)
     val hotSwapSession = manager.createSession(MockHotSwapProvider(), disposable)
@@ -133,7 +135,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     assertTrue(channel.isEmpty)
 
     Disposer.dispose(disposable1)
-    assertCompleted(channel)
+    assertNull(channel.receive())
 
     listener.onCanceled()
     assertTrue(channel.isEmpty)
@@ -161,9 +163,6 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
         closeOldAndAddFile.join()
         addListener.join()
         var status = channel.receive()
-        if (status == HotSwapVisibleStatus.SESSION_COMPLETED) {
-          status = channel.receive()
-        }
         if (status == null) {
           status = channel.receive()
         }
@@ -181,7 +180,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     val disposable1 = Disposer.newDisposable(testRootDisposable)
     val disposable2 = Disposer.newDisposable(testRootDisposable)
 
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val provider1 = MockHotSwapProvider()
     val session1 = manager.createSession(provider1, disposable1)
     val provider2 = MockHotSwapProvider()
@@ -199,18 +198,16 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     assertEquals(session2 to HotSwapVisibleStatus.CHANGES_READY, channel.receive())
 
     Disposer.dispose(disposable2)
-    val currentStatus = channel.receive()
+    var currentStatus = channel.receive()
     val expectedNextStatus = session1 to HotSwapVisibleStatus.CHANGES_READY
-    // session complete status might be skipped
-    if (currentStatus == session2 to HotSwapVisibleStatus.SESSION_COMPLETED) {
-      assertEquals(expectedNextStatus, channel.receive())
+    // null status might be skipped
+    if (currentStatus == null to null) {
+      currentStatus = channel.receive()
     }
-    else {
-      assertEquals(expectedNextStatus, currentStatus)
-    }
+    assertEquals(expectedNextStatus, currentStatus)
 
     Disposer.dispose(disposable1)
-    assertCompleted(channel, session1)
+    assertEquals(null to null, channel.receive())
 
     Disposer.dispose(disposable0)
   }
@@ -220,7 +217,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     val disposable1 = Disposer.newDisposable(testRootDisposable)
     val disposable2 = Disposer.newDisposable(testRootDisposable)
 
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val provider1 = MockHotSwapProvider()
     manager.createSession(provider1, disposable1)
     val provider2 = MockHotSwapProvider()
@@ -241,7 +238,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     assertTrue(channel.isEmpty)
 
     Disposer.dispose(disposable2)
-    assertCompleted(channel, session2)
+    assertEquals(null to null, channel.receive())
 
     Disposer.dispose(disposable0)
   }
@@ -251,7 +248,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     val disposable1 = Disposer.newDisposable(testRootDisposable)
     val disposable2 = Disposer.newDisposable(testRootDisposable)
 
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val provider1 = MockHotSwapProvider()
     val session1 = manager.createSession(provider1, disposable1)
     val provider2 = MockHotSwapProvider()
@@ -277,18 +274,16 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     assertEquals(session2 to HotSwapVisibleStatus.CHANGES_READY, channel.receive())
 
     Disposer.dispose(disposable2)
-    val currentStatus = channel.receive()
+    var currentStatus = channel.receive()
     val expectedNextStatus = session1 to HotSwapVisibleStatus.CHANGES_READY
-    // session complete status might be skipped
-    if (currentStatus == session2 to HotSwapVisibleStatus.SESSION_COMPLETED) {
-      assertEquals(expectedNextStatus, channel.receive())
+    // null status might be skipped
+    if (currentStatus == null to null) {
+      currentStatus = channel.receive()
     }
-    else {
-      assertEquals(expectedNextStatus, currentStatus)
-    }
+    assertEquals(expectedNextStatus, currentStatus)
 
     Disposer.dispose(disposable1)
-    assertCompleted(channel, session1)
+    assertEquals(null to null, channel.receive())
 
     Disposer.dispose(disposable0)
   }
@@ -306,7 +301,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     assertEquals(session to HotSwapVisibleStatus.NO_CHANGES, channel.receive())
     Disposer.dispose(disposable)
 
-    assertCompleted(channel, session)
+    assertEquals(null to null, channel.receive())
     Disposer.dispose(listenerDisposable)
   }
 
@@ -314,7 +309,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     val disposable0 = Disposer.newDisposable(testRootDisposable)
     val disposable1 = Disposer.newDisposable(testRootDisposable)
 
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val provider1 = MockHotSwapProvider()
     val session1 = manager.createSession(provider1, disposable1)
 
@@ -333,7 +328,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
 
     Disposer.dispose(disposable1)
     assertNull(manager.currentSession)
-    assertCompleted(channel)
+    assertNull(channel.receive())
 
     manager.onSessionSelected(session1)
     assertNull(manager.currentSession)
@@ -345,7 +340,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
   fun testHidingAndAddingChangesAfterIt() = runBlocking {
     val disposable = Disposer.newDisposable(testRootDisposable)
 
-    val manager = HotSwapSessionManager.getInstance(project)
+    val manager = HotSwapSessionManagerImpl.getInstance(project)
     val provider = MockHotSwapProvider()
     manager.createSession(provider, disposable)
 
@@ -364,7 +359,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
 
     Disposer.dispose(disposable)
 
-    assertCompleted(channel)
+    assertNull(channel.receive())
     Disposer.dispose(listenerDisposable)
   }
 
@@ -372,28 +367,9 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
     channel: ReceiveChannel<HotSwapVisibleStatus?>,
     disposable2: Disposable,
   ) {
-    assertCompleted(channel)
+    assertNull(channel.receive())
+    assertTrue(channel.isEmpty) { "Expected no more events, but got ${channel.tryReceive().getOrNull()}" }
     Disposer.dispose(disposable2)
-    assertTrue(channel.isEmpty)
-  }
-
-  private suspend fun assertCompleted(channel: ReceiveChannel<HotSwapVisibleStatus?>) {
-    var status = channel.receive()
-    if (status == HotSwapVisibleStatus.SESSION_COMPLETED) {
-      status = channel.receive()
-    }
-    assertNull(status)
-  }
-
-  private suspend fun assertCompleted(
-    channel: ReceiveChannel<Pair<HotSwapSession<*>?, HotSwapVisibleStatus?>>,
-    session: HotSwapSession<MockVirtualFile>,
-  ) {
-    var status = channel.receive()
-    if (status == (session to HotSwapVisibleStatus.SESSION_COMPLETED)) {
-      status = channel.receive()
-    }
-    assertEquals(null to null, status)
   }
 
   private fun <T> CoroutineScope.addStatusListener(disposable: Disposable, channel: SendChannel<T>, selector: (CurrentSessionState?) -> T) {
@@ -401,7 +377,7 @@ class HotSwapSessionManagerTest : HeavyPlatformTestCase() {
       val job = coroutineContext.job
       Disposer.register(disposable) { job.cancel() }
       try {
-        HotSwapSessionManager.getInstance(this@HotSwapSessionManagerTest.project).currentStatusFlow.collect { status ->
+        HotSwapSessionManagerImpl.getInstance(this@HotSwapSessionManagerTest.project).currentStatusFlow.collect { status ->
           channel.send(selector(status))
         }
       }

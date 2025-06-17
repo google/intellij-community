@@ -5,10 +5,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.platform.eel.spawnProcess
-import com.intellij.platform.eel.getOrThrow
+import com.intellij.platform.eel.ExecuteProcessException
+import com.intellij.platform.eel.ThrowsChecked
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.readWholeText
+import com.intellij.platform.eel.spawnProcess
 import com.intellij.python.community.impl.venv.createVenv
 import com.intellij.python.community.services.systemPython.SystemPythonProvider
 import com.intellij.python.community.services.systemPython.SystemPythonService
@@ -22,6 +23,8 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.RegistryKey
 import com.intellij.testFramework.junit5.TestDisposable
 import com.intellij.testFramework.registerExtension
+import com.jetbrains.python.Result
+import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.getOrThrow
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
 import com.jetbrains.python.venvReader.VirtualEnvReader
@@ -43,11 +46,12 @@ import kotlin.time.Duration.Companion.minutes
 @PyEnvTestCase
 class SystemPythonServiceShowCaseTest {
 
+  @ThrowsChecked(ExecuteProcessException::class)
   @Test
   fun testListPythons(): Unit = timeoutRunBlocking(10.minutes) {
     for (systemPython in SystemPythonService().findSystemPythons(forceRefresh = true)) {
       fileLogger().info("Python found: $systemPython")
-      val eelApi = systemPython.pythonBinary.getEelDescriptor().upgrade()
+      val eelApi = systemPython.pythonBinary.getEelDescriptor().toEelApi()
       val process = eelApi.exec.spawnProcess(systemPython.pythonBinary.pathString, "--version").eelIt()
       val output = async {
         (if (systemPython.languageLevel.isPy3K) process.stdout else process.stderr).readWholeText()
@@ -88,7 +92,7 @@ class SystemPythonServiceShowCaseTest {
   @Test
   fun testRefresh(@TestDisposable disposable: Disposable): Unit = timeoutRunBlocking(10.minutes) {
     val mockProvider = mockk<SystemPythonProvider>()
-    coEvery { mockProvider.findSystemPythons(any()) } returns Result.failure(java.lang.AssertionError("..."))
+    coEvery { mockProvider.findSystemPythons(any()) } returns Result.failure(MessageError("..."))
     coEvery { mockProvider.uiCustomization } returns null
     val sut = SystemPythonService()
     sut.findSystemPythons()

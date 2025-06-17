@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.completion.ItemPriority
 import org.jetbrains.kotlin.idea.completion.impl.k2.ImportStrategyDetector
-import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.GetOperatorInsertionHandler
+import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.BracketOperatorInsertionHandler
 import org.jetbrains.kotlin.idea.completion.impl.k2.lookups.factories.NamedArgumentLookupElementFactory
 import org.jetbrains.kotlin.idea.completion.impl.k2.lookups.factories.TypeLookupElementFactory
 import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionOptions
@@ -30,11 +30,12 @@ object KotlinFirLookupElementFactory {
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     fun createConstructorCallLookupElement(
-        symbol: KaNamedClassSymbol,
+        containingSymbol: KaNamedClassSymbol,
+        visibleConstructorSymbols: List<KaConstructorSymbol>,
         importingStrategy: ImportStrategy = ImportStrategy.DoNothing,
     ): LookupElementBuilder? {
-        val constructorSymbols = symbol.memberScope.constructors.toList().takeIf { it.isNotEmpty() } ?: return null
-        return ClassLookupElementFactory.createConstructorLookup(symbol, constructorSymbols, importingStrategy)
+        if (visibleConstructorSymbols.isEmpty()) return null
+        return ClassLookupElementFactory.createConstructorLookup(containingSymbol, visibleConstructorSymbols, importingStrategy)
     }
 
     context(KaSession)
@@ -80,26 +81,17 @@ object KotlinFirLookupElementFactory {
     }
 
     context(KaSession)
-    fun createGetOperatorLookupElement(
+    fun createBracketOperatorLookupElement(
+        operatorName: Name,
         signature: KaCallableSignature<*>,
         options: CallableInsertionOptions,
         expectedType: KaType? = null,
     ): LookupElementBuilder {
-        val indexingLookupElement = createCallableLookupElement(Name.identifier("[]"), signature, options, expectedType)
-            .withInsertHandler(GetOperatorInsertionHandler)
-        indexingLookupElement.priority = ItemPriority.GET_OPERATOR
+        require(operatorName.identifier.length == 2) { "Bracket operator name '$operatorName' should consist of 2 characters (the brackets)" }
+        val indexingLookupElement = createCallableLookupElement(operatorName, signature, options, expectedType)
+            .withInsertHandler(BracketOperatorInsertionHandler)
+        indexingLookupElement.priority = ItemPriority.BRACKET_OPERATOR
         return indexingLookupElement
-    }
-
-    context(KaSession)
-    @ApiStatus.Experimental
-    fun createCallableLookupElementWithTrailingLambda(
-        name: Name,
-        signature: KaCallableSignature<*>,
-        options: CallableInsertionOptions,
-    ): LookupElementBuilder? = when (signature) {
-        is KaFunctionSignature<*> -> FunctionLookupElementFactory.createLookupWithTrailingLambda(name, signature, options)
-        else -> null
     }
 
     fun createPackagePartLookupElement(packagePartFqName: FqName): LookupElement =
