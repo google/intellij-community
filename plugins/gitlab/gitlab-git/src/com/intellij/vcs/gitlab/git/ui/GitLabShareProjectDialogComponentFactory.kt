@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import org.jetbrains.plugins.gitlab.api.dto.GitLabGroupDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabNamespaceDTO
+import org.jetbrains.plugins.gitlab.authentication.GitLabLoginSource
 import org.jetbrains.plugins.gitlab.authentication.GitLabLoginUtil
 import org.jetbrains.plugins.gitlab.authentication.LoginResult
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
@@ -53,10 +54,9 @@ internal object GitLabShareProjectDialogComponentFactory {
             .bindSelectedItemIn(cs, vm.account.valueFlow)
             .bindValidationOnApplyIn(cs, vm.account)
             .align(AlignX.FILL).resizableColumn()
-            .enabledIf(vm.accounts.mapState { it.isNotEmpty() }.asObservableIn(cs))
 
           link(GitLabBundle.message("share.dialog.account.addButton")) { event ->
-            val (account, token) = GitLabLoginUtil.logInViaToken(project, event.source as JComponent, uniqueAccountPredicate = { server, username ->
+            val (account, token) = GitLabLoginUtil.logInViaToken(project, event.source as JComponent, loginSource = GitLabLoginSource.SHARE, uniqueAccountPredicate = { server, username ->
               vm.accounts.value.none { it.server == server && it.name == username }
             }) as? LoginResult.Success ?: return@link
 
@@ -69,7 +69,7 @@ internal object GitLabShareProjectDialogComponentFactory {
 
           link(GitLabBundle.message("share.dialog.tokenExpired.label")) { event ->
             val account = vm.account.value ?: return@link
-            val (_, token) = GitLabLoginUtil.updateToken(project, event.source as JComponent, account, uniqueAccountPredicate = { server, username ->
+            val (_, token) = GitLabLoginUtil.updateToken(project, event.source as JComponent, account, loginSource = GitLabLoginSource.SHARE, uniqueAccountPredicate = { server, username ->
               vm.accounts.value.none { it.server == server && it.name == username }
             }) as? LoginResult.Success ?: return@link
 

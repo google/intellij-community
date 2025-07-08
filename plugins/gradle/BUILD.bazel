@@ -22,6 +22,7 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//platform/external-system-api:externalSystem",
     "//platform/observable",
     "//platform/external-system-impl:externalSystem-impl",
@@ -30,6 +31,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//jps/model-api:model",
     "//platform/lang-api:lang",
+    "//platform/lang-core",
     "//platform/lang-impl",
     "//platform/projectModel-api:projectModel",
     "//platform/smRunner",
@@ -83,18 +85,19 @@ jvm_library(
 ### auto-generated section `build intellij.gradle` end
 
 ### auto-generated section `build intellij.gradle.common` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-java_library(
+jvm_library(
   name = "gradle-common",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   exports = ["//plugins/gradle"],
   runtime_deps = ["//plugins/gradle"]
 )
 ### auto-generated section `build intellij.gradle.common` end
 
 ### auto-generated section `build intellij.gradle.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -103,9 +106,10 @@ jvm_resources(
   strip_prefix = "testData"
 )
 
-java_library(
+jvm_library(
   name = "gradle-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -125,6 +129,7 @@ jvm_library(
     "//platform/backend/workspace",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//platform/external-system-api/dependency-updater",
     "//platform/external-system-impl:externalSystem-impl",
     "//platform/observable",
@@ -133,6 +138,7 @@ jvm_library(
     "//java/openapi:java",
     "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -141,6 +147,7 @@ jvm_library(
     "//platform/external-system-impl:externalSystem-tests_test_lib",
     "//platform/external-system-api/testFramework",
     "//java/testFramework",
+    "//plugins/gradle/tooling-extension-impl:toolingExtension-impl",
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
     "//java/execution/impl",
     "@lib//:assert_j",
@@ -170,7 +177,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "gradle-tests_test",
   runtime_deps = [":gradle-tests_test_lib"]
 )

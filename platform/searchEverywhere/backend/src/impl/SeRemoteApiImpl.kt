@@ -4,6 +4,7 @@ package com.intellij.platform.searchEverywhere.backend.impl
 import com.intellij.ide.rpc.DataContextId
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.findProjectOrNull
+import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.impl.SeRemoteApi
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
@@ -37,6 +38,19 @@ class SeRemoteApiImpl: SeRemoteApi {
     return SeBackendService.getInstance(project).canBeShownInFindResults(sessionRef, dataContextId, providerIds, isAllTab)
   }
 
+  override suspend fun openInFindToolWindow(
+    projectId: ProjectId,
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId?,
+    providerIds: List<SeProviderId>,
+    params: SeParams,
+    isAllTab: Boolean
+  ): Boolean {
+    val project = projectId.findProjectOrNull() ?: return false
+    return SeBackendService.getInstance(project)
+      .openInFindToolWindow(projectId, sessionRef, dataContextId, providerIds, params, isAllTab)
+  }
+
   override suspend fun isShownInSeparateTab(projectId: ProjectId, sessionRef: DurableRef<SeSessionEntity>, dataContextId: DataContextId, providerId: SeProviderId): Boolean {
     val project = projectId.findProjectOrNull() ?: return false
     return SeBackendService.getInstance(project).isShownInSeparateTab(sessionRef, dataContextId, providerId)
@@ -50,14 +64,19 @@ class SeRemoteApiImpl: SeRemoteApi {
     params: SeParams,
     dataContextId: DataContextId?,
     requestedCountChannel: ReceiveChannel<Int>,
-  ): Flow<SeItemData> {
+  ): Flow<SeTransferEvent> {
     val project = projectId.findProjectOrNull() ?: return emptyFlow()
     return SeBackendService.getInstance(project)
       .getItems(sessionRef, providerIds, isAllTab, params, dataContextId, requestedCountChannel)
   }
 
-  override suspend fun getAvailableProviderIds(): List<SeProviderId> {
-    return SeItemsProviderFactory.EP_NAME.extensionList.map { SeProviderId(it.id) }
+  override suspend fun getAvailableProviderIds(
+    projectId: ProjectId,
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId
+  ) : Map<String, Set<SeProviderId>> {
+    val project = projectId.findProjectOrNull() ?: return emptyMap()
+    return SeBackendService.getInstance(project).getAvailableProviderIds(sessionRef, dataContextId)
   }
 
   override suspend fun getSearchScopesInfoForProviders(
@@ -66,7 +85,7 @@ class SeRemoteApiImpl: SeRemoteApi {
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
     isAllTab: Boolean,
-  ): Map<SeProviderId, SeSearchScopesInfo> {
+  ): Map<SeProviderId, SearchScopesInfo> {
     val project = projectId.findProjectOrNull() ?: return emptyMap()
     return SeBackendService.getInstance(project).getSearchScopesInfoForProviders(sessionRef, dataContextId, providerIds, isAllTab)
   }

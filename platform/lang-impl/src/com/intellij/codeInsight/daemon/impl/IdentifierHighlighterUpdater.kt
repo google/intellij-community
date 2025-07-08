@@ -5,6 +5,7 @@ import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar
 import com.intellij.codeInsight.highlighting.BraceHighlightingHandler
 import com.intellij.codeInsight.highlighting.HighlightHandlerBase
 import com.intellij.codeInsight.multiverse.CodeInsightContext
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ex.EditorEx
@@ -28,11 +29,11 @@ import kotlin.concurrent.Volatile
  * In both cases, [doCollectInformation] will produce and apply HighlightInfos to the host file.
  */
 @ApiStatus.Internal
-class IdentifierHighlighterUpdater (
+class IdentifierHighlighterUpdater(
   private val myPsiFile: PsiFile,
   private val myEditor: Editor,
   val context: CodeInsightContext,
-  val hostPsiFile: PsiFile
+  val hostPsiFile: PsiFile,
 ) {
   init {
     setId(myPsiFile.project)
@@ -40,6 +41,7 @@ class IdentifierHighlighterUpdater (
   @RequiresBackgroundThread
   @ApiStatus.Internal
   suspend fun doCollectInformation(project: Project, visibleRange: ProperTextRange): IdentifierHighlightingResult {
+    ApplicationManager.getApplication().assertIsNonDispatchThread()
     return IdentifierHighlightingManager.getInstance(project).getMarkupData(myEditor, visibleRange)
   }
 
@@ -92,7 +94,7 @@ class IdentifierHighlighterUpdater (
   private fun createHighlightInfo(
     range: Segment,
     type: HighlightInfoType,
-    existingMarkupTooltips: Set<Pair<String, Segment>>
+    existingMarkupTooltips: Set<Pair<String, Segment>>,
   ): HighlightInfo {
     val start = range.getStartOffset()
     val tooltip = if (start <= myEditor.getDocument().textLength) HighlightHandlerBase.getLineTextErrorStripeTooltip(
@@ -111,10 +113,11 @@ class IdentifierHighlighterUpdater (
   @RequiresBackgroundThread
   @ApiStatus.Internal
   @TestOnly
-  fun doCollectInformationForTestsSynchronously(): List<HighlightInfo> {
-    val result =
-      IdentifierHighlightingComputer(myPsiFile, myEditor, ProperTextRange.create(myPsiFile.textRange), myEditor.caretModel.offset).computeRanges()
-    return createHighlightInfos(result)
+  fun doCollectInformationForTestsSynchronously(): IdentifierHighlightingResult {
+    ApplicationManager.getApplication().assertIsNonDispatchThread()
+    ApplicationManager.getApplication().assertReadAccessAllowed()
+    assert(ApplicationManager.getApplication().isUnitTestMode())
+    return IdentifierHighlightingComputer(myPsiFile, myEditor, ProperTextRange.create(myPsiFile.textRange), myEditor.caretModel.offset).computeRanges()
   }
 
   companion object {

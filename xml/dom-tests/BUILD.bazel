@@ -1,10 +1,11 @@
 ### auto-generated section `build intellij.xml.dom.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "dom-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -15,6 +16,7 @@ jvm_library(
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
+    "//platform/lang-core",
     "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-api:indexing",
@@ -33,7 +35,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "dom-tests_test",
   runtime_deps = [":dom-tests_test_lib"]
 )

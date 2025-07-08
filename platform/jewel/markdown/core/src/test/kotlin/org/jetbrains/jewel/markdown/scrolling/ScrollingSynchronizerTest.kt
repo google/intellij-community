@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.intellij.lang.annotations.Language
 import org.jetbrains.jewel.foundation.BorderColors
+import org.jetbrains.jewel.foundation.DisabledAppearanceValues
 import org.jetbrains.jewel.foundation.GlobalColors
 import org.jetbrains.jewel.foundation.GlobalMetrics
 import org.jetbrains.jewel.foundation.OutlineColors
@@ -47,6 +48,8 @@ import org.jetbrains.jewel.markdown.processing.MarkdownProcessor
 import org.jetbrains.jewel.markdown.rendering.DefaultInlineMarkdownRenderer
 import org.jetbrains.jewel.markdown.rendering.InlinesStyling
 import org.jetbrains.jewel.markdown.rendering.MarkdownStyling
+import org.jetbrains.jewel.markdown.rendering.MarkdownStyling.List.Ordered.NumberFormatStyles.NumberFormatStyle
+import org.jetbrains.jewel.markdown.rendering.MarkdownStyling.List.Unordered.BulletCharStyles
 import org.jetbrains.jewel.ui.component.styling.DividerMetrics
 import org.jetbrains.jewel.ui.component.styling.DividerStyle
 import org.jetbrains.jewel.ui.component.styling.LocalDividerStyle
@@ -797,6 +800,7 @@ public class ScrollingSynchronizerTest {
             contentColor = Color.Black,
             colorPalette = ThemeColorPalette.Empty,
             iconData = ThemeIconData.Empty,
+            disabledAppearanceValues = DisabledAppearanceValues(brightness = 33, contrast = -35, alpha = 100),
         )
     }
 
@@ -876,6 +880,8 @@ public class ScrollingSynchronizerTest {
                             itemVerticalSpacing = 4.dp,
                             itemVerticalSpacingTight = 2.dp,
                             padding = PaddingValues(4.dp),
+                            numberFormatStyles =
+                                MarkdownStyling.List.Ordered.NumberFormatStyles(firstLevel = NumberFormatStyle.Decimal),
                         ),
                     unordered =
                         MarkdownStyling.List.Unordered(
@@ -885,6 +891,8 @@ public class ScrollingSynchronizerTest {
                             itemVerticalSpacing = 4.dp,
                             itemVerticalSpacingTight = 2.dp,
                             padding = PaddingValues(4.dp),
+                            markerMinWidth = 16.dp,
+                            bulletCharStyles = BulletCharStyles(),
                         ),
                 ),
             image =

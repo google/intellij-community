@@ -3,24 +3,38 @@ package com.intellij.openapi.progress.util
 
 import com.intellij.CommonBundle
 import com.intellij.diagnostic.LoadingState
+import com.intellij.diagnostic.PerformanceWatcher
 import com.intellij.ide.IdeEventQueue
+import com.intellij.ide.actions.RevealFileAction
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.KeyboardShortcut
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ThreadingSupport
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.impl.fus.FreezeUiUsageCollector
+import com.intellij.openapi.progress.util.ui.NiceOverlayUi
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
+import com.intellij.ui.KeyStrokeAdapter
+import com.intellij.ui.scale.JBUIScale
+import com.intellij.util.application
 import com.intellij.util.ui.AsyncProcessIcon
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.future.asCompletableFuture
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.Nls
 import java.awt.AWTEvent
 import java.awt.KeyboardFocusManager
 import java.awt.event.InvocationEvent
+import java.awt.event.KeyEvent
+import java.awt.event.MouseEvent
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
+import javax.swing.JRootPane
 import javax.swing.SwingUtilities
 
 /**
@@ -44,12 +58,25 @@ import javax.swing.SwingUtilities
  */
 @ApiStatus.Internal
 object SuvorovProgress {
+  var entered: Boolean = false
 
   @Volatile
   private lateinit var eternalStealer: EternalEventStealer
 
   fun init(disposable: Disposable) {
     eternalStealer = EternalEventStealer(disposable)
+  }
+
+  private val title: AtomicReference<@Nls String> = AtomicReference()
+
+  fun <T> withProgressTitle(title: String, action: () -> T): T {
+    val oldTitle = this.title.getAndSet(title)
+    try {
+      return action()
+    }
+    finally {
+      this.title.set(oldTitle)
+    }
   }
 
   @JvmStatic
@@ -63,7 +90,10 @@ object SuvorovProgress {
 
     FreezeUiUsageCollector.reportUiFreezePopupVisible()
 
-    val value = if (!LoadingState.COMPONENTS_LOADED.isOccurred) {
+    // in tests, there is no UI scale, but we still want to run SuvorovProgress
+    val isScaleInitialized = (application.isUnitTestMode || JBUIScale.isInitialized())
+
+    val value = if (!LoadingState.COMPONENTS_LOADED.isOccurred || !isScaleInitialized) {
       "None"
     }
     else {
@@ -78,8 +108,62 @@ object SuvorovProgress {
         thisLogger().warn("Spinning progress would not work without enabled registry value `editor.allow.raw.access.on.edt`")
         processInvocationEventsWithoutDialog(awaitedValue, Int.MAX_VALUE)
       }
+      "NiceOverlay" -> {
+        val currentFocusedPane = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusedWindow?.let(SwingUtilities::getRootPane)
+        if (currentFocusedPane == null) {
+          // can happen also in tests
+          processInvocationEventsWithoutDialog(awaitedValue, Int.MAX_VALUE)
+        } else {
+          showNiceOverlay(awaitedValue, currentFocusedPane)
+        }
+      }
       "Bar", "Overlay" -> showPotemkinProgress(awaitedValue, isBar = value == "Bar")
       else -> throw IllegalArgumentException("Unknown value for registry key `ide.freeze.fake.progress.kind`: $value")
+    }
+  }
+
+  private fun showNiceOverlay(awaitedValue: Deferred<*>, rootPane: JRootPane) {
+    val niceOverlay = NiceOverlayUi(rootPane, false)
+
+    val disposable = Disposer.newDisposable()
+    val stealer = PotemkinProgress.startStealingInputEvents(
+      { event ->
+        var dumpThreads = false
+        if (event is MouseEvent && event.id == MouseEvent.MOUSE_CLICKED) {
+          event.consume()
+          val reaction = niceOverlay.mouseClicked(event.point)
+          when (reaction) {
+            NiceOverlayUi.ClickOutcome.DUMP_THREADS -> dumpThreads = true
+            NiceOverlayUi.ClickOutcome.CLOSED, NiceOverlayUi.ClickOutcome.NOTHING -> Unit
+          }
+        }
+        if (event is MouseEvent && event.id == MouseEvent.MOUSE_MOVED) {
+          event.consume()
+          niceOverlay.mouseMoved(event.point)
+        }
+        if (event is KeyEvent && niceOverlay.dumpThreadsButtonShortcut == KeyStrokeAdapter.getDefaultKeyStroke(event)?.let { KeyboardShortcut(it, null) }) {
+          event.consume()
+          dumpThreads = true
+        }
+        if (dumpThreads) {
+          ApplicationManager.getApplication().executeOnPooledThread(Runnable {
+            val dumpDir = PerformanceWatcher.getInstance().dumpThreads("freeze-popup", true, false)
+            if (dumpDir != null) {
+              RevealFileAction.openFile(dumpDir)
+            }
+          })
+        }
+      }, disposable)
+
+    try {
+      while (!awaitedValue.isCompleted) {
+        niceOverlay.redrawMainComponent()
+        stealer.dispatchEvents(0)
+        Thread.sleep(10)
+      }
+    }
+    finally {
+      Disposer.dispose(disposable)
     }
   }
 
@@ -87,8 +171,9 @@ object SuvorovProgress {
     // some focus machinery may require Write-Intent read action
     // we need to remove it from there
     getGlobalThreadingSupport().relaxPreventiveLockingActions {
-      val progress = if (isBar) {
-        PotemkinProgress(CommonBundle.message("title.long.non.interactive.progress"), null, null, null)
+      val title = this.title.get()
+      val progress = if (title != null || isBar) {
+        PotemkinProgress(title ?: CommonBundle.message("title.long.non.interactive.progress"), null, null, null)
       }
       else {
         val window = SwingUtilities.getRootPane(KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner)
@@ -190,21 +275,6 @@ object SuvorovProgress {
   private fun sleep() {
     Thread.sleep(0, 100_000)
   }
-
-  abstract class ForcedWriteActionRunnable : Runnable {
-
-    companion object {
-      private const val NAME = "ForcedWriteActionRunnable"
-
-      fun isMarkedRunnable(event: InvocationEvent): Boolean {
-        return event.toString().contains(NAME)
-      }
-    }
-
-    override fun toString(): String {
-      return NAME
-    }
-  }
 }
 
 /**
@@ -217,13 +287,14 @@ object SuvorovProgress {
 private class EternalEventStealer(disposable: Disposable) {
   @Volatile
   private var enabled = false
+  private var counter = 0
 
-  private val specialEvents = LinkedBlockingQueue<SpecialDispatchEvent>()
+  private val specialEvents = LinkedBlockingQueue<ForcedEvent>()
 
   init {
     IdeEventQueue.getInstance().addPostEventListener(
       { event ->
-        if (enabled && event.toString().contains(",runnable=ForcedWriteActionRunnable")) {
+        if (enabled && event.toString().contains(",runnable=${ThreadingSupport.RunnableWithTransferredWriteAction.NAME}")) {
           val specialDispatchEvent = SpecialDispatchEvent(event)
           specialEvents.add(specialDispatchEvent)
           IdeEventQueue.getInstance().doPostEvent(specialDispatchEvent, true)
@@ -240,36 +311,40 @@ private class EternalEventStealer(disposable: Disposable) {
   fun dispatchAllEventsForTimeout(timeoutMillis: Long, deferred: Deferred<*>) {
     val initialMark = System.nanoTime()
 
+    val id = counter++
     deferred.invokeOnCompletion {
-      synchronized(this@EternalEventStealer) {
-        (this@EternalEventStealer as Object).notifyAll()
-      }
+      specialEvents.add(TerminalEvent(id))
     }
 
-    synchronized(this) {
-      while (true) {
-        val currentMark = System.nanoTime()
-        val elapsedSinceStartNanos = currentMark - initialMark
-        val toSleep = timeoutMillis - (elapsedSinceStartNanos / 1_000_000)
-        if (toSleep <= 0) {
-          return
+    while (true) {
+      val currentMark = System.nanoTime()
+      val elapsedSinceStartNanos = currentMark - initialMark
+      val toSleep = timeoutMillis - (elapsedSinceStartNanos / 1_000_000)
+      if (toSleep <= 0) {
+        return
+      }
+      if (deferred.isCompleted) {
+        return
+      }
+      try {
+        when (val event = specialEvents.poll(toSleep, TimeUnit.MILLISECONDS)) {
+          is TerminalEvent -> {
+            // return only if we get the event for the right id
+            if (event.id == id) {
+              return
+            }
+          }
+          is SpecialDispatchEvent -> getGlobalThreadingSupport().relaxPreventiveLockingActions {
+            event.execute()
+          }
+          null -> Unit
         }
-        if (deferred.isCompleted) {
-          return
-        }
-        try {
-          (this as Object).wait(toSleep)
-        } catch (_ : InterruptedException) {
-          // we still return locking result regardless of interruption
-          Thread.currentThread().interrupt()
-        }
-        while (true) {
-          val event = specialEvents.poll() ?: break
-          event.execute()
-        }
-        if (!deferred.isActive) {
-          return
-        }
+      } catch (_ : InterruptedException) {
+        // we still return locking result regardless of interruption
+        Thread.currentThread().interrupt()
+      }
+      if (!deferred.isActive) {
+        return
       }
     }
   }
@@ -279,7 +354,11 @@ private class EternalEventStealer(disposable: Disposable) {
   }
 }
 
-private class SpecialDispatchEvent private constructor(val reference: AtomicReference<AWTEvent>) : InvocationEvent(Any(), {
+private sealed interface ForcedEvent
+
+private class TerminalEvent(val id: Int) : ForcedEvent
+
+private class SpecialDispatchEvent private constructor(val reference: AtomicReference<AWTEvent>) : ForcedEvent, InvocationEvent(Any(), {
   execute(reference)
 }) {
   companion object {

@@ -34,8 +34,7 @@ jvm_library(
 ### auto-generated section `build intellij.pycharm.community` end
 
 ### auto-generated section `build intellij.pycharm.community.customization` start
-load("@rules_java//java:defs.bzl", "java_library")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "pycharm-community-customization_resources",
@@ -43,9 +42,10 @@ jvm_resources(
   strip_prefix = "ide/resources"
 )
 
-java_library(
+jvm_library(
   name = "pycharm-community-customization",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":pycharm-community-customization_resources",
     "//python/ide/impl",
@@ -58,11 +58,12 @@ java_library(
 ### auto-generated section `build intellij.pycharm.community.customization` end
 
 ### auto-generated section `build intellij.pycharm.community.main` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-java_library(
+jvm_library(
   name = "pycharm-community-main",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     "//platform/main/intellij.platform.monolith.main:monolith-main",
     "//platform/bootstrap",
@@ -116,12 +117,13 @@ java_library(
 ### auto-generated section `build intellij.pycharm.community.main` end
 
 ### auto-generated section `build intellij.python.commonTests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "python-commonTests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -149,7 +151,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "python-commonTests_test",
   runtime_deps = [":python-commonTests_test_lib"]
 )
@@ -177,14 +179,19 @@ jvm_library(
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//platform/analysis-api:analysis",
+    "//platform/code-style-api:codeStyle",
     "//platform/util/concurrency",
     "//platform/credential-store",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//platform/foldings",
     "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/lang-core",
+    "//platform/macro",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
+    "//platform/remote-core",
     "//platform/structure-view-impl:structureView-impl",
     "//platform/usageView-impl",
     "//platform/workspace/storage",
@@ -259,8 +266,6 @@ jvm_library(
     "//python/python-syntax:syntax",
     "//platform/ui.jcef",
     "//libraries/io",
-    "//libraries/ktor-client",
-    "//libraries/ktor-client-cio",
     "//platform/util/progress",
     "//platform/feedback",
     "@lib//:kotlinx-datetime-jvm",
@@ -287,6 +292,7 @@ jvm_library(
     "@lib//:kaml",
     "//python/impl.helperLocator:community-helpersLocator",
     "//python/python-exec-service/execService.python",
+    "//python/interpreters",
   ],
   exports = [
     "//python/openapi:community",
@@ -304,11 +310,12 @@ jvm_library(
 ### auto-generated section `build intellij.python.community.impl` end
 
 ### auto-generated section `build intellij.python.community.plugin.main` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-java_library(
+jvm_library(
   name = "python-community-plugin-main",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     "//:main",
     "//java/openapi:java",
@@ -322,11 +329,12 @@ java_library(
 ### auto-generated section `build intellij.python.community.plugin.main` end
 
 ### auto-generated section `build intellij.python.community.plugin.modules` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-java_library(
+jvm_library(
   name = "python-community-plugin-modules",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     "//python/IntelliLang-python:langInjection",
     "//python/python-copyright:copyright",
@@ -339,7 +347,7 @@ java_library(
 ### auto-generated section `build intellij.python.community.plugin.modules` end
 
 ### auto-generated section `build intellij.python.community.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -348,9 +356,10 @@ jvm_resources(
   strip_prefix = "testResources"
 )
 
-java_library(
+jvm_library(
   name = "python-community-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -360,15 +369,19 @@ jvm_library(
   associates = ["//python:python-community-impl"],
   deps = [
     "//platform/analysis-api:analysis",
+    "//platform/code-style-api:codeStyle",
     "//platform/util/concurrency",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//platform/foldings",
     "//platform/indexing-api:indexing",
     "//jps/model-api:model",
+    "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
+    "//platform/remote-core",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/workspace/storage",
@@ -441,6 +454,8 @@ jvm_library(
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//python/impl.helperLocator:community-helpersLocator",
+    "//python/python-pyproject:pyproject",
+    "//python/python-pyproject:pyproject_test_lib",
   ],
   runtime_deps = [
     ":python-community-tests_test_resources",
@@ -455,15 +470,14 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "python-community-tests_test",
   runtime_deps = [":python-community-tests_test_lib"]
 )
 ### auto-generated section `build intellij.python.community.tests` end
 
 ### auto-generated section `build intellij.python.helpers` start
-load("@rules_java//java:defs.bzl", "java_library")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "python-helpers_resources",
@@ -477,9 +491,10 @@ jvm_resources(
   strip_prefix = "helpers/third_party/thriftpy"
 )
 
-java_library(
+jvm_library(
   name = "python-helpers",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":python-helpers_resources",
     ":python-helpers_resources_1",
@@ -488,7 +503,7 @@ java_library(
 ### auto-generated section `build intellij.python.helpers` end
 
 ### auto-generated section `build intellij.python.helpers.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -512,7 +527,7 @@ jvm_library(
   runtime_deps = [":python-helpers-tests_test_resources"]
 )
 
-jvm_test(
+jps_test(
   name = "python-helpers-tests_test",
   runtime_deps = [":python-helpers-tests_test_lib"]
 )

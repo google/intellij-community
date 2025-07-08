@@ -53,8 +53,6 @@ import com.intellij.ui.ComponentUtil;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.*;
 import com.intellij.util.concurrency.*;
-import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
-import com.intellij.util.concurrency.annotations.RequiresWriteLock;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.ui.EDT;
@@ -69,7 +67,6 @@ import org.jetbrains.annotations.*;
 
 import javax.swing.*;
 import java.awt.*;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -169,8 +166,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   private final @Nullable Disposable myLastDisposable;  // the last to be disposed
 
   private static final String WAS_EVER_SHOWN = "was.ever.shown";
-
-  private static final ThreadLocal<Boolean> isForcedWriteAction = ThreadLocal.withInitial(() -> false);
 
   private static final LegacyProgressIndicatorProvider myLegacyIndicatorProvider = () -> {
     ProgressIndicator indicator = ProgressIndicatorProvider.getGlobalProgressIndicator();
@@ -569,10 +564,10 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
            new Runnable() {
              @Override
              public void run() {
-               try (AccessToken ignored = ThreadContext.installThreadContext(
-                 ThreadContext.currentThreadContext().plus(asContextElement(modalityState)), true)) {
+               ThreadContext.installThreadContext(ThreadContext.currentThreadContext().plus(asContextElement(modalityState)), true, () -> {
                  runIntendedWriteActionOnCurrentThread(runnable);
-               }
+                 return Unit.INSTANCE;
+               });
              }
 
              @Override
@@ -1098,10 +1093,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public void runWriteAction(@NotNull Runnable action) {
     checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
-    if (isForcedWriteAction.get()) {
-      action.run();
-      return;
-    }
     try {
       getThreadingSupport().runWriteAction(action.getClass(), runnableUnitFunction(action));
     }
@@ -1114,9 +1105,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public <T> T runWriteAction(@NotNull Computable<T> computation) {
     checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
-    if (isForcedWriteAction.get()) {
-      return computation.compute();
-    }
     try {
       return getThreadingSupport().runWriteAction(computation.getClass(), computation::compute);
     }
@@ -1129,9 +1117,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public <T, E extends Throwable> T runWriteAction(@NotNull ThrowableComputable<T, E> computation) throws E {
     checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
-    if (isForcedWriteAction.get()) {
-      return computation.compute();
-    }
     try {
       return getThreadingSupport().runWriteAction(computation.getClass(), rethrowCheckedExceptions(computation));
     }
@@ -1264,7 +1249,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public boolean isWriteAccessAllowed() {
-    return isForcedWriteAction.get() || getThreadingSupport().isWriteAccessAllowed();
+    return getThreadingSupport().isWriteAccessAllowed();
   }
 
   @Override
@@ -1519,32 +1504,10 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     return getThreadingSupport().isParallelizedReadAction(context);
   }
 
+  @Override
   public @NotNull ThreadingSupport getThreadingSupport() {
     return lock;
   }
 
-  @RequiresBackgroundThread(generateAssertion = false)
-  @RequiresWriteLock(generateAssertion = false)
-  public void invokeAndWaitWithTransferredWriteAction(Runnable runnable) throws Throwable {
-    assert isWriteAccessAllowed() : "Transferring of write action is permitted only if write lock is acquired";
-    assert !EDT.isCurrentThreadEdt() : "Transferring of write action is permitted only on background thread";
-    try {
-      EventQueue.invokeAndWait(new SuvorovProgress.ForcedWriteActionRunnable() {
-        @Override
-        public void run() {
-          boolean currentValue = isForcedWriteAction.get();
-          isForcedWriteAction.set(true);
-          try {
-            ((TransactionGuardImpl)TransactionGuard.getInstance()).performUserActivity(runnable);
-          }
-          finally {
-            isForcedWriteAction.set(currentValue);
-          }
-        }
-      });
-    }
-    catch (InvocationTargetException e) {
-      throw e.getTargetException();
-    }
-  }
+
 }

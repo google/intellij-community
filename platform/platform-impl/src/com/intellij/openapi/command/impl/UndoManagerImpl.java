@@ -81,8 +81,8 @@ public class UndoManagerImpl extends UndoManager {
   protected UndoManagerImpl(@Nullable ComponentManager componentManager) {
     myProject = componentManager instanceof Project project ? project : null;
     myAdjustableUndoableActionsHolder = new SharedAdjustableUndoableActionsHolder();
-    mySharedUndoStacksHolder = new SharedUndoRedoStacksHolder(true, myAdjustableUndoableActionsHolder);
-    mySharedRedoStacksHolder = new SharedUndoRedoStacksHolder(false, myAdjustableUndoableActionsHolder);
+    mySharedUndoStacksHolder = new SharedUndoRedoStacksHolder(myAdjustableUndoableActionsHolder, isPerClientSupported(), true);
+    mySharedRedoStacksHolder = new SharedUndoRedoStacksHolder(myAdjustableUndoableActionsHolder, isPerClientSupported(), false);
   }
 
   @Override
@@ -276,9 +276,8 @@ public class UndoManagerImpl extends UndoManager {
     mySharedRedoStacksHolder.clearDocumentReferences(document);
   }
 
-  // TODO: remove public
   @ApiStatus.Internal
-  public void clearStacks(@Nullable FileEditor editor) {
+  protected void clearStacks(@Nullable FileEditor editor) {
     for (UndoClientState state : getAllClientStates()) {
       state.clearStacks(editor);
     }
@@ -336,6 +335,11 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   @ApiStatus.Internal
+  protected boolean isPerClientSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
   protected final int getStackSize(@Nullable DocumentReference docRef, boolean isUndo) {
     UndoClientState state = Objects.requireNonNull(getClientState(), "undo/redo is not available");
     return state.getStackSize(docRef, isUndo);
@@ -346,7 +350,8 @@ public class UndoManagerImpl extends UndoManager {
     mySharedUndoStacksHolder.trimStacks(Collections.singleton(docRef));
   }
 
-  void onCommandStarted(
+  @ApiStatus.Internal
+  protected void onCommandStarted(
     @Nullable Project project,
     @NotNull UndoConfirmationPolicy undoConfirmationPolicy,
     boolean recordOriginalReference

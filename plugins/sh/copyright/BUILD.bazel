@@ -25,7 +25,7 @@ jvm_library(
 ### auto-generated section `build intellij.sh.copyright` end
 
 ### auto-generated section `build intellij.sh.copyright.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 jvm_library(
@@ -44,7 +44,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "copyright-tests_test",
   runtime_deps = [":copyright-tests_test_lib"]
 )

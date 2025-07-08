@@ -1,10 +1,11 @@
 ### auto-generated section `build kotlin.code-insight.fixes.k2.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -18,6 +19,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-common",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
+    "//platform/lang-core",
     "//platform/core-ui",
     "//plugins/kotlin/plugin/k2",
     "//plugins/kotlin/base/test:test_test_lib",
@@ -33,7 +35,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

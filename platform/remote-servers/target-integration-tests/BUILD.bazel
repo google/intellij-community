@@ -1,10 +1,11 @@
 ### auto-generated section `build intellij.platform.remoteServers.targetsIntegrationTests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "remoteServers-targetsIntegrationTests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -19,7 +20,9 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//jps/model-api:model",
+    "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -37,7 +40,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "remoteServers-targetsIntegrationTests_test",
   runtime_deps = [":remoteServers-targetsIntegrationTests_test_lib"]
 )

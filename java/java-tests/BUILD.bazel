@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.java.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -8,9 +8,10 @@ jvm_resources(
   strip_prefix = "testData/inspection"
 )
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -20,13 +21,16 @@ jvm_library(
   associates = ["//java/java-impl:impl"],
   deps = [
     "//platform/analysis-api:analysis",
+    "//platform/code-style-api:codeStyle",
     "//platform/util/concurrency",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/execution-impl",
     "//platform/foldings",
     "//platform/indexing-api:indexing",
     "//jps/model-api:model",
     "//jps/model-serialization",
+    "//platform/lang-core",
     "//platform/lvcs-api:lvcs",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
@@ -35,6 +39,7 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/java-impl-inspections:impl-inspections",
+    "//platform/platform-impl/concurrency",
     "//java/idea-ui:ui",
     "//platform/usageView-impl",
     "//platform/util/diff",
@@ -109,7 +114,6 @@ jvm_library(
     "@lib//:jaxb-api",
     "@lib//:fastutil-min",
     "//platform/platform-impl:ide-impl",
-    "//platform/platform-impl:ide-impl_test_lib",
     "//jps/model-impl",
     "//platform/core-ui",
     "//platform/code-style-impl:codeStyle-impl",
@@ -149,6 +153,7 @@ jvm_library(
     "//java/java-syntax:syntax",
     "//platform/lang-impl",
     "//xml/impl",
+    "//platform/syntax/syntax-scripts:scripts",
   ],
   runtime_deps = [
     ":tests_test_resources",
@@ -158,7 +163,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

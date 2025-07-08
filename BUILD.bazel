@@ -1,5 +1,4 @@
 load("@rules_java//java:defs.bzl", "java_binary")
-load("@rules_jvm//:src/jvm-args.bzl", "get_jvm_flags")
 load("//build:compiler-options.bzl", "create_kotlinc_options")
 
 create_kotlinc_options(name= "k8", jvm_target = 8)
@@ -8,11 +7,7 @@ create_kotlinc_options(name = "k17", jvm_target = 17)
 
 java_binary(
     name = "monorepo-jvm-builder",
-    jvm_flags = get_jvm_flags([
-        "-Dkotlin.environment.keepalive=true",
-        "-Djps.use.experimental.storage=true",
-        "-XX:+HeapDumpOnOutOfMemoryError",
-    ]),
+#     jvm_flags = [],  -- Note(k15tfu): ignored w/ deploy jar, use @rules_jvm//:jvm-builder-jvm_flags
     main_class = "org.jetbrains.bazel.jvm.worker.JvmBuildWorker",
     visibility = ["//visibility:public"],
     runtime_deps = ["@rules_jvm//src/jvm-builder:jvm-builder-lib", "@lib//:rhizomedb-compiler-plugin", "@lib//:expects-compiler-plugin", "@lib//:rpc-compiler-plugin"],
@@ -72,16 +67,22 @@ java_binary(
     "--add-opens=jdk.attach/sun.tools.attach=ALL-UNNAMED",
     "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
     "--add-opens=jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED",
-    "--add-opens=jdk.jdi/com.sun.tools.jdi=ALL-UNNAMED"
+    "--add-opens=jdk.jdi/com.sun.tools.jdi=ALL-UNNAMED",
+    "-Didea.home.path=$${BUILD_WORKSPACE_DIRECTORY}",
   ]
 )
 
-### auto-generated section `build intellij.idea.community.main` start
-load("@rules_java//java:defs.bzl", "java_library")
+## used to determine community root path in the test
+## see community/build/tests-options.bzl
+exports_files(["intellij.idea.community.main.iml"])
 
-java_library(
+### auto-generated section `build intellij.idea.community.main` start
+load("@rules_jvm//:jvm.bzl", "jvm_library")
+
+jvm_library(
   name = "main",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     "//platform/main/intellij.platform.monolith.main:monolith-main",
     "//plugins/coverage",
@@ -256,16 +257,18 @@ java_library(
     "//plugins/maven/maven3-server-impl:server-m3-impl",
     "//plugins/maven/maven36-server-impl:server-m36-impl",
     "//plugins/maven/maven40-server-impl:server-m40",
+    "//plugins/mcp-server:mcpserver",
   ]
 )
 ### auto-generated section `build intellij.idea.community.main` end
 
 ### auto-generated section `build intellij.idea.community.main.android` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
-java_library(
+jvm_library(
   name = "main-android",
   visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   runtime_deps = [
     "//android/android:core",
     "//:main",

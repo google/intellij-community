@@ -1,6 +1,6 @@
 ### auto-generated section `build kotlin.j2k.k2.tests` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 create_kotlinc_options(
@@ -9,9 +9,10 @@ create_kotlinc_options(
   opt_in = ["org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction"]
 )
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -47,7 +48,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

@@ -82,7 +82,6 @@ public class HighlightInfo implements Segment {
   private static final byte FROM_INJECTION_MASK = 0x2;
   private static final byte AFTER_END_OF_LINE_MASK = 0x4;
   private static final byte FILE_LEVEL_ANNOTATION_MASK = 0x8;
-  private static final byte NEEDS_UPDATE_ON_TYPING_MASK = 0x10;
 
   @NotNull
   @Unmodifiable
@@ -103,7 +102,7 @@ public class HighlightInfo implements Segment {
     }));
   }
 
-  @MagicConstant(intValues = {HAS_HINT_MASK, FROM_INJECTION_MASK, AFTER_END_OF_LINE_MASK, FILE_LEVEL_ANNOTATION_MASK, NEEDS_UPDATE_ON_TYPING_MASK})
+  @MagicConstant(intValues = {HAS_HINT_MASK, FROM_INJECTION_MASK, AFTER_END_OF_LINE_MASK, FILE_LEVEL_ANNOTATION_MASK})
   private @interface FlagConstant {
   }
 
@@ -154,7 +153,7 @@ public class HighlightInfo implements Segment {
    * Used as an optimization to conserve memory
    */
   private static final RangeMarker FIX_MARKER_SAME_AS_HIGHLIGHTER = FileStatusMap.WHOLE_FILE_DIRTY_MARKER;
-  private @Nullable("null means it's the same as highlighter") RangeMarker fixMarker = FIX_MARKER_SAME_AS_HIGHLIGHTER;
+  private volatile @Nullable("null means it's the same as highlighter") RangeMarker fixMarker = FIX_MARKER_SAME_AS_HIGHLIGHTER;
   /**
    * @see FlagConstant for allowed values
    */
@@ -181,7 +180,6 @@ public class HighlightInfo implements Segment {
                           @Nullable @Tooltip String escapedToolTip,
                           @NotNull HighlightSeverity severity,
                           boolean afterEndOfLine,
-                          @Nullable Boolean needsUpdateOnTyping,
                           boolean isFileLevelAnnotation,
                           int navigationShift,
                           @Nullable ProblemGroup problemGroup,
@@ -204,7 +202,6 @@ public class HighlightInfo implements Segment {
     toolTip = encodeTooltip(escapedToolTip, escapedDescription);
     this.severity = severity;
     myFlags = (byte)((afterEndOfLine ? AFTER_END_OF_LINE_MASK : 0) |
-                     (calcNeedUpdateOnTyping(needsUpdateOnTyping, type) ? NEEDS_UPDATE_ON_TYPING_MASK : 0) |
                      (isFileLevelAnnotation ? FILE_LEVEL_ANNOTATION_MASK : 0) |
                      (hasHint ? HAS_HINT_MASK : 0)
     );
@@ -238,7 +235,7 @@ public class HighlightInfo implements Segment {
       if (!processed.add(descriptor)) continue;
       TextRange fixRange = descriptor.getFixRange();
       if (fixRange == null) {
-        fixRange = TextRange.create(getFixTextRange());
+        fixRange = TextRangeScalarUtil.create(getFixTextRangeScalar());
       }
       T result = predicate.apply(descriptor, fixRange);
       if (result != null) {
@@ -257,7 +254,6 @@ public class HighlightInfo implements Segment {
   }
 
   @NotNull
-  @ApiStatus.Internal
   private synchronized Segment getFixTextRange() {
     RangeMarker myFixMarker = fixMarker;
     if (myFixMarker != null) {
@@ -273,10 +269,29 @@ public class HighlightInfo implements Segment {
     }
     return TextRangeScalarUtil.create(fixRange);
   }
+  private long getFixTextRangeScalar() {
+    RangeMarker myFixMarker;
+    RangeHighlighterEx myHighlighter;
+    synchronized (this) {
+      myFixMarker = fixMarker;
+      myHighlighter = highlighter;
+    }
+    if (myFixMarker != null) {
+      if (myFixMarker == FIX_MARKER_SAME_AS_HIGHLIGHTER) {
+        if (myHighlighter != null && myHighlighter.isValid()) {
+          return TextRangeScalarUtil.toScalarRange(myHighlighter);
+        }
+      }
+      else if (myFixMarker.isValid()) {
+        return TextRangeScalarUtil.toScalarRange(myFixMarker);
+      }
+    }
+    return fixRange;
+  }
 
   @ApiStatus.Internal
   public void markFromInjection() {
-    setFlag(FROM_INJECTION_MASK, true);
+    setFlag(FROM_INJECTION_MASK);
   }
 
   @ApiStatus.Internal
@@ -393,9 +408,9 @@ public class HighlightInfo implements Segment {
     return BitUtil.isSet(myFlags, mask);
   }
 
-  private void setFlag(@FlagConstant byte mask, boolean value) {
+  private void setFlag(@FlagConstant byte mask) {
     //noinspection NonAtomicOperationOnVolatileField
-    myFlags = BitUtil.set(myFlags, mask, value);
+    myFlags = BitUtil.set(myFlags, mask, true);
   }
 
   @ApiStatus.Internal
@@ -509,20 +524,6 @@ public class HighlightInfo implements Segment {
 
   private static @NotNull EditorColorsScheme getColorsScheme(@Nullable EditorColorsScheme customScheme) {
     return customScheme != null ? customScheme : EditorColorsManager.getInstance().getGlobalScheme();
-  }
-
-  public boolean needUpdateOnTyping() {
-    return isFlagSet(NEEDS_UPDATE_ON_TYPING_MASK);
-  }
-
-  private static boolean calcNeedUpdateOnTyping(@Nullable Boolean needsUpdateOnTyping, @NotNull HighlightInfoType type) {
-    if (needsUpdateOnTyping != null) {
-      return needsUpdateOnTyping;
-    }
-    if (type instanceof HighlightInfoType.UpdateOnTypingSuppressible suppressible) {
-      return suppressible.needsUpdateOnTyping();
-    }
-    return true;
   }
 
   @Override
@@ -671,6 +672,10 @@ public class HighlightInfo implements Segment {
 
     @NotNull Builder endOfLine();
 
+    /**
+     * @deprecated Does nothing
+     */
+    @Deprecated(forRemoval = true)
     @NotNull Builder needsUpdateOnTyping(boolean update);
 
     @NotNull Builder severity(@NotNull HighlightSeverity severity);
@@ -763,7 +768,6 @@ public class HighlightInfo implements Segment {
     HighlightInfo info = new HighlightInfo(
       forcedAttributes, forcedAttributesKey, convertType(annotation), annotation.getStartOffset(), annotation.getEndOffset(),
       annotation.getMessage(), annotation.getTooltip(), annotation.getSeverity(), annotation.isAfterEndOfLine(),
-      annotation.needsUpdateOnTyping(),
       annotation.isFileLevelAnnotation(), 0, annotation.getProblemGroup(), annotatorClass, annotation.getGutterIconRenderer(), HighlightInfoUpdaterImpl.MANAGED_HIGHLIGHT_INFO_GROUP,
       false, annotation.getLazyQuickFixes());
 
@@ -824,8 +828,8 @@ public class HighlightInfo implements Segment {
     return isFlagSet(HAS_HINT_MASK);
   }
 
-  private void setHint(boolean hasHint) {
-    setFlag(HAS_HINT_MASK, hasHint);
+  private void setHint() {
+    setFlag(HAS_HINT_MASK);
   }
 
   public int getActualStartOffset() {
@@ -1139,11 +1143,11 @@ public class HighlightInfo implements Segment {
   }
   // must be called from synchronized(this)
   private void updateFields(@NotNull @Unmodifiable List<? extends IntentionActionDescriptor> descriptors, @Nullable Document document) {
-    long newFixRange = TextRangeScalarUtil.toScalarRange(getFixTextRange());
+    long newFixRange = getFixTextRangeScalar();
     for (IntentionActionDescriptor descriptor : descriptors) {
       TextRange fixRange = descriptor.getFixRange();
       if (descriptor.myAction instanceof HintAction) {
-        setHint(true);
+        setHint();
       }
       if (document == null && descriptor.myFixRange instanceof RangeMarker marker) {
         document = marker.getDocument();
@@ -1211,10 +1215,8 @@ public class HighlightInfo implements Segment {
       return true;
     }
     if (!includeFixRange) return false;
-    Segment fixRange = getFixTextRange();
-    startOffset = fixRange.getStartOffset();
-    endOffset = fixRange.getEndOffset();
-    return startOffset <= offset && offset <= endOffset;
+    long fixRange = getFixTextRangeScalar();
+    return TextRangeScalarUtil.containsOffset(fixRange, offset);
   }
   private static @NotNull RangeMarker getOrCreate(@NotNull Document document,
                                                   @NotNull Long2ObjectMap<RangeMarker> range2markerCache,
@@ -1232,7 +1234,7 @@ public class HighlightInfo implements Segment {
   synchronized void updateQuickFixFields(@NotNull Document document,
                                          @NotNull Long2ObjectMap<RangeMarker> range2markerCache,
                                          long finalHighlighterRange) {
-    long fixTextRange = TextRangeScalarUtil.coerceRange(TextRangeScalarUtil.toScalarRange(getFixTextRange()), 0, document.getTextLength());
+    long fixTextRange = TextRangeScalarUtil.coerceRange(getFixTextRangeScalar(), 0, document.getTextLength());
     updateFixMarker(document, range2markerCache, fixTextRange, finalHighlighterRange);
     updateDescriptorFixRanges(getIntentionActionDescriptors(), document, range2markerCache, fixTextRange);
   }
@@ -1362,7 +1364,9 @@ public class HighlightInfo implements Segment {
     }
     List<LazyFixDescription> newPairs = ContainerUtil.map(pairs, desc -> {
       Future<? extends List<IntentionActionDescriptor>> future = desc.future();
-      if (future == null) {
+      if (future == null || !future.isDone()) {
+        // if the existing fixture computation is not ready yet
+        // it's under another progress and cancellation won't work
         Consumer<? super QuickFixActionRegistrar> computer = desc.fixesComputer();
         future = CompletableFuture.completedFuture(doComputeLazyQuickFixes(document, psiFile.getProject(), desc.psiModificationStamp(), computer));
         return new LazyFixDescription(computer, desc.psiModificationStamp(), future);
@@ -1393,7 +1397,7 @@ public class HighlightInfo implements Segment {
       return List.of();
     }
     assertIntentionActionDescriptorsAreRangeMarkerBased(getIntentionActionDescriptors());
-    List<IntentionActionDescriptor> newDescriptors = Collections.synchronizedList(new ArrayList<>());
+    List<IntentionActionDescriptor> lazyDescriptors = Collections.synchronizedList(new ArrayList<>());
     QuickFixActionRegistrar registrarDelegate = new QuickFixActionRegistrar() {
       @Override
       public void register(@NotNull IntentionAction action) {
@@ -1406,7 +1410,7 @@ public class HighlightInfo implements Segment {
       }
       private void doRegister(@NotNull Segment fixRange, @NotNull IntentionAction action, @Nullable HighlightDisplayKey key) {
         IntentionActionDescriptor descriptor = new IntentionActionDescriptor(action, null, null, null, key, myProblemGroup, severity, fixRange);
-        newDescriptors.add(descriptor);
+        lazyDescriptors.add(descriptor);
         synchronized (HighlightInfo.this) {
           updateFields(List.of(descriptor), document);
           assertIntentionActionDescriptorsAreRangeMarkerBased(List.of(descriptor));
@@ -1414,8 +1418,8 @@ public class HighlightInfo implements Segment {
       }
     };
     computation.accept(registrarDelegate);
-    assertIntentionActionDescriptorsAreRangeMarkerBased(newDescriptors);
-    return newDescriptors;
+    assertIntentionActionDescriptorsAreRangeMarkerBased(lazyDescriptors);
+    return lazyDescriptors;
   }
 
   private static void assertIntentionActionDescriptorsAreRangeMarkerBased(@NotNull List<? extends IntentionActionDescriptor> descriptors) {
@@ -1506,7 +1510,6 @@ public class HighlightInfo implements Segment {
     if (toolTip != null) {
       builder.escapedToolTip(toolTip);
     }
-    builder.needsUpdateOnTyping(needUpdateOnTyping());
     if (isFileLevelAnnotation()) {
       builder.fileLevelAnnotation();
     }

@@ -4,6 +4,7 @@ package com.intellij.platform.searchEverywhere.impl
 import com.intellij.ide.rpc.DataContextId
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
+import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
 import fleet.kernel.DurableRef
@@ -36,7 +37,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
     params: SeParams,
     dataContextId: DataContextId?,
     requestedCountChannel: ReceiveChannel<Int>,
-  ): Flow<SeItemData>
+  ): Flow<SeTransferEvent>
 
   suspend fun itemSelected(
     projectId: ProjectId,
@@ -61,7 +62,20 @@ interface SeRemoteApi : RemoteApi<Unit> {
                                    dataContextId: DataContextId,
                                    providerId: SeProviderId): Boolean
 
-  suspend fun getAvailableProviderIds(): List<SeProviderId>
+  suspend fun openInFindToolWindow(
+    projectId: ProjectId,
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId?,
+    providerIds: List<SeProviderId>,
+    params: SeParams,
+    isAllTab: Boolean
+  ): Boolean
+
+  suspend fun getAvailableProviderIds(
+    projectId: ProjectId,
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId
+  ): Map<String, Set<SeProviderId>>
 
   suspend fun getSearchScopesInfoForProviders(
     projectId: ProjectId,
@@ -69,7 +83,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
     isAllTab: Boolean,
-  ): Map<SeProviderId, SeSearchScopesInfo>
+  ): Map<SeProviderId, SearchScopesInfo>
 
   suspend fun getTypeVisibilityStatesForProviders(
     index: Int,

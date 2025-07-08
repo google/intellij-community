@@ -88,21 +88,26 @@ internal fun generateDeps(
     else if (element is JpsLibraryDependency) {
       val untypedLib = element.library ?: error("library dependency '$element' from module ${module.module.name} is not resolved")
       val lib = untypedLib.asTyped(JpsRepositoryLibraryType.INSTANCE)
+      // non-repository library, meaning library files are under VCS
       if (lib == null) {
         val files = untypedLib.getPaths(JpsOrderRootType.COMPILED)
         val firstFile = files.first()
         val targetName = camelToSnakeCase(escapeBazelLabel(firstFile.nameWithoutExtension))
-        val isCommunityLib = firstFile.startsWith(context.communityDir)
+        val isCommunityLib = firstFile.startsWith(context.communityRoot)
         val owner = context.getLibOwner(isCommunityLib)
 
-        val libBuildFileDir = firstFile.relativeTo(owner.moduleFile.parent.parent).parent.invariantSeparatorsPathString
+        val communityOrUltimateRoot = owner.moduleFile.parent.parent
+        val libBuildFileDir = firstFile.relativeTo(communityOrUltimateRoot).parent.invariantSeparatorsPathString
         context.addLocalLibrary(
           lib = LocalLibrary(files = files, lib = Library(targetName = targetName, owner = owner)),
           isProvided = isProvided,
         )
 
         if (!isCommunityLib) {
-          require(!module.isCommunity)
+          require(!module.isCommunity) {
+            "Module ${module.module.name} must not depend on a non-community libraries because it is a community module" +
+            "(library=${untypedLib.name}, files=$files, bazelTargetName=$targetName)"
+          }
         }
 
         val prefix = when {
@@ -213,6 +218,8 @@ internal fun generateDeps(
       val libName = element.libraryReference.libraryName
       if (libName == "jetbrains-jewel-markdown-laf-bridge-styling" ||
           libName == "jetbrains.kotlin.compose.compiler.plugin" ||
+          libName == "jetbrains.compose.foundation.desktop:toolbox" ||
+          libName == "jetbrains.compose.ui.test.junit4.desktop:toolbox" ||
           libName == "jetbrains-compose-ui-test-junit4-desktop") {
         plugins.add("@lib//:compose-plugin")
       }
@@ -302,7 +309,9 @@ private fun addDep(
         deps.add(dependencyLabel)
 
         if (dependencyModuleDescriptor != null && !dependencyModuleDescriptor.testSources.isEmpty()) {
-          deps.add(getLabelForTest(dependencyLabel))
+          if (needsBackwardCompatibleTestDependency(dependencyModuleDescriptor.module.name, dependentModule)) {
+            deps.add(getLabelForTest(dependencyLabel))
+          }
         }
       }
       JpsJavaDependencyScope.TEST, JpsJavaDependencyScope.PROVIDED -> {
@@ -380,6 +389,22 @@ private fun addDep(
     JpsJavaDependencyScope.TEST -> {
       // we produce separate Bazel targets for production and test source roots
     }
+  }
+}
+
+private fun needsBackwardCompatibleTestDependency(
+  name: @NlsSafe String,
+  dependentModule: ModuleDescriptor,
+): Boolean {
+  if (name.startsWith("intellij.platform.ide.")) {
+    /// Newly extracted modules from platform-impl are not test-framework modules for sure, and no one should depend on their test targets.
+    // todo - move ToolWindowManagerTest from platform-lang to platform-impl tests
+    return name == "intellij.platform.ide.impl" && dependentModule.module.name == "intellij.platform.lang.tests"
+  }
+  else {
+    // If we depend on module A and A includes test sources, we must add a dependency not only on A’s production library target but also on its test library target.
+    // See: https://youtrack.jetbrains.com/issue/IJI-2851/ (auto-add dependency on test target only for existing bad modules and forbid it for everything else).
+    return true
   }
 }
 

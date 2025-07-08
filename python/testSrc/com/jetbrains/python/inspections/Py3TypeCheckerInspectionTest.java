@@ -2894,4 +2894,104 @@ def foo(param: str | int) -> TypeGuard[str]:
                    f(<warning descr="Expected type 'Literal[1]', got 'Literal[2]' instead">a=2</warning>)
                    """);
   }
+
+  // PY-55691
+  public void testAttrsDataclassProtocolMatchingDefine() {
+    runWithAdditionalClassEntryInSdkRoots("packages", () ->
+      doTestByText("""
+                     import attrs
+                     
+                     @attrs.define
+                     class User:
+                         password: str
+                     
+                     attrs.fields(User)
+                     """)
+    );
+  }
+
+  // PY-55691
+  public void testAttrsDataclassProtocolMatchingFrozen() {
+    runWithAdditionalClassEntryInSdkRoots("packages", () ->
+      doTestByText("""
+                     import attrs
+                     
+                     @attrs.frozen
+                     class User:
+                         password: str
+                     
+                     attrs.fields(User)
+                     """)
+    );
+  }
+
+  // PY-76854
+  public void testNonHashableDataclassAssignedToHashable() {
+    doTestByText("""
+                   from dataclasses import dataclass
+                   from typing import Hashable
+                   
+                   
+                   @dataclass
+                   class DC:
+                       a: int
+                   
+                   
+                   v: Hashable = <warning descr="Expected type 'Hashable', got 'DC' instead">DC(0)</warning>
+                   
+                   @dataclass(eq=True)
+                   class DC2:
+                       a: int
+                   
+                   
+                   v2: Hashable = <warning descr="Expected type 'Hashable', got 'DC2' instead">DC2(0)</warning>
+                   """);
+  }
+
+  // PY-76854
+  public void testHashableDataclassAssignedToHashable() {
+    doTestByText("""
+                   from dataclasses import dataclass
+                   from typing import Hashable
+                   
+                   
+                   @dataclass(eq=True, frozen=True)
+                   class DC:
+                       a: int
+                   
+                   
+                   v: Hashable = DC(0)
+                   
+                   @dataclass(eq=True)
+                   class DC2:
+                       a: int
+                   
+                       def __hash__(self) -> int:
+                           return 0
+                   
+                   
+                   v2: Hashable = DC2(0)
+                   
+                   @dataclass(unsafe_hash=True)
+                   class DC3:
+                       a: int
+                   
+                   
+                   v3: Hashable = DC3(0)
+                   
+                   @dataclass(eq=False, frozen=True)
+                   class DC4:
+                       a: int
+                   
+                   
+                   v4: Hashable = DC4(0)
+                   
+                   @dataclass(eq=False)
+                   class DC5:
+                       a: int
+                   
+                   
+                   v5: Hashable = DC5(0)
+                   """);
+  }
 }

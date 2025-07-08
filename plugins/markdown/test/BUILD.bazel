@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.markdown.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -8,9 +8,10 @@ jvm_resources(
   strip_prefix = "data"
 )
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -24,6 +25,7 @@ jvm_library(
     "//plugins/markdown/frontmatter/toml",
     "//plugins/markdown/frontmatter/yaml",
     "//platform/analysis-api:analysis",
+    "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
     "//platform/editor-ui-ex:editor-ex",
     "//plugins/markdown/images",
@@ -66,7 +68,7 @@ jvm_library(
   runtime_deps = [":tests_test_resources"]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

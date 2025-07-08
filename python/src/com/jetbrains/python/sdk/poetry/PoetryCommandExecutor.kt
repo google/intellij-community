@@ -13,11 +13,13 @@ import com.intellij.python.community.execService.ExecOptions
 import com.intellij.python.community.execService.ExecService
 import com.intellij.python.community.execService.execGetStdout
 import com.intellij.python.community.impl.poetry.poetryPath
+import com.intellij.python.pyproject.PY_PROJECT_TOML
 import com.intellij.util.SystemProperties
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
 import com.jetbrains.python.isSuccess
+import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.PyPackage
 import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.PyRequirementParser
@@ -48,14 +50,14 @@ import kotlin.time.Duration.Companion.minutes
 /**
  *  This source code is edited by @koxudaxi Koudai Aono <koxudaxi@gmail.com>
  */
-private const val REPLACE_PYTHON_VERSION = """import re,sys;f=open("pyproject.toml", "r+");orig=f.read();f.seek(0);f.write(re.sub(r"(python = \"\^)[^\"]+(\")", "\g<1>"+'.'.join(str(v) for v in sys.version_info[:2])+"\g<2>", orig))"""
+private const val REPLACE_PYTHON_VERSION = """import re,sys;f=open("$PY_PROJECT_TOML", "r+");orig=f.read();f.seek(0);f.write(re.sub(r"(python = \"\^)[^\"]+(\")", "\g<1>"+'.'.join(str(v) for v in sys.version_info[:2])+"\g<2>", orig))"""
 private val poetryNotFoundException: @Nls String = PyBundle.message("python.sdk.poetry.execution.exception.no.poetry.message")
 private val VERSION_2 = "2.0.0".toVersion()
 
 @Internal
 suspend fun runPoetry(projectPath: Path?, vararg args: String): PyResult<String> {
   val executable = getPoetryExecutable().getOr { return it }
-  return runExecutableWithProgress(executable, projectPath, 10.minutes, *args)
+  return runExecutableWithProgress(executable, projectPath, 10.minutes, args = args)
 }
 
 
@@ -98,7 +100,8 @@ suspend fun validatePoetryExecutable(poetryExecutable: Path?): ValidationInfo? =
  */
 @Internal
 suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): PyResult<String> {
-  val projectPath = sdk.associatedModulePath?.let { Path.of(it) } ?: return PyResult.localizedError(poetryNotFoundException) // Choose a correct sdk
+  val projectPath = sdk.associatedModulePath?.let { Path.of(it) }
+                    ?: return PyResult.localizedError(poetryNotFoundException) // Choose a correct sdk
   runPoetry(projectPath, "env", "use", sdk.homePath!!)
   return runPoetry(projectPath, *args)
 }
@@ -113,17 +116,25 @@ suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): PyResult<String> {
 suspend fun setupPoetry(projectPath: Path, python: String?, installPackages: Boolean, init: Boolean): PyResult<@SystemDependent String> {
   if (init) {
     runPoetry(projectPath, *listOf("init", "-n").toTypedArray())
+      .getOr { return it }
     if (python != null) { // Replace a python version in toml
-      ExecService().execGetStdout(Path.of(python), listOf("-c", REPLACE_PYTHON_VERSION), ExecOptions(workingDirectory = projectPath)).getOr { return it }
+      ExecService().execGetStdout(Path.of(python), listOf("-c", REPLACE_PYTHON_VERSION), ExecOptions(workingDirectory = projectPath))
+        .getOr { return it }
     }
   }
-  when {
-    installPackages -> {
-      python?.let { runPoetry(projectPath, "env", "use", it) }
-      runPoetry(projectPath, "install")
-    }
-    python != null -> runPoetry(projectPath, "env", "use", python)
-    else -> runPoetry(projectPath, "run", "python", "-V")
+
+  val env = if (python != null) {
+    runPoetry(projectPath, "env", "use", python)
+  }
+  else {
+    runPoetry(projectPath, "run", "python", "-V")
+  }
+
+  env.onFailure { return PyResult.failure(it) }
+
+  if (installPackages) {
+    runPoetry(projectPath, "install")
+      .onFailure { return PyResult.failure(it) }
   }
 
   return runPoetry(projectPath, "env", "info", "-p")

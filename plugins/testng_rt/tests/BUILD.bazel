@@ -1,10 +1,11 @@
 ### auto-generated section `build intellij.testng.rt.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -14,6 +15,7 @@ jvm_library(
   deps = [
     "//java/java-tests:tests_test_lib",
     "//platform/core-api:core",
+    "//platform/execution-impl",
     "//jps/model-api:model",
     "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
@@ -22,6 +24,7 @@ jvm_library(
     "//plugins/testng",
     "//plugins/testng:testng_test_lib",
     "//java/execution/impl",
+    "//platform/lang-core",
     "//platform/smRunner",
     "//platform/smRunner:smRunner_test_lib",
     "//aether-dependency-resolver",
@@ -33,7 +36,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

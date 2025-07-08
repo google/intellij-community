@@ -46,6 +46,8 @@ fun createBuildOptionsForTest(
   val outDir = createTestBuildOutDir(productProperties)
   val options = BuildOptions(
     cleanOutDir = false,
+    //TODO: figure out what to do on bazel
+    // affects org.jetbrains.intellij.build.impl.CompilationContextImpl.overrideClassesOutputDirectory
     useCompiledClassesFromProjectOutput = true,
     jarCacheDir = homeDir.resolve("out/dev-run/jar-cache"),
     buildDateInSeconds = getDevModeOrTestBuildDateInSeconds(),
@@ -154,6 +156,7 @@ fun runTestBuild(
           traceSpanName = "${testInfo.spanName}#${iterationNumber}",
           writeTelemetry = false,
           checkIntegrityOfEmbeddedFrontend = checkIntegrityOfEmbeddedFrontend,
+          checkThatBundledPluginInFrontendArePresent = checkIntegrityOfEmbeddedFrontend,
           build = { context ->
             build(context)
             onSuccess(context)
@@ -175,6 +178,7 @@ fun runTestBuild(
       ),
       writeTelemetry = true,
       checkIntegrityOfEmbeddedFrontend = checkIntegrityOfEmbeddedFrontend,
+      checkThatBundledPluginInFrontendArePresent = checkIntegrityOfEmbeddedFrontend,
       traceSpanName = testInfo.spanName,
       build = { context ->
         build(context)
@@ -188,15 +192,20 @@ fun runTestBuild(
 suspend fun runTestBuild(
   testInfo: TestInfo,
   context: suspend () -> BuildContext,
+  checkThatBundledPluginInFrontendArePresent: Boolean = true,
   build: suspend (BuildContext) -> Unit = { buildDistributions(it) }
 ) {
-  doRunTestBuild(context = context(), traceSpanName = testInfo.spanName, writeTelemetry = true, checkIntegrityOfEmbeddedFrontend = true, build = build)
+  doRunTestBuild(context = context(), traceSpanName = testInfo.spanName, writeTelemetry = true, 
+                 checkIntegrityOfEmbeddedFrontend = true,
+                 checkThatBundledPluginInFrontendArePresent = checkThatBundledPluginInFrontendArePresent,
+                 build = build)
 }
 
 private val defaultLogFactory = Logger.getFactory()
 
 private suspend fun doRunTestBuild(context: BuildContext, traceSpanName: String, writeTelemetry: Boolean,
                                    checkIntegrityOfEmbeddedFrontend: Boolean,
+                                   checkThatBundledPluginInFrontendArePresent: Boolean,
                                    build: suspend (context: BuildContext) -> Unit) {
   var outDir: Path? = null
   var traceFile: Path? = null
@@ -219,6 +228,9 @@ private suspend fun doRunTestBuild(context: BuildContext, traceSpanName: String,
           val frontendRootModule = context.productProperties.embeddedFrontendRootModule
           if (frontendRootModule != null && context.generateRuntimeModuleRepository) {
             RuntimeModuleRepositoryChecker.checkProductModules(productModulesModule = frontendRootModule, context = context, softly = softly)
+            if (checkThatBundledPluginInFrontendArePresent) {
+              RuntimeModuleRepositoryChecker.checkBundledPluginsArePresent(productModulesModule = frontendRootModule, context = context, isEmbeddedVariant = true, softly = softly)
+            }
             RuntimeModuleRepositoryChecker.checkIntegrityOfEmbeddedFrontend(frontendRootModule, context, softly)
             checkKeymapPluginsAreBundledWithFrontend(frontendRootModule, context, softly)
           }

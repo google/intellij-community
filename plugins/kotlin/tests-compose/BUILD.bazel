@@ -1,10 +1,11 @@
 ### auto-generated section `build kotlin.tests-compose` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "tests-compose",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -14,7 +15,7 @@ jvm_library(
   deps = ["@lib//:kotlin-stdlib"]
 )
 
-jvm_test(
+jps_test(
   name = "tests-compose_test",
   runtime_deps = [":tests-compose_test_lib"]
 )

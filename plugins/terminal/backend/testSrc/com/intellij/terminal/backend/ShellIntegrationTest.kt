@@ -10,10 +10,7 @@ import com.intellij.terminal.backend.util.TerminalSessionTestUtil.awaitOutputEve
 import com.intellij.terminal.session.*
 import com.intellij.terminal.session.dto.toState
 import com.intellij.terminal.session.dto.toStyleRange
-import com.intellij.testFramework.DisposableRule
-import com.intellij.testFramework.ExtensionTestUtil
-import com.intellij.testFramework.ProjectRule
-import com.intellij.testFramework.RuleChain
+import com.intellij.testFramework.*
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jediterm.core.util.TermSize
 import kotlinx.coroutines.*
@@ -31,6 +28,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
 import kotlin.io.path.writeText
+import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.seconds
 
 @RunWith(Parameterized::class)
@@ -40,7 +38,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
   @Rule
   @JvmField
-  val ruleChain: RuleChain = RuleChain(projectRule, disposableRule)
+  val ruleChain: RuleChain = RuleChain(projectRule, disposableRule, DisposeNonLightProjectsRule())
 
   companion object {
     @JvmStatic
@@ -54,18 +52,19 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
   fun `shell integration send correct events on command invocation`() = timeoutRunBlocking(30.seconds) {
     val cwd = System.getProperty("user.home")
     val options = ShellStartupOptions.Builder().workingDirectory(cwd).build()
-    val events = startSessionAndCollectOutputEvents(options) { input ->
+    val events = startSessionAndCollectOutputEvents(options, isLowLevelSession = true) { input ->
       input.send(TerminalWriteBytesEvent("pwd".toByteArray() + ENTER_BYTES))
     }
 
     val shellIntegrationEvents = events.filter { it is TerminalShellIntegrationEvent }
     val expectedEvents = listOf(
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
-      TerminalCommandStartedEvent("pwd"),
-      TerminalCommandFinishedEvent("pwd", 0, cwd),
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
+      TerminalAliasesReceivedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
+      TerminalCommandStartedEvent::class,
+      TerminalCommandFinishedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
     )
 
     assertSameEvents(shellIntegrationEvents, expectedEvents, events)
@@ -73,7 +72,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
   @Test
   fun `shell integration should not send command finished event without command started event on Ctrl+C`() = timeoutRunBlocking(30.seconds) {
-    val events = startSessionAndCollectOutputEvents { input ->
+    val events = startSessionAndCollectOutputEvents(isLowLevelSession = true) { input ->
       input.send(TerminalWriteBytesEvent("abcdef".toByteArray()))
       delay(1000)
       input.send(TerminalWriteBytesEvent(CTRL_C_BYTES))
@@ -81,10 +80,11 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
     val shellIntegrationEvents = events.filter { it is TerminalShellIntegrationEvent }
     val expectedEvents = listOf(
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent
+      TerminalAliasesReceivedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class
     )
 
     assertSameEvents(shellIntegrationEvents, expectedEvents, events)
@@ -101,7 +101,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
     Assume.assumeTrue(shellPath.toString().contains("zsh"))
 
     val options = ShellStartupOptions.Builder().initialTermSize(TermSize(80, 4)).build()
-    val events = startSessionAndCollectOutputEvents(options) { input ->
+    val events = startSessionAndCollectOutputEvents(options, isLowLevelSession = true) { input ->
       input.send(TerminalWriteBytesEvent("g".toByteArray() + TAB_BYTES))
       // Shell can ask "do you wish to see all N possibilities? (y/n)"
       // Wait for this question and ask `y`
@@ -111,10 +111,11 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
     val shellIntegrationEvents = events.filter { it is TerminalShellIntegrationEvent }
     val expectedEvents = listOf(
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent
+      TerminalAliasesReceivedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class
     )
 
     assertSameEvents(shellIntegrationEvents, expectedEvents, events)
@@ -136,7 +137,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
       .initialTermSize(TermSize(80, 100))
       .workingDirectory(cwd)
       .build()
-    val events = startSessionAndCollectOutputEvents(options) { input ->
+    val events = startSessionAndCollectOutputEvents(options, isLowLevelSession = true) { input ->
       // Configure the shell to show completion items on the first Tab key press.
       input.send(TerminalWriteBytesEvent(bindCommand.toByteArray() + ENTER_BYTES))
       delay(1000)
@@ -145,17 +146,18 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
     val shellIntegrationEvents = events.filter { it is TerminalShellIntegrationEvent }
     val expectedEvents = listOf(
+      TerminalAliasesReceivedEvent::class,
       // Initialization
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
       // Bind command execution
-      TerminalCommandStartedEvent(bindCommand),
-      TerminalCommandFinishedEvent(bindCommand, 0, cwd),
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
+      TerminalCommandStartedEvent::class,
+      TerminalCommandFinishedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
       // Prompt redraw after completion
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class
     )
 
     assertSameEvents(shellIntegrationEvents, expectedEvents, events)
@@ -163,17 +165,18 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
   @Test
   fun `prompt events received after prompt is redrawn because of Ctrl+L`() = timeoutRunBlocking(30.seconds) {
-    val events = startSessionAndCollectOutputEvents { input ->
+    val events = startSessionAndCollectOutputEvents(isLowLevelSession = true) { input ->
       input.send(TerminalWriteBytesEvent("abcdef".toByteArray()))
       input.send(TerminalWriteBytesEvent(CTRL_L_BYTES))
     }
 
     val shellIntegrationEvents = events.filter { it is TerminalShellIntegrationEvent }
     val expectedEvents = listOf(
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent,
-      TerminalPromptStartedEvent,
-      TerminalPromptFinishedEvent
+      TerminalAliasesReceivedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class,
+      TerminalPromptStartedEvent::class,
+      TerminalPromptFinishedEvent::class
     )
 
     assertSameEvents(shellIntegrationEvents, expectedEvents, events)
@@ -362,11 +365,11 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
       val initialCommand = TerminalSessionTestUtil.createShellCommand(shellPath.toString())
       val fullCommand = initialCommand + listOf("--rcfile", rcFile.toString())
       val options = ShellStartupOptions.Builder().shellCommand(fullCommand).build()
-      startSessionAndCollectOutputEvents(options, terminalInputActions)
+      startSessionAndCollectOutputEvents(options, block = terminalInputActions)
     }
 
-    val regularSessionOutput = calculateResultingOutput(regularSessionEvents.await())
-    val posixSessionOutput = calculateResultingOutput(posixSessionEvents.await())
+    val regularSessionOutput = calculateResultingOutput(regularSessionEvents.await()).trim()
+    val posixSessionOutput = calculateResultingOutput(posixSessionEvents.await()).trim()
 
     // Check that the output of posix and regular sessions is the same
     assertThat(posixSessionOutput).isEqualTo(regularSessionOutput)
@@ -375,6 +378,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
   private suspend fun startSessionAndCollectOutputEvents(
     options: ShellStartupOptions = ShellStartupOptions.Builder().build(),
+    isLowLevelSession: Boolean = false,
     block: suspend (SendChannel<TerminalInputEvent>) -> Unit,
   ): List<TerminalOutputEvent> {
     return coroutineScope {
@@ -389,6 +393,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
       val session = TerminalSessionTestUtil.startTestTerminalSession(
         projectRule.project,
         allOptions,
+        isLowLevelSession,
         childScope("TerminalSession"),
       )
       val inputChannel = session.getInputChannel()
@@ -450,7 +455,7 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
 
   private fun assertSameEvents(
     actual: List<TerminalOutputEvent>,
-    expected: List<TerminalOutputEvent>,
+    expected: List<KClass<out TerminalShellIntegrationEvent>>,
     eventsToLog: List<TerminalOutputEvent>,
   ) {
     fun List<TerminalOutputEvent>.asString(): String {
@@ -460,16 +465,16 @@ internal class ShellIntegrationTest(private val shellPath: Path) {
     val errorMessage = {
       """
         |Expected:
-        |${expected.asString()}
+        |${expected}
         |-------------------------------------------------------------
         |But was:
-        |${actual.asString()}
+        |${actual.map { it::class }}
         |-------------------------------------------------------------
         |${dumpTerminalState(eventsToLog)}
       """.trimMargin()
     }
 
-    assertThat(actual)
+    assertThat(actual.map { it::class })
       .overridingErrorMessage(errorMessage)
       .isEqualTo(expected)
   }

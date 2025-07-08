@@ -6,7 +6,6 @@ import com.intellij.debugger.impl.PrioritizedTask
 import com.intellij.debugger.ui.impl.watch.StackFrameDescriptorImpl
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.xdebugger.frame.XStackFrameUiPresentationContainer
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy.Companion.useFeProxy
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -33,11 +32,11 @@ internal fun computeUiPresentation(
       close(e)
       throw e
     }
-    JavaFramesListRenderer.customizePresentation(descriptor, container, selectedDescriptor)
+    JavaFramesListRenderer.customizePresentation(descriptor, container, selectedDescriptor, false)
     send(container)
   }
 
-  if (!useFeProxy() || descriptor == null || selectedDescriptor == null) {
+  if (descriptor == null || selectedDescriptor == null) {
     close()
     return@channelFlow
   }
@@ -49,9 +48,10 @@ internal fun computeUiPresentation(
 
   descriptor.exactRecursiveIndex.asDeferred().await()?.let { index ->
     if (index > 0) {
-      container.append(" [$index]", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+      send(container.copy().apply {
+        append(" [$index]", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+      })
     }
   }
-  send(container)
   close()
 }.buffer(Channel.CONFLATED)

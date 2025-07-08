@@ -72,7 +72,7 @@ jvm_library(
 ### auto-generated section `build intellij.platform.polySymbols.testFramework` end
 
 ### auto-generated section `build intellij.platform.polySymbols.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -89,7 +89,6 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/lang-impl",
     "//platform/platform-impl:ide-impl",
-    "//platform/platform-impl:ide-impl_test_lib",
     "//platform/core-ui",
     "//platform/editor-ui-ex:editor-ex",
     "@lib//:junit4",
@@ -115,7 +114,7 @@ jvm_library(
   runtime_deps = [":polySymbols-tests_test_resources"]
 )
 
-jvm_test(
+jps_test(
   name = "polySymbols-tests_test",
   runtime_deps = [":polySymbols-tests_test_lib"]
 )

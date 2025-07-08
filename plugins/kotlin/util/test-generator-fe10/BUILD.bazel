@@ -1,10 +1,11 @@
 ### auto-generated section `build kotlin.util.test-generator-fe10` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "test-generator-fe10",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -56,7 +57,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "test-generator-fe10_test",
   runtime_deps = [":test-generator-fe10_test_lib"]
 )

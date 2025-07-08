@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.kotlin.gradle.multiplatform-tests.k2` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 jvm_library(
@@ -46,7 +46,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "kotlin-gradle-multiplatform-tests-k2_test",
   runtime_deps = [":kotlin-gradle-multiplatform-tests-k2_test_lib"]
 )

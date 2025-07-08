@@ -1,10 +1,11 @@
 ### auto-generated section `build kotlin.project-wizard.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -19,11 +20,13 @@ jvm_library(
     "@lib//:kotlin-reflect",
     "@lib//:junit4",
     "//platform/analysis-api:analysis",
+    "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
     "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
     "//platform/external-system-impl:externalSystem-impl",
     "//jps/model-api:model",
+    "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//plugins/kotlin/base/test",
     "//plugins/kotlin/base/test:test_test_lib",
@@ -79,11 +82,13 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "//plugins/kotlin/base/scripting.k1",
     "//plugins/kotlin/base/scripting.k1:scripting.k1_test_lib",
+    "//platform/backend/observation",
+    "//platform/backend/observation:observation_test_lib",
   ],
   runtime_deps = ["//plugins/kotlin/plugin/k1"]
 )
 
-jvm_test(
+jps_test(
   name = "tests_test",
   runtime_deps = [":tests_test_lib"]
 )

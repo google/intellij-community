@@ -1,4 +1,5 @@
 ### auto-generated section `build intellij.platform.objectSerializer` start
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 jvm_library(
@@ -50,7 +51,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "object-serializer_test",
   runtime_deps = [":object-serializer_test_lib"]
 )
@@ -69,12 +70,13 @@ jvm_library(
 ### auto-generated section `build intellij.platform.objectSerializer.annotations` end
 
 ### auto-generated section `build intellij.platform.objectSerializer.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "objectSerializer-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -97,7 +99,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "objectSerializer-tests_test",
   runtime_deps = [":objectSerializer-tests_test_lib"]
 )

@@ -8,6 +8,7 @@ import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.spellchecker.SpellCheckerManager;
 import com.intellij.spellchecker.dictionary.CustomDictionaryProvider;
+import com.intellij.spellchecker.state.AppDictionaryState;
 import com.intellij.spellchecker.util.SpellCheckerBundle;
 import com.intellij.ui.*;
 import com.intellij.ui.table.TableView;
@@ -22,10 +23,10 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
-import static com.intellij.openapi.util.io.FileUtilRt.extensionEquals;
+import static com.intellij.spellchecker.SpellCheckerManagerKt.isDic;
 import static com.intellij.ui.SimpleTextAttributes.GRAY_ATTRIBUTES;
 import static java.util.Arrays.asList;
 
@@ -63,7 +64,6 @@ public final class CustomDictionariesPanel extends JPanel {
             .forEach(path -> myCustomDictionariesTableView.getListTableModel().addRow(path)));
         }
       })
-
       .setRemoveActionName(SpellCheckerBundle.message("remove.custom.dictionaries"))
       .setRemoveAction(button -> {
         removedDictionaries.addAll(myCustomDictionariesTableView.getSelectedObjects());
@@ -74,6 +74,15 @@ public final class CustomDictionariesPanel extends JPanel {
                                    x -> defaultDictionaries.contains(x) || builtInDictionaries.containsKey(x))
       )
 
+      .setEditActionUpdater(e -> {
+        String selectedDictionary = myCustomDictionariesTableView.getSelectedObject();
+        if (selectedDictionary == null) return false;
+
+        if (selectedDictionary.equals(SpellCheckerBundle.message("app.dictionary"))) {
+          return !AppDictionaryState.getInstance().words.isEmpty();
+        }
+        return true;
+      })
       .setEditActionName(SpellCheckerBundle.message("edit.custom.dictionary"))
       .setEditAction(new AnActionButtonRunnable() {
         @Override
@@ -105,7 +114,7 @@ public final class CustomDictionariesPanel extends JPanel {
     final FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(true, false, false, false, false, true) {
       @Override
       public boolean isFileSelectable(@Nullable VirtualFile file) {
-        return file != null && extensionEquals(file.getPath(), "dic");
+        return file != null && isDic(file.getName());
       }
     };
 

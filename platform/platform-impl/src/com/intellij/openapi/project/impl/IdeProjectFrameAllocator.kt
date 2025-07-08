@@ -24,10 +24,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
-import com.intellij.openapi.fileEditor.impl.EditorsSplitters
-import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl
-import com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions
-import com.intellij.openapi.fileEditor.impl.stopOpenFilesActivity
+import com.intellij.openapi.fileEditor.impl.*
 import com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.project.Project
@@ -53,6 +50,7 @@ import com.intellij.problems.WolfTheProblemSolver
 import com.intellij.psi.PsiManager
 import com.intellij.toolWindow.computeToolWindowBeans
 import com.intellij.ui.ScreenUtil
+import com.intellij.util.PlatformUtils
 import com.intellij.util.TimeoutUtil
 import com.intellij.util.messages.SimpleMessageBusConnection
 import kotlinx.coroutines.*
@@ -113,7 +111,7 @@ internal class IdeProjectFrameAllocator(
 
         launch {
           val windowManager = serviceAsync<WindowManager>() as WindowManagerImpl
-          withContext(Dispatchers.EDT) {
+          withContext(Dispatchers.ui(UiDispatcherKind.STRICT)) {
             windowManager.assignFrame(frameHelper, project)
             frameHelper.setRawProject(project)
           }
@@ -122,7 +120,7 @@ internal class IdeProjectFrameAllocator(
         launch {
           val fileEditorManager = project.serviceAsync<FileEditorManager>() as FileEditorManagerImpl
           fileEditorManager.initJob.join()
-          withContext(Dispatchers.EDT) {
+          withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
             frameHelper.toolWindowPane.setDocumentComponent(fileEditorManager.mainSplitters)
           }
         }
@@ -151,18 +149,17 @@ internal class IdeProjectFrameAllocator(
         val project = projectInitObservable.awaitProjectInit()
         span("initFrame") {
           launch(CoroutineName("tool window pane creation")) {
-            val toolWindowManager = async { project.serviceAsync<ToolWindowManager>() as? ToolWindowManagerImpl }
+            val deferredToolWindowManager = async { project.serviceAsync<ToolWindowManager>() as? ToolWindowManagerImpl }
             val taskListDeferred = async(CoroutineName("toolwindow init command creation")) {
               computeToolWindowBeans(project = project)
             }
-            val toolWindowPane = withContext(Dispatchers.EDT) {
-              deferredProjectFrameHelper.await().toolWindowPane
+
+            val toolWindowManager = deferredToolWindowManager.await() ?: return@launch
+            val projectFrameHelper = deferredProjectFrameHelper.await()
+            val toolWindowPane = withContext(Dispatchers.UI) {
+              projectFrameHelper.toolWindowPane
             }
-            toolWindowManager.await()?.init(
-              pane = toolWindowPane,
-              reopeningEditorJob = reopeningEditorJob,
-              taskListDeferred = taskListDeferred,
-            )
+            toolWindowManager.init(pane = toolWindowPane, reopeningEditorJob = reopeningEditorJob, taskListDeferred = taskListDeferred)
           }
         }
       }
@@ -201,7 +198,7 @@ internal class IdeProjectFrameAllocator(
     val frame = getFrame()
     val frameInfo = getFrameInfo()
 
-    withContext(Dispatchers.EDT) {
+    withContext(Dispatchers.ui(UiDispatcherKind.STRICT)) {
       if (frame != null) {
         if (!frame.isVisible) {
           throw CancellationException("Pre-allocated frame was already closed")
@@ -246,8 +243,8 @@ internal class IdeProjectFrameAllocator(
     catch (@Suppress("IncorrectCancellationExceptionHandling") _: CancellationException) {
     }
 
-    // make sure that in case of some error we close frame for a not loaded project
-    withContext(Dispatchers.EDT + NonCancellable) {
+    // make sure that in case of some error we close the frame for a not loaded project
+    withContext(Dispatchers.ui(UiDispatcherKind.STRICT) + NonCancellable) {
       (serviceAsync<WindowManager>() as WindowManagerImpl).releaseFrame(frameHelper)
     }
   }
@@ -382,7 +379,24 @@ private suspend fun postOpenEditors(
 
 private suspend fun focusSelectedEditor(editorComponent: EditorsSplitters) {
   val composite = editorComponent.currentWindow?.selectedComposite ?: return
-  composite.waitForAvailable()
+  // TODO: this check for JB Client is made to keep the same behaviour in monolith,
+  //   but in 253 we may remove this check and see what may be broken with async editor focus
+  if (!PlatformUtils.isJetBrainsClient()) {
+    // let's focus the editor synchronously in local mode
+    composite.waitForAvailable()
+    focusSelectedEditorInComposite(composite)
+  }
+  else {
+    // in Remote Dev we cannot wait for composite availability synchronously,
+    // since editors come from the backend and this is a too long process
+    composite.coroutineScope.launch(Dispatchers.EDT + FUSProjectHotStartUpMeasurer.getContextElementToPass()) {
+      composite.waitForAvailable()
+      focusSelectedEditorInComposite(composite)
+    }
+  }
+}
+
+private suspend fun focusSelectedEditorInComposite(composite: EditorComposite) {
   val textEditor = composite.selectedEditor as? TextEditor
   if (textEditor == null) {
     FUSProjectHotStartUpMeasurer.firstOpenedUnknownEditor(composite.file, System.nanoTime())
@@ -404,8 +418,7 @@ internal fun applyBoundsOrDefault(frame: JFrame, bounds: Rectangle?, restoreOnly
   else {
     if (restoreOnlyLocation) {
       frame.location = bounds.location
-      // We need to guarantee that the size is smaller than this screen,
-      // to be able to maximize the frame after this.
+      // we need to guarantee that the size is smaller than this screen to be able to maximize the frame after this
       setDefaultSize(frame, ScreenUtil.getScreenRectangle(bounds.location))
     }
     else {
@@ -467,12 +480,12 @@ private suspend fun openProjectViewIfNeeded(project: Project, toolWindowInitJob:
 
   // todo should we use `runOnceForProject(project, "OpenProjectViewOnStart")` or not?
   val toolWindowManager = project.serviceAsync<ToolWindowManager>()
-  withContext(Dispatchers.EDT) {
+  withContext(Dispatchers.ui(UiDispatcherKind.STRICT)) {
     if (toolWindowManager.activeToolWindowId == null) {
       val toolWindow = toolWindowManager.getToolWindow("Project")
       if (toolWindow != null) {
         // maybe readAction
-        writeIntentReadAction {
+        withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
           toolWindow.activate(null, !AppMode.isRemoteDevHost())
         }
       }

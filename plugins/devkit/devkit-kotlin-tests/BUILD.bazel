@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.devkit.kotlin.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -8,9 +8,10 @@ jvm_resources(
   strip_prefix = "testData"
 )
 
-java_library(
+jvm_library(
   name = "kotlin-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -24,6 +25,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
+    "//platform/lang-core",
     "//platform/core-ui",
     "//platform/editor-ui-api:editor-ui",
     "//jps/model-api:model",
@@ -57,7 +59,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "kotlin-tests_test",
   runtime_deps = [":kotlin-tests_test_lib"]
 )

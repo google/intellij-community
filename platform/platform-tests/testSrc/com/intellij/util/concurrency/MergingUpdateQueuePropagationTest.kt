@@ -21,11 +21,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.asCompletableFuture
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -133,5 +132,38 @@ class MergingUpdateQueuePropagationTest {
     assertFalse(update.isRejected)
     delay(400.milliseconds)
     assertTrue(update.isRejected)
+  }
+
+  @Test
+  fun `frequent flush of merging queue retains progress`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val queueProcessingJob = Job()
+    val queue = MergingUpdateQueue("test queue", 200, true, null, null, null, Alarm.ThreadToUse.POOLED_THREAD, coroutineScope = CoroutineScope(queueProcessingJob))
+    val counter = AtomicInteger()
+    val update = Update.create(1) {
+      counter.incrementAndGet()
+    }
+    queue.queue(update)
+    repeat(1000) {
+      queue.sendFlush()
+    }
+    delay(300)
+    assertThat(counter.get()).isEqualTo(1)
+  }
+
+  @Test
+  fun `frequent flush of merging queue retains progress while adding new tasks`(): Unit = timeoutRunBlocking(context = Dispatchers.Default) {
+    val queueProcessingJob = Job()
+    val queue = MergingUpdateQueue("test queue", 200, true, null, null, null, Alarm.ThreadToUse.POOLED_THREAD, coroutineScope = CoroutineScope(queueProcessingJob))
+    val counter = AtomicInteger()
+    val repeats = 1000
+    repeat(repeats) {
+      val update = Update.create(it) {
+        counter.incrementAndGet()
+      }
+      queue.queue(update)
+      queue.sendFlush()
+    }
+    delay(1000)
+    assertThat(counter.get()).isEqualTo(repeats)
   }
 }

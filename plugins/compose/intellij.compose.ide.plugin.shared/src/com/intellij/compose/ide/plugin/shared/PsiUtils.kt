@@ -1,11 +1,8 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.compose.ide.plugin.shared
 
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
-import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootModificationTracker
 import com.intellij.openapi.roots.impl.ProjectFileIndexFacade
 import com.intellij.openapi.util.Key
@@ -21,7 +18,6 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.calls
 import org.jetbrains.kotlin.analysis.api.resolution.singleConstructorCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.idea.stubindex.KotlinFullClassNameIndex
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtAnnotated
@@ -56,45 +52,19 @@ fun isElementInLibrarySource(element: PsiElement): Boolean {
  * @return true if the Compose annotation class is found in the module's classpath; false otherwise.
  */
 @ApiStatus.Internal
-fun isComposeEnabledInModule(element: PsiElement): Boolean {
+fun isComposeEnabledForElementModule(element: PsiElement): Boolean {
   val module = ModuleUtilCore.findModuleForPsiElement(element) ?: return false
   return isComposeEnabledInModule(module)
 }
-/**
- * Checks if the Compose functionality is enabled in the module.
- * Compose functionality is enabled if the Compose annotation is available in the evaluated module's classpath.
- *
- * @param module - the [Module] which should be evaluated.
- * @return true if the Compose annotation class is found in the module's classpath; false otherwise.
- */
-internal fun isComposeEnabledInModule(module: Module): Boolean {
-  val moduleScope = module.getModuleWithDependenciesAndLibrariesScope(/*includeTests = */true)
-  val foundClasses = KotlinFullClassNameIndex[COMPOSABLE_ANNOTATION_CLASS_ID.asFqNameString(), module.project, moduleScope]
-  return foundClasses.isNotEmpty()
-}
-
-private const val ANDROID_SDK_TYPE_NAME: String = "Android SDK"
-
-internal fun isAndroidSdkConfiguredInModule(module: Module): Boolean {
-  val sdkType = ModuleRootManager.getInstance(module).sdk?.sdkType ?: return false
-  return sdkType.name == ANDROID_SDK_TYPE_NAME
-}
-
-private const val ANDROID_JETPACK_COMPOSE_PLUGIN_ID: String = "androidx.compose.plugins.idea"
-
-internal fun isAndroidJetpackComposePluginLoaded(): Boolean {
-  val androidJetpackComposePluginId = PluginId.findId(ANDROID_JETPACK_COMPOSE_PLUGIN_ID) ?: return false
-  return PluginManagerCore.isLoaded(androidJetpackComposePluginId)
-}
-
-internal fun isModifierEnabledInModule(module: Module): Boolean {
-  val moduleScope = module.getModuleWithDependenciesAndLibrariesScope(/*includeTests = */true)
-  val foundClasses = KotlinFullClassNameIndex[COMPOSE_MODIFIER_CLASS_ID.asFqNameString(), module.project, moduleScope]
-  return foundClasses.isNotEmpty()
-}
 
 internal fun PsiElement.isComposableFunction(): Boolean =
-  (this as? KtNamedFunction)?.getAnnotationWithCaching(COMPOSABLE_FUNCTION_KEY) { it.isComposableAnnotation() } != null
+  this is KtNamedFunction && this.hasComposableAnnotation()
+
+internal fun KtAnnotated.hasComposableAnnotation(): Boolean =
+  this.getAnnotationWithCaching(COMPOSABLE_FUNCTION_KEY) { it.isComposableAnnotation() } != null
+
+internal val PsiElement.module: Module?
+  get() = ModuleUtilCore.findModuleForPsiElement(this)
 
 private val COMPOSABLE_FUNCTION_KEY: Key<CachedValue<KtAnnotationEntry?>> =
   Key.create("com.intellij.compose.ide.plugin.shared.isComposableFunction")
@@ -108,11 +78,16 @@ private fun KtAnnotated.getAnnotationWithCaching(
   CachedValueProvider.Result.create(annotationEntry, containingKtFile, ProjectRootModificationTracker.getInstance(project))
 }
 
-private fun KtAnnotationEntry.isComposableAnnotation(): Boolean = analyze(this) {
+internal fun KtAnnotationEntry.isComposableAnnotation(): Boolean = analyze(this) {
   classIdMatches(this@isComposableAnnotation, COMPOSABLE_ANNOTATION_CLASS_ID)
 }
 
-private fun KaSession.classIdMatches(element: KtAnnotationEntry, classId: ClassId): Boolean {
+internal fun KtAnnotationEntry.isPreviewParameterAnnotation(): Boolean = analyze(this) {
+  classIdMatches(this@isPreviewParameterAnnotation, MULTIPLATFORM_PREVIEW_PARAMETER_CLASS_ID) ||
+  classIdMatches(this@isPreviewParameterAnnotation, JETPACK_PREVIEW_PARAMETER_CLASS_ID)
+}
+
+internal fun KaSession.classIdMatches(element: KtAnnotationEntry, classId: ClassId): Boolean {
   val shortName = element.shortName ?: return false
   if (classId.shortClassName != shortName) return false
 

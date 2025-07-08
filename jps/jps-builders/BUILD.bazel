@@ -60,7 +60,7 @@ jvm_library(
 ### auto-generated section `build intellij.platform.jps.build` end
 
 ### auto-generated section `build intellij.platform.jps.build.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
@@ -69,9 +69,10 @@ jvm_resources(
   strip_prefix = "testResources"
 )
 
-java_library(
+jvm_library(
   name = "build-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -108,7 +109,7 @@ jvm_library(
   runtime_deps = [":build-tests_test_resources"]
 )
 
-jvm_test(
+jps_test(
   name = "build-tests_test",
   runtime_deps = [":build-tests_test_lib"]
 )

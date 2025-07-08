@@ -53,12 +53,13 @@ jvm_library(
 ### auto-generated section `build intellij.vcs.svn` end
 
 ### auto-generated section `build intellij.vcs.svn.tests` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
-java_library(
+jvm_library(
   name = "vcs-svn-tests",
-  visibility = ["//visibility:public"]
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
@@ -76,7 +77,6 @@ jvm_library(
     "//platform/vcs-impl",
     "//platform/vcs-impl:vcs-impl_test_lib",
     "//platform/platform-impl:ide-impl",
-    "//platform/platform-impl:ide-impl_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/ide-core-impl",
@@ -92,7 +92,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "vcs-svn-tests_test",
   runtime_deps = [":vcs-svn-tests_test_lib"]
 )

@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.platform.benchmarks` start
-load("@rules_java//java:defs.bzl", "java_library")
+load("@community//build:tests-options.bzl", "jps_test")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 jvm_library(
@@ -10,7 +10,6 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/platform-impl:ide-impl",
-    "//platform/platform-impl:ide-impl_test_lib",
     "@lib//:jmh-core",
     "@lib//:jmh-generator-annprocess",
     "//platform/indexing-api:indexing",
@@ -26,7 +25,7 @@ jvm_library(
   ]
 )
 
-jvm_test(
+jps_test(
   name = "benchmarks_test",
   runtime_deps = [":benchmarks_test_lib"]
 )

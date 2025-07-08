@@ -36,6 +36,8 @@ fun Finder.codeEditor(@Language("xpath") xpath: String? = null, action: JEditorU
     JEditorUiComponent::class.java).action()
 }
 
+fun Finder.codeEditorForFile(fileName: String): JEditorUiComponent = codeEditor("//div[@class='EditorTabs']//div[@accessiblename='Editor for $fileName']")
+
 fun Finder.editor(@Language("xpath") xpath: String? = null, action: JEditorUiComponent.() -> Unit) {
   x(xpath ?: "//div[@class='EditorComponentImpl']", JEditorUiComponent::class.java).action()
 }
@@ -254,6 +256,10 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
 
   fun hoverOverIcon(line: Int) {
     moveMouse(icons.firstOrNull { it.line == line - 1 }!!.location)
+  }
+
+  fun clickOnIcon(line: Int) {
+    click(icons.firstOrNull { it.line == line - 1 }!!.location)
   }
 
   fun rightClickOnIcon(line: Int) {

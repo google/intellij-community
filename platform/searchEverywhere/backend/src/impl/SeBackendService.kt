@@ -10,6 +10,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.platform.project.ProjectId
+import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.equalityProviders.SeEqualityChecker
 import com.intellij.platform.searchEverywhere.providers.SeLog
@@ -43,26 +45,38 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     params: SeParams,
     dataContextId: DataContextId?,
     requestedCountChannel: ReceiveChannel<Int>,
-  ): Flow<SeItemData> {
+  ): Flow<SeTransferEvent> {
     val requestedCountState = MutableStateFlow(0)
     val receivingJob = coroutineScope.launch {
       requestedCountChannel.consumeEach { count ->
         requestedCountState.update { it + count }
       }
     }
+    val resultsBalancer = SeResultsCountBalancer(providerIds)
 
     SeLog.log(SeLog.ITEM_EMIT) { "Backend will request items from providers: ${providerIds.joinToString(", ")}" }
 
-    val itemsFlows = providerIds.mapNotNull {
+    val itemsFlows = providerIds.mapNotNull { providerId ->
       getProvidersHolder(sessionRef, dataContextId)
-        ?.get(it, isAllTab)
+        ?.get(providerId, isAllTab)
         ?.getItems(params)
+        ?.map {
+          resultsBalancer.add(it)
+          SeTransferItem(it) as SeTransferEvent
+        }
+        ?.onCompletion {
+          resultsBalancer.end(providerId)
+          emit(SeTransferEnd(providerId))
+        }
     }
 
     val equalityChecker = SeEqualityChecker()
     return flow {
-      itemsFlows.merge().buffer(capacity = 0, onBufferOverflow = BufferOverflow.SUSPEND).mapNotNull { itemData ->
-        equalityChecker.checkAndUpdateIfNeeded(itemData)
+      itemsFlows.merge().buffer(capacity = 0, onBufferOverflow = BufferOverflow.SUSPEND).mapNotNull { transferEvent ->
+        when (transferEvent) {
+          is SeTransferEnd -> transferEvent
+          is SeTransferItem -> equalityChecker.checkAndUpdateIfNeeded(transferEvent.itemData)?.let { SeTransferItem(it) }
+        }
       }.collect { item ->
         requestedCountState.first { it > 0 }
         requestedCountState.update { it - 1 }
@@ -75,19 +89,37 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     }
   }
 
-  private suspend fun getProvidersHolder(sessionRef: DurableRef<SeSessionEntity>,
-                                         dataContextId: DataContextId?): SeProvidersHolder? =
+  suspend fun getAvailableProviderIds(
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId
+  ) : Map<String, Set<SeProviderId>> {
+    val providersHolder = getProvidersHolder(sessionRef, dataContextId) ?: return emptyMap()
+
+    val essential = providersHolder.getEssentialAllTabProviderIds()
+    val nonEssential = SeItemsProviderFactory.EP_NAME.extensionList.map { it.id.toProviderId() }.filter { it !in essential }.toSet()
+
+    return mapOf(SeProviderIdUtils.ESSENTIAL_KEY to essential, SeProviderIdUtils.NON_ESSENTIAL_KEY to nonEssential)
+  }
+
+  private suspend fun getProvidersHolder(
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId?,
+  ): SeProvidersHolder? =
     mutex.withLock {
       val session = sessionRef.derefOrNull() ?: return@withLock null
       sessionIdToProviderHolders[session.eid]?.let { return@withLock it }
 
       if (dataContextId == null) {
-        throw IllegalStateException("Cannot create providers on the backend: no serialized data context")
+        SeLog.error("Cannot create providers on the backend: no serialized data context")
+        return@withLock null
       }
 
       val dataContext = withContext(Dispatchers.EDT) {
         dataContextId.dataContext()
-      } ?: throw IllegalStateException("Cannot create providers on the backend: couldn't deserialize data context")
+      } ?: run {
+        SeLog.error("Cannot create providers on the backend: couldn't deserialize data context")
+        return@withLock null
+      }
 
       val actionEvent = AnActionEvent.createEvent(dataContext, null, "", ActionUiKind.NONE, null)
       val providersHolder = SeProvidersHolder.initialize(actionEvent, project, sessionRef, "Backend")
@@ -111,8 +143,8 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     sessionRef: DurableRef<SeSessionEntity>,
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
-    isAllTab: Boolean
-  ): Map<SeProviderId, SeSearchScopesInfo> {
+    isAllTab: Boolean,
+  ): Map<SeProviderId, SearchScopesInfo> {
     return providerIds.mapNotNull { providerId ->
       val provider = getProvidersHolder(sessionRef, dataContextId)?.get(providerId, isAllTab)
       provider?.getSearchScopesInfo()?.let {
@@ -126,7 +158,7 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     sessionRef: DurableRef<SeSessionEntity>,
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
-    isAllTab: Boolean
+    isAllTab: Boolean,
   ): List<SeTypeVisibilityStatePresentation> {
     return providerIds.mapNotNull { providerId ->
       val provider = getProvidersHolder(sessionRef, dataContextId)?.get(providerId, isAllTab)
@@ -165,6 +197,23 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     providerId: SeProviderId,
   ): Boolean {
     return getProvidersHolder(sessionRef, dataContextId)?.getLegacyContributor(providerId, false)?.isShownInSeparateTab ?: false
+  }
+
+  suspend fun openInFindToolWindow(
+    projectId: ProjectId,
+    sessionRef: DurableRef<SeSessionEntity>,
+    dataContextId: DataContextId?,
+    providerIds: List<SeProviderId>,
+    params: SeParams,
+    isAllTab: Boolean,
+  ): Boolean {
+    val providersHolder = getProvidersHolder(sessionRef, dataContextId)
+    if (providersHolder == null) return false
+
+    SeFindToolWindowManager(project).openInFindToolWindow(
+      providerIds, params, isAllTab, providersHolder, projectId,
+    )
+    return true
   }
 
   companion object {
