@@ -2,6 +2,9 @@
 package com.intellij.openapi.application.impl
 
 import com.intellij.concurrency.ContextAwareRunnable
+import com.intellij.concurrency.currentThreadContext
+import com.intellij.ide.IdeEventQueue
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ThreadingSupport.RunnableWithTransferredWriteAction
 import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.application.TransactionGuardImpl
@@ -11,17 +14,20 @@ import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.util.ThrowableRunnable
+import com.intellij.util.application
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.ui.EDT
 import io.opentelemetry.api.metrics.BatchCallback
 import io.opentelemetry.api.metrics.Meter
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.awt.EventQueue
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -115,8 +121,54 @@ internal fun runnableUnitFunction(runnable: Runnable): () -> Unit = runnable::ru
 internal fun rethrowCheckedExceptions(f: ThrowableRunnable<*>): () -> Unit = f::run
 internal fun <T> rethrowCheckedExceptions(f: ThrowableComputable<T, *>): () -> T = f::compute
 
+@TestOnly
+@ApiStatus.Experimental
+object TestOnlyThreading {
+  @JvmStatic
+  fun <T> releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(action: () -> T): T {
+    val application = ApplicationManager.getApplication()
+    if (application == null) {
+      return action()
+    }
+    if (application.isWriteIntentLockAcquired) {
+      return getGlobalThreadingSupport().releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(action)
+    } else {
+      return action()
+    }
+  }
+}
+
 @ApiStatus.Internal
 object InternalThreading {
+  private val backgroundWriteActionCounter = AtomicInteger(0)
+
+  @JvmStatic
+  fun incrementBackgroundWriteActionCount() {
+    backgroundWriteActionCounter.incrementAndGet()
+  }
+
+  @JvmStatic
+  fun isBackgroundWriteActionRunning(): Boolean {
+    return backgroundWriteActionCounter.get() > 0
+  }
+
+  @JvmStatic
+  fun decrementBackgroundWriteActionCount() {
+    backgroundWriteActionCounter.decrementAndGet()
+  }
+
+  object RunInBackgroundWriteActionMarker
+    : CoroutineContext.Element,
+      CoroutineContext.Key<RunInBackgroundWriteActionMarker> {
+    override val key: CoroutineContext.Key<*> get() = this
+  }
+
+  @Internal
+  @JvmStatic
+  fun isBackgroundWriteActionAllowed(): Boolean =
+    currentThreadContext()[RunInBackgroundWriteActionMarker] != null
+
+
 
   @RequiresBackgroundThread(generateAssertion = false)
   @RequiresWriteLock(generateAssertion = false)
@@ -143,3 +195,4 @@ object InternalThreading {
     exceptionRef.get()?.let { throw it }
   }
 }
+

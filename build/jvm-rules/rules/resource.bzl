@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_java//java:defs.bzl", "JavaInfo", "java_common")
+load("//:rules/impl/transitions.bzl", "jvm_platform_transition", "scrubbed_host_platform_transition")
 
 visibility("private")
 
@@ -26,7 +27,6 @@ def _jvm_resources_impl(ctx):
         ],
         #         arguments = [args],
         outputs = [resultJar],
-        use_default_shell_env = True,
         tools = [ctx.file._worker],
         executable = java_runtime.java_executable_exec_path,
         execution_requirements = {
@@ -74,7 +74,7 @@ jvm_resources = rule(
         "_worker": attr.label(
             default = "//:resource-packager",
             allow_single_file = True,
-            cfg = "exec",
+            cfg = scrubbed_host_platform_transition,
         ),
         "_worker_jvm_flags": attr.label(
             default = "//:resource-packager-jvm_flags",
@@ -85,4 +85,5 @@ jvm_resources = rule(
         ),
     },
     provides = [JavaInfo],
+    cfg = jvm_platform_transition,
 )

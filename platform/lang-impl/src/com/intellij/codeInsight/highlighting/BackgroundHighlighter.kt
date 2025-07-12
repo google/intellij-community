@@ -32,6 +32,8 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.progress.runBlockingCancellable
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -238,8 +240,8 @@ class BackgroundHighlighter(coroutineScope: CoroutineScope) {
         createPass(newPsiFile, hostEditor, newEditor)
       }
       if (identPass != null) {
-        var result = EMPTY_RESULT
         var infos = listOf<HighlightInfo>()
+        var result = EMPTY_RESULT
         try {
           result = identPass.doCollectInformation(project, visibleRange)
           if (result == WRONG_DOCUMENT_VERSION) {

@@ -45,6 +45,8 @@ import javax.swing.JComponent
 object DefaultUiPluginManagerController : UiPluginManagerController {
   private val LOG = Logger.getInstance(DefaultUiPluginManagerController::class.java)
 
+  override fun isEnabled(): Boolean = true
+
   override fun getTarget(): PluginSource = PluginSource.LOCAL
 
   override fun getPlugins(): List<PluginUiModel> {
@@ -52,7 +54,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   }
 
   override fun initSession(sessionId: String): InitSessionResult {
-    val session = findSession(sessionId) ?: return InitSessionResult(emptyList(), emptyMap())
+    val session = createSession(sessionId)
     val applicationInfo = ApplicationInfo.getInstance()
     val visiblePlugins = mutableListOf<PluginUiModel>()
     for (plugin in getInstalledAndPendingPlugins()) {
@@ -122,8 +124,8 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     }
   }
 
-  override fun createSession(sessionId: String) {
-    PluginManagerSessionService.getInstance().createSession(sessionId)
+  fun createSession(sessionId: String): PluginManagerSession {
+    return PluginManagerSessionService.getInstance().createSession(sessionId)
   }
 
   override fun closeSession(sessionId: String) {
@@ -232,6 +234,10 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
       sessionManager.removeSession(sessionId)
     }
     return changedStates
+  }
+
+  override suspend fun isPluginEnabled(pluginId: PluginId): Boolean {
+    return !PluginManagerCore.isDisabled(pluginId)
   }
 
   override fun connectToUpdateServiceWithCounter(sessionId: String, callback: (Int?) -> Unit): PluginUpdatesService {

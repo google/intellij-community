@@ -2,16 +2,14 @@
 package com.intellij.openapi.module.impl.scopes
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl
-import com.intellij.openapi.roots.JdkOrderEntry
-import com.intellij.openapi.roots.LibraryOrderEntry
-import com.intellij.openapi.roots.ModuleSourceOrderEntry
-import com.intellij.openapi.roots.OrderEntry
-import com.intellij.openapi.roots.impl.LibraryRootDescriptor
-import com.intellij.openapi.roots.impl.ModuleRootDescriptor
-import com.intellij.openapi.roots.impl.RootDescriptor
-import com.intellij.openapi.roots.impl.SdkRootDescriptor
+import com.intellij.openapi.roots.*
+import com.intellij.openapi.roots.impl.*
 import com.intellij.openapi.vfs.VirtualFile
 
 internal class ScopeRootDescriptor(
@@ -20,7 +18,6 @@ internal class ScopeRootDescriptor(
   val orderIndex: Int, // used to check which dependency has higher priority
 ) {
   fun correspondTo(rootDescriptor: RootDescriptor): Boolean {
-    val orderEntry = orderEntry
     when (rootDescriptor) {
       is LibraryRootDescriptor -> {
         if (orderEntry !is LibraryOrderEntry) return false
@@ -28,8 +25,16 @@ internal class ScopeRootDescriptor(
         return library == rootDescriptor.library
       }
       is ModuleRootDescriptor -> {
-        if (orderEntry !is ModuleSourceOrderEntry) return false
-        val module = orderEntry.rootModel.module
+        val module = when (orderEntry) {
+          is ModuleSourceOrderEntry -> {
+            orderEntry.rootModel.module
+          }
+          is ModuleOrderEntry -> {
+            orderEntry.module
+          }
+          else -> return false
+        }
+
         return module == rootDescriptor.module
       }
       is SdkRootDescriptor -> {
@@ -38,6 +43,16 @@ internal class ScopeRootDescriptor(
         val rootDescriptorSdk = rootDescriptor.sdk
         return orderEntrySdk == rootDescriptorSdk ||
                isEqualBackup(orderEntrySdk, rootDescriptorSdk)
+      }
+      is DummyRootDescriptor -> {
+        // todo not sure if this is correct, please investigate further
+        val result = this.root == rootDescriptor.root
+
+        if (result) {
+          log.debug { "DummyRootDescriptor corresponds to scopeRootDescriptor $rootDescriptor, $this" }
+        }
+
+        return result
       }
     }
   }
@@ -62,3 +77,5 @@ internal class ScopeRootDescriptor(
 
   private fun Sdk.unwrap(): Sdk = if (this is ProjectJdkImpl) this.delegate else this
 }
+
+private val log = logger<SdkRootDescriptor>()

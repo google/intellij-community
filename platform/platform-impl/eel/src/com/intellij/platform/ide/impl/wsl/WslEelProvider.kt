@@ -4,8 +4,8 @@ package com.intellij.platform.ide.impl.wsl
 import com.intellij.execution.eel.MultiRoutingFileSystemUtils
 import com.intellij.execution.ijent.nio.IjentEphemeralRootAwareFileSystemProvider
 import com.intellij.execution.wsl.*
-import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.registry.Registry
@@ -22,7 +22,6 @@ import com.intellij.platform.ijent.IjentPosixApi
 import com.intellij.platform.ijent.community.impl.IjentFailSafeFileSystemPosixApi
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider
 import com.intellij.platform.ijent.community.impl.nio.telemetry.TracingFileSystemProvider
-import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.util.containers.ContainerUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.job
@@ -61,15 +60,6 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
   private val reportedNonExistentWslIds = AtomicReference<List<String>>(listOf())
 
   override fun compute(localFS: FileSystem, sanitizedPath: String): FileSystem? {
-    try {
-      if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
-        return null
-      }
-    }
-    catch (@Suppress("IncorrectCancellationExceptionHandling") _: AlreadyDisposedException) {
-      return null
-    }
-
     @MultiRoutingFileSystemPath
     val wslRoot: String
     val distributionId: String
@@ -99,16 +89,35 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
       }
     }
 
+    try {
+      if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
+        return null
+      }
+    }
+    catch (err: Exception) {
+      if (err is ControlFlowException) {
+        return null
+      }
+      else {
+        throw err
+      }
+    }
+
     val key = if (useNewFileSystem) wslRoot else distributionId
     return providersCache.computeIfAbsent(key) {
       service<EelEarlyAccessChecker>().check(sanitizedPath)
+
+      val descriptor = WslEelDescriptor(WSLDistribution(distributionId))
+      if (LOG.isDebugEnabled) {
+        LOG.debug("Triggered initialization of IJent for $descriptor, the path is $sanitizedPath", Throwable())
+      }
 
       val ijentUri = URI("ijent", "wsl", "/$distributionId", null, null)
 
       val ijentFsProvider = TracingFileSystemProvider(IjentNioFileSystemProvider.getInstance())
 
       try {
-        val ijentFs = IjentFailSafeFileSystemPosixApi(coroutineScope, WslEelDescriptor(WSLDistribution(distributionId)))
+        val ijentFs = IjentFailSafeFileSystemPosixApi(coroutineScope, descriptor)
         val fs = ijentFsProvider.newFileSystem(ijentUri, IjentNioFileSystemProvider.newFileSystemMap(ijentFs))
 
         coroutineScope.coroutineContext.job.invokeOnCompletion {

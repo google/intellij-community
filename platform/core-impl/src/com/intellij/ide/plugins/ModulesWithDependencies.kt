@@ -1,10 +1,11 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplacePutWithAssignment", "ReplaceGetOrSet", "ReplaceNegatedIsEmptyWithIsNotEmpty")
 
 package com.intellij.ide.plugins
 
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.util.Java11Shim
+import org.jetbrains.annotations.ApiStatus
 import java.util.*
 
 private val VCS_ALIAS_ID = PluginId.getId("com.intellij.modules.vcs")
@@ -155,19 +156,24 @@ internal fun toCoreAwareComparator(comparator: Comparator<PluginModuleDescriptor
   // so, ensure that core plugin is always first (otherwise not possible to register actions - a parent group not defined)
   // don't use sortWith here - avoid loading kotlin stdlib
   return Comparator { o1, o2 ->
+    val o1isCore = o1 !is ContentModuleDescriptor && o1.pluginId == PluginManagerCore.CORE_ID
+    val o2isCore = o2 !is ContentModuleDescriptor && o2.pluginId == PluginManagerCore.CORE_ID
     when {
-      o1 !is ContentModuleDescriptor && o1.pluginId == PluginManagerCore.CORE_ID -> -1
-      o2 !is ContentModuleDescriptor && o2.pluginId == PluginManagerCore.CORE_ID -> 1
-      else -> comparator.compare(o1, o2)
+      o1isCore == o2isCore -> comparator.compare(o1, o2)
+      o1isCore -> -1
+      else -> 1
     }
   }
 }
 
+/**
+ * No new entries should be added to this set; if a plugin modules depends on content modules extracted from the core plugin, explicit dependencies on them should be added.
+ * There is no need to fully convert the plugin to v2 for that.
+ */
+@ApiStatus.Obsolete
 private val knownNotFullyMigratedPluginIds: Set<String> = hashSetOf(
-  // Migration started with converting intellij.notebooks.visualization to a platform plugin, but adding a package prefix to Pythonid
-  // or com.jetbrains.pycharm.ds.customization is a challenging task that can't be done by a single shot.
-  "Pythonid",
-  "com.jetbrains.pycharm.ds.customization",
+  "Pythonid", //todo remove this: PY-82565
+  "com.jetbrains.pycharm.ds.customization", //todo remove this: DS-7102
 )
 
 /**

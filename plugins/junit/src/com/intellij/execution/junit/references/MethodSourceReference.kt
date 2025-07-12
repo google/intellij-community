@@ -8,10 +8,10 @@ import com.siyeh.ig.psiutils.TestUtils
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UMethod
 
-class MethodSourceReference(element: PsiLanguageInjectionHost) : BaseJunitAnnotationReference(element) {
-  override fun hasNoStaticProblem(factoryMethod: PsiMethod, literalClazz: UClass, literalMethod: UMethod?): Boolean {
-    val isStatic = factoryMethod.hasModifierProperty(PsiModifier.STATIC)
-    val psiClass = factoryMethod.containingClass ?: return false
-    return factoryMethod.parameterList.isEmpty && TestUtils.testInstancePerClass(psiClass) != isStatic
+class MethodSourceReference(element: PsiLanguageInjectionHost) : JUnitMethodAnnotationReference(element) {
+  override fun hasNoStaticProblem(element: PsiMethod, literalClazz: UClass, literalMethod: UMethod?): Boolean {
+    val isStatic = element.hasModifierProperty(PsiModifier.STATIC)
+    val psiClass = element.containingClass ?: return false
+    return element.parameterList.isEmpty && TestUtils.testInstancePerClass(psiClass) != isStatic
   }
 }

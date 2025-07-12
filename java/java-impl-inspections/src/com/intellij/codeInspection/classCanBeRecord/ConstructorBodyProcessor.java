@@ -5,11 +5,11 @@ import com.intellij.openapi.util.Ref;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.*;
 import com.intellij.psi.controlFlow.ControlFlowUtil;
+import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.util.JavaPsiConstructorUtil;
 import com.intellij.util.containers.MultiMap;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.NotNullByDefault;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -20,7 +20,6 @@ import static com.intellij.psi.PsiModifier.STATIC;
 
 @NotNullByDefault
 final class ConstructorBodyProcessor {
-  private final PsiClass containingClass;
   private final PsiMethod constructor;
   private final Map<PsiParameter, @Nullable PsiField> paramsToFields = new HashMap<>();
   // TODO(bartekpacia): change type to SequencedMap once we move to Java 21
@@ -43,7 +42,6 @@ final class ConstructorBodyProcessor {
 
   ConstructorBodyProcessor(PsiMethod constructor,
                            List<PsiField> instanceFields) {
-    this.containingClass = Objects.requireNonNull(constructor.getContainingClass(), "constructor must have containing class");
     this.constructor = constructor;
     this.instanceFields = instanceFields;
     final PsiCodeBlock body = Objects.requireNonNull(constructor.getBody(), "constructor must have body");
@@ -61,6 +59,9 @@ final class ConstructorBodyProcessor {
     }
     final PsiExpression expression = expressionStatement.getExpression();
 
+    final PsiClass containingClass = constructor.getContainingClass();
+    if (containingClass == null) return;
+
     if (expression instanceof PsiMethodCallExpression methodCallExpr && JavaPsiConstructorUtil.isChainedConstructorCall(methodCallExpr)) {
       delegating = true;
       for (PsiExpression arg : methodCallExpr.getArgumentList().getExpressions()) {
@@ -77,7 +78,7 @@ final class ConstructorBodyProcessor {
       // This means that:
       //  - all instance variables must be already initialized, OR
       //  - (JDK 25+) this statement is inside early construction context, more specifically: in constructor prologue (see JEP 513).
-      //      This means that it must NOT use use 'this', either implicitly or explicitly, except for simple assignment statements.
+      //      This means that it must NOT use 'this', either implicitly or explicitly, except for simple assignment statements.
 
       otherStatements.add(statement);
       if (fieldNamesToInitializers.isEmpty() && PsiUtil.isAvailable(JavaFeature.STATEMENTS_BEFORE_SUPER, statement)) {
@@ -248,21 +249,47 @@ final class ConstructorBodyProcessor {
     return resolved instanceof PsiField psiField && !psiField.hasModifierProperty(STATIC);
   }
 
-  private static boolean hasReferenceToContainingClass(@NotNull PsiClass containingClass, @Nullable PsiExpression expression) {
+  private static boolean hasReferenceToContainingClass(PsiClass containingClass, @Nullable PsiExpression expression) {
     if (expression == null) return false;
     Ref<Boolean> hasReferenceToClassUnderConstruction = new Ref<>(false);
     expression.accept(new JavaRecursiveElementWalkingVisitor() {
+      void markInvalid() {
+        hasReferenceToClassUnderConstruction.set(true);
+        stopWalking();
+      }
+
+      @Override
+      public void visitClass(PsiClass aClass) {
+        // Empty on purpose.
+      }
+
+      @Override
+      public void visitThisExpression(PsiThisExpression expression) {
+        super.visitThisExpression(expression);
+        markInvalid();
+      }
+
       @Override
       public void visitReferenceExpression(PsiReferenceExpression expression) {
         super.visitReferenceExpression(expression);
-        PsiElement resolved = expression.resolve();
-        if (resolved instanceof PsiField field && !field.hasModifierProperty(STATIC) && field.getContainingClass() == containingClass) {
-          hasReferenceToClassUnderConstruction.set(true);
+
+        if (expression.getQualifier() != null) {
+          return;
         }
-        else if (resolved instanceof PsiMethod method &&
-                 !method.hasModifierProperty(STATIC) &&
-                 method.getContainingClass() == containingClass) {
-          hasReferenceToClassUnderConstruction.set(true);
+
+        PsiElement resolved = expression.resolve();
+        if (resolved == null) {
+          markInvalid();
+          return;
+        }
+
+        if (resolved instanceof PsiField field && !field.hasModifierProperty(STATIC) && field.getContainingClass() == containingClass) {
+          markInvalid();
+        }
+        else if (resolved instanceof PsiMethod method && !method.hasModifierProperty(STATIC)) {
+          if (InheritanceUtil.isInheritorOrSelf(containingClass, method.getContainingClass(), true)) {
+            markInvalid();
+          }
         }
       }
     });

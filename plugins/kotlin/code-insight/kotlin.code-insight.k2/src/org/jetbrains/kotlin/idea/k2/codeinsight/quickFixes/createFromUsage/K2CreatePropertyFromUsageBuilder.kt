@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 import com.intellij.codeInsight.Nullability
 import com.intellij.codeInsight.daemon.QuickFixBundle
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.codeInsight.intention.PriorityAction
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.lang.java.request.CreateFieldFromJavaUsageRequest
 import com.intellij.lang.jvm.JvmClass
@@ -69,8 +70,8 @@ object K2CreatePropertyFromUsageBuilder {
         classOrFileName: String?,
         request: CreateFieldRequest,
         lateinit: Boolean
-    ): IntentionAction {
-        if (!request.isValid) null
+    ): IntentionAction? {
+        if (!request.isValid) return null
         return CreatePropertyFromUsageAction(targetContainer, classOrFileName, request, lateinit)
     }
 
@@ -180,8 +181,8 @@ object K2CreatePropertyFromUsageBuilder {
         owner: KtModifierListOwner,
         target: AnnotationUseSiteTarget?,
         request: AnnotationRequest
-    ): IntentionAction {
-        if (!request.isValid) null
+    ): IntentionAction? {
+        if (!request.isValid) return null
 
         return CreateAnnotationAction(owner, target, request)
     }
@@ -191,7 +192,7 @@ object K2CreatePropertyFromUsageBuilder {
         private val classOrFileName: String?,
         private val request: CreateFieldRequest,
         private val lateinit: Boolean
-    ) : IntentionAction {
+    ) : IntentionAction, PriorityAction {
         val pointer: SmartPsiElementPointer<KtElement> = SmartPointerManager.createPointer(targetContainer)
 
         private val varVal: String
@@ -199,6 +200,13 @@ object K2CreatePropertyFromUsageBuilder {
                 val writeable = JvmModifier.FINAL !in request.modifiers && !request.isConstant
                 return if (writeable) "var" else "val"
             }
+
+        override fun getPriority(): PriorityAction.Priority {
+            if ((request as? CreatePropertyFromKotlinUsageRequest)?.isExtension == true) {
+                return PriorityAction.Priority.LOW
+            }
+            return PriorityAction.Priority.NORMAL
+        }
 
         private val kotlinModifiers: List<KtModifierKeywordToken>?
             get() =
@@ -425,7 +433,6 @@ object K2CreatePropertyFromUsageBuilder {
                 }
             }
         }
-        return false
     }
 
     private val fieldAnnotationTargetCallableId: CallableId =

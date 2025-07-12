@@ -55,6 +55,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public abstract class PsiDocumentManagerBase extends PsiDocumentManager implements DocumentListener, Disposable {
   private static final Logger LOG = Logger.getInstance(PsiDocumentManagerBase.class);
@@ -62,7 +63,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
 
   private boolean isInsideCommitHandler; //accessed from EDT only
 
-  private final Map<Document, List<Runnable>> documentCommitActions = CollectionFactory.createConcurrentWeakMap();
+  private final Map<Document, List<Consumer<? super Document>>> documentCommitActions = CollectionFactory.createConcurrentWeakMap();
   private final Map<Object, Runnable> identifiedAllDocumentCommitActions = new LinkedHashMap<>(); //accessed from EDT only
   private final List<Runnable> allDocumentCommitActions = new ArrayList<>(); //accessed from EDT only
 
@@ -174,7 +175,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   }
 
   @ApiStatus.Internal
-  public final @NotNull List<FileViewProvider> getCachedViewProviders(@NotNull Document document) {
+  public final @NotNull @Unmodifiable List<FileViewProvider> getCachedViewProviders(@NotNull Document document) {
     VirtualFile virtualFile = getVirtualFile(document);
     if (virtualFile == null) return Collections.emptyList();
     return getFileManager().findCachedViewProviders(virtualFile);
@@ -323,7 +324,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       action.run();
     }
     else {
-      addRunOnCommit(document, action);
+      addRunOnCommit(document, __->action.run());
     }
   }
 
@@ -365,18 +366,36 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
     return false;
   }
 
+  /**
+   * Adds {@code action} to the list of actions to be called when the document is committed.
+   * NB. Do not leak the document instance from the action code, to prevent memory excessive consumption when the Document is going to be garbage-collected.
+   * For example, this code is wrong:
+   * {@code addRunOnCommit(document, d->document.getText())}
+   * because the lambda {@code d->document.getText()} leaks the document instance.
+   * Use the document passed to the Consumer instead, e.g.:
+   * {@code addRunOnCommit(document, d->d.getText())}
+   */
   @ApiStatus.Internal
-  public void addRunOnCommit(@NotNull Document document, @NotNull Runnable action) {
-    List<Runnable> actions = documentCommitActions.computeIfAbsent(document, __ -> ContainerUtil.createConcurrentList());
+  public void addRunOnCommit(@NotNull Document document, @NotNull Consumer<? super @NotNull Document> action) {
+    List<Consumer<? super Document>> actions = documentCommitActions.computeIfAbsent(document, __ -> ContainerUtil.createConcurrentList());
     actions.add(ThreadContext.captureThreadContext(action));
   }
 
-  private @NotNull List<Runnable> getAndClearDocumentCommitActions(@NotNull Document document) {
-    List<Runnable> list = documentCommitActions.remove(document);
+  /**
+   * @deprecated for binary compatibility only, use {@link #addRunOnCommit(Document, Consumer)} instead
+   */
+  @Deprecated
+  @ApiStatus.Internal
+  public void addRunOnCommit(@NotNull Document document, @NotNull Runnable action) {
+    throw new AbstractMethodError();
+  }
+
+  private @NotNull @Unmodifiable List<Consumer<? super Document>> getAndClearDocumentCommitActions(@NotNull Document document) {
+    List<Consumer<? super Document>> list = documentCommitActions.remove(document);
     return list == null ? Collections.emptyList() : list;
   }
 
-  private @NotNull List<Runnable> getAndClearAllDocumentCommitActions() {
+  private @NotNull @Unmodifiable List<Runnable> getAndClearAllDocumentCommitActions() {
     ThreadingAssertions.assertEventDispatchThread();
 
     List<Runnable> actions = new ArrayList<>();
@@ -410,8 +429,8 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
 
   @ApiStatus.Internal
   public boolean finishCommit(@NotNull Document document,
-                              @NotNull List<? extends BooleanRunnable> finishProcessors,
-                              @NotNull List<? extends BooleanRunnable> reparseInjectedProcessors,
+                              @NotNull @Unmodifiable List<? extends BooleanRunnable> finishProcessors,
+                              @NotNull @Unmodifiable List<? extends BooleanRunnable> reparseInjectedProcessors,
                               boolean synchronously,
                               @NotNull Object reason) {
     assert !myProject.isDisposed() : "Already disposed";
@@ -439,8 +458,8 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   }
 
   protected boolean finishCommitInWriteAction(@NotNull Document document,
-                                              @NotNull List<? extends BooleanRunnable> finishProcessors,
-                                              @NotNull List<? extends BooleanRunnable> reparseInjectedProcessors,
+                                              @NotNull @Unmodifiable List<? extends BooleanRunnable> finishProcessors,
+                                              @NotNull @Unmodifiable List<? extends BooleanRunnable> reparseInjectedProcessors,
                                               boolean synchronously) {
     if (isEventSystemEnabled(document)) {
       ThreadingAssertions.assertEventDispatchThread();
@@ -485,8 +504,8 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   }
 
   private boolean commitToExistingPsi(@NotNull Document document,
-                                      @NotNull List<? extends BooleanRunnable> finishProcessors,
-                                      @NotNull List<? extends BooleanRunnable> reparseInjectedProcessors,
+                                      @NotNull @Unmodifiable List<? extends BooleanRunnable> finishProcessors,
+                                      @NotNull @Unmodifiable List<? extends BooleanRunnable> reparseInjectedProcessors,
                                       boolean synchronously,
                                       @Nullable VirtualFile virtualFile) {
     for (BooleanRunnable finishRunnable : finishProcessors) {
@@ -513,7 +532,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   }
 
   @ApiStatus.Internal
-  public void forceReload(@Nullable VirtualFile virtualFile, @NotNull List<? extends FileViewProvider> viewProviders) {
+  public void forceReload(@Nullable VirtualFile virtualFile, @NotNull @Unmodifiable List<? extends FileViewProvider> viewProviders) {
     if (!viewProviders.isEmpty()) {
       DebugUtil.performPsiModification("psi.forceReload", () -> {
         for (FileViewProvider viewProvider : viewProviders) {
@@ -732,7 +751,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
       return;
     }
 
-    runActions(getAndClearDocumentCommitActions(document));
+    runActions(document, getAndClearDocumentCommitActions(document));
 
     if (app.isDispatchThread()) {
       runActionsWhenAllCommitted();
@@ -758,7 +777,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
     }
   }
 
-  private static void runActions(@NotNull List<? extends Runnable> actions) {
+  private static void runActions(@NotNull @Unmodifiable List<? extends Runnable> actions) {
     List<Pair<Runnable, Throwable>> exceptions = new ArrayList<>();
     for (Runnable action : actions) {
       //noinspection IncorrectCancellationExceptionHandling
@@ -778,6 +797,30 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
     }
     for (Pair<Runnable, Throwable> pair : exceptions) {
       Runnable action = pair.getFirst();
+      Throwable e = pair.getSecond();
+      LOG.error("During running " + action, e);
+    }
+  }
+  private static void runActions(@NotNull Document document, @NotNull @Unmodifiable List<? extends Consumer<? super Document>> actions) {
+    List<Pair<Consumer<? super Document>, Throwable>> exceptions = new ArrayList<>();
+    for (Consumer<? super Document> action : actions) {
+      //noinspection IncorrectCancellationExceptionHandling
+      try {
+        ThreadContext.resetThreadContext(() -> {
+          action.accept(document);
+          return null;
+        });
+      }
+      catch (ProcessCanceledException e) {
+        // some actions are crazy enough to use PCE for their own control flow.
+        // swallow and ignore to not disrupt completely unrelated control flow.
+      }
+      catch (Throwable e) {
+        exceptions.add(Pair.create(action, e));
+      }
+    }
+    for (Pair<Consumer<? super Document>, Throwable> pair : exceptions) {
+      Consumer<? super Document> action = pair.getFirst();
       Throwable e = pair.getSecond();
       LOG.error("During running " + action, e);
     }
@@ -889,7 +932,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
     throw new UnsupportedOperationException();
   }
 
-  public @NotNull List<DocumentEvent> getEventsSinceCommit(@NotNull Document document) {
+  public @NotNull @Unmodifiable List<DocumentEvent> getEventsSinceCommit(@NotNull Document document) {
     assert document instanceof DocumentImpl : document;
     UncommittedInfo info = getUncommittedInfo(document);
     if (info != null) {
@@ -1251,12 +1294,12 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
 
   @NotNull
   @ApiStatus.Internal
-  public List<BooleanRunnable> reparseChangedInjectedFragments(@NotNull Document hostDocument,
-                                                               @NotNull PsiFile hostPsiFile,
-                                                               @NotNull TextRange range,
-                                                               @NotNull ProgressIndicator indicator,
-                                                               @NotNull ASTNode oldRoot,
-                                                               @NotNull ASTNode newRoot) {
+  public @Unmodifiable List<BooleanRunnable> reparseChangedInjectedFragments(@NotNull Document hostDocument,
+                                                                             @NotNull PsiFile hostPsiFile,
+                                                                             @NotNull TextRange range,
+                                                                             @NotNull ProgressIndicator indicator,
+                                                                             @NotNull ASTNode oldRoot,
+                                                                             @NotNull ASTNode newRoot) {
     return Collections.emptyList();
   }
 

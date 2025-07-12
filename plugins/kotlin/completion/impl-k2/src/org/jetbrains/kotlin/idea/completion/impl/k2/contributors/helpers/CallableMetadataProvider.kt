@@ -3,6 +3,7 @@
 package org.jetbrains.kotlin.idea.completion.contributors.helpers
 
 import com.intellij.util.applyIf
+import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaImplicitReceiver
@@ -10,6 +11,7 @@ import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
 import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.*
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.buildClassTypeWithStarProjections
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.resolveToExpandedSymbol
 import org.jetbrains.kotlin.idea.completion.lookups.isExtensionCall
 import org.jetbrains.kotlin.idea.completion.reference
@@ -22,7 +24,8 @@ import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 
 internal object CallableMetadataProvider {
 
-    class CallableMetadata(
+    @Serializable
+    data class CallableMetadata(
         val kind: CallableKind,
         /**
          * In case of the local callable, the index of local scope in scope tower.
@@ -114,7 +117,7 @@ internal object CallableMetadataProvider {
         val symbol = signature.symbol
 
         val expectedReceiver = getExpectedNonExtensionReceiver(signature.symbol) ?: return null
-        val expectedReceiverType = buildClassType(expectedReceiver)
+        val expectedReceiverType = buildClassTypeWithStarProjections(expectedReceiver)
 
         val replaceTypeArguments = expectedReceiverType is KaClassType && expectedReceiverType.typeArguments.isNotEmpty()
         val actualReceiverTypes = if (replaceTypeArguments) {
@@ -186,7 +189,7 @@ internal object CallableMetadataProvider {
             return listOfNotNull(
                 expandedSymbol,
                 expandedSymbol.companionObject,
-            ).map { buildClassType(it) }
+            ).map { buildClassTypeWithStarProjections(it) }
         }
 
         if (receiver is KtExpression) {
@@ -259,17 +262,8 @@ internal object CallableMetadataProvider {
             ?.lhs == explicitReceiver
 
     context(KaSession)
-    @OptIn(KaExperimentalApi::class)
-    private fun buildClassType(symbol: KaClassLikeSymbol): KaType = buildClassType(symbol) {
-        @OptIn(KaExperimentalApi::class)
-        repeat(symbol.typeParameters.size) {
-            argument(buildStarTypeProjection())
-        }
-    }
-
-    context(KaSession)
     private fun KaType.replaceTypeArgumentsWithStarProjections(): KaType? =
-        expandedSymbol?.let { buildClassType(it) }?.withNullability(nullability)
+        expandedSymbol?.let { buildClassTypeWithStarProjections(it) }?.withNullability(nullability)
 
     context(KaSession)
     private fun callableWeightByReceiver(

@@ -24,7 +24,6 @@ import com.intellij.openapi.editor.impl.SoftWrapModelImpl
 import com.intellij.openapi.editor.impl.softwrap.EmptySoftWrapPainter
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
-import com.intellij.openapi.observable.util.addFocusListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFocusManager
@@ -191,7 +190,14 @@ internal class ReworkedTerminalView(
     listenPanelSizeChanges()
     listenAlternateBufferSwitch()
 
-    TerminalVfsSynchronizer.install(controller, ::addFocusListener, this)
+    val synchronizer = TerminalVfsSynchronizer(
+      controller,
+      outputModel,
+      sessionModel,
+      terminalPanel,
+      coroutineScope.childScope("TerminalVfsSynchronizer"),
+    )
+    outputEditor.putUserData(TerminalVfsSynchronizer.KEY, synchronizer)
   }
 
   override fun addTerminationCallback(onTerminated: Runnable, parentDisposable: Disposable) {
@@ -444,10 +450,6 @@ internal class ReworkedTerminalView(
 
   override fun connectToTty(ttyConnector: TtyConnector, initialTermSize: TermSize) {
     error("connectToTty is not supported in ReworkedTerminalView")
-  }
-
-  private fun addFocusListener(parentDisposable: Disposable, listener: FocusListener) {
-    terminalPanel.addFocusListener(parentDisposable, listener)
   }
 
   private fun configureInlineCompletion(editor: EditorEx, model: TerminalOutputModel, coroutineScope: CoroutineScope, parentDisposable: Disposable) {

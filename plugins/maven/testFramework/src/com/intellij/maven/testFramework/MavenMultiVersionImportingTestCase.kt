@@ -9,13 +9,18 @@ import com.intellij.openapi.roots.ExcludeFolder
 import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.platform.backend.workspace.workspaceModel
+import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.testFramework.RunAll
 import com.intellij.util.ArrayUtil
 import com.intellij.util.Function
 import com.intellij.util.ThrowableRunnable
 import com.intellij.util.text.VersionComparatorUtil
+import com.intellij.workspaceModel.ide.legacyBridge.SourceRootTypeRegistry
 import junit.framework.TestCase
+import org.jetbrains.idea.maven.model.MavenConstants
+import org.jetbrains.idea.maven.importing.MavenImportUtil
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.jps.model.java.JavaResourceRootType
@@ -29,10 +34,10 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.math.min
 
-private const val MAVEN_4_VERSION = "4.0.0-rc-3"
+private const val MAVEN_4_VERSION = "4.0.0-rc-4"
 private val MAVEN_VERSIONS: Array<String> = arrayOf<String>(
-  "bundled",
-  "4"
+  //"bundled",
+  "4/4.0.0",
 )
 
 @RunWith(Parameterized::class)
@@ -45,6 +50,11 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   @Parameterized.Parameter(0)
   @JvmField
   var myMavenVersion: String? = null
+
+  @Parameterized.Parameter(1)
+  @JvmField
+  var myMavenModelVersion: String? = null
+
   protected var myWrapperTestFixture: MavenWrapperTestFixture? = null
 
   protected fun assumeVersionMoreThan(version: String) {
@@ -62,6 +72,15 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     val version: String = getActualVersion(myMavenVersion!!)
     if (version.startsWith("4.")) r.run()
   }
+
+  protected fun forModel40(r: Runnable) {
+    if (myMavenModelVersion == MavenConstants.MODEL_VERSION_4_0_0) r.run()
+  }
+
+  protected fun forModel41(r: Runnable) {
+    if (myMavenModelVersion == MavenConstants.MODEL_VERSION_4_1_0) r.run()
+  }
+
 
   protected fun assumeMaven3() {
     val version: String = getActualVersion(myMavenVersion!!)
@@ -100,9 +119,11 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
       return
     }
     val actualMavenVersion = getActualVersion(myMavenVersion!!)
+    if (isMaven4)
     MavenLog.LOG.warn("Running test with Maven $actualMavenVersion")
     myWrapperTestFixture = MavenWrapperTestFixture(project, actualMavenVersion)
     myWrapperTestFixture!!.setUp()
+    modelVersion = myMavenModelVersion ?: MavenConstants.MODEL_VERSION_4_0_0
   }
 
   override fun tearDown() {
@@ -152,39 +173,46 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     get() = StringUtil.compareVersionNumbers(
       getActualVersion(myMavenVersion!!), "4.0") >= 0
 
-  protected fun maven4orNull(value: String?): String? {
-    return if (this.isMaven4) value else null
+  protected fun withModel410Only(value: String?): String? {
+    val isRc3 = getActualVersion(myMavenVersion!!).equals("4.0.0-rc-3", true)
+    return if (isRc3 || this.myMavenModelVersion == MavenConstants.MODEL_VERSION_4_1_0) value else null
+  }
+
+  protected fun isModel410(): Boolean {
+    val isRc3 = getActualVersion(myMavenVersion!!).equals("4.0.0-rc-3", true)
+    if (isRc3) return true
+    return this.isMaven4 && this.myMavenModelVersion == MavenConstants.MODEL_VERSION_4_1_0
   }
 
   protected fun defaultResources(): Array<String> {
-    return arrayOfNotNull("src/main/resources", maven4orNull("src/main/resources-filtered"))
+    return arrayOfNotNull("src/main/resources", withModel410Only("src/main/resources-filtered"))
   }
 
   protected fun defaultTestResources(): Array<String> {
-    return arrayOfNotNull("src/test/resources", maven4orNull("src/test/resources-filtered"))
+    return arrayOfNotNull("src/test/resources", withModel410Only("src/test/resources-filtered"))
   }
 
   protected fun allDefaultResources(): Array<String> {
     return ArrayUtil.mergeArrays(defaultResources(), *defaultTestResources())
   }
 
-  protected fun assertDefaultResources(moduleName: String, vararg additionalSources: String?) {
+  protected fun assertDefaultResources(moduleName: String, vararg additionalSources: String) {
     val expectedSources = ArrayUtil.mergeArrays(defaultResources(), *additionalSources)
     assertResources(moduleName, *expectedSources)
   }
 
-  protected fun assertDefaultTestResources(moduleName: String, vararg additionalSources: String?) {
+  protected fun assertDefaultTestResources(moduleName: String, vararg additionalSources: String) {
     val expectedSources = ArrayUtil.mergeArrays(defaultTestResources(), *additionalSources)
     assertTestResources(moduleName, *expectedSources)
   }
 
-  protected fun assertDefaultResources(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg additionalSources: String?) {
+  protected fun assertDefaultResources(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg additionalSources: String) {
     val expectedSources = ArrayUtil.mergeArrays(defaultResources(), *additionalSources)
     val contentRoot = getContentRoot(moduleName)
     doAssertContentFolders(contentRoot, contentRoot.getSourceFolders(rootType), *expectedSources)
   }
 
-  protected fun assertDefaultTestResources(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg additionalSources: String?) {
+  protected fun assertDefaultTestResources(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg additionalSources: String) {
     val expectedSources = ArrayUtil.mergeArrays(defaultTestResources(), *additionalSources)
     val contentRoot = getContentRoot(moduleName)
     doAssertContentFolders(contentRoot, contentRoot.getSourceFolders(rootType), *expectedSources)
@@ -206,13 +234,13 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     createProjectSubDirs(subdir, *folders)
   }
 
-  private fun createProjectSubDirs(subdir: String?, vararg relativePaths: String?) {
+  private fun createProjectSubDirs(subdir: String?, vararg relativePaths: String) {
     for (path in relativePaths) {
       createProjectSubDir(subdir + path)
     }
   }
 
-  protected fun assertRelativeContentRoots(moduleName: String, vararg expectedRelativeRoots: String?) {
+  protected fun assertRelativeContentRoots(moduleName: String, vararg expectedRelativeRoots: String) {
     val expectedRoots = expectedRelativeRoots
       .map { root -> projectPath.resolve(root).toCanonicalPath() }
       .toTypedArray<String>()
@@ -244,8 +272,12 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     doAssertContentFolders(contentRoot, folders, *expectedSources)
   }
 
+  protected fun assertSources(moduleName: String, expectedSources: Collection<String>) {
+    assertSources(moduleName, *expectedSources.toTypedArray())
+  }
+
   protected fun assertSources(moduleName: String, vararg expectedSources: String) {
-    doAssertContentFolders(moduleName, JavaSourceRootType.SOURCE, *expectedSources)
+    doAssertSourceRoots(moduleName, JavaSourceRootType.SOURCE, *expectedSources)
   }
 
   protected fun assertContentRootSources(moduleName: String, contentRoot: String, vararg expectedSources: String) {
@@ -254,7 +286,7 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   }
 
   protected fun assertResources(moduleName: String, vararg expectedSources: String) {
-    doAssertContentFolders(moduleName, JavaResourceRootType.RESOURCE, *expectedSources)
+    doAssertSourceRoots(moduleName, JavaResourceRootType.RESOURCE, *expectedSources)
   }
 
   protected fun assertContentRootResources(moduleName: String, contentRoot: String, vararg expectedSources: String) {
@@ -262,8 +294,12 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     doAssertContentFolders(root, root.getSourceFolders(JavaResourceRootType.RESOURCE), *expectedSources)
   }
 
+  protected fun assertTestSources(moduleName: String, expectedSources: Collection<String>) {
+    assertTestSources(moduleName, *expectedSources.toTypedArray())
+  }
+
   protected fun assertTestSources(moduleName: String, vararg expectedSources: String) {
-    doAssertContentFolders(moduleName, JavaSourceRootType.TEST_SOURCE, *expectedSources)
+    doAssertSourceRoots(moduleName, JavaSourceRootType.TEST_SOURCE, *expectedSources)
   }
 
   protected fun assertContentRootTestSources(moduleName: String, contentRoot: String, vararg expectedSources: String) {
@@ -272,7 +308,7 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   }
 
   protected fun assertTestResources(moduleName: String, vararg expectedSources: String) {
-    doAssertContentFolders(moduleName, JavaResourceRootType.TEST_RESOURCE, *expectedSources)
+    doAssertSourceRoots(moduleName, JavaResourceRootType.TEST_RESOURCE, *expectedSources)
   }
 
   protected fun assertContentRootTestResources(moduleName: String, contentRoot: String, vararg expectedSources: String) {
@@ -290,11 +326,47 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
     doAssertContentFolders(root, listOf<ExcludeFolder>(*root.getExcludeFolders()), *expectedExcludes)
   }
 
+  protected fun doAssertSourceRoots(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg expected: String) {
+    val sourceRootTypeRegistry = SourceRootTypeRegistry.getInstance()
+    val moduleEntity = project.workspaceModel.currentSnapshot.resolve(ModuleId(moduleName))!!
+    val actualPaths = moduleEntity.contentRoots
+      .flatMap { it.sourceRoots }
+      .filter { sourceRootTypeRegistry.findTypeById(it.rootTypeId) == rootType }
+      .map { Path.of(it.url.url.removePrefix("file://")) }
+
+    val expectedPaths = expected.map { Path.of(it) }
+
+    // compare absolute paths
+    if (expectedPaths.all { it.isAbsolute }) {
+      assertSameElements("Unexpected list of source roots ", actualPaths, expectedPaths)
+      return
+    }
+
+    val basePath: Path = MavenImportUtil.findPomXml(project, moduleName)?.parent?.toNioPath() ?: run {
+      assertSize(1, moduleEntity.contentRoots)
+      Path.of(moduleEntity.contentRoots.first().url.url.removePrefix("file://"))
+    }
+
+    // compare relative paths
+    if (expectedPaths.all { !it.isAbsolute }) {
+      val actualRelativePaths = actualPaths.map { basePath.relativize(it) }
+      assertSameElements("Unexpected list of source roots ", actualRelativePaths.map { it.toString() }, expectedPaths.map { it.toString()})
+      return
+    }
+
+    // compare absolute + relative paths
+    val expectedAbsolutePaths = expectedPaths.map { basePath.resolve(it) }
+    assertSameElements("Unexpected list of source roots ", actualPaths, expectedAbsolutePaths)
+
+  }
+
+  @Deprecated("use doAssertSourceRoots instead", ReplaceWith("doAssertSourceRoots(moduleName, rootType, *expected)"))
   protected fun doAssertContentFolders(moduleName: String, rootType: JpsModuleSourceRootType<*>, vararg expected: String) {
     val contentRoot = getContentRoot(moduleName)
     doAssertContentFolders(contentRoot, contentRoot.getSourceFolders(rootType), *expected)
   }
 
+  @Deprecated("use doAssertSourceRoots instead", ReplaceWith("doAssertSourceRoots(moduleName, rootType, *expected)"))
   private fun doAssertContentFolders(
     e: ContentEntry,
     folders: List<ContentFolder>,
@@ -341,7 +413,7 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   }
 
   companion object {
-    @Parameterized.Parameters(name = "with Maven-{0}")
+    @Parameterized.Parameters(name = "with Maven-{0} and model-{1}")
     @JvmStatic
     fun getMavenVersions(): List<Array<String>> {
       val mavenVersionsString = System.getProperty("maven.versions.to.run")
@@ -349,7 +421,15 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
       if (mavenVersionsString != null && !mavenVersionsString.isEmpty()) {
         mavenVersionsToRun = mavenVersionsString.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
       }
-      return mavenVersionsToRun.map { arrayOf<String>(it) }
+      return mavenVersionsToRun.map {
+        val versionAndModel = it.split('/')
+        val version = versionAndModel[0]
+        val model = versionAndModel.getOrElse(1) { MavenConstants.MODEL_VERSION_4_0_0 }
+        if (model == MavenConstants.MODEL_VERSION_4_0_0 || model == MavenConstants.MODEL_VERSION_4_1_0) {
+          return@map arrayOf(version, model)
+        }
+        throw IllegalStateException("Unknown model: $model from $it")
+      }.toList()
     }
 
     internal fun getActualVersion(version: String): String {

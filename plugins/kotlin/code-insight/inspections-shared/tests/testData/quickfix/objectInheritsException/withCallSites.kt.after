@@ -1,6 +1,10 @@
 // "Change exception object to class" "true"
 // WITH_STDLIB
-<caret>class MyException : Exception()
+package some
+
+import some.MyException
+
+<caret>class MyException : Throwable()
 
 fun foo() {
     throw MyException()

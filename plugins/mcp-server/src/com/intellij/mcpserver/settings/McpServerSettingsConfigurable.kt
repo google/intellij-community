@@ -4,6 +4,7 @@ package com.intellij.mcpserver.settings
 import com.intellij.icons.AllIcons
 import com.intellij.mcpserver.McpServerBundle
 import com.intellij.mcpserver.McpserverIcons
+import com.intellij.mcpserver.clientConfiguration.McpClient
 import com.intellij.mcpserver.createSseServerJsonEntry
 import com.intellij.mcpserver.createStdioMcpServerJsonConfiguration
 import com.intellij.mcpserver.impl.McpClientDetector
@@ -14,14 +15,17 @@ import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.SearchableConfigurable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.MessageDialogBuilder
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBOptionButton
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.ComponentPredicate
 import com.intellij.ui.layout.ValueComponentPredicate
 import com.intellij.ui.layout.and
 import com.intellij.ui.layout.not
+import com.intellij.util.ui.ColorizeProxyIcon
 import com.intellij.util.ui.TextTransferable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -76,14 +80,9 @@ class McpServerSettingsConfigurable : SearchableConfigurable {
       }.bottomGap(BottomGap.SMALL)
 
       row {
-        comment(McpServerBundle.message("settings.explanation.when.server.disabled"))
+        comment(McpServerBundle.message("settings.explanation.when.server.disabled",
+                                        McpClientDetector.detectGlobalMcpClients().joinToString("<br/>") { " • " + it.name.displayName }))
       }.bottomGap(BottomGap.NONE).visibleIf(enabledCheckboxState!!.not())
-      McpClientDetector.detectGlobalMcpClients().forEach {
-        row {
-          comment(" • " + it.name.displayName)
-        }.topGap(TopGap.NONE).bottomGap(BottomGap.NONE).visibleIf(enabledCheckboxState!!.not())
-      }
-
 
       group(McpServerBundle.message("settings.client.group"), indent = false) {
         row {
@@ -93,7 +92,6 @@ class McpServerSettingsConfigurable : SearchableConfigurable {
           McpClientDetector.detectGlobalMcpClients().forEach { mcpClient ->
             val isConfigured = ValueComponentPredicate(mcpClient.isConfigured() ?: false)
             val isPortCorrect = ValueComponentPredicate(mcpClient.isPortCorrect())
-            val json = mcpClient.json
             row {
               text(mcpClient.name.displayName)
             }.topGap(TopGap.SMALL)
@@ -122,19 +120,21 @@ class McpServerSettingsConfigurable : SearchableConfigurable {
                 }
               }, object : AbstractAction(McpServerBundle.message("copy.mcp.server.configuration")) {
                 override fun actionPerformed(e: ActionEvent?) {
-                  CopyPasteManager.getInstance().setContents(TextTransferable(json.encodeToString(buildJsonObject {
-                    put("jetbrains", json.encodeToJsonElement(mcpClient.getConfig()))
+                  CopyPasteManager.getInstance().setContents(TextTransferable(McpClient.json.encodeToString (buildJsonObject {
+                    put("jetbrains", McpClient.json.encodeToJsonElement(mcpClient.getConfig()))
                   }) as CharSequence))
                   if (e != null) showCopiedBallon(e)
                 }
-              })))
+              })).apply {
+                addSeparator = false
+              })
               icon(McpserverIcons.Expui.StatusEnabled).gap(RightGap.SMALL).visibleIf(isConfigured.and(isPortCorrect).and(autoconfiguredPressed.not()))
               text(McpServerBundle.message("mcp.server.configured")).visibleIf(isConfigured.and(isPortCorrect).and(autoconfiguredPressed.not()))
 
               icon(McpserverIcons.Expui.StatusEnabled).gap(RightGap.SMALL).visibleIf(autoconfiguredPressed)
               text(McpServerBundle.message("mcp.server.client.restart.info.settings")).visibleIf(autoconfiguredPressed)
 
-              icon(McpserverIcons.Expui.StatusDisabled).gap(RightGap.SMALL).visibleIf(isConfigured.not())
+              icon(ColorizeProxyIcon.Simple(McpserverIcons.Expui.StatusDisabled, JBColor.GRAY)).gap(RightGap.SMALL).visibleIf(isConfigured.not())
               comment(McpServerBundle.message("mcp.server.not.configured")).visibleIf(isConfigured.not())
 
               icon(AllIcons.General.Error).gap(RightGap.SMALL).visibleIf(isConfigured.and(isPortCorrect.not()))
@@ -155,19 +155,19 @@ class McpServerSettingsConfigurable : SearchableConfigurable {
           row {
             button(McpServerBundle.message("copy.mcp.server.sse.configuration"), {
               val json = createSseServerJsonEntry(McpServerService.getInstance().port)
-              CopyPasteManager.getInstance().setContents(TextTransferable(json.toString() as CharSequence))
+              CopyPasteManager.getInstance().setContents(TextTransferable(McpClient.json.encodeToString(json) as CharSequence))
               showCopiedBallon(it)
             })
             button(McpServerBundle.message("copy.mcp.server.stdio.configuration"), {
               val json = createStdioMcpServerJsonConfiguration(McpServerService.getInstance().port, null)
-              CopyPasteManager.getInstance().setContents(TextTransferable(json.toString() as CharSequence))
+              CopyPasteManager.getInstance().setContents(TextTransferable(McpClient.json.encodeToString(json) as CharSequence))
               showCopiedBallon(it)
             })
           }
         }
       }.visibleIf(enabledCheckboxState!!)
 
-      group(McpServerBundle.message("border.title.terminal.commands")) {
+      group(McpServerBundle.message("border.title.commands.execution")) {
         row {
           checkBox(McpServerBundle.message("checkbox.enable.brave.mode.skip.command.execution.confirmations")).comment(McpServerBundle.message("text.warning.enabling.brave.mode.will.allow.terminal.commands.to.execute.without.confirmation.use.with.caution")).bindSelected(settings.state::enableBraveMode)
         }
@@ -249,7 +249,7 @@ private class CheckboxWithValidation(@Nls checkboxText: String, var validator: C
 
 private object ConsentValidator : CheckboxValidator {
   override fun isValidNewValue(isSelected: Boolean): Boolean = if (isSelected) {
-    MessageDialogBuilder.yesNo(McpServerBundle.message("dialog.title.mcp.server.consent"), McpServerBundle.message("dialog.message.mcp.server.consent")).ask(getLastFocusedOrOpenedProject())
+    MessageDialogBuilder.yesNo(McpServerBundle.message("dialog.title.mcp.server.consent"), McpServerBundle.message("dialog.message.mcp.server.consent"), Messages.getWarningIcon()).ask(getLastFocusedOrOpenedProject())
   }
   else true
 }

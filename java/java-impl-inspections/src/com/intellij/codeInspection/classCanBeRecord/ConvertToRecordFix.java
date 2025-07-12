@@ -16,7 +16,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.PsiAnnotation.TargetType;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
-import com.intellij.psi.util.*;
+import com.intellij.psi.util.JavaPsiRecordUtil;
+import com.intellij.psi.util.PropertyUtil;
+import com.intellij.psi.util.PropertyUtilBase;
+import com.intellij.psi.util.PsiUtil;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.SmartList;
@@ -128,7 +131,7 @@ public final class ConvertToRecordFix implements LocalQuickFix {
    * @see com.siyeh.ig.memory.InnerClassMayBeStaticInspection
    */
   private static boolean containsOuterNonStaticReferences(PsiClass psiClass) {
-    InnerClassReferenceVisitor visitor = new InnerClassReferenceVisitor(psiClass, false);
+    InnerClassReferenceVisitor visitor = new InnerClassReferenceVisitor(psiClass);
     psiClass.accept(visitor);
     return !visitor.canInnerClassBeStatic();
   }

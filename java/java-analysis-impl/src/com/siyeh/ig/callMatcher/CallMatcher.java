@@ -1,8 +1,10 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.siyeh.ig.callMatcher;
 
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.*;
+import com.intellij.psi.util.ImportsUtil;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiTypesUtil;
 import com.intellij.psi.util.PsiUtil;
@@ -17,11 +19,16 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.uast.UCallExpression;
 import org.jetbrains.uast.UCallableReferenceExpression;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.intellij.psi.CommonClassNames.JAVA_LANG_OBJECT;
+import static com.intellij.psi.CommonClassNames.JAVA_LANG_STRING;
 
 /**
  * This interface represents a condition upon method call
@@ -312,61 +319,17 @@ public interface CallMatcher extends Predicate<PsiMethodCallExpression> {
      * The resulting matcher enforces the following criteria for unresolved calls:
      * - Method name must match the specified names.
      * - The argument list must match certain conditions based on parameter types.
+     * - Checking types is limited and checks only basic cases. Generics, primitive conversions, and so on are not supported and should be checked separately.
+     * - Class name must match the specified class name.
      * - Class name must end with qualifier expressions. Qualifier expression should be unresolved.
-     * - Call type (for example, static/instance) is not checked
+     * - Call is checked as it is static.
      * <p>
      * This matcher supports only {@link #test(PsiMethodCallExpression)} method.
      *
      * @return a new CallMatcher instance that allows unresolved method calls to be matched
      */
-    public CallMatcher allowUnresolved() {
-      return new CallMatcher() {
-        @Override
-        public Stream<String> names() {
-          return Simple.this.names();
-        }
-
-        @Override
-        public boolean methodReferenceMatches(PsiMethodReferenceExpression methodRef) {
-          throw new UnsupportedOperationException("PsiMethodReferenceExpression is not supported");
-        }
-
-        @Override
-        public boolean test(@Nullable PsiMethodCallExpression call) {
-          if (Simple.this.test(call)) return true;
-          if (call == null) return false;
-          String name = call.getMethodExpression().getReferenceName();
-          if (name == null || !myNames.contains(name)) return false;
-          if (!unresolvedArgumentListMatch(call.getArgumentList())) return false;
-          PsiMethod method = call.resolveMethod();
-          if (method != null) return false;
-          PsiExpression qualifierExpression = call.getMethodExpression().getQualifierExpression();
-          if (!(qualifierExpression instanceof PsiReferenceExpression qualifierRefExpression)) return false;
-          if (qualifierRefExpression.getQualifierExpression() != null) return false;
-          String referenceName = qualifierRefExpression.getReferenceName();
-          if (referenceName == null && myClassName.isEmpty()) return true;
-          if (referenceName == null) return false;
-          if (!myClassName.endsWith(referenceName)) return false;
-          PsiElement resolvedQualifier = qualifierRefExpression.resolve();
-          if (resolvedQualifier != null) return false;
-          return true;
-        }
-
-        @Override
-        public boolean methodMatches(@Nullable PsiMethod method) {
-          throw new UnsupportedOperationException("PsiMethod is not supported");
-        }
-
-        @Override
-        public boolean uCallMatches(@Nullable UCallExpression call) {
-          throw new UnsupportedOperationException("UCallExpression is not supported");
-        }
-
-        @Override
-        public boolean uCallableReferenceMatches(@Nullable UCallableReferenceExpression reference) {
-          throw new UnsupportedOperationException("UCallableReferenceExpression is not supported");
-        }
-      };
+    public CallMatcher allowStaticUnresolved() {
+      return new UnresolvedStaticCallMatcher();
     }
 
     @Override
@@ -413,9 +376,16 @@ public interface CallMatcher extends Predicate<PsiMethodCallExpression> {
 
     private static boolean expressionTypeMatches(@Nullable String type, @NotNull PsiExpression argument) {
       if (type == null) return true;
+      if (type.endsWith("...")) {
+        type = type.substring(0, type.length() - 3);
+      }
       PsiType psiType = argument.getType();
       if (psiType == null) return false;
-      return psiType.equalsToText(type) || PsiTypesUtil.classNameEquals(psiType, type);
+      return psiType.equalsToText(type) ||
+             PsiTypesUtil.classNameEquals(psiType, type) ||
+             JAVA_LANG_OBJECT.equals(type) ||
+             //small optimization, because it can be slow and String is popular
+             (!JAVA_LANG_STRING.equals(type) && InheritanceUtil.isInheritor(psiType, type));
     }
 
     @Contract(pure = true)
@@ -458,13 +428,29 @@ public interface CallMatcher extends Predicate<PsiMethodCallExpression> {
     private boolean unresolvedArgumentListMatch(@NotNull PsiExpressionList expressionList) {
       if (myParameters == null) return true;
       PsiExpression[] args = expressionList.getExpressions();
+      if (myParameters.length == 0 && args.length != 0) return false;
       if (myParameters.length > 0) {
-        if (args.length < myParameters.length - 1) return false;
+        String lastParameter = myParameters[myParameters.length - 1];
+        if (lastParameter != null && lastParameter.endsWith("...")) {
+          if (args.length < myParameters.length - 1) return false;
+        }
+        else {
+          if (args.length != myParameters.length) return false;
+        }
       }
-      for (int i = 0; i < Math.min(myParameters.length, args.length); i++) {
+      for (int i = 0; i < args.length; i++) {
         PsiExpression arg = args[i];
-        String parameter = myParameters[i];
-        if (!expressionTypeMatches(parameter, arg)) return false;
+        String parameter;
+        if (i < myParameters.length) {
+          parameter = myParameters[i];
+        }
+        else {
+          parameter = myParameters[myParameters.length - 1];
+        }
+        if (!(expressionTypeMatches(parameter, arg) ||
+              (myParameters.length - 1 == i && args.length == myParameters.length &&
+               parameter.endsWith("...") &&
+               expressionTypeMatches(parameter.substring(0, parameter.length() - 3) + "[]", arg)))) return false;
       }
       return true;
     }
@@ -502,6 +488,99 @@ public interface CallMatcher extends Predicate<PsiMethodCallExpression> {
     public String toString() {
       return myClassName + "." + String.join("|", myNames);
     }
+
+    /**
+     * @see Simple#allowStaticUnresolved()
+     */
+    private class UnresolvedStaticCallMatcher implements CallMatcher{
+        @Override
+        public Stream<String> names() {
+          return Simple.this.names();
+        }
+
+        @Override
+        public boolean methodReferenceMatches(PsiMethodReferenceExpression methodRef) {
+          throw new UnsupportedOperationException("PsiMethodReferenceExpression is not supported");
+        }
+
+        @Override
+        public boolean test(@Nullable PsiMethodCallExpression call) {
+          if (Simple.this.test(call)) return true;
+          if (call == null) return false;
+          String name = call.getMethodExpression().getReferenceName();
+          if (name == null || !myNames.contains(name)) return false;
+          if (!unresolvedArgumentListMatch(call.getArgumentList())) return false;
+          PsiMethod method = call.resolveMethod();
+          if (method != null) return false;
+          if(!qualifierMatch(call.getMethodExpression().getQualifierExpression(), call)) return false;
+          return true;
+        }
+
+        private boolean qualifierMatch(@Nullable PsiExpression expression, @NotNull PsiMethodCallExpression call) {
+          StringBuilder referenceName = new StringBuilder();
+          if (expression instanceof PsiReferenceExpression qualifierRefExpression) {
+            PsiReferenceExpression currentQualifier = qualifierRefExpression;
+            while (true) {
+              String nextReferenceName = currentQualifier.getReferenceName();
+              if (nextReferenceName == null) break;
+              if (referenceName.isEmpty()) {
+                referenceName = new StringBuilder(nextReferenceName);
+              }
+              else {
+                referenceName.insert(0, nextReferenceName + ".");
+              }
+              if (currentQualifier.getQualifierExpression() instanceof PsiReferenceExpression referenceExpression) {
+                currentQualifier = referenceExpression;
+              }
+              else {
+                break;
+              }
+            }
+          }
+          if (myClassName.contentEquals(referenceName)) return true;
+          if (myClassName.equals("java.lang." + referenceName)) return true;
+          if (!(call.getContainingFile() instanceof PsiJavaFile javaFile)) return false;
+          if (javaFile.getPackageStatement() != null) {
+            if (myClassName.equals(javaFile.getPackageStatement().getPackageName() + "." + referenceName)) return true;
+          }
+          List<PsiImportStatementBase> importStatements = new ArrayList<>(ImportsUtil.getAllImplicitImports(javaFile));
+          PsiImportList importList = javaFile.getImportList();
+          if (importList != null) {
+            importStatements.addAll(List.of(importList.getAllImportStatements()));
+          }
+          for (PsiImportStatementBase statement : importStatements) {
+            if (!(statement instanceof PsiImportStaticStatement staticStatement)) continue;
+            if (staticStatement.isOnDemand() && staticStatement.getImportReference() != null) {
+              if (myClassName.equals(staticStatement.getImportReference().getQualifiedName() + "." + referenceName)) return true;
+              if ((referenceName.isEmpty()) && myClassName.equals(staticStatement.getImportReference().getQualifiedName())) return true;
+            }
+            if (!staticStatement.isOnDemand() && staticStatement.getImportReference() != null) {
+              String staticReference = staticStatement.getImportReference().getQualifiedName();
+              String shortName = StringUtil.getShortName(staticReference);
+              if (shortName.contentEquals(referenceName) ||
+                  referenceName.toString().startsWith(shortName + ".")) {
+                if (myClassName.equals(StringUtil.getPackageName(staticReference) + "." + referenceName)) return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        @Override
+        public boolean methodMatches(@Nullable PsiMethod method) {
+          throw new UnsupportedOperationException("PsiMethod is not supported");
+        }
+
+        @Override
+        public boolean uCallMatches(@Nullable UCallExpression call) {
+          throw new UnsupportedOperationException("UCallExpression is not supported");
+        }
+
+        @Override
+        public boolean uCallableReferenceMatches(@Nullable UCallableReferenceExpression reference) {
+          throw new UnsupportedOperationException("UCallableReferenceExpression is not supported");
+        }
+      }
   }
 
   enum CallType {

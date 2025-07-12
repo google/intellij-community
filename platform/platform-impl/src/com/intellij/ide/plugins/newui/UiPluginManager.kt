@@ -37,10 +37,6 @@ class UiPluginManager {
     return getController().getPlugins()
   }
 
-  fun createSession(uuid: UUID) {
-    getController().createSession(uuid.toString())
-  }
-
   fun closeSession(uuid: UUID) {
     getController().closeSession(uuid.toString())
   }
@@ -223,7 +219,7 @@ class UiPluginManager {
 
   fun getController(): UiPluginManagerController {
     if (Registry.`is`("reworked.plugin.manager.enabled", false)) {
-      return UiPluginManagerController.EP_NAME.extensionList.firstOrNull() ?: DefaultUiPluginManagerController
+      return UiPluginManagerController.EP_NAME.extensionList.firstOrNull { it.isEnabled() } ?: DefaultUiPluginManagerController
     }
     return DefaultUiPluginManagerController
   }

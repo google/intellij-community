@@ -3,6 +3,7 @@ package com.jetbrains.lsp.protocol
 import kotlinx.serialization.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
@@ -266,11 +267,28 @@ class CompletionTriggerKindSerializer : EnumAsIntSerializer<CompletionTriggerKin
     deserialize = { CompletionTriggerKind.values().get(it - 1) },
 )
 
+/**
+ * How a completion was triggered
+ */
 @Serializable(CompletionTriggerKindSerializer::class)
 enum class CompletionTriggerKind(val value: Int) {
-    Invoked(1),
-    TriggerCharacter(2),
-    TriggerForIncompleteCompletions(3);
+  /**
+   * Completion was triggered by typing an identifier (24x7 code
+   * complete), manual invocation (e.g Ctrl+Space) or via API.
+   */
+  Invoked(1),
+
+  /**
+   * Completion was triggered by a trigger character specified by
+   * the `triggerCharacters` properties of the
+   * `CompletionRegistrationOptions`.
+   */
+  TriggerCharacter(2),
+
+  /**
+   * Completion was re-triggered as the current completion list is incomplete.
+   */
+  TriggerForIncompleteCompletions(3);
 }
 
 @Serializable
@@ -632,8 +650,14 @@ value class TextEditOrInsertReplaceEdit private constructor(val edit: JsonElemen
 @Serializable
 @JvmInline
 value class StringOrMarkupContent private constructor(val content: JsonElement) {
-    constructor(content: String) : this(JsonPrimitive(content))
-    constructor(content: MarkupContent) : this(LSP.json.encodeToJsonElement(MarkupContent.serializer(), content))
+  constructor(content: String) : this(JsonPrimitive(content))
+  constructor(content: MarkupContent) : this(LSP.json.encodeToJsonElement(MarkupContent.serializer(), content))
+
+  fun contentAsString(): String = when (content) {
+    is JsonPrimitive -> content.content
+    is JsonObject -> LSP.json.decodeFromJsonElement(MarkupContent.serializer(), content).value
+    else -> error("Unexpected content type: ${content::class.simpleName}")
+  }
 }
 
 class CompletionItemKindSerializer : EnumAsIntSerializer<CompletionItemKind>(

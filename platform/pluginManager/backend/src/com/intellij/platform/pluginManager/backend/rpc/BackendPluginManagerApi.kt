@@ -121,10 +121,6 @@ class BackendPluginManagerApi : PluginManagerApi {
     DefaultUiPluginManagerController.closeSession(sessionId)
   }
 
-  override suspend fun createSession(sessionId: String) {
-    DefaultUiPluginManagerController.createSession(sessionId)
-  }
-
   override suspend fun executeMarketplaceQuery(query: String, count: Int, includeIncompatible: Boolean): PluginSearchResult {
     return DefaultUiPluginManagerController.executePluginsSearch(query, count, includeIncompatible)
   }
@@ -214,5 +210,9 @@ class BackendPluginManagerApi : PluginManagerApi {
   override suspend fun initSession(sessionId: String): InitSessionResult {
     val initSessionResult = DefaultUiPluginManagerController.initSession(sessionId)
     return InitSessionResult(initSessionResult.visiblePlugins.map { PluginDto.fromModel(it) }, initSessionResult.pluginStates)
+  }
+
+  override suspend fun isPluginEnabled(pluginId: PluginId): Boolean {
+    return DefaultUiPluginManagerController.isPluginEnabled(pluginId)
   }
 }

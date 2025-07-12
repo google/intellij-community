@@ -5,6 +5,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import com.intellij.platform.vcs.impl.shared.rpc.RepositoryId
 import com.intellij.util.PlatformIcons
+import com.intellij.util.ui.CheckboxIcon
+import com.intellij.vcs.git.shared.repo.GitRepositoryColorsHolder
 import git4idea.GitReference
 import git4idea.GitTag
 import icons.DvcsImplIcons
@@ -22,7 +24,11 @@ object GitBranchesTreeIconProvider {
     else -> AllIcons.Vcs.BranchNode
   }
 
-  fun forRepository(project: Project, repositoryId: RepositoryId): Icon = GitRepoIconProvider.getIcon(project, repositoryId)
+  fun forRepository(project: Project, repositoryId: RepositoryId): Icon {
+    val color = GitRepositoryColorsHolder.getInstance(project).getColor(repositoryId)
+    if (color == null) return GitRepoIconProvider.getIcon(project, repositoryId)
+    return CheckboxIcon.createAndScale(color)
+  }
 
   fun forGroup(): Icon = PlatformIcons.FOLDER_ICON
 }

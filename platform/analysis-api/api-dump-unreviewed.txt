@@ -1041,10 +1041,6 @@ f:com.intellij.codeInspection.InspectionsBundle
 - sf:BUNDLE:java.lang.String
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
 - s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
-f:com.intellij.codeInspection.InspectionsDeprecatedMessagesBundle
-- com.intellij.DynamicBundle
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 com.intellij.codeInspection.InspectionsReportConverter
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:convert(java.lang.String,java.lang.String,java.util.Map,java.util.List):V
@@ -2337,8 +2333,12 @@ a:com.intellij.openapi.command.undo.UndoManager
 - <init>():V
 - s:getGlobalInstance():com.intellij.openapi.command.undo.UndoManager
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.command.undo.UndoManager
+- a:getNextRedoNanoTime(com.intellij.openapi.fileEditor.FileEditor):J
+- a:getNextUndoNanoTime(com.intellij.openapi.fileEditor.FileEditor):J
 - a:getRedoActionNameAndDescription(com.intellij.openapi.fileEditor.FileEditor):com.intellij.openapi.util.Pair
 - a:getUndoActionNameAndDescription(com.intellij.openapi.fileEditor.FileEditor):com.intellij.openapi.util.Pair
+- a:isNextRedoAskConfirmation(com.intellij.openapi.fileEditor.FileEditor):Z
+- a:isNextUndoAskConfirmation(com.intellij.openapi.fileEditor.FileEditor):Z
 - a:isRedoAvailable(com.intellij.openapi.fileEditor.FileEditor):Z
 - a:isRedoInProgress():Z
 - a:isUndoAvailable(com.intellij.openapi.fileEditor.FileEditor):Z

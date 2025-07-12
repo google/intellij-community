@@ -10,13 +10,10 @@ import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.fs.createTemporaryDirectory
 import com.intellij.platform.eel.fs.createTemporaryFile
+import com.intellij.platform.eel.fs.getPath
 import com.intellij.platform.eel.isWindows
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.provider.LocalEelDescriptor
-import com.intellij.platform.eel.provider.asEelPath
-import com.intellij.platform.eel.provider.asNioPath
-import com.intellij.platform.eel.provider.getEelDescriptor
-import com.intellij.platform.eel.provider.toEelApiBlocking
+import com.intellij.platform.eel.provider.*
 import com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalContentToRemote
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import kotlinx.coroutines.*
@@ -52,6 +49,19 @@ object EelPathUtils {
   @JvmStatic
   fun isPathLocal(path: Path): Boolean {
     return path.getEelDescriptor() == LocalEelDescriptor
+  }
+
+  fun expandUserHome(eelDescriptor: EelDescriptor, path: String): Path {
+    val userHome = eelDescriptor.toEelApiBlocking().userInfo.home
+    val path = runCatching { Path(path).asEelPath().toString() }.getOrNull() ?: path // try to normalize path
+
+    return eelDescriptor.getPath(if (path == "~") {
+      userHome.toString()
+    } else if (path.startsWith("~/") || path.startsWith("~\\")) {
+      userHome.toString() + path.substring(1)
+    } else {
+      path
+    }).asNioPath()
   }
 
   /**
@@ -105,22 +115,35 @@ object EelPathUtils {
   }
 
   @JvmStatic
+  @OptIn(ExperimentalPathApi::class)
   @RequiresBackgroundThread(generateAssertion = false)
-  fun createTemporaryDirectory(project: Project?, prefix: String = "", suffix: String = ""): Path {
-    if (project == null || isProjectLocal(project)) {
-      return Files.createTempDirectory(prefix)
+  fun createTemporaryDirectory(project: Project?, prefix: String = "", suffix: String = "", deleteOnExit: Boolean = false): Path {
+    if (project == null || isProjectLocal(project) || project.projectFilePath == null) {
+      val dir = Files.createTempDirectory(prefix)
+      if (deleteOnExit) {
+        Runtime.getRuntime().addShutdownHook(Thread {
+          dir.deleteRecursively()
+        })
+      }
+      return dir
     }
-    val projectFilePath = project.projectFilePath ?: return Files.createTempDirectory(prefix)
-    return runBlockingMaybeCancellable {
-      val eel = Path.of(projectFilePath).getEelDescriptor().toEelApi()
-      createTemporaryDirectory(eel, prefix, suffix)
-    }
+    val eel = Path.of(project.projectFilePath!!).getEelDescriptor().toEelApiBlocking()
+    return createTemporaryDirectory(eel, prefix, suffix, deleteOnExit)
+  }
+
+  private suspend fun createTemporaryDirectoryImpl(eelApi: EelApi, prefix: String = "", suffix: String = "", deleteOnExit: Boolean = false): Path {
+    val file = eelApi.fs.createTemporaryDirectory()
+      .prefix(prefix)
+      .suffix(suffix)
+      .deleteOnExit(deleteOnExit)
+      .getOrThrowFileSystemException()
+    return file.asNioPath()
   }
 
   @JvmStatic
-  suspend fun createTemporaryDirectory(eelApi: EelApi, prefix: String = "", suffix: String = ""): Path {
-    val file = eelApi.fs.createTemporaryDirectory().prefix(prefix).suffix(suffix).getOrThrowFileSystemException()
-    return file.asNioPath()
+  @RequiresBackgroundThread(generateAssertion = false)
+  fun createTemporaryDirectory(eelApi: EelApi, prefix: String = "", suffix: String = "", deleteOnExit: Boolean = false): Path {
+    return runBlockingMaybeCancellable { createTemporaryDirectoryImpl(eelApi, prefix, suffix, deleteOnExit) }
   }
 
   @JvmStatic
@@ -333,7 +356,7 @@ object EelPathUtils {
 
   private suspend fun EelApi.createTempFor(source: Path, deleteOnExit: Boolean): Path {
     return if (source.isDirectory()) {
-      fs.createTemporaryDirectory().deleteOnExit(deleteOnExit).getOrThrowFileSystemException().asNioPath()
+      createTemporaryDirectoryImpl(eelApi = this, deleteOnExit = deleteOnExit)
     }
     else {
       fs.createTemporaryFile().suffix(source.name).deleteOnExit(deleteOnExit).getOrThrowFileSystemException().asNioPath()

@@ -7,10 +7,10 @@ import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonGenerator
 import com.intellij.platform.plugins.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.plugins.parser.impl.RawPluginDescriptor
-import com.intellij.platform.plugins.parser.impl.XIncludeLoader
 import com.intellij.platform.plugins.parser.impl.elements.ContentElement
 import com.intellij.platform.plugins.parser.impl.elements.DependenciesElement
 import com.intellij.platform.plugins.parser.impl.elements.ModuleLoadingRule
+import com.intellij.platform.plugins.testFramework.LoadFromSourceXIncludeLoader
 import com.intellij.platform.plugins.testFramework.ValidationPluginDescriptorReaderContext
 import com.intellij.project.IntelliJProjectConfiguration
 import com.intellij.testFramework.PlatformTestUtil
@@ -51,7 +51,13 @@ data class PluginValidationOptions(
   val skipUnresolvedOptionalContentModules: Boolean = false,
   val reportDependsTagInPluginXmlWithPackageAttribute: Boolean = true,
   val referencedPluginIdsOfExternalPlugins: Set<String> = emptySet(),
-  val pathsIncludedFromLibrariesViaXiInclude: Set<String> = emptySet(),
+  val prefixesOfPathsIncludedFromLibrariesViaXiInclude: List<String> = emptyList(),
+
+  /**
+   * By default, files included via xi:include patterns are searched in 'META-INF', 'idea' and the root directory.
+   * This property allows specifying custom patterns of directories where such files are searched.
+   */
+  val additionalPatternsOfDirectoriesContainingIncludedXmlFiles: List<String> = emptyList(),
 
   /**
    * Describes different core plugins (with ID `com.intellij`) located in the project sources. 
@@ -142,9 +148,9 @@ class PluginModelValidator(
   private val _errors = mutableListOf<PluginValidationError>()
   private val xIncludeLoader =
     LoadFromSourceXIncludeLoader(
-      pathsIncludedFromLibrariesViaXiInclude = validationOptions.pathsIncludedFromLibrariesViaXiInclude, 
+      prefixesOfPathsIncludedFromLibrariesViaXiInclude = validationOptions.prefixesOfPathsIncludedFromLibrariesViaXiInclude,
       project = project,
-      directoriesToIndex = listOf("META-INF", "idea", ""),
+      parentDirectoriesPatterns = listOf("META-INF", "idea", "") + validationOptions.additionalPatternsOfDirectoriesContainingIncludedXmlFiles,
     )
 
   fun validate(): PluginValidationResult {
@@ -417,7 +423,7 @@ class PluginModelValidator(
             moduleInfo = dependency
           )
           if (referencingModuleInfo.dependencies.contains(ref)) {
-            registerError("Referencing module dependencies contains $id: $id")
+            registerError("Dependency on '$id' is already declared in ${referencingModuleInfo.descriptorFile.name}", fix = "Remove duplicating dependency on '$id'")
             continue
           }
           referencingModuleInfo.dependencies.add(ref)
@@ -794,62 +800,6 @@ class PluginModelValidator(
       is Path -> projectHomePath.relativize(value).invariantSeparatorsPathString
       else -> value.toString()
     }
-  }
-}
-
-private class LoadFromSourceXIncludeLoader(
-  private val pathsIncludedFromLibrariesViaXiInclude: Set<String>, 
-  private val project: JpsProject,
-  private val directoriesToIndex: List<String>,
-) : XIncludeLoader {
-  private val shortXmlPathToFullPaths = collectXmlFilesInIndexedDirectories()
-
-  private fun collectXmlFilesInIndexedDirectories(): Map<String, List<Path>> {
-    val shortNameToPaths = LinkedHashMap<String, MutableList<Path>>()
-    for (module in project.modules) {
-      for (sourceRoot in module.productionSourceRoots) {
-        for (directoryName in directoriesToIndex) {
-          val directory = if (directoryName == "") sourceRoot.path else sourceRoot.path.resolve(directoryName)
-          if (directory.isDirectory()) {
-            val prefix = if (directoryName == "") "" else "$directoryName/" 
-            for (xmlFile in directory.listDirectoryEntries("*.xml")) {
-              val shortPath = "$prefix${xmlFile.name}"
-              if (shortPath == "META-INF/plugin.xml") {
-                continue
-              }
-              shortNameToPaths.computeIfAbsent(shortPath) { ArrayList() }.add(xmlFile)
-            }
-          }
-        }
-      }
-    }
-    return shortNameToPaths
-  }
-
-  override fun loadXIncludeReference(path: String): XIncludeLoader.LoadedXIncludeReference? {
-    if (path in pathsIncludedFromLibrariesViaXiInclude 
-        || path.startsWith("META-INF/tips-")
-        || path.startsWith("com/intellij/database/dialects/") //contains many files which slow down tests
-        || path.startsWith("com/intellij/sql/dialects/") //contains many files which slow down tests
-    ) {
-      //todo: support loading from libraries
-      return XIncludeLoader.LoadedXIncludeReference("<idea-plugin/>".byteInputStream(), "dummy tag for external $path")
-    }
-    val directoryName = path.substringBeforeLast(delimiter = '/', missingDelimiterValue = "")
-    val files = if (directoryName in directoriesToIndex) {
-      shortXmlPathToFullPaths[path] ?: emptyList()
-    }
-    else {
-      project.modules.asSequence()
-        .flatMap { it.productionSourceRoots }
-        .mapNotNullTo(ArrayList()) { it.findFile(path) }
-        .filterTo(ArrayList()) { it.exists() }
-    }
-    val file = files.firstOrNull()
-    if (file != null) {
-      return XIncludeLoader.LoadedXIncludeReference(file.inputStream(), file.pathString)
-    }
-    return null
   }
 }
 

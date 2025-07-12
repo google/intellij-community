@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("DialogTitleCapitalization")
 
 package com.intellij.internal.ui
@@ -11,7 +11,6 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.IdeFrameImpl
 import com.intellij.openapi.wm.impl.WindowButtonsConfiguration
@@ -24,6 +23,7 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.system.OS
 import com.intellij.util.ui.StartupUiUtil
 import kotlinx.coroutines.*
 import java.awt.Frame
@@ -39,7 +39,7 @@ internal class UnixInfoTestAction : DumbAwareAction() {
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
   override fun update(e: AnActionEvent) {
-    e.presentation.isEnabledAndVisible = SystemInfoRt.isXWindow
+    e.presentation.isEnabledAndVisible = OS.isGenericUnix()
   }
 
   override fun actionPerformed(e: AnActionEvent) {
@@ -78,7 +78,6 @@ private class UnixInfoDialog(val project: Project?, dialogTitle: String) :
         properties(listOf(
           SystemInfo::isLinux,
           SystemInfo::isFreeBSD,
-          SystemInfo::isSolaris,
           SystemInfo::isUnix,
           SystemInfo::isChromeOS))
         properties(listOf(

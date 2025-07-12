@@ -187,7 +187,8 @@ internal class GitNewBranchDialog @JvmOverloads constructor(
   }
 
   private fun createRepositoriesCombobox(): ComboBox<GitRepository?> {
-    val items = listOf<GitRepository?>(ALL_REPOSITORIES, *allRepositories.toTypedArray())
+    val items = listOf(ALL_REPOSITORIES, *allRepositories.toTypedArray())
+
     return ComboBox(CollectionComboBoxModel(items)).apply {
       renderer = listCellRenderer<GitRepository?>(GitBundle.message("new.branch.dialog.branch.root.all.name")) {
         val repo = value

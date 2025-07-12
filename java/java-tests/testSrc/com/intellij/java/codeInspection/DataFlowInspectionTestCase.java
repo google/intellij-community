@@ -48,24 +48,21 @@ public abstract class DataFlowInspectionTestCase extends LightJavaCodeInsightFix
                      "}");
   }
 
-  static void addJetBrainsNotNullByDefault(JavaCodeInsightTestFixture fixture) {
-    fixture.addClass("""
-                         package org.jetbrains.annotations;
-                         
-                         import java.lang.annotation.*;
-                         
-                         @Target({ElementType.TYPE, ElementType.PACKAGE})\s
-                         public @interface NotNullByDefault {}""");
-  }
-
   static void addJSpecifyNullMarked(JavaCodeInsightTestFixture fixture) {
     @Language("JAVA") String nullMarked =
       """
         package org.jspecify.annotations;
         import java.lang.annotation.*;
-        @Target({ElementType.TYPE, ElementType.MODULE})
+        @Target({ElementType.TYPE, ElementType.METHOD, ElementType.MODULE})
         public @interface NullMarked {}""";
     fixture.addClass(nullMarked);
+    @Language("JAVA") String nullUnmarked =
+      """
+        package org.jspecify.annotations;
+        import java.lang.annotation.*;
+        @Target({ElementType.TYPE, ElementType.METHOD, ElementType.MODULE})
+        public @interface NullUnmarked {}""";
+    fixture.addClass(nullUnmarked);
   }
 
   public static void setupTypeUseAnnotations(String pkg, JavaCodeInsightTestFixture fixture) {

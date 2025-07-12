@@ -2,7 +2,9 @@
 package org.jetbrains.kotlin.tools.projectWizard.wizard
 
 import com.intellij.ide.wizard.NewProjectWizardActivityKey
+import com.intellij.openapi.externalSystem.util.DEFAULT_SYNC_TIMEOUT_MS
 import com.intellij.platform.backend.observation.trackActivityBlocking
+import com.intellij.testFramework.IndexingTestUtil.Companion.waitUntilIndexesAreReady
 import com.intellij.testFramework.TestObservation
 import org.jetbrains.kotlin.tools.projectWizard.cli.BuildSystem
 import org.jetbrains.kotlin.tools.projectWizard.cli.assertSuccess
@@ -44,6 +46,9 @@ class GradleProjectSettingsTest : AbstractProjectTemplateNewWizardProjectImportT
 
     fun <R> waitForAllProjectActivities(action: () -> R): R {
         return project.trackActivityBlocking(NewProjectWizardActivityKey, action)
-            .also { TestObservation.waitForConfiguration(project, 5000) }
+            .also {
+                TestObservation.waitForConfiguration(project, DEFAULT_SYNC_TIMEOUT_MS)
+                waitUntilIndexesAreReady(project)
+            }
     }
 }

@@ -73,6 +73,8 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
   public void testInstanceof() {
     doTest();
   }
+  
+  public void testTakeWhileUpdate() { doTest(); }
 
   public void testNewStringWrongEquals() { doTest(); }
 
@@ -140,7 +142,6 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
   public void testSwitchBooleanWhen() { doTest(); }
 
   public void testJetBrainsNotNullByDefault() {
-    addJetBrainsNotNullByDefault(myFixture);
     doTest();
   }
   
@@ -219,6 +220,12 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
   
   public void testJSpecifyLambdaTernary() {
     addJSpecifyNullMarked(myFixture);
+    doTest();
+  }
+  
+  public void testJSpecifyNullUnmarkedOverNullMarked() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
     doTest();
   }
 

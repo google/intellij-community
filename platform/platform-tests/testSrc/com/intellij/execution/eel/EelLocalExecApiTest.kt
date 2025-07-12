@@ -149,11 +149,15 @@ class EelLocalExecApiTest {
         logger.warn("Waiting for $HELLO")
         while (helloStream.receive(dirtyBuffer) != ReadResult.EOF) {
           val line = decoder.decode(dirtyBuffer.flip()).toString()
-          logger.warn("Line read: $line")
+          logger.warn("Adding raw line '$line'")
           cleanBuffer.add(line)
           dirtyBuffer.clear()
-          if (HELLO in cleanBuffer.getString()) {
+          val fullLine = cleanBuffer.getString()
+          if (HELLO in fullLine) {
             break
+          }
+          else {
+            logger.warn("No $HELLO in $fullLine")
           }
         }
       }
@@ -167,7 +171,7 @@ class EelLocalExecApiTest {
     cleanBuffer.setPosEnd(HELLO)
     while (true) {
 
-      ttyState = TTYState.deserializeIfValid(cleanBuffer.getString())
+      ttyState = TTYState.deserializeIfValid(cleanBuffer.getString(), logger::warn)
       if (ttyState != null) {
         break
       }
@@ -199,7 +203,7 @@ class EelLocalExecApiTest {
       }
 
       if (ptyManagement == PTYManagement.PTY_RESIZE_LATER && (exitType == ExitType.INTERRUPT || exitType == ExitType.EXIT_WITH_COMMAND) && process.isWinConPtyProcess) {
-        delay(15.seconds) // workaround: wait a bit to let ConPTY apply the resize
+        delay(10.seconds) // workaround: wait a bit to let ConPTY apply the resize
       }
 
       // Test kill api

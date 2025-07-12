@@ -10,7 +10,6 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -35,8 +34,6 @@ public final class SystemInfo {
   public static final String JAVA_RUNTIME_VERSION = getRtVersion(JAVA_VERSION);
   public static final String JAVA_VENDOR = System.getProperty("java.vm.vendor", "Unknown");
 
-  public static final boolean isAarch64 = OS_ARCH.equals("aarch64");
-
   private static String getRtVersion(@SuppressWarnings("SameParameterValue") String fallback) {
     String rtVersion = System.getProperty("java.runtime.version");
     return rtVersion != null && Character.isDigit(rtVersion.charAt(0)) ? rtVersion : fallback;
@@ -46,7 +43,6 @@ public final class SystemInfo {
   public static final boolean isMac = SystemInfoRt.isMac;
   public static final boolean isLinux = SystemInfoRt.isLinux;
   public static final boolean isFreeBSD = SystemInfoRt.isFreeBSD;
-  public static final boolean isSolaris = SystemInfoRt.isSolaris;
   public static final boolean isUnix = SystemInfoRt.isUnix;
 
   public static final boolean isChromeOS = isLinux && isCrostini();
@@ -56,9 +52,9 @@ public final class SystemInfo {
   public static final boolean isAzulJvm = Strings.indexOfIgnoreCase(JAVA_VENDOR, "Azul", 0) >= 0;
   public static final boolean isJetBrainsJvm = Strings.indexOfIgnoreCase(JAVA_VENDOR, "JetBrains", 0) >= 0;
 
-  @SuppressWarnings("SpellCheckingInspection")
+  @SuppressWarnings({"SpellCheckingInspection", "IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
   private static boolean isCrostini() {
-    return new File("/dev/.cros_milestone").exists();
+    return new java.io.File("/dev/.cros_milestone").exists();
   }
 
   public static boolean isOsVersionAtLeast(@NotNull String version) {
@@ -90,8 +86,6 @@ public final class SystemInfo {
     }
   }
 
-  public static final boolean isMacSystemMenu = isMac && (SystemInfoRt.isJBSystemMenu || Boolean.getBoolean("apple.laf.useScreenMenuBar"));
-
   public static final boolean isFileSystemCaseSensitive = SystemInfoRt.isFileSystemCaseSensitive;
 
   /** @deprecated use {@link com.intellij.execution.configurations.PathEnvironmentVariableUtil#isOnPath} instead */
@@ -115,10 +109,8 @@ public final class SystemInfo {
   public static final boolean isMacOSSonoma = isMac && isOsVersionAtLeast("14.0");
   public static final boolean isMacOSSequoia = isMac && isOsVersionAtLeast("15.0");
 
-  /**
-   * Build number is the only more or less stable approach to get comparable Windows versions.
-   * See <a href="https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions">list of builds</a>.
-   */
+  /** Use {@link com.intellij.util.system.OS.WindowsInfo#getBuildNumber} instead */
+  @ApiStatus.Obsolete
   public static @Nullable Long getWinBuildNumber() {
     return isWindows ? WinBuildNumber.getWinBuildNumber() : null;
   }
@@ -206,10 +198,20 @@ public final class SystemInfo {
   @ApiStatus.ScheduledForRemoval
   public static final boolean is64Bit = CpuArch.CURRENT.width == 64;
 
+  /** @deprecated use {@link CpuArch#isArm64()} */
+  @Deprecated
+  @ApiStatus.ScheduledForRemoval
+  public static final boolean isAarch64 = CpuArch.isArm64();
+
+  /** @deprecated press 'F' */
+  @Deprecated
+  @ApiStatus.ScheduledForRemoval
+  public static final boolean isSolaris = false;
+
   /** @deprecated misleading; consider using {@link com.intellij.util.system.OS#isGenericUnix} instead, if appropriate */
   @Deprecated
   @ApiStatus.ScheduledForRemoval
-  public static final boolean isXWindow = SystemInfoRt.isUnix && !SystemInfoRt.isMac;
+  public static final boolean isXWindow = isUnix && !isMac;
 
   private static final NotNullLazyValue<Boolean> ourHasXdgOpen = isUnix && !isMac ? lazy(() -> isOnPath("xdg-open")) : NotNullLazyValue.createConstantValue(false);
   private static final NotNullLazyValue<Boolean> ourHasXdgMime = isUnix && !isMac ? lazy(() -> isOnPath("xdg-mime")) : NotNullLazyValue.createConstantValue(false);
