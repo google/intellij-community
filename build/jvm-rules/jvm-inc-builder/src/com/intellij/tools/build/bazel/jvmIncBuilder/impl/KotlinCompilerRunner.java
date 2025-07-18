@@ -125,6 +125,9 @@ public class KotlinCompilerRunner implements CompilerRunner {
   @Override
   public ExitCode compile(Iterable<NodeSource> sources, Iterable<NodeSource> deletedSources, DiagnosticSink diagnostic, OutputSink out) throws Exception {
     try {
+      if (isEmpty(sources)) {
+        return ExitCode.OK;
+      }
       K2JVMCompilerArguments kotlinArgs = buildKotlinCompilerArguments(myContext, sources);
       KotlinIncrementalCacheImpl incCache = new KotlinIncrementalCacheImpl(myStorageManager, flat(deletedSources, sources), myModuleEntryPath, myLastGoodModuleEntryContent);
       OutputVirtualFile outputFileSystemRoot = new OutputFileSystem(new KotlinVirtualFileProvider(out)).root;
@@ -337,7 +340,7 @@ public class KotlinCompilerRunner implements CompilerRunner {
   }
 
   private static @Nullable Function1<? super @NotNull OutputFileCollection, @NotNull Unit> createAbiOutputConsumer(@Nullable ZipOutputBuilder abiOutput) {
-    return abiOutput == null || !OutputSinkImpl.USE_KOTLIN_ABI_BYTECODE? null : outputCollection -> {
+    return abiOutput == null? null : outputCollection -> {
       for (OutputFile generatedOutput : outputCollection.asList()) {
         String relativePath = generatedOutput.getRelativePath().replace(File.separatorChar, '/');
         abiOutput.putEntry(relativePath, generatedOutput.asByteArray());

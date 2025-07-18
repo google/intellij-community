@@ -2,10 +2,12 @@
 
 package com.intellij.mcpserver.toolsets.vcs
 
+import com.intellij.mcpserver.McpServerBundle
 import com.intellij.mcpserver.McpToolset
 import com.intellij.mcpserver.annotations.McpDescription
 import com.intellij.mcpserver.annotations.McpTool
 import com.intellij.mcpserver.project
+import com.intellij.mcpserver.reportToolActivity
 import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -26,6 +28,7 @@ class VcsToolset : McpToolset {
         @McpDescription("Text or keywords to search for in commit messages")
         text: String
     ): String {
+        currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.searching.commits", text))
         val project = currentCoroutineContext().project
         val queryText = text
         val matchingCommits = mutableListOf<String>()
@@ -77,6 +80,7 @@ class VcsToolset : McpToolset {
         Note: Works with any VCS supported by the IDE, but is most commonly used with Git
     """)
     suspend fun get_project_vcs_status(): String {
+      currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.checking.vcs.status"))
         val project = currentCoroutineContext().project
         val projectDir = project.projectDirectory
 

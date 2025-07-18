@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.server
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
@@ -126,7 +127,10 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
   }
 
   suspend fun evaluateEffectivePom(file: File, activeProfiles: Collection<String>, inactiveProfiles: Collection<String>): String? {
-    return getOrCreateWrappee().evaluateEffectivePom(file, ArrayList(activeProfiles), ArrayList(inactiveProfiles), ourToken)
+    return runLongRunningTask(
+      LongRunningEmbedderTask { embedder, taskInput ->
+        embedder.evaluateEffectivePom(taskInput, file, ArrayList(activeProfiles), ArrayList(inactiveProfiles), ourToken)
+      }, null, MavenLogEventHandler)
   }
 
   @Deprecated("use {@link MavenEmbedderWrapper#resolveArtifacts()}")
@@ -184,7 +188,11 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
   ): MavenArtifactResolveResult {
     if (artifacts.isEmpty()) return MavenArtifactResolveResult(emptyList(), null)
     return runBlockingMaybeCancellable {
-      getOrCreateWrappee().resolveArtifactsTransitively(ArrayList(artifacts), ArrayList(remoteRepositories), ourToken)
+      runLongRunningTask(
+        LongRunningEmbedderTask { embedder, taskInput ->
+          embedder.resolveArtifactsTransitively(taskInput, ArrayList(artifacts), ArrayList(remoteRepositories), ourToken)
+        }, null, MavenLogEventHandler)
+
     }.transform()
   }
 
@@ -193,8 +201,10 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
     remoteRepositories: List<MavenRemoteRepository>,
   ): MavenArtifactResolveResult {
     if (artifacts.isEmpty()) return MavenArtifactResolveResult(emptyList(), null)
-    return getOrCreateWrappee().resolveArtifactsTransitively(ArrayList(artifacts), ArrayList(remoteRepositories), ourToken).transform()
-  }
+    return runLongRunningTask(
+      LongRunningEmbedderTask { embedder, taskInput ->
+        embedder.resolveArtifactsTransitively(taskInput, ArrayList(artifacts), ArrayList(remoteRepositories), ourToken)
+      }, null, MavenLogEventHandler)  }
 
   private fun MavenArtifact.transformPaths(transformer: RemotePathTransformerFactory.Transformer) = this.replaceFile(
     File(transformer.toIdePath(file.path)!!),
@@ -328,8 +338,6 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
       getOrCreateWrappee()
     }
 
-
-
     return coroutineScope {
       val progressIndication = launch {
         tracer.spanBuilder("waitForLongRunningTask").useWithScope { span ->
@@ -346,6 +354,7 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
               processImportEvents(status)
               eventHandler.handleConsoleEvents(status.consoleEvents())
               eventHandler.handleDownloadEvents(status.downloadEvents())
+              handleDownloadArtifactEvents(status)
             }
             catch (e: Throwable) {
               if (isActive) {
@@ -376,6 +385,7 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
             processImportEvents(status)
             eventHandler.handleConsoleEvents(status.consoleEvents())
             eventHandler.handleDownloadEvents(status.downloadEvents())
+            handleDownloadArtifactEvents(status)
             response.result
           }
         }
@@ -383,6 +393,14 @@ abstract class MavenEmbedderWrapper internal constructor(private val project: Pr
       finally {
         progressIndication.cancelAndJoin()
       }
+    }
+  }
+
+  private fun handleDownloadArtifactEvents(status: LongRunningTaskStatus) {
+    val artifactEvents = status.downloadArtifactEvents()
+    for (e in artifactEvents) {
+      ApplicationManager.getApplication().messageBus.syncPublisher(MavenServerConnector.DOWNLOAD_LISTENER_TOPIC).artifactDownloaded(
+        File(e.file))
     }
   }
 

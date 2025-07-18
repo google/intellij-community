@@ -16,7 +16,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.blockingContextToIndicator
 import com.intellij.openapi.project.Project
-import com.intellij.platform.debugger.impl.rpc.TimeoutSafeResult
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.findProject
 import com.intellij.platform.project.findProjectOrNull
@@ -33,8 +33,10 @@ import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerImpl
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointUtil
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.XBreakpointId
+import com.intellij.xdebugger.impl.rpc.XBreakpointTypeId
 import com.intellij.xdebugger.impl.rpc.models.findValue
+import com.intellij.xdebugger.impl.rpc.toRpc
 import fleet.rpc.core.toRpc
 import fleet.util.channels.use
 import kotlinx.coroutines.*
@@ -75,6 +77,7 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     val project = projectId.findProjectOrNull() ?: return XBreakpointsLineInfo(listOf(), false)
     val editor = editorId.findEditorOrNull() ?: return XBreakpointsLineInfo(listOf(), false)
     val rawInfo: BreakpointsLineRawInfo? = readAction {
+      if (!DocumentUtil.isValidLine(line, editor.document)) return@readAction null
       blockingContextToIndicator {
         val position = XDebuggerUtil.getInstance().createPosition(FileDocumentManager.getInstance().getFile(editor.document), line)
                        ?: return@blockingContextToIndicator null
@@ -129,7 +132,7 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     val position = request.position.sourcePosition()
     val lineTypes = request.types.mapNotNull { XBreakpointUtil.findType(it.id) as? XLineBreakpointType<*> }
     LOG.info("[$requestId] Toggle line breakpoint request received file: ${request.position}, line: ${request.position.line}" +
-             "Request details: hasBreakpoints=${request.hasBreakpoints}, isTemporary=${request.isTemporary}, isConditional=${request.isConditional}," +
+             "Request details: hasBreakpoints=${request.hasBreakpoints}, isTemporary=${request.isTemporary}, isLogging=${request.isLogging}," +
              "  line breakpoint types: ${lineTypes.map { it.id }}")
 
     val variants = readAction { XDebuggerUtilImpl.getLineBreakpointVariants(project, lineTypes, position) }.await()
@@ -195,10 +198,10 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     val breakpoint = readAction {
       XDebuggerUtilImpl.addLineBreakpoint(breakpointManager, variant, position.file, position.line, request.isTemporary)
     }
-    if (request.isConditional) {
+    if (request.isLogging) {
       breakpoint.setSuspendPolicy(SuspendPolicy.NONE)
-      if (request.condition != null) {
-        breakpoint.setLogExpression(request.condition)
+      if (request.logExpression != null) {
+        breakpoint.setLogExpression(request.logExpression)
       }
       else {
         breakpoint.setLogMessage(true)

@@ -55,15 +55,17 @@ public interface MavenServerEmbedder extends Remote {
     MavenToken token) throws RemoteException;
 
   @NotNull
-  MavenArtifactResolveResult resolveArtifactsTransitively(
+  MavenServerResponse<@NotNull MavenArtifactResolveResult> resolveArtifactsTransitively(
+    @NotNull LongRunningTaskInput longRunningTaskInput,
     @NotNull ArrayList<MavenArtifactInfo> artifacts,
     @NotNull ArrayList<MavenRemoteRepository> remoteRepositories,
     MavenToken token) throws RemoteException;
   HashSet<MavenRemoteRepository> resolveRepositories(@NotNull ArrayList<MavenRemoteRepository> repositories, MavenToken token)
     throws RemoteException;
 
-  @Nullable
-  String evaluateEffectivePom(
+  @NotNull
+  MavenServerResponse<@NotNull String> evaluateEffectivePom(
+    @NotNull LongRunningTaskInput longRunningTaskInput,
     @NotNull File file,
     @NotNull ArrayList<String> activeProfiles,
     @NotNull ArrayList<String> inactiveProfiles,

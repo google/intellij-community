@@ -4,6 +4,7 @@ package com.intellij.tools.build.bazel.jvmIncBuilder.impl;
 import com.intellij.tools.build.bazel.jvmIncBuilder.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.bazel.jvm.Input;
 import org.jetbrains.jps.dependency.NodeSource;
 import org.jetbrains.jps.dependency.NodeSourcePathMapper;
 import org.jetbrains.jps.dependency.impl.PathSourceMapper;
@@ -12,11 +13,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static org.jetbrains.jps.util.Iterators.map;
 
 /** @noinspection IO_FILE_USAGE*/
 public class BuildContextImpl implements BuildContext {
+  private static final Logger LOG = Logger.getLogger("com.intellij.tools.build.bazel.jvmIncBuilder.impl.BuildContextImpl");
   private final String myTargetName;
   private final Map<CLFlags, List<String>> myFlags;
   private final boolean myAllowWarnings;
@@ -34,7 +38,7 @@ public class BuildContextImpl implements BuildContext {
 
   private volatile boolean myHasErrors;
 
-  public BuildContextImpl(Path baseDir, Iterable<String> inputs, Iterable<byte[]> inputDigests, Map<CLFlags, List<String>> flags, Appendable messageSink) {
+  public BuildContextImpl(Path baseDir, Iterable<Input> inputs, Map<CLFlags, List<String>> flags, Appendable messageSink) {
     myFlags = Map.copyOf(flags);
     myTargetName = CLFlags.TARGET_LABEL.getMandatoryScalarValue(flags);
     myAllowWarnings = !"off".equals(CLFlags.WARN.getOptionalScalarValue(flags));
@@ -62,9 +66,9 @@ public class BuildContextImpl implements BuildContext {
     Map<NodeSource, String> sourcesMap = new HashMap<>();
     Map<Path, String> otherInputsMap = new HashMap<>();
     Base64.Encoder base64 = Base64.getEncoder().withoutPadding();
-    Iterator<String> digestsIterator = map(inputDigests, base64::encodeToString).iterator();
-    for (Path inputPath : map(inputs, input -> baseDir.resolve(input).normalize())) {
-      String inputDigest = digestsIterator.hasNext()? digestsIterator.next() : "";
+    for (Input input : inputs) {
+      Path inputPath = baseDir.resolve(input.path).normalize();
+      String inputDigest = base64.encodeToString(input.digest);
       if (isSourceDependency(inputPath)) {
         sourcesMap.put(myPathMapper.toNodeSource(inputPath), inputDigest);
       }
@@ -170,7 +174,7 @@ public class BuildContextImpl implements BuildContext {
 
     String jvmTarget = CLFlags.JVM_TARGET.getOptionalScalarValue(flags);
     if (jvmTarget != null) {
-      if (JavaCompilerConfig.USE_RELEASE_OPTION) {
+      if (shouldUseReleaseOption(jvmTarget)) {
         options.add("--release");
         options.add(jvmTarget);
       }
@@ -198,6 +202,36 @@ public class BuildContextImpl implements BuildContext {
       options.add(exp);
     }
     return options;
+  }
+
+  private static boolean shouldUseReleaseOption(String jvmTarget) {
+    if (!JavaCompilerConfig.USE_RELEASE_OPTION) {
+      return false;
+    }
+    // todo: if worker's compatibility with jvm versions <= 10 is required, parse Properties.getProperty("java.version")
+    int compilerVersion = Runtime.version().feature();
+    int targetPlatformVersion = parseTargetPlatformVersion(jvmTarget);
+    // --release option is supported in java9+ and higher
+    if (compilerVersion >= 9 && targetPlatformVersion > 0) {
+      // Only specify '--release' when cross-compilation is indeed really required.
+      // Otherwise, '--release' may not be compatible with other compilation options, e.g. exporting a package from system module
+      return compilerVersion != targetPlatformVersion;
+    }
+    return false;
+  }
+
+  private static int parseTargetPlatformVersion(String target) {
+    if (target != null) {
+      target = target.trim();
+      int dotIndex = target.lastIndexOf(".");
+      try {
+        return Integer.parseInt(dotIndex < 0? target : target.substring(dotIndex + 1));
+      }
+      catch (NumberFormatException e) {
+        LOG.log(Level.INFO, "Error parsing JVM target version ", e);
+      }
+    }
+    return -1;
   }
 
   private static boolean isSourceDependency(Path path) {

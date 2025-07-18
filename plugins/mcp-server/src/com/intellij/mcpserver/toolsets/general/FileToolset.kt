@@ -3,12 +3,9 @@
 
 package com.intellij.mcpserver.toolsets.general
 
-import com.intellij.mcpserver.McpServerBundle
-import com.intellij.mcpserver.McpToolset
+import com.intellij.mcpserver.*
 import com.intellij.mcpserver.annotations.McpDescription
 import com.intellij.mcpserver.annotations.McpTool
-import com.intellij.mcpserver.mcpFail
-import com.intellij.mcpserver.project
 import com.intellij.mcpserver.toolsets.Constants
 import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.mcpserver.util.relativizeIfPossible
@@ -31,6 +28,7 @@ import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.coroutines.*
+import kotlinx.io.IOException
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -56,6 +54,7 @@ class FileToolset : McpToolset {
     @McpDescription("Maximum recursion depth") maxDepth: Int = 5,
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION) timeout: Int = Constants.MEDIUM_TIMEOUT_MILLISECONDS_VALUE,
   ): DirectoryTreeInfo {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.traversing.folder.tree", directoryPath))
     val project = currentCoroutineContext().project
     val resolvedPath = project.resolveInProject(directoryPath)
     if (!resolvedPath.exists()) mcpFail("No such directory: $resolvedPath")
@@ -93,6 +92,7 @@ class FileToolset : McpToolset {
     @McpDescription("Timeout in milliseconds")
     timeout: Int = Constants.MEDIUM_TIMEOUT_MILLISECONDS_VALUE,
   ): FilesListResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.finding.files.by.name", nameKeyword))
     val project = currentCoroutineContext().project
     val projectDir = project.projectDirectory
 
@@ -143,6 +143,7 @@ class FileToolset : McpToolset {
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION)
     timeout: Int = Constants.MEDIUM_TIMEOUT_MILLISECONDS_VALUE
   ) : FilesListResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.finding.files.by.glob", globPattern))
     val project = currentCoroutineContext().project
     val projectDirPath = project.projectDirectory
     val fileIndex = ProjectRootManager.getInstance(project).getFileIndex()
@@ -202,6 +203,7 @@ class FileToolset : McpToolset {
     @McpDescription(Constants.RELATIVE_PATH_IN_PROJECT_DESCRIPTION)
     filePath: String,
   ) {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.opening.file", filePath))
     val project = currentCoroutineContext().project
     val resolvedPath = project.resolveInProject(filePath)
 
@@ -222,6 +224,7 @@ class FileToolset : McpToolset {
         |Use this tool to explore current open editors.
     """)
   suspend fun get_all_open_file_paths(): OpenFilesInfo {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.getting.open.files"))
     val project = currentCoroutineContext().project
     val projectDir = project.projectDirectory
 
@@ -250,12 +253,25 @@ class FileToolset : McpToolset {
     @McpDescription("Content to write into the new file")
     text: String? = null,
   ) {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.creating.file", pathInProject))
     val project = currentCoroutineContext().project
 
     val path = project.resolveInProject(pathInProject)
-    val newFile = LocalFileSystem.getInstance().createChildFile(null, VfsUtil.createDirectories(path.parent.pathString), path.name)
+    val newFile = try {
+      LocalFileSystem.getInstance().createChildFile(null, VfsUtil.createDirectories(path.parent.pathString), path.name)
+    }
+    catch (io: IOException) {
+      mcpFail("Can't create file: $path: ${io.message}")
+    }
+    val refreshed = CompletableDeferred<Unit>()
+    LocalFileSystem.getInstance().refreshFiles(listOf(newFile), true, false) {
+      refreshed.complete(Unit)
+    }
+    refreshed.await()
+    // newFile point to a fake file, so we need to refresh it to get a real one
+    val createdFile = LocalFileSystem.getInstance().findFileByNioFile(path) ?: mcpFail("File $path wasn't created")
     writeAction {
-      val document = FileDocumentManager.getInstance().getDocument(newFile, project) ?: mcpFail("Can't get document for created file: $newFile")
+      val document = FileDocumentManager.getInstance().getDocument(createdFile) ?: mcpFail("Can't get document for created file: $newFile")
       if (text != null) {
         document.setText(text)
       }

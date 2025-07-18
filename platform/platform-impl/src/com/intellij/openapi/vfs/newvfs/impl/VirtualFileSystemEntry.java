@@ -16,12 +16,8 @@ import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
 import com.intellij.util.LocalTimeCounter;
-import com.intellij.util.text.CharArrayUtil;
 import org.intellij.lang.annotations.MagicConstant;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,16 +31,30 @@ import static com.intellij.openapi.vfs.InvalidVirtualFileAccessException.getInva
 import static com.intellij.util.SystemProperties.getBooleanProperty;
 
 public abstract class VirtualFileSystemEntry extends NewVirtualFile {
-  public static final VirtualFileSystemEntry[] EMPTY_ARRAY = new VirtualFileSystemEntry[0];
+  public static final VirtualFileSystemEntry[] EMPTY_ARRAY = {};
+
+  /**
+   * true: use new (recursive) implementation of {@link #computePath(String, String)},
+   * false: use legacy (iterative) implementation
+   */
+  private static final boolean USE_RECURSIVE_PATH_COMPUTE = getBooleanProperty("VirtualFileSystemEntry.USE_RECURSIVE_PATH_COMPUTE", true);
 
   /**
    * If true -- {@link #isValid()} return false for 'alien' vfiles (vfiles created in previous VFS session).
    * If false -- {@link #isValid()} throw AssertionError for 'alien' files (as all other method do)
+   *
    * @see #isValid() comments for details
    */
   private static final boolean TREAT_ALIEN_FILES_AS_INVALID_INSTEAD_OF_CODE_BUG = getBooleanProperty(
     "VirtualFileSystemEntry.TREAT_ALIEN_FILES_AS_INVALID_INSTEAD_OF_CODE_BUG", true
   );
+
+  /**
+   * Max file-tree depth to switch from recursive to iterative path computation -- to avoid potential StackOverflowException.
+   * Specific value is severely on a safe side, but intentionally so, since the path computation could be invoked with stack
+   * already deep enough -- and we have very deep stacktraces in our code
+   */
+  private static final int MAX_DEPTH_FOR_RECURSIVE_PATH_COMPUTATION = 64;
 
   @ApiStatus.Internal
   static final class VfsDataFlags {
@@ -156,16 +166,16 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
 
   @Override
   public @NotNull String getName() {
-    return getNameSequence().toString();
-  }
-
-  @Override
-  public @NotNull CharSequence getNameSequence() {
     PersistentFSImpl pfs = owningPersistentFS();
     if (pfs == null) {
       return "<FS-is-disposed>";//shutdown-safe
     }
     return pfs.getName(myId);
+  }
+
+  @Override
+  public @NotNull CharSequence getNameSequence() {
+    return getName();
   }
 
   public final int getNameId() {
@@ -248,41 +258,153 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
     }
   }
 
-  private @NotNull String computePath(@NotNull String protocol, @NotNull String protoSeparator) {
+  //TODO RC: the whole 'String getPath()'/'String getUrl()' methods causes a lot of performance issues because:
+  //         1. They look like a simple getters, and clients (even inside JB) use them assuming they are cheap, while
+  //            they are not.
+  //         2. String representation of Path/Url is ineffective in may ways -- e.g. it involves a lot of memory allocating,
+  //            memcopy-ing, and memcmp-ing. E.g. splitting path into segments, finding is one path is an ancestor of
+  //            another one, changing path from platform-specific to platform-agnostic -- all that requires a lot of
+  //            memory-allocation, scanning, and copying while working with String paths/urls.
+  //         3. String representation of Path/Url is ineffective and error-prone while working with case-INsensitive
+  //            file systems -- one must always remember that path/url _may_ be case-insensitive (and even some _part_
+  //            of path could be case-sensitive, while other part is case-insensitive).
+  //         Better approach would be to have a lightweight analog of Path:
+  //         - PathSegment(name, caseSensitive)
+  //         - InternalPath(PathSegment[])
+  //         - InternalUrl(protocol, PathSegment[])
+  //         And use this abstraction internally everywhere instead of 'String path'. E.g. VirtualFile should have
+  //         .getInternalPath()->InternalPath and .getInternalUrl()->InternalUrl methods.
+  //         This approach has many upsides:
+  //         - No need to convert between platform-dependent/-independent forms -- same InternalPath instance could be
+  //           _formatted_ in both ways, if needed, but InternalPath itself is platform-agnostic.
+  //         - PathSegments could be cached/interned/reused -> reduce allocation pressure
+  //         - Case-(in)sensitivity is embedded into PathSegment, hence can't be forgot/missed/omitted
+  //         - Since case-sensitivity is embedded into PathSegment, PathSegment could cache case-insensitive hashCode
+  //           thus greatly reducing cost of evaluating StringUtilRt.stringHashCodeInsensitive() every time, and also
+  //           speeds up case-insensitive equals (by piggibacking on hashCode comparison first)
+  //         - isAncestor(path1, path2) could be calculated faster
+  //         Actually, we already have a (limited) implementation of InternalPath: com.intellij.compiler.server.InternedPath
+  //         It could be taken as a starting point.
+  //         ...Why not using java.nio.Path: because it is (way) more expensive -- it takes more memory, involves IO,
+  //         and generally linked to the specific FileSystem -- while InternalPath should be very lightweight and
+  //         completely uncoupled from any specific FS
+
+  private @NotNull String computePath(@NotNull String protocol,
+                                      @NotNull String protoSeparator) {
+    if (USE_RECURSIVE_PATH_COMPUTE) {
+      return computePathRecursively(this, protocol, protoSeparator).toString();
+    }
+    else {
+      return computePathIteratively(this, protocol, protoSeparator);
+    }
+  }
+
+  /**
+   * Recursive implementation of {@link #computePathIteratively(VirtualFileSystemEntry, String, String)}: avoids allocating ArrayList,
+   * and uses StringBuilder instead of plain char[] -- StringBuilder uses byte[] inside, which may be faster than explicit char[]
+   */
+  @VisibleForTesting
+  @ApiStatus.Internal
+  public static @NotNull StringBuilder computePathRecursively(@NotNull VirtualFile file,
+                                                              @NotNull String protocol,
+                                                              @NotNull String protoSeparator) {
+    return computePathRecursively(
+      (VirtualFileSystemEntry)file, protocol, protoSeparator,
+      /*requiredBufferSize: */ 0, /*depth: */ 0
+    );
+  }
+
+  private static @NotNull StringBuilder computePathRecursively(@NotNull VirtualFileSystemEntry file,
+                                                               @NotNull String protocol,
+                                                               @NotNull String protoSeparator,
+                                                               int requiredBufferSize,
+                                                               int depth) {
+    if (depth > MAX_DEPTH_FOR_RECURSIVE_PATH_COMPUTATION) {
+      //For very deep file-trees StackOverflow might happen (EA-823363), so if depth is large enough
+      //  it's better to switch to non-recursive method:
+      String pathPrefix = computePathIteratively(file, protocol, protoSeparator);
+      StringBuilder pathBuilder = new StringBuilder(pathPrefix.length() + 1 + requiredBufferSize)
+        .append(pathPrefix);
+      if (!pathPrefix.endsWith("/")) {
+        pathBuilder.append('/');//must end with '/'
+      }
+      return pathBuilder;
+    }
+
+    VirtualFileSystemEntry parent = file.getParent();
+    if (parent == null) {// <=> (file instanceof FsRoot)
+      String rootPath = file.getPath();
+      return new StringBuilder(
+        protocol.length() + protoSeparator.length() + rootPath.length() + requiredBufferSize
+      )
+        .append(protocol)
+        .append(protoSeparator)
+        .append(rootPath);//FsRoot.getPath() intentionally ends with '/'
+    }
+
+    String fileName = file.getName();
+
+    StringBuilder pathBuilder = computePathRecursively(
+      parent,
+      protocol, protoSeparator,
+      requiredBufferSize + fileName.length() + 1,
+      depth + 1
+    );
+
+    pathBuilder.append(fileName);
+    if (requiredBufferSize > 0) { // requiredBufferSize=0 is the top calling frame, don't need trailing '/'
+      pathBuilder.append('/');
+    }
+    return pathBuilder;
+  }
+
+  /**
+   * Iterative implementation of {@link #computePath(String, String)}: builds the path into a char[], allocates
+   * temporary ArrayList as stack.
+   * Currently used as a fallback for very long paths there recursive method may exceed the stack
+   */
+  @VisibleForTesting
+  @ApiStatus.Internal
+  public static @NotNull String computePathIteratively(@NotNull VirtualFileSystemEntry file,
+                                                       @NotNull String protocol,
+                                                       @NotNull String protoSeparator) {
+    VirtualFileSystemEntry v = file;
     int length = 0;
-    List<CharSequence> names = new ArrayList<>();
-    VirtualFileSystemEntry v = this;
+    List<String> names = new ArrayList<>();
     for (; ; ) {
-      VirtualDirectoryImpl parent = v.getParent();
-      if (parent == null) {
+      VirtualFileSystemEntry parent = v.getParent();
+      if (parent == null) { //<=> (v instanceof FsRoot)
         break;
       }
-      CharSequence name = v.getNameSequence();
-      if (length != 0) length++;
-      length += name.length();
+
+      String name = v.getName();
       names.add(name);
+
+      if (length != 0) {
+        length += name.length() + 1; //add '/'
+      }
+      else {
+        length += name.length();
+      }
+
       v = parent;
     }
-    int protocolLength = protocol.length();
-    String rootPath = v.getPath();
-    int rootPathLength = rootPath.length();
-    length += protocolLength + protoSeparator.length() + rootPathLength;
-    char[] path = new char[length];
-    CharArrayUtil.getChars(protocol, path, 0);
-    CharArrayUtil.getChars(protoSeparator, path, protocolLength);
-    int o = protocolLength + protoSeparator.length();
-    CharArrayUtil.getChars(rootPath, path, o, rootPathLength);
-    o += rootPathLength;
+
+    String rootPath = v.getPath();//root==FsRoot, its' getPath() contains trailing '/'
+
+    StringBuilder pathBuilder = new StringBuilder(
+      protocol.length() + protoSeparator.length() + rootPath.length() + length
+    )
+      .append(protocol).append(protoSeparator).append(rootPath);
     for (int i = names.size() - 1; i >= 1; i--) {
-      CharSequence name = names.get(i);
-      int nameLength = name.length();
-      CharArrayUtil.getChars(name, path, o, nameLength);
-      o += nameLength;
-      path[o++] = '/';
+      String name = names.get(i);
+      pathBuilder.append(name).append('/');
     }
-    CharSequence name = names.get(0);
-    CharArrayUtil.getChars(name, path, o);
-    return new String(path);
+    if (!names.isEmpty()) {
+      String name = names.get(0);
+      pathBuilder.append(name);
+    }
+    return pathBuilder.toString();
   }
 
   @Override

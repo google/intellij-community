@@ -74,7 +74,7 @@ import java.util.function.Supplier
 import javax.swing.*
 import kotlin.math.abs
 
-internal class ToolWindowImpl(
+@ApiStatus.Internal class ToolWindowImpl(
   @JvmField val toolWindowManager: ToolWindowManagerImpl,
   private val id: String,
   private val canCloseContent: Boolean,
@@ -485,6 +485,8 @@ internal class ToolWindowImpl(
   override fun stretchHeight(value: Int) {
     toolWindowManager.stretchHeight(this, value)
   }
+
+  internal fun getNullableDecorator() = decorator
 
   override fun getDecorator(): InternalDecoratorImpl = decorator!!
 

@@ -178,9 +178,7 @@ class ToolWindowPane private constructor(
     updateToolStripesVisibility(uiSettings)
 
     // layered pane
-    val splitter = if (isWideScreen) horizontalSplitter else verticalSplitter
-    val customPane = InternalUICustomization.getInstance()?.createToolWindowPaneLayered(splitter, frame)
-    layeredPane = customPane as? FrameLayeredPane ?: FrameLayeredPane(splitter, frame = frame)
+    layeredPane = FrameLayeredPane(if (isWideScreen) horizontalSplitter else verticalSplitter, frame = frame)
 
     // compose layout
     buttonManager.setupToolWindowPane(this)
@@ -431,6 +429,10 @@ class ToolWindowPane private constructor(
     pair.first.setSize(max(minValue, min(maxValue, actualSize)))
   }
 
+  @Internal fun getComponentSize(window: ToolWindow): Dimension? {
+    return findResizerAndComponent(window)?.second?.size
+  }
+
   private fun findResizerAndComponent(window: ToolWindow): Pair<Resizer, Component>? {
     if (!window.isVisible) {
       return null
@@ -619,7 +621,7 @@ class ToolWindowPane private constructor(
       }
 
       override fun createDivider(): Divider {
-        return InternalUICustomization.getInstance()?.createCustomDivider(isVisible, this)
+        return InternalUICustomization.getInstance()?.createCustomDivider(isVertical, this)
                ?: super.createDivider().also { it.background = JBUI.CurrentTheme.ToolWindow.mainBorderColor() }
       }
 

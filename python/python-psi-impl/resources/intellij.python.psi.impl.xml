@@ -4,6 +4,10 @@
     <module name="intellij.python.community.helpersLocator"/>
   </dependencies>
 
+  <extensionPoints>
+    <extensionPoint qualifiedName="Pythonid.pyAnnotator" interface="com.jetbrains.python.validation.PyAnnotator" dynamic="true"/>
+  </extensionPoints>
+
   <extensions defaultExtensionNs="com.intellij">
     <readWriteAccessDetector implementation="com.jetbrains.python.findUsages.PyReadWriteAccessDetector"/>
 
@@ -162,6 +166,15 @@
 
     <inlineActionHandler implementation="com.jetbrains.python.refactoring.inline.PyInlineLocalHandler"/>
     <inlineActionHandler implementation="com.jetbrains.python.refactoring.inline.PyInlineFunctionHandler"/>
+
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PySyntaxAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyDocStringHighlightingAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyDefinitionsHighlightingAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyLocalVariableHighlightingAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyCompositeAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyFunctionHighlightingAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyBuiltinHighlightingAnnotator"/>
+    <annotator language="Python" implementationClass="com.jetbrains.python.validation.UnsupportedFeatures"/>
 
     <localInspection language="Python" shortName="PyUnusedLocalInspection" suppressId="PyUnusedLocal" bundle="messages.PyPsiBundle" key="INSP.NAME.unused" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING" implementationClass="com.jetbrains.python.inspections.unusedLocal.PyUnusedLocalInspection"/>
     <localInspection language="Python" shortName="PyRedundantParenthesesInspection" suppressId="PyRedundantParentheses" bundle="messages.PyPsiBundle" key="INSP.NAME.redundant.parentheses" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING" implementationClass="com.jetbrains.python.inspections.PyRedundantParenthesesInspection"/>

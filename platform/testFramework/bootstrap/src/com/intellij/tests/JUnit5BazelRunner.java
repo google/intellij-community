@@ -1,28 +1,32 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tests;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ScanResult;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.Filter;
+import org.junit.platform.engine.FilterResult;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.discovery.ClassNameFilter;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.engine.discovery.MethodSelector;
 import org.junit.platform.launcher.*;
+import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
+import org.junit.platform.launcher.core.LauncherFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMethod;
 
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
-public final class JUnit5BazelRunner extends JUnit5BaseRunner {
+public final class JUnit5BazelRunner {
   private static final String bazelEnvSelfLocation = "SELF_LOCATION";
   private static final String bazelEnvTestTmpDir = "TEST_TMPDIR";
   private static final String bazelEnvRunFilesDir = "RUNFILES_DIR";
@@ -37,21 +41,41 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
   // true by default. try as much as possible to run tests in sandbox
   private static final String jbEnvSandbox = "JB_TEST_SANDBOX";
 
+  private static final ClassLoader ourClassLoader = Thread.currentThread().getContextClassLoader();
+  private static final Launcher launcher = LauncherFactory.create();
+
+  private static LauncherDiscoveryRequest getDiscoveryRequest() throws Throwable {
+    List<? extends DiscoverySelector> bazelTestSelectors = getTestsSelectors(ourClassLoader);
+    return LauncherDiscoveryRequestBuilder.request()
+      .configurationParameter("junit.jupiter.extensions.autodetection.enabled", "true")
+      .selectors(bazelTestSelectors)
+      .filters(getTestFilters(bazelTestSelectors))
+      .build();
+  }
+
+  private static List<? extends DiscoverySelector> getTestSelectorsByClassPathRoots(ClassLoader classLoader) throws Throwable {
+    Set<Path> classPathRoots = getClassPathRoots(classLoader);
+    return getSelectors(classPathRoots);
+  }
+
+  private static TestPlan getTestPlan() throws Throwable {
+    LauncherDiscoveryRequest discoveryRequest = getDiscoveryRequest();
+    return launcher.discover(discoveryRequest);
+  }
+
   public static void main(String[] args) throws IOException {
     try {
       System.err.println("Running tests via " + JUnit5BazelRunner.class.getName());
-
-      JUnit5BaseRunner runner = new JUnit5BazelRunner();
 
       var isBazelTestRun = isBazelTestRun();
       if (!isBazelTestRun) {
         throw new RuntimeException("Missing expected env variable in bazel test environment.");
       }
 
-      String bazelTestSelfLocation = System.getenv(bazelEnvSelfLocation);
+      String bazelTestTestSrcDir = System.getenv(bazelEnvTestSrcDir);
 
-      // as intellij.test.jars.location value required not only here (for tests discovery) but also in other parts of the test framework
-      System.setProperty("intellij.test.jars.location", Path.of(bazelTestSelfLocation).getParent().toString());
+      // set intellij.test.jars.location as a temporary workaround for debugger-agent.jar downloading
+      System.setProperty("intellij.test.jars.location", bazelTestTestSrcDir);
 
       if (Boolean.parseBoolean(System.getenv(jbEnvPrintSortedClasspath))) {
         Arrays.stream(System.getProperty("java.class.path")
@@ -118,20 +142,19 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
 
       System.out.println("Number of test engines: " + ServiceLoader.load(TestEngine.class).stream().count());
 
-      TestPlan testPlan = runner.getTestPlan();
-      if (testPlan.containsTests()) {
-        var testExecutionListener = runner.getTestExecutionListener();
-        execute(testPlan, testExecutionListener);
-
-        if (testExecutionListener instanceof ConsoleTestLogger && ((ConsoleTestLogger)testExecutionListener).hasTestsWithThrowableResults()) {
-          System.err.println("Some tests failed");
-          System.exit(1);
-        }
-      }
-      else {
+      TestPlan testPlan = getTestPlan();
+      if (!testPlan.containsTests()) {
         //see org.jetbrains.intellij.build.impl.TestingTasksImpl.NO_TESTS_ERROR
         System.err.println("No tests found");
         System.exit(42);
+      }
+
+      var testExecutionListener = getTestExecutionListener();
+      launcher.execute(testPlan, testExecutionListener);
+
+      if (testExecutionListener instanceof ConsoleTestLogger && ((ConsoleTestLogger)testExecutionListener).hasTestsWithThrowableResults()) {
+        System.err.println("Some tests failed");
+        System.exit(1);
       }
     }
     catch (Throwable e) {
@@ -146,8 +169,7 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
     }
   }
 
-  @Override
-  TestExecutionListener getTestExecutionListener() {
+  private static TestExecutionListener getTestExecutionListener() {
     if (isUnderTeamCity()) {
       return new JUnit5TeamCityRunnerForTestAllSuite.TCExecutionListener();
     } else {
@@ -155,16 +177,31 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
     }
   }
 
-  @Override
-  public Filter<?>[] getTestFilters(ClassLoader classLoader) {
-    ArrayList<Filter<?>> filters = new ArrayList<>(0);
-    filters.add(ClassNameFilter.includeClassNamePatterns(".*Test"));
-    return filters.toArray(new Filter[0]);
+  private static Filter<?>[] getTestFilters(List<? extends DiscoverySelector> bazelTestSelectors) {
+    // value of --test_filter, if specified
+    // https://bazel.build/reference/test-encyclopedia
+    String testFilter = System.getenv(bazelEnvTestBridgeTestOnly);
+    if (testFilter == null || testFilter.isBlank()) {
+      return new Filter[0];
+    }
+
+    // in case when we already have precise method selectors, so we aren't going to filter by test class name
+    if (bazelTestSelectors.stream().allMatch(selector -> selector instanceof MethodSelector)) {
+      return new Filter[0];
+    }
+
+    String[] parts = testFilter.split("#", 2);
+    if (parts.length == 2) {
+      throw new IllegalStateException("Method filters are not expected in name-based test filter");
+    }
+    String classNamePart = parts[0];
+    ClassNameFilter classNameFilter = getClassNameFilter(classNamePart);
+
+    return new Filter[]{classNameFilter};
   }
 
-  @Override
-  public List<? extends DiscoverySelector> getTestsSelectors(ClassLoader classLoader) {
-    List<? extends DiscoverySelector> bazelTestClassSelector = getBazelTestClassSelectors(classLoader);
+  private static List<? extends DiscoverySelector> getTestsSelectors(ClassLoader classLoader) throws Throwable {
+    List<? extends DiscoverySelector> bazelTestClassSelector = getBazelTestMethodSelectors(classLoader);
     if (!bazelTestClassSelector.isEmpty()) {
       return bazelTestClassSelector;
     }
@@ -179,7 +216,7 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
 
   // bazel-specific
 
-  private static List<DiscoverySelector> getBazelTestClassSelectors(ClassLoader classLoader) {
+  private static List<MethodSelector> getBazelTestMethodSelectors(ClassLoader classLoader) {
     // value of --test_filter, if specified
     // https://bazel.build/reference/test-encyclopedia
     String testFilter = System.getenv(bazelEnvTestBridgeTestOnly);
@@ -190,44 +227,62 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
     System.err.println("Test filter: " + testFilter);
 
     String[] parts = testFilter.split("#", 2);
-    String classNamePart = parts[0];
-    String className;
-    if (!classNamePart.contains(".")) {
-      className = findFullyQualifiedName(classNamePart, classLoader);
-      if (className == null) {
-        // TODO Add optional classpath info?
-        throw new RuntimeException("Cannot find class by simple name: " + classNamePart);
-      }
-    }
-    else {
-      className = classNamePart;
-    }
 
+    // build only method selectors, as filtering by class name only has to be done separately
     if (parts.length == 2) {
+      String className = parts[0];
       String methodName = parts[1];
+      //let's be strict here and force user to specify fully qualified class name
+      if (!className.contains(".")) {
+        throw new IllegalArgumentException("Class name should contain package when filtering with method name: " + className);
+      }
       System.err.println("Selecting class: " + className);
       System.err.println("Selecting method: " + methodName);
       return List.of(selectMethod(classLoader, className, methodName));
-    }
-    else {
-      System.err.println("Selecting class: " + className);
-      return List.of(selectClass(classLoader, className));
+    } else {
+      return Collections.emptyList();
     }
   }
 
-  private static String findFullyQualifiedName(String simpleClassName, ClassLoader classLoader) {
-    try (ScanResult scanResult = new ClassGraph()
-      .enableClassInfo()
-      .ignoreClassVisibility()
-      .addClassLoader(classLoader)
-      .scan()
-    ) {
-      return scanResult.getAllClasses().stream()
-        .filter(classInfo -> classInfo.getSimpleName().equals(simpleClassName))
-        .map(classInfo -> classInfo.getName())
-        .findFirst()
-        .orElse(null);
+  private static ClassNameFilter getClassNameFilter(String filterClassName) {
+    String filterClassNameSimpleName;
+    String filterClassNameFQN;
+    int lastFilterClassNamePartDotIndex = filterClassName.lastIndexOf('.');
+    if (lastFilterClassNamePartDotIndex < 0) {
+      filterClassNameSimpleName = filterClassName;
+      filterClassNameFQN = null;
+    } else {
+      filterClassNameSimpleName = filterClassName.substring(lastFilterClassNamePartDotIndex + 1);
+      filterClassNameFQN = filterClassName;
     }
+
+    if (!Character.isUpperCase(filterClassNameSimpleName.charAt(0))) {
+      throw new IllegalArgumentException("Class name should start with uppercase letter: " + filterClassNameSimpleName);
+    }
+
+    return new ClassNameFilter() {
+      @Override
+      public FilterResult apply(String className) {
+        if (filterClassNameFQN == null) {
+          int lastClassNamePartDotIndex = className.lastIndexOf('.');
+          String classNameSimpleName = className.substring(lastClassNamePartDotIndex + 1);
+          if (classNameSimpleName.startsWith(filterClassNameSimpleName)) {
+            return FilterResult.included(null);
+          }
+          else {
+            return FilterResult.excluded(null);
+          }
+        }
+        else {
+          if (className.startsWith(filterClassNameFQN)) {
+            return FilterResult.included(null);
+          }
+          else {
+            return FilterResult.excluded(null);
+          }
+        }
+      }
+    };
   }
 
   private static Path getBazelTempDir() throws IOException {
@@ -307,6 +362,33 @@ public final class JUnit5BazelRunner extends JUnit5BaseRunner {
     }
   }
 
+  public static Set<Path> getClassPathRoots(ClassLoader classLoader) throws Throwable {
+    // to get relevant jars for the current test target, we do the following:
+    // - get the list of all the paths in classpath by getBaseUrls() using reflection
+    // - get from this list only those paths, that located next to env.SELF_LOCATION
+    // where SELF_LOCATION is the path to the test executable/script and set by Bazel automatically
+    Method getBaseUrls = classLoader.getClass().getMethod("getBaseUrls");
+    //noinspection unchecked
+    List<Path> paths = (List<Path>)getBaseUrls.invoke(classLoader);
+
+    String bazelTestSelfLocation = System.getenv(bazelEnvSelfLocation);
+    Path bazelTestSelfLocationDir = Path.of(bazelTestSelfLocation).getParent().toAbsolutePath();
+    return paths.stream()
+      .filter(p -> bazelTestSelfLocationDir.equals(p.toAbsolutePath().getParent()))
+      .collect(Collectors.toSet());
+  }
+
+  public static List<? extends DiscoverySelector> getSelectors(Set<Path> classPathRoots) {
+    List<? extends DiscoverySelector> selectors;
+    if (classPathRoots != null) {
+      selectors = DiscoverySelectors.selectClasspathRoots(classPathRoots);
+    }
+    else {
+      selectors = Collections.singletonList(DiscoverySelectors.selectPackage(""));
+    }
+
+    return selectors;
+  }
 
   private static class ConsoleTestLogger implements TestExecutionListener {
     private final Set<TestIdentifier> testsWithThrowableResult = new HashSet<>();

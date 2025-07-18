@@ -168,7 +168,21 @@ public open class DefaultInlineMarkdownRenderer(rendererExtensions: List<Markdow
         currentTextStyle: TextStyle,
     ) {
         // Each image source corresponds to one rendered image.
-        appendInlineContent(node.source, "![${node.title}](${node.source})")
+        appendInlineContent(
+            node.source,
+            buildString {
+                append(" ![")
+                if (node.alt.isNotEmpty()) append(node.alt)
+                append("](")
+                append(node.source)
+                if (!node.title.isNullOrBlank()) {
+                    append(" \"")
+                    append(node.title)
+                    append("\"")
+                }
+                append(") ")
+            },
+        )
     }
 
     // The T type parameter is needed to avoid issues with capturing lambdas
@@ -223,8 +237,11 @@ public open class DefaultInlineMarkdownRenderer(rendererExtensions: List<Markdow
      *   effectively hiding it.
      * @return A new [TextStyle] with the properties merged according to the logic.
      */
-    private fun TextStyle.smartMerge(other: SpanStyle, enabled: Boolean) =
-        merge(
+    private fun TextStyle.smartMerge(other: SpanStyle, enabled: Boolean): TextStyle {
+        val otherFontWeight = other.fontWeight
+        val thisFontWeight = fontWeight
+
+        return merge(
             // We use the other's FontStyle (if any) when it's not just Normal, otherwise we keep
             // our own FontStyle. This preserves incoming Italic, since Markdown has no way to
             // reset it to Normal anyway.
@@ -239,10 +256,11 @@ public open class DefaultInlineMarkdownRenderer(rendererExtensions: List<Markdow
             // decrease the weight of text.
             fontWeight =
                 when {
-                    other.fontWeight != null && fontWeight == null -> other.fontWeight
-                    other.fontWeight == null && fontWeight != null -> fontWeight
-                    other.fontWeight != null && fontWeight != null ->
-                        FontWeight(max(fontWeight!!.weight, other.fontWeight!!.weight))
+                    otherFontWeight != null && thisFontWeight == null -> otherFontWeight
+                    otherFontWeight == null && thisFontWeight != null -> thisFontWeight
+                    otherFontWeight != null && thisFontWeight != null ->
+                        FontWeight(max(thisFontWeight.weight, otherFontWeight.weight))
+
                     else -> null
                 },
             // The color is taken from the other, unless it's unspecified, or enabled is false
@@ -263,4 +281,5 @@ public open class DefaultInlineMarkdownRenderer(rendererExtensions: List<Markdow
             platformStyle =
                 PlatformTextStyle(platformStyle?.spanStyle?.merge(other.platformStyle), platformStyle?.paragraphStyle),
         )
+    }
 }

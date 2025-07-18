@@ -22,8 +22,6 @@ import java.awt.Graphics
 import java.awt.Paint
 import java.awt.Rectangle
 import javax.swing.JComponent
-import javax.swing.JFrame
-import javax.swing.JLayeredPane
 import javax.swing.JPanel
 
 @ApiStatus.Experimental
@@ -64,8 +62,6 @@ open class InternalUICustomization {
     }
 
   internal open fun configureToolWindowPane(toolWindowPaneParent: JComponent, buttonManager: ToolWindowButtonManager) {}
-
-  open fun createToolWindowPaneLayered(splitter: JComponent, frame: JFrame): JLayeredPane? = null
 
   /**
    * TODO
@@ -108,6 +104,8 @@ open class InternalUICustomization {
   open val isCustomPaintersAllowed: Boolean = false
 
   open fun attachIdeFrameBackgroundPainter(frame: IdeFrame, glassPane: IdeGlassPane): Unit = Unit
+
+  open fun updateBackgroundPainter() {}
 
   open fun attachIdeFallbackBackgroundPainter(glassPane: IdeGlassPane): Unit = Unit
 

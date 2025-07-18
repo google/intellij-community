@@ -18,7 +18,7 @@ import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFil
 import org.jetbrains.intellij.build.impl.projectStructureMapping.ProjectLibraryEntry
 import org.jetbrains.intellij.build.io.copyDir
 import org.jetbrains.intellij.build.io.copyFileToDir
-import org.jetbrains.intellij.build.kotlin.KotlinPluginBuilder
+import org.jetbrains.intellij.build.kotlin.CommunityKotlinPluginBuilder
 import org.jetbrains.intellij.build.python.PythonCommunityPluginModules
 import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
@@ -62,7 +62,7 @@ object CommunityRepositoryModules {
       spec.mainJarName = "uiDesigner.jar"
       spec.withModule("intellij.java.guiForms.jps", "jps/java-guiForms-jps.jar")
     },
-    KotlinPluginBuilder.kotlinPlugin(KotlinPluginBuilder.KotlinUltimateSources.WITH_COMMUNITY_MODULES),
+    CommunityKotlinPluginBuilder.kotlinPlugin(),
     pluginAuto(listOf("intellij.vcs.git")) { spec ->
       spec.withModule("intellij.vcs.git.rt", "git4idea-rt.jar")
     },
@@ -215,6 +215,9 @@ object CommunityRepositoryModules {
       spec.withProjectLibrary("package-search-api-client")
       spec.withProjectLibrary("ktor-client-logging")
       spec.withProjectLibrary("kotlinx-document-store-mvstore")
+    },
+    pluginAuto("intellij.platform.jewel.samples.idePlugin") { spec ->
+      spec.withModule("intellij.platform.jewel.samples.showcase")
     }
   )
 

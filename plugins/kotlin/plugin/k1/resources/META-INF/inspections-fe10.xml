@@ -37,13 +37,6 @@
 
     <intentionAction>
       <language>kotlin</language>
-      <className>org.jetbrains.kotlin.idea.intentions.SpecifyTypeExplicitlyInDestructuringAssignmentIntention</className>
-      <bundleName>messages.KotlinBundle</bundleName>
-      <categoryKey>group.names.kotlin</categoryKey>
-    </intentionAction>
-
-    <intentionAction>
-      <language>kotlin</language>
       <className>org.jetbrains.kotlin.idea.intentions.RemoveExplicitTypeIntention</className>
       <bundleName>messages.KotlinBundle</bundleName>
       <categoryKey>group.names.kotlin</categoryKey>
@@ -423,13 +416,6 @@
     <intentionAction>
       <language>kotlin</language>
       <className>org.jetbrains.kotlin.idea.intentions.ToRawStringLiteralIntention</className>
-      <bundleName>messages.KotlinBundle</bundleName>
-      <categoryKey>group.names.kotlin</categoryKey>
-    </intentionAction>
-
-    <intentionAction>
-      <language>kotlin</language>
-      <className>org.jetbrains.kotlin.idea.intentions.ToOrdinaryStringLiteralIntention</className>
       <bundleName>messages.KotlinBundle</bundleName>
       <categoryKey>group.names.kotlin</categoryKey>
     </intentionAction>
@@ -825,15 +811,6 @@
                      level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.replace.manual.range.with.indices.calls.display.name" bundle="messages.KotlinBundle"/>
-
-
-    <localInspection implementationClass="org.jetbrains.kotlin.idea.inspections.ReplaceUntilWithRangeUntilInspection"
-                     groupPath="Kotlin"
-                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
-                     enabledByDefault="true"
-                     level="INFORMATION"
-                     language="kotlin"
-                     key="inspection.replace.until.with.rangeUntil.operator.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.inspections.branchedTransformations.IfThenToElvisInspection"
                      groupPath="Kotlin"

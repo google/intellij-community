@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.uast.kotlin
 
@@ -9,17 +9,14 @@ import com.intellij.util.SmartList
 import com.intellij.util.containers.addIfNotNull
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaLibraryModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModuleProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KaErrorType
-import org.jetbrains.kotlin.analysis.api.types.KaType
-import org.jetbrains.kotlin.analysis.api.types.KaTypeMappingMode
-import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
-import org.jetbrains.kotlin.analysis.api.types.symbol
+import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.asJava.toLightAnnotation
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -28,7 +25,6 @@ import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.parents
-import org.jetbrains.kotlin.psi.psiUtil.unwrapParenthesesLabelsAndAnnotations
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.withPsiEntry
 import org.jetbrains.kotlin.utils.yieldIfNotNull
@@ -52,24 +48,37 @@ interface FirKotlinUastResolveProviderService : BaseKotlinUastResolveProviderSer
 
     fun isSupportedFile(file: KtFile): Boolean = true
 
+    context(KaSession)
+    private fun KaAnnotation.toFakeDeserializedSymbol(
+        parent: KtDeclaration,
+        symbol: KaDeclarationSymbol
+    ): UastFakeDeserializedSymbolAnnotation {
+        return UastFakeDeserializedSymbolAnnotation(symbol.createPointer(), classId, parent)
+    }
+
     override fun convertToPsiAnnotation(ktElement: KtElement): PsiAnnotation? {
-        val ktDeclaration = ktElement.getStrictParentOfType<KtModifierList>()?.parent as? KtDeclaration
-        // SLC won't model a declaration with value class in its signature.
-        if (ktDeclaration != null && hasTypeForValueClassInSignature(ktDeclaration)) {
+        ktElement.toLightAnnotation()?.let { return it }
+        val declaration = ktElement.getStrictParentOfType<KtModifierList>()?.parent as? KtDeclaration
+        return if (declaration != null) {
             (ktElement as? KtAnnotationEntry)?.let { entry ->
-                analyzeForUast(ktDeclaration) {
-                    val declaration = ktDeclaration.symbol
-                    declaration.annotations.find { it.psi == entry }?.let { annoApp ->
-                        return UastFakeDeserializedSymbolAnnotation(
-                            declaration.createPointer(),
-                            annoApp.classId,
-                            ktDeclaration
-                        )
+                analyzeForUast(declaration) {
+                    val declarationSymbol = declaration.symbol
+                    declaration.symbol.annotations.firstOrNull { it.psi == entry }?.let { annotation ->
+                        return annotation.toFakeDeserializedSymbol(declaration, declarationSymbol)
+                    }
+
+                    if (entry.useSiteTarget == null || declarationSymbol !is KaPropertySymbol) return null
+
+                    declarationSymbol.getter?.annotations?.firstOrNull { it.psi == entry }?.let { annotation ->
+                        return annotation.toFakeDeserializedSymbol(declaration, declarationSymbol.getter!!)
+                    }
+
+                    declarationSymbol.setter?.annotations?.firstOrNull { it.psi == entry }?.let { annotation ->
+                        return annotation.toFakeDeserializedSymbol(declaration, declarationSymbol.setter!!)
                     }
                 }
             }
-        }
-        return ktElement.toLightAnnotation()
+        } else null
     }
 
     override fun convertValueArguments(ktCallElement: KtCallElement, parent: UElement): List<UNamedExpression>? {

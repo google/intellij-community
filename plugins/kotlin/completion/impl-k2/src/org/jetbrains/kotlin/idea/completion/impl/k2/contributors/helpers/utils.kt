@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.idea.codeinsight.utils.getFqNameIfPackageOrNonLocal
 import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters
 import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters.Companion.languageVersionSettings
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
@@ -26,6 +27,7 @@ import org.jetbrains.kotlin.idea.util.positionContext.KotlinNameReferencePositio
 import org.jetbrains.kotlin.idea.util.positionContext.KotlinRawPositionContext
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.psi.KtFile
 
 object KtOutsideTowerScopeKinds {
 
@@ -231,3 +233,13 @@ private fun LanguageVersionSettings.excludeSyntheticJavaProperties(
     positionContext: KotlinNameReferencePositionContext,
 ): Boolean = positionContext is KDocNameReferencePositionContext
         || positionContext is KotlinCallableReferencePositionContext && !supportsFeature(LanguageFeature.ReferencesToSyntheticJavaProperties)
+
+/**
+ * Checks if the scope contains an alias for the [symbol] and returns the name of the alias.
+ */
+context(KaSession)
+internal fun KtFile.getAliasNameIfExists(symbol: KaSymbol): Name? {
+    val fqName = symbol.getFqNameIfPackageOrNonLocal() ?: return null
+    // TODO: It's possible to optimize this by using a map for the aliases if it turns out to be a bottleneck.
+    return findAliasByFqName(fqName)?.name?.let { Name.identifier(it) }
+}

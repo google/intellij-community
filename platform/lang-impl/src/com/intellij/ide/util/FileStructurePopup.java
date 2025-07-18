@@ -183,6 +183,7 @@ public final class FileStructurePopup implements Disposable, TreeActionsOwner {
     myTree = new MyTree(myAsyncTreeModel);
     StructureViewComponent.registerAutoExpandListener(myTree, myTreeModel);
     PopupUtil.applyNewUIBackground(myTree);
+    myTree.getAccessibleContext().setAccessibleName(LangBundle.message("file.structure.tree.accessible.name"));
 
     ModelListener modelListener = () -> rebuild(false);
     myTreeModel.addModelListener(modelListener);
@@ -575,6 +576,7 @@ public final class FileStructurePopup implements Disposable, TreeActionsOwner {
     label.setBorder(JBUI.Borders.empty(0, 4));
     label.setHorizontalAlignment(SwingConstants.RIGHT);
     label.setVerticalAlignment(SwingConstants.CENTER);
+    label.getAccessibleContext().setAccessibleName(LangBundle.message("file.structure.settings.accessible.name"));
 
     List<AnAction> sorters = createSorters();
     new ClickListener() {

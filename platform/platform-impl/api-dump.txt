@@ -164,6 +164,8 @@ com.intellij.ide.actions.CloseAction$CloseTarget
 - a:close():V
 c:com.intellij.ide.actions.OpenFileAction
 - p:doOpenFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
+c:com.intellij.ide.actions.RevealFileAction
+- s:showDialog(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,java.io.File,com.intellij.openapi.ui.DoNotAskOption):V
 com.intellij.ide.actions.SettingsEntryPointAction$ActionProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - getLastActions(com.intellij.openapi.actionSystem.DataContext):java.util.Collection
@@ -200,6 +202,8 @@ com.intellij.ide.file.BatchFileChangeListener
 - sf:TOPIC:com.intellij.util.messages.Topic
 - batchChangeCompleted(com.intellij.openapi.project.Project):V
 - batchChangeStarted(com.intellij.openapi.project.Project,java.lang.String):V
+f:com.intellij.ide.impl.ProjectNewWindowDoNotAskOption
+- com.intellij.openapi.ui.DoNotAskOption
 com.intellij.ide.navigationToolbar.NavBarModelExtension
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:additionalRoots(com.intellij.openapi.project.Project):java.util.Collection
@@ -662,6 +666,8 @@ com.intellij.openapi.progress.util.ProgressIndicatorListener
 - onFractionChanged(D):V
 - stopped():V
 - s:whenProgressFractionChanged(com.intellij.openapi.progress.ProgressIndicator,java.util.function.Consumer):V
+c:com.intellij.openapi.progress.util.ProgressWindow
+- startBlocking(java.lang.Runnable,Z,java.util.concurrent.CompletableFuture):V
 com.intellij.openapi.progress.util.ProgressWindow$Listener
 - a:progressWindowCreated(com.intellij.openapi.progress.util.ProgressWindow):V
 com.intellij.openapi.project.configuration.ConfigurationResult
@@ -672,6 +678,16 @@ com.intellij.openapi.ui.playback.PlaybackCommand
 - a:canGoFurther():Z
 - a:execute(com.intellij.openapi.ui.playback.PlaybackContext):java.util.concurrent.CompletableFuture
 - getScriptDir():java.io.File
+e:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- java.lang.Enum
+- sf:ACTUAL:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- sf:BREW:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- sf:SNAP:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- sf:TOOLBOX:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- sf:UNKNOWN:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- f:toolName:java.lang.String
+- s:valueOf(java.lang.String):com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+- s:values():com.intellij.openapi.updateSettings.impl.ExternalUpdateManager[]
 com.intellij.openapi.updateSettings.impl.UpdateSettingsProvider
 - a:getPluginRepositories():java.util.List
 com.intellij.openapi.updateSettings.impl.UpdateSettingsUIProvider
@@ -1243,13 +1259,10 @@ com.intellij.ui.layout.CellBuilder
 - ba:focused():com.intellij.ui.layout.CellBuilder
 - a:getComponent():javax.swing.JComponent
 - a:growPolicy(com.intellij.ui.layout.GrowPolicy):com.intellij.ui.layout.CellBuilder
-- ba:onApply(kotlin.jvm.functions.Function0):com.intellij.ui.layout.CellBuilder
-- ba:onIsModified(kotlin.jvm.functions.Function0):com.intellij.ui.layout.CellBuilder
-- ba:onReset(kotlin.jvm.functions.Function0):com.intellij.ui.layout.CellBuilder
 - ba:withValidationOnApply(kotlin.jvm.functions.Function2):com.intellij.ui.layout.CellBuilder
 - ba:withValidationOnInput(kotlin.jvm.functions.Function2):com.intellij.ui.layout.CellBuilder
 f:com.intellij.ui.layout.CellKt
-- sf:createPropertyBinding(kotlin.reflect.KMutableProperty0,java.lang.Class):com.intellij.ui.layout.PropertyBinding
+- bsf:createPropertyBinding(kotlin.reflect.KMutableProperty0,java.lang.Class):com.intellij.ui.layout.PropertyBinding
 com.intellij.ui.layout.LayoutBuilderImpl
 - a:build(java.awt.Container,com.intellij.ui.layout.LCFlags[]):V
 - a:getComponentValidateCallbacks():java.util.Map
@@ -1259,7 +1272,6 @@ com.intellij.ui.layout.RowBuilder
 - com.intellij.ui.layout.BaseBuilder
 - a:createChildRow(javax.swing.JLabel,Z,Z,java.lang.String):com.intellij.ui.layout.Row
 - bs:createChildRow$default(com.intellij.ui.layout.RowBuilder,javax.swing.JLabel,Z,Z,java.lang.String,I,java.lang.Object):com.intellij.ui.layout.Row
-- ba:onGlobalApply(kotlin.jvm.functions.Function0):com.intellij.ui.layout.Row
 - b:row(java.lang.String,Z,kotlin.jvm.functions.Function1):com.intellij.ui.layout.Row
 - row(javax.swing.JLabel,Z,kotlin.jvm.functions.Function1):com.intellij.ui.layout.Row
 - bs:row$default(com.intellij.ui.layout.RowBuilder,java.lang.String,Z,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.ui.layout.Row

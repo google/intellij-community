@@ -13,7 +13,7 @@ jvm_library(
     "//platform/progress/backend",
     "//platform/xdebugger-impl/backend",
     "//platform/searchEverywhere/backend",
-    "//platform/vcs-impl/backend",
+    "//platform/vcs-impl",
     "//platform/bookmarks/backend",
     "//platform/recentFiles/backend",
     "//platform/editor/backend",
@@ -25,6 +25,7 @@ jvm_library(
     "//platform/scopes/backend",
     "//platform/remote-topics/backend",
     "//platform/buildView/backend",
+    "//platform/lang-impl/backend",
   ]
 )
 
@@ -44,7 +45,7 @@ jvm_library(
     "//platform/progress/backend",
     "//platform/xdebugger-impl/backend",
     "//platform/searchEverywhere/backend",
-    "//platform/vcs-impl/backend",
+    "//platform/vcs-impl",
     "//platform/bookmarks/backend",
     "//platform/recentFiles/backend",
     "//platform/editor/backend",
@@ -54,6 +55,7 @@ jvm_library(
     "//platform/managed-cache/managed.cache.backend",
     "//platform/scopes/backend",
     "//platform/buildView/backend",
+    "//platform/lang-impl/backend",
   ]
 )
 ### auto-generated section `build intellij.platform.backend.main` end

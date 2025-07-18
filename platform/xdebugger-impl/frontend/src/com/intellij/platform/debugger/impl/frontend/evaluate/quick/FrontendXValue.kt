@@ -8,8 +8,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.debugger.impl.rpc.XValueApi
-import com.intellij.platform.debugger.impl.rpc.XValueDto
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.ThreeState
@@ -17,9 +16,9 @@ import com.intellij.xdebugger.Obsolescent
 import com.intellij.xdebugger.XExpression
 import com.intellij.xdebugger.frame.*
 import com.intellij.xdebugger.frame.presentation.XValuePresentation
-import com.intellij.xdebugger.impl.rpc.*
 import com.intellij.xdebugger.impl.ui.tree.XValueExtendedPresentation
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeEx
+import com.intellij.xdebugger.impl.util.MonolithUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.asCompletableFuture
@@ -27,6 +26,7 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.asCompletableFuture
 import org.jetbrains.concurrency.asPromise
+import java.util.concurrent.CompletableFuture
 
 @ApiStatus.Internal
 class FrontendXValue private constructor(
@@ -44,8 +44,6 @@ class FrontendXValue private constructor(
 
   @Volatile
   private var canNavigateToTypeSource = false
-
-  var descriptor: XValueDescriptor? = null
 
   private val xValueContainer = FrontendXValueContainer(project, cs, hasParentValue) {
     XValueApi.getInstance().computeChildren(xValueDto.id)
@@ -90,14 +88,14 @@ class FrontendXValue private constructor(
     cs.launch {
       canNavigateToTypeSource = xValueDto.canNavigateToTypeSource.await()
     }
-
-    cs.launch {
-      descriptor = xValueDto.descriptor?.await()
-    }
   }
 
   override fun canNavigateToSource(): Boolean {
     return xValueDto.canNavigateToSource
+  }
+
+  override fun getXValueDescriptorAsync(): CompletableFuture<XValueDescriptor?>? {
+    return xValueDto.descriptor?.asCompletableFuture()
   }
 
   override fun canNavigateToTypeSource(): Boolean {
@@ -192,6 +190,11 @@ class FrontendXValue private constructor(
       XValueApi.getInstance().computeExpression(xValueDto.id)?.xExpression()
     }
     return deferred.asCompletableFuture().asPromise()
+  }
+
+  override fun getReferrersProvider(): XReferrersProvider? {
+    // TODO referrersProvider is only supported in monolith
+    return MonolithUtils.findXValueById(xValueDto.id)?.referrersProvider
   }
 
   override fun toString(): String {

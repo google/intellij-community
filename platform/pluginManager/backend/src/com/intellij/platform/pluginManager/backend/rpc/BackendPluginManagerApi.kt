@@ -57,8 +57,8 @@ class BackendPluginManagerApi : PluginManagerApi {
     DefaultUiPluginManagerController.setPluginStatus(sessionId, pluginIds, enable)
   }
 
-  override suspend fun isPluginRequiresUltimateButItIsDisabled(pluginId: PluginId): Boolean {
-    return DefaultUiPluginManagerController.isPluginRequiresUltimateButItIsDisabled(pluginId)
+  override suspend fun isPluginRequiresUltimateButItIsDisabled(sessionId: String, pluginId: PluginId): Boolean {
+    return DefaultUiPluginManagerController.isPluginRequiresUltimateButItIsDisabled(sessionId, pluginId)
   }
 
   override suspend fun isDisabledInDiff(sessionId: String, pluginId: PluginId): Boolean {
@@ -180,7 +180,8 @@ class BackendPluginManagerApi : PluginManagerApi {
     return channelFlow {
       val session = PluginManagerSessionService.getInstance().getSession(sessionId)
       session?.updateService?.calculateUpdates { result ->
-        trySend(result.map { PluginDto.fromModel(it) })
+        val pluginDtos = result?.map { PluginDto.fromModel(it) } ?: emptyList()
+        trySend(pluginDtos)
       }
       awaitClose()
     }

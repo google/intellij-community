@@ -58,8 +58,6 @@
                  description="Enable new terminal for PowerShell on Unix"/>
     <registryKey key="terminal.new.ui.show.promotion" defaultValue="false"
                  description="Whether to show the GotIt tooltip with a proposal to try the New Terminal"/>
-    <registryKey key="terminal.new.ui.inline.completion" defaultValue="false"
-                 description="Whether to show the inline (grey text) completion in the New Terminal"/>
     <registryKey key="terminal.new.ui.autocompletion" defaultValue="true"
                  description="Whether to run autocompletion in the New Terminal"/>
     <registryKey key="terminal.classic.refresh.vfs.on.shell.command.finished" defaultValue="true"
@@ -70,8 +68,8 @@
                   For WSL environments, the shell process in WSL will be launched via IJEnt instead of using wsl.exe."/>
     <registryKey key="terminal.new.ui.completion.popup" defaultValue="false"
                  description="Disabled completion popUp for reworked terminal for development time"/>
-    <registryKey key="terminal.type.ahead" defaultValue="false"
-                 description="Early prototype of type-ahead for the reworked terminal"/>
+    <registryKey key="terminal.type.ahead" defaultValue="true"
+                 description="Whether terminal should predict how shell handles typing to minimize the typing latency. Monolith-only at the moment"/>
     <registryKey key="terminal.generic.hyperlinks" defaultValue="false"
                  description="Show generic file hyperlinks in the reworked terminal. Such hyperlinks are highlighted on mouse hover.
                   Open a new terminal after enabling this option to take effect."/>

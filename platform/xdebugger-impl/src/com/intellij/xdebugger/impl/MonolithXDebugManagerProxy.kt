@@ -38,9 +38,10 @@ private class MonolithXDebugManagerProxy : XDebugManagerProxy {
   }
 
   override fun getSessionIdByContentDescriptor(project: Project, descriptor: RunContentDescriptor): XDebugSessionId? {
-    val sessions = XDebuggerManagerImpl.getInstance(project).debugSessions
-    val session = sessions.firstOrNull { it.runContentDescriptor === descriptor } ?: return null
-    return (session as XDebugSessionImpl).id
+    val session = XDebuggerManagerImpl.getInstance(project).debugSessions
+      .filterIsInstance<XDebugSessionImpl>()
+      .firstOrNull { it.getRunContentDescriptorIfInitialized() === descriptor }
+    return session?.id
   }
 
   override fun getCurrentSessionFlow(project: Project): Flow<XDebugSessionProxy?> {
@@ -57,7 +58,7 @@ private class MonolithXDebugManagerProxy : XDebugManagerProxy {
     return XBreakpointManagerProxy.Monolith(XDebuggerManager.getInstance(project).breakpointManager as XBreakpointManagerImpl)
   }
 
-  override fun canUpdateInlineDebuggerFrames(): Boolean {
+  override fun canShowInlineDebuggerData(xValue: XValue): Boolean {
     return true
   }
 }

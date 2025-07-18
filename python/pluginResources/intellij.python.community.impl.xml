@@ -111,7 +111,6 @@
                                 implementationClass="com.jetbrains.python.documentation.PythonExternalDocumentationProvider"
                                 order="before pythonDocumentationProvider"/>
     <lang.emacs language="Python" implementationClass="com.jetbrains.python.editor.PyEmacsHandler"/>
-    <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyAnnotatingVisitor"/>
     <annotator language="Python" implementationClass="com.jetbrains.python.inspections.PyCompatibilityInspectionAdvertiser"/>
 
     <editorActionHandler action="EditorCopy" implementationClass="com.intellij.execution.console.ConsoleHistoryCopyHandler"/>
@@ -138,8 +137,8 @@
     <applicationService serviceImplementation="com.jetbrains.python.packaging.PyPackageService"/>
     <applicationService serviceInterface="com.jetbrains.python.module.PyModuleService"
                         serviceImplementation="com.jetbrains.python.module.PyModuleServiceImpl"/>
-    <applicationService serviceInterface="com.jetbrains.python.sdk.flavors.WinRegistryService"
-                        serviceImplementation="com.jetbrains.python.sdk.flavors.WinRegistryServiceImpl"/>
+    <applicationService serviceInterface="com.jetbrains.python.sdk.WinRegistryService"
+                        serviceImplementation="com.jetbrains.python.sdk.WinRegistryServiceImpl"/>
     <typedHandler implementation="com.jetbrains.python.codeInsight.PyMethodNameTypedHandler" id="pyMethodNameTypedHandler"/>
 
     <idIndexer filetype="Python" implementationClass="com.jetbrains.python.PyIdIndexer"/>
@@ -461,6 +460,9 @@
     <registryKey defaultValue="false" description="Don't run `lock` before listing dependencies when using Poetry"
                  restartRequired="false" key="python.poetry.list.packages.without.lock"/>
 
+    <registryKey defaultValue="false" description="Use legacy system python detection method based on flavors"
+                 restartRequired="false" key="python.use.system.legacy.provider"/>
+
     <!-- typing -->
     <multiHostInjector implementation="com.jetbrains.python.codeInsight.typing.PyTypingAnnotationInjector"/>
 
@@ -620,10 +622,7 @@
 
     <notificationGroup id="Black Formatter Integration" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
                        key="black.configurable.name"/>
-
     <dependencyCollector kind="python" implementation="com.jetbrains.python.packaging.PyDependencyCollector"/>
-    <lookup.usageDetails implementation="com.jetbrains.python.statistics.PyCompletionStatisticLogger"/>
-    <statistics.collectorExtension implementation="com.jetbrains.python.statistics.PyCompletionUsageExtension"/>
 
     <!-- Parameter Info -->
     <registryKey key="python.parameter.info.show.all.hints" defaultValue="false"
@@ -788,16 +787,6 @@
 
   <extensions defaultExtensionNs="Pythonid">
     <pyReferenceCustomTargetChecker implementation="com.jetbrains.python.testing.pyTestFixtures.PyTestFixtureTargetChecker"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.DocStringAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.PyDefinitionsAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.GeneratorInArgumentListAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.StarAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.StringLiteralQuotesAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.FStringsAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.PyPatternAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.PyTryExceptAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.PyLocalVariableAnnotator"/>
-    <pyAnnotator implementation="com.jetbrains.python.validation.PyTypeParameterListAnnotator"/>
 
     <!--stdlib-->
     <documentationLinkProvider implementation="com.jetbrains.python.codeInsight.stdlib.PyStdlibDocumentationLinkProvider"/>
@@ -895,6 +884,15 @@
 
 
     <systemPythonProvider implementation="com.jetbrains.python.sdk.uv.UvSystemPythonProvider"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.LegacySystemPythonProvider"/>
+
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.BrewSystemPythonProvider" os="mac"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.MacSystemPythonProvider" os="mac"/>
+
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.WindowsSystemPythonProvider" os="windows"/>
+
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.PyenvSystemPythonProvider"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.UnixSystemPythonProvider"/>
 
     <inspectionExtension implementation="com.jetbrains.python.sdk.configuration.suppressors.PyInterpreterInspectionSuppressor"/>
     <inspectionExtension implementation="com.jetbrains.python.inspections.PyUnresolvedReferenceDefaultInspectionExtension" order="last"/>

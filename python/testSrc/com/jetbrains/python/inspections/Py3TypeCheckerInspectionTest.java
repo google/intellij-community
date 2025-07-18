@@ -29,6 +29,11 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
     doTest();
   }
 
+  // PY-72232
+  public void testWithItemNonContextManager() {
+    doTest();
+  }
+
   // PY-10660
   public void testStructUnpackPy3() {
     doMultiFileTest();
@@ -55,6 +60,11 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
 
   // PY-16898
   public void testAsyncForIterable() {
+    doTest();
+  }
+
+  // PY-6729
+  public void testYieldFromNonIterable() {
     doTest();
   }
 
@@ -2993,5 +3003,33 @@ def foo(param: str | int) -> TypeGuard[str]:
                    
                    v5: Hashable = DC5(0)
                    """);
+  }
+
+  // PY-76855
+  public void testAccessToAttributeOfGenericClassWithDefaultIsNotAmbiguous() {
+    doTestByText("""
+                   class Test1[T = int]():
+                       attr: T
+                   class Test2[T]():
+                       attr: T
+                   
+                   Test1.attr #OK
+                   Test2.<warning descr="Access to generic instance variables via class is ambiguous">attr</warning>
+                   """);
+  }
+
+  // PY-76818
+  public void testMatchModuleWithProtocolNumOfAttrs() {
+    doMultiFileTest();
+  }
+
+  // PY-76818
+  public void testMatchProtocolWithModuleCallables() {
+    doMultiFileTest();
+  }
+
+  // PY-76818
+  public void testMatchGenericProtocolWithModule() {
+    doMultiFileTest();
   }
 }

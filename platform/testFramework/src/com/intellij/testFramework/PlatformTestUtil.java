@@ -39,6 +39,7 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.application.impl.LaterInvocator;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.application.impl.TestOnlyThreading;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.extensions.ProjectExtensionPointName;
@@ -80,6 +81,7 @@ import com.intellij.util.io.Decompressor;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import junit.framework.AssertionFailedError;
+import kotlin.Unit;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -353,7 +355,10 @@ public final class PlatformTestUtil {
     while (busyCondition.get()) {
       assertMaxWaitTimeSince(startTimeMillis);
       TimeoutUtil.sleep(5);
-      UIUtil.dispatchAllInvocationEvents();
+      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+        UIUtil.dispatchAllInvocationEvents();
+        return Unit.INSTANCE;
+      });
     }
   }
 
@@ -380,7 +385,10 @@ public final class PlatformTestUtil {
     long start = System.currentTimeMillis();
     while (true) {
       if (promise.getState() == Promise.State.PENDING) {
-        UIUtil.dispatchAllInvocationEvents();
+        TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+          UIUtil.dispatchAllInvocationEvents();
+          return Unit.INSTANCE;
+        });
       }
       try {
         return promise.blockingGet(20, TimeUnit.MILLISECONDS);
@@ -407,7 +415,10 @@ public final class PlatformTestUtil {
     long start = System.currentTimeMillis();
     while (true) {
       if (!future.isDone()) {
-        UIUtil.dispatchAllInvocationEvents();
+        TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+          UIUtil.dispatchAllInvocationEvents();
+          return Unit.INSTANCE;
+        });
       }
       try {
         return future.get(10, TimeUnit.MILLISECONDS);
@@ -489,14 +500,17 @@ public final class PlatformTestUtil {
     assertDispatchThreadWithoutWriteAccess();
     IdeEventQueue eventQueue = IdeEventQueue.getInstance();
     ThreadContext.resetThreadContext(() -> {
-      while (true) {
-        AWTEvent event = eventQueue.peekEvent();
-        if (event == null) break;
-        event = eventQueue.getNextEvent();
-        if (event instanceof InvocationEvent) {
-          eventQueue.dispatchEvent(event);
+      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+        while (true) {
+          AWTEvent event = eventQueue.peekEvent();
+          if (event == null) break;
+          event = eventQueue.getNextEvent();
+          if (event instanceof InvocationEvent) {
+            eventQueue.dispatchEvent(event);
+          }
         }
-      }
+        return Unit.INSTANCE;
+      });
       return null;
     });
   }
@@ -505,30 +519,14 @@ public final class PlatformTestUtil {
    * Dispatch all pending events (if any) in the {@link IdeEventQueue}. Should only be invoked from EDT.
    */
   public static void dispatchAllEventsInIdeEventQueue() {
-    assertEventQueueDispatchThread();
-    while (true) {
-      try {
-        if (dispatchNextEventIfAny() == null) break;
-      }
-      catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    EdtTestUtilKt.dispatchAllEventsInIdeEventQueue();
   }
 
   /**
    * Dispatch one pending event (if any) in the {@link IdeEventQueue}. Should only be invoked from EDT.
    */
   public static AWTEvent dispatchNextEventIfAny() throws InterruptedException {
-    return ThreadContext.resetThreadContext(() -> {
-      assertEventQueueDispatchThread();
-      IdeEventQueue eventQueue = IdeEventQueue.getInstance();
-      AWTEvent event = eventQueue.peekEvent();
-      if (event == null) return null;
-      AWTEvent event1 = eventQueue.getNextEvent();
-      eventQueue.dispatchEvent(event1);
-      return event1;
-    });
+    return EdtTestUtilKt.dispatchNextEventIfAny();
   }
 
   public static @NotNull StringBuilder print(@NotNull AbstractTreeStructure structure,

@@ -58,7 +58,6 @@ import com.intellij.openapi.wm.WindowManager;
 import com.intellij.openapi.wm.impl.IdeFrameImpl;
 import com.intellij.openapi.wm.impl.IdeGlassPaneEx;
 import com.intellij.pom.Navigatable;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.reference.SoftReference;
 import com.intellij.ui.*;
@@ -879,12 +878,6 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
   public void uiDataSnapshot(@NotNull DataSink sink) {
     Map<Integer, Usage> usages = getSelectedUsages();
     if (usages == null) return;
-    sink.lazy(PlatformCoreDataKeys.PSI_ELEMENT_ARRAY, () -> usages.values().stream()
-      .filter(usage -> usage instanceof UsageInfoAdapter)
-      .flatMap(usage -> Arrays.stream(((UsageInfoAdapter)usage).getMergedInfos()))
-      .map(info -> info.getElement())
-      .filter(Objects::nonNull)
-      .toArray(PsiElement[]::new));
     sink.lazy(CommonDataKeys.VIRTUAL_FILE_ARRAY, () -> usages.values().stream()
       .filter(usage -> usage instanceof UsageInFile)
       .map(usage -> ((UsageInFile)usage).getFile())

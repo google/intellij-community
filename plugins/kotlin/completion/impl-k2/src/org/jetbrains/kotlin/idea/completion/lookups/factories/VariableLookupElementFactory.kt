@@ -33,9 +33,10 @@ internal object VariableLookupElementFactory {
     fun createLookup(
         signature: KaVariableSignature<*>,
         options: CallableInsertionOptions,
+        aliasName: Name? = null,
     ): LookupElementBuilder {
         val rendered = renderVariable(signature)
-        var builder = createLookupElementBuilder(options, signature, rendered)
+        var builder = createLookupElementBuilder(options, signature, rendered, aliasName = aliasName)
 
         val symbol = signature.symbol
         if (symbol is KaPropertySymbol) {
@@ -52,8 +53,9 @@ internal object VariableLookupElementFactory {
         signature: KaVariableSignature<*>,
         rendered: String,
         insertionStrategy: CallableInsertionStrategy = options.insertionStrategy,
+        aliasName: Name? = null,
     ): LookupElementBuilder {
-        val name = signature.symbol.name
+        val name = aliasName ?: signature.symbol.name
         val lookupString = name.asString()
 
         return when (insertionStrategy) {
@@ -68,7 +70,7 @@ internal object VariableLookupElementFactory {
                 )
 
                 // todo reuse rendered/renderedDeclaration
-                val tailText = getTailTextForVariableCall(functionalType, signature)
+                val tailText = getTailTextForVariableCall(functionalType, signature, useFqName = aliasName != null)
 
                 LookupElementBuilder.create(lookupObject, lookupString)
                     .withTailText(tailText, true)
@@ -84,7 +86,7 @@ internal object VariableLookupElementFactory {
                 val lookupObject = VariableLookupObject(name, options, rendered)
                 markIfSyntheticJavaProperty(
                     LookupElementBuilder.create(lookupObject, lookupString)
-                        .withTailText(getTailText(signature), true), signature.symbol
+                        .withTailText(getTailText(signature, useFqName = aliasName != null), true), signature.symbol
                 ).withInsertHandler(VariableInsertionHandler)
             }
         }

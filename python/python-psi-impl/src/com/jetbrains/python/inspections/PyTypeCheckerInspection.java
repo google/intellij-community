@@ -98,6 +98,13 @@ public class PyTypeCheckerInspection extends PyInspection {
     }
 
     @Override
+    public void visitPyWithStatement(@NotNull PyWithStatement node) {
+      for (PyWithItem withItem : node.getWithItems()) {
+        checkContextManagerValue(withItem.getExpression(), node.isAsync());
+      }
+    }
+
+    @Override
     public void visitPyReturnStatement(@NotNull PyReturnStatement node) {
       ScopeOwner owner = ScopeUtil.getScopeOwner(node);
       if (owner instanceof PyFunction function) {
@@ -135,6 +142,11 @@ public class PyTypeCheckerInspection extends PyInspection {
       ScopeOwner owner = ScopeUtil.getScopeOwner(node);
       if (!(owner instanceof PyFunction function)) return;
 
+      final PyExpression yieldExpr = node.getExpression();
+      if (yieldExpr != null && node.isDelegating()) {
+        checkIteratedValue(yieldExpr, false);
+      }
+
       final PyAnnotation annotation = function.getAnnotation();
       final String typeCommentAnnotation = function.getTypeCommentAnnotation();
       if (annotation == null && typeCommentAnnotation == null) return;
@@ -159,8 +171,6 @@ public class PyTypeCheckerInspection extends PyInspection {
       final PyType expectedSendType = generatorDesc.sendType();
 
       final PyType thisYieldType = node.getYieldType(myTypeEvalContext);
-
-      final PyExpression yieldExpr = node.getExpression();
 
       if (!PyTypeChecker.match(expectedYieldType, thisYieldType, myTypeEvalContext)) {
         String expectedName = PythonDocumentationProvider.getVerboseTypeName(expectedYieldType, myTypeEvalContext);
@@ -267,7 +277,9 @@ public class PyTypeCheckerInspection extends PyInspection {
     }
 
     private static boolean requiresTypeSpecialization(@Nullable PyType type) {
-      if (type instanceof PyTypeParameterType && !(type instanceof PySelfType)) return true;
+      if (type instanceof PyTypeParameterType typeParameterType &&
+          typeParameterType.getDefaultType() == null &&
+          !(type instanceof PySelfType)) return true;
       return type instanceof PyCollectionType collectionType &&
              exists(collectionType.getElementTypes(), Visitor::requiresTypeSpecialization);
     }
@@ -393,6 +405,22 @@ public class PyTypeCheckerInspection extends PyInspection {
           final String typeName = PythonDocumentationProvider.getTypeName(type, myTypeEvalContext);
 
           String qualifiedName = "collections." + iterableClassName;
+          registerProblem(iteratedValue, PyPsiBundle.message("INSP.type.checker.expected.type.got.type.instead", qualifiedName, typeName));
+        }
+      }
+    }
+
+    private void checkContextManagerValue(@Nullable PyExpression iteratedValue, boolean isAsync) {
+      if (iteratedValue != null) {
+        final PyType type = myTypeEvalContext.getType(iteratedValue);
+        final String contextManagerClassName = isAsync ? PyNames.ABSTRACT_ASYNC_CONTEXT_MANAGER : PyNames.ABSTRACT_CONTEXT_MANAGER;
+
+        if (type != null &&
+            !PyTypeChecker.isUnknown(type, myTypeEvalContext) &&
+            !PyABCUtil.isSubtype(type, contextManagerClassName, myTypeEvalContext)) {
+          final String typeName = PythonDocumentationProvider.getTypeName(type, myTypeEvalContext);
+
+          String qualifiedName = "contextlib." + contextManagerClassName;
           registerProblem(iteratedValue, PyPsiBundle.message("INSP.type.checker.expected.type.got.type.instead", qualifiedName, typeName));
         }
       }

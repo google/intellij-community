@@ -20,6 +20,7 @@ private class FrontendXDebugManagerProxy : XDebugManagerProxy {
     return XDebugSessionProxy.useFeProxy() ||
            (frontendType is FrontendType.Remote && frontendType.isGuest()) // CWM case
   }
+
   override suspend fun <T> withId(value: XValue, session: XDebugSessionProxy, block: suspend (XValueId) -> T): T {
     val valueId = (value as FrontendXValue).xValueDto.id
     return block(valueId)
@@ -45,9 +46,7 @@ private class FrontendXDebugManagerProxy : XDebugManagerProxy {
     return FrontendXDebuggerManager.getInstance(project).breakpointsManager
   }
 
-  override fun canUpdateInlineDebuggerFrames(): Boolean {
-    val frontendType = FrontendApplicationInfo.getFrontendType()
-    val isCwm = (frontendType is FrontendType.Remote && frontendType.isGuest()) // CWM case
-    return !isCwm
+  override fun canShowInlineDebuggerData(xValue: XValue): Boolean {
+    return xValue is FrontendXValue
   }
 }

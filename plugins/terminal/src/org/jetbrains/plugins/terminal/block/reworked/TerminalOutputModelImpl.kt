@@ -199,6 +199,10 @@ class TerminalOutputModelImpl(
     else highlightingsModel.getHighlightingsSnapshot()
   }
 
+  override fun getHighlightingAt(documentOffset: Int): HighlightingInfo? {
+    return highlightingsModel.getHighlightingAt(documentOffset)
+  }
+
   override fun addListener(parentDisposable: Disposable, listener: TerminalOutputModelListener) {
     dispatcher.addListener(listener, parentDisposable)
   }
@@ -246,7 +250,7 @@ class TerminalOutputModelImpl(
      * Indexes of the ranges are absolute to support trimming the start of the list
      * without reassigning indexes for the remaining ranges: [removeBefore].
      */
-    private val styleRanges: MutableList<StyleRange> = ArrayList()
+    private val styleRanges: MutableList<StyleRange> = ArrayDeque() // ArrayDeque is used here for fast removeAt(0).
 
     /**
      * Contains sorted ranges of the highlightings that cover all document length.
@@ -269,6 +273,29 @@ class TerminalOutputModelImpl(
       val snapshot = TerminalOutputHighlightingsSnapshot(document, documentRelativeHighlightings)
       highlightingsSnapshot = snapshot
       return snapshot
+    }
+
+    fun getHighlightingAt(documentOffset: Int): HighlightingInfo? {
+      if (documentOffset < 0 || documentOffset >= document.textLength) {
+        return null
+      }
+      val absoluteOffset = documentOffset + trimmedCharsCount
+      val index = styleRanges.binarySearch {
+        when {
+          it.endOffset <= absoluteOffset -> -1
+          it.startOffset > absoluteOffset -> 1
+          else -> 0
+        }
+      }
+      return if (index >= 0) {
+        val range = styleRanges[index]
+        HighlightingInfo(
+          startOffset = (range.startOffset - trimmedCharsCount).toInt(),
+          endOffset = (range.endOffset - trimmedCharsCount).toInt(),
+          textAttributesProvider = TextStyleAdapter(range.style, colorPalette),
+        )
+      }
+      else null
     }
 
     fun addHighlightings(documentOffset: Int, styles: List<StyleRange>) {

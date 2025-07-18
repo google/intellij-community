@@ -12,7 +12,6 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.platform.debugger.impl.frontend.evaluate.quick.FrontendXDebuggerEvaluator
 import com.intellij.platform.debugger.impl.frontend.evaluate.quick.FrontendXValue
 import com.intellij.platform.debugger.impl.frontend.frame.FrontendDropFrameHandler
 import com.intellij.platform.debugger.impl.frontend.frame.FrontendXExecutionStack
@@ -20,7 +19,7 @@ import com.intellij.platform.debugger.impl.frontend.frame.FrontendXStackFrame
 import com.intellij.platform.debugger.impl.frontend.frame.FrontendXSuspendContext
 import com.intellij.platform.debugger.impl.frontend.storage.FrontendXStackFramesStorage
 import com.intellij.platform.debugger.impl.frontend.storage.getOrCreateStackFrame
-import com.intellij.platform.debugger.impl.rpc.XValueMarkerId
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.execution.impl.frontend.createFrontendProcessHandler
 import com.intellij.platform.execution.impl.frontend.executionEnvironment
 import com.intellij.platform.util.coroutines.childScope
@@ -40,21 +39,10 @@ import com.intellij.xdebugger.impl.XSourceKind
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy
 import com.intellij.xdebugger.impl.frame.*
 import com.intellij.xdebugger.impl.inline.DebuggerInlayListener
-import com.intellij.xdebugger.impl.rpc.SuspendData
-import com.intellij.xdebugger.impl.rpc.XDebugSessionApi
-import com.intellij.xdebugger.impl.rpc.XDebugSessionDataDto
-import com.intellij.xdebugger.impl.rpc.XDebugSessionDto
-import com.intellij.xdebugger.impl.rpc.XDebugSessionId
-import com.intellij.xdebugger.impl.rpc.XDebugSessionState
-import com.intellij.xdebugger.impl.rpc.XDebuggerSessionEvent
-import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabDto
-import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabInfo
-import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabInfoCallback
-import com.intellij.xdebugger.impl.rpc.XSourcePositionDto
-import com.intellij.xdebugger.impl.rpc.consoleView
-import com.intellij.xdebugger.impl.rpc.sourcePosition
+import com.intellij.xdebugger.impl.rpc.*
 import com.intellij.xdebugger.impl.ui.XDebugSessionData
 import com.intellij.xdebugger.impl.ui.XDebugSessionTab
+import com.intellij.xdebugger.impl.util.MonolithUtils
 import com.intellij.xdebugger.ui.XDebugTabLayouter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -78,7 +66,9 @@ class FrontendXDebuggerSession private constructor(
   private val eventsDispatcher = EventDispatcher.create(XDebugSessionListener::class.java)
   override val id: XDebugSessionId = sessionDto.id
 
-  val sourcePosition: StateFlow<XSourcePosition?> =
+  // TODO merge sourcePosition, topSourcePosition, sessionState with suspendContext flow
+  // TODO to be sure that the state is not out of sync
+  private val sourcePosition: StateFlow<XSourcePosition?> =
     cs.createPositionFlow { XDebugSessionApi.getInstance().currentSourcePosition(id) }
 
   private val topSourcePosition: StateFlow<XSourcePosition?> =
@@ -107,14 +97,8 @@ class FrontendXDebuggerSession private constructor(
 
   // TODO Actually session could have a global evaluator, see
   //  com.intellij.xdebugger.XDebugProcess.getEvaluator overrides
-  private val evaluator: StateFlow<FrontendXDebuggerEvaluator?> =
-    currentStackFrame.map { frame ->
-      val frameEvaluator = frame?.evaluator ?: return@map null
-      frameEvaluator as FrontendXDebuggerEvaluator
-    }.stateIn(cs, SharingStarted.Eagerly, null)
-
   override val currentEvaluator: XDebuggerEvaluator?
-    get() = evaluator.value
+    get() = currentStackFrame.value?.evaluator
 
   override val isStopped: Boolean
     get() = sessionState.value.isStopped
@@ -145,9 +129,14 @@ class FrontendXDebuggerSession private constructor(
 
   override val valueMarkers: XValueMarkers<FrontendXValue, XValueMarkerId> = FrontendXValueMarkers(project)
 
-  private var _sessionTab: XDebugSessionTab? = null
+  private val sessionTabDeferred = CompletableDeferred<XDebugSessionTab>()
+
+  @OptIn(ExperimentalCoroutinesApi::class)
   override val sessionTab: XDebugSessionTab?
-    get() = _sessionTab
+    get() = if (sessionTabDeferred.isCompleted) sessionTabDeferred.getCompleted() else null
+
+  override val sessionTabWhenInitialized: Deferred<XDebugSessionTab>
+    get() = sessionTabDeferred
 
   // TODO all of the methods below
   // TODO pass in DTO?
@@ -198,7 +187,7 @@ class FrontendXDebuggerSession private constructor(
       }
     }
     cs.launch {
-      XDebugSessionApi.getInstance().sessionTabInfo(id).collectLatest { tabDto ->
+      XDebugSessionTabApi.getInstance().sessionTabInfo(id).collectLatest { tabDto ->
         if (tabDto == null) return@collectLatest
         initTabInfo(tabDto)
         this.cancel() // Only one tab expected
@@ -279,7 +268,7 @@ class FrontendXDebuggerSession private constructor(
       withContext(Dispatchers.EDT) {
         XDebugSessionTab.create(proxy, tabInfo.iconId?.icon(), tabInfo.executionEnvironmentProxyDto?.executionEnvironment(project, cs), tabInfo.contentToReuse,
                                 tabInfo.forceNewDebuggerUi, tabInfo.withFramesCustomization).apply {
-          _sessionTab = this
+          sessionTabDeferred.complete(this)
           proxy.onTabInitialized(this)
           showTab()
           runContentDescriptor?.coroutineScope?.awaitCancellationAndInvoke {
@@ -341,7 +330,9 @@ class FrontendXDebuggerSession private constructor(
   }
 
   override fun createTabLayouter(): XDebugTabLayouter {
-    return object : XDebugTabLayouter() {} // TODO
+    // Additional tabs are not supported in RemDev
+    val monolithLayouter = MonolithUtils.findSessionById(id)?.debugProcess?.createTabLayouter()
+    return monolithLayouter ?: object : XDebugTabLayouter() {} // TODO support additional tabs in RemDev
   }
 
   override fun addSessionListener(listener: XDebugSessionListener, disposable: Disposable) {
@@ -370,7 +361,7 @@ class FrontendXDebuggerSession private constructor(
 
   override fun onTabInitialized(tab: XDebugSessionTab) {
     cs.launch {
-      XDebugSessionApi.getInstance().onTabInitialized(id, XDebuggerSessionTabInfoCallback(tab))
+      XDebugSessionTabApi.getInstance().onTabInitialized(id, XDebuggerSessionTabInfoCallback(tab))
     }
   }
 
@@ -393,7 +384,7 @@ class FrontendXDebuggerSession private constructor(
     return false
   }
 
-  override fun getDropFrameHandler(): XDropFrameHandler? = dropFrameHandler
+  override fun getDropFrameHandler(): XDropFrameHandler = dropFrameHandler
 
   override fun getActiveNonLineBreakpoint(): XBreakpointProxy? {
     return activeNonLineBreakpoint.value

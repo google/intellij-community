@@ -9,7 +9,7 @@ import com.intellij.ide.actions.RevealFileAction
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ThreadingSupport
+import com.intellij.openapi.application.impl.InternalThreading
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.impl.fus.FreezeUiUsageCollector
 import com.intellij.openapi.progress.util.ui.NiceOverlayUi
@@ -58,7 +58,6 @@ import javax.swing.SwingUtilities
  */
 @ApiStatus.Internal
 object SuvorovProgress {
-  var entered: Boolean = false
 
   @Volatile
   private lateinit var eternalStealer: EternalEventStealer
@@ -113,7 +112,8 @@ object SuvorovProgress {
         if (currentFocusedPane == null) {
           // can happen also in tests
           processInvocationEventsWithoutDialog(awaitedValue, Int.MAX_VALUE)
-        } else {
+        }
+        else {
           showNiceOverlay(awaitedValue, currentFocusedPane)
         }
       }
@@ -155,6 +155,7 @@ object SuvorovProgress {
         }
       }, disposable)
 
+    repostAllEvents()
     try {
       while (!awaitedValue.isCompleted) {
         niceOverlay.redrawMainComponent()
@@ -205,13 +206,7 @@ object SuvorovProgress {
 
   @OptIn(InternalCoroutinesApi::class)
   private fun processInvocationEventsWithoutDialog(awaitedValue: Deferred<*>, showingDelay: Int) {
-    eternalStealer.enable()
-    try {
-      eternalStealer.dispatchAllEventsForTimeout(showingDelay.toLong(), awaitedValue)
-    }
-    finally {
-      eternalStealer.disable()
-    }
+    eternalStealer.dispatchAllEventsForTimeout(showingDelay.toLong(), awaitedValue)
   }
 
   private fun showSpinningProgress(awaitedValue: Deferred<*>) {
@@ -285,27 +280,17 @@ object SuvorovProgress {
  * One needs to be careful to maintain keep AWT events in the order they were posted.
  */
 private class EternalEventStealer(disposable: Disposable) {
-  @Volatile
-  private var enabled = false
   private var counter = 0
-
   private val specialEvents = LinkedBlockingQueue<ForcedEvent>()
 
   init {
     IdeEventQueue.getInstance().addPostEventListener(
       { event ->
-        if (enabled && event.toString().contains(",runnable=${ThreadingSupport.RunnableWithTransferredWriteAction.NAME}")) {
-          val specialDispatchEvent = SpecialDispatchEvent(event)
-          specialEvents.add(specialDispatchEvent)
-          IdeEventQueue.getInstance().doPostEvent(specialDispatchEvent, true)
-          return@addPostEventListener true
+        if (event is InternalThreading.TransferredWriteActionEvent) {
+          specialEvents.add(TransferredWriteActionWrapper(event))
         }
         false
       }, disposable)
-  }
-
-  fun enable() {
-    enabled = true
   }
 
   fun dispatchAllEventsForTimeout(timeoutMillis: Long, deferred: Deferred<*>) {
@@ -327,15 +312,15 @@ private class EternalEventStealer(disposable: Disposable) {
         return
       }
       try {
-        when (val event = specialEvents.poll(toSleep, TimeUnit.MILLISECONDS)) {
+        when (val event = specialEvents.poll() ?: specialEvents.poll(toSleep, TimeUnit.MILLISECONDS)) {
           is TerminalEvent -> {
             // return only if we get the event for the right id
             if (event.id == id) {
               return
             }
           }
-          is SpecialDispatchEvent -> getGlobalThreadingSupport().relaxPreventiveLockingActions {
-            event.execute()
+          is TransferredWriteActionWrapper -> getGlobalThreadingSupport().relaxPreventiveLockingActions {
+            event.event.execute()
           }
           null -> Unit
         }
@@ -343,14 +328,7 @@ private class EternalEventStealer(disposable: Disposable) {
         // we still return locking result regardless of interruption
         Thread.currentThread().interrupt()
       }
-      if (!deferred.isActive) {
-        return
-      }
     }
-  }
-
-  fun disable() {
-    enabled = false
   }
 }
 
@@ -358,27 +336,8 @@ private sealed interface ForcedEvent
 
 private class TerminalEvent(val id: Int) : ForcedEvent
 
-private class SpecialDispatchEvent private constructor(val reference: AtomicReference<AWTEvent>) : ForcedEvent, InvocationEvent(Any(), {
-  execute(reference)
-}) {
-  companion object {
-    fun execute(ref: AtomicReference<AWTEvent>) {
-      val actualEvent = ref.getAndSet(null) ?: return
-      IdeEventQueue.getInstance().dispatchEvent(actualEvent)
-    }
-  }
-
-  constructor(event: AWTEvent) : this(AtomicReference(event))
-
-  fun execute() {
-    execute(reference)
-  }
-
-  override fun toString(): String {
-    return "SpecialDispatchEvent"
-  }
-}
-
+@JvmInline
+private value class TransferredWriteActionWrapper(val event: InternalThreading.TransferredWriteActionEvent) : ForcedEvent
 
 /**
  * Protection against race condition: imagine someone posted an event that wants lock, and then they post [SuvorovProgress.ForcedWriteActionRunnable].

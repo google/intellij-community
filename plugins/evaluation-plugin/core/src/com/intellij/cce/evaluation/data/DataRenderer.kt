@@ -52,6 +52,10 @@ sealed interface DataRenderer<in T> {
     override val serialName: String = "text_diff"
   }
 
+  data object ColoredInsights : DataRenderer<ColoredInsightsData> {
+    override val serialName: String = "colored_insights"
+  }
+
   class Serializer : JsonSerializer<DataRenderer<*>>, JsonDeserializer<DataRenderer<*>> {
     override fun serialize(src: DataRenderer<*>?, typeOfSrc: Type?, context: JsonSerializationContext?): JsonElement? {
       val serialized = context?.serialize(src)
@@ -73,6 +77,7 @@ sealed interface DataRenderer<in T> {
         "lines" -> Lines
         "text_diff" -> TextDiff
         "snippets" -> Snippets
+        "colored_insights" -> ColoredInsights
         else -> throw IllegalArgumentException("Unknown type: $type")
       }
     }
@@ -108,9 +113,14 @@ data class FileUpdate(
 
 fun sanitizeText(text: String): String = text.replace("\r\n", "\n")
 
+
+/**
+ * 0-based line numbers.
+ * [start] and [end] are inclusive.
+ */
 interface Range {
   val start: Int
   val end: Int
 }
 
-data class NamedRange(override val start: Int, override val end: Int, val text: String, val negativeExample: Boolean = false) : Range
+data class NamedRange(override val start: Int, override val end: Int, val text: String, val negativeExample: Boolean? = null) : Range

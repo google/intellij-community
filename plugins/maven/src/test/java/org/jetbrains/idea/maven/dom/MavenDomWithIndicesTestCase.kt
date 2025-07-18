@@ -18,6 +18,7 @@ package org.jetbrains.idea.maven.dom
 import com.intellij.maven.testFramework.MavenDomTestCase
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.ExtensionTestUtil.maskExtensions
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ import org.jetbrains.idea.maven.onlinecompletion.MavenCompletionProviderFactory
 import org.jetbrains.idea.maven.project.MavenSettingsCache
 import org.jetbrains.idea.maven.server.MavenServerConnector
 import org.jetbrains.idea.maven.server.MavenServerDownloadListener
+import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.reposearch.DependencySearchService
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -54,7 +56,7 @@ abstract class MavenDomWithIndicesTestCase : MavenDomTestCase() {
                       """.trimIndent())
     }
     else {
-      MavenSettingsCache.getInstance(project).reloadAsync();
+      MavenSettingsCache.getInstance(project).reloadAsync()
     }
     withContext(Dispatchers.EDT) { myIndicesFixture!!.setUpAfterImport() }
   }
@@ -112,10 +114,12 @@ abstract class MavenDomWithIndicesTestCase : MavenDomTestCase() {
   protected suspend fun runAndExpectArtifactDownloadEvents(expectedGroupId: String, expectedArtifactIds: Set<String>, action: suspend () -> Unit) {
     val groupFolder = expectedGroupId.replace('.', '/')
     val actualEvents: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    val downloadListener = MavenServerDownloadListener { _, relativePath ->
-      if (relativePath.startsWith(groupFolder)) {
-        val artifactId = relativePath.substring(groupFolder.length).split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()[1]
+    val downloadListener = MavenServerDownloadListener { file ->
+      val absolutePath = FileUtilRt.toSystemIndependentName(file.absolutePath)
+      if (absolutePath.contains(groupFolder) && absolutePath.endsWith("jar")) {
+        val artifactId = absolutePath.substringAfter(groupFolder).split("/")[1]
         if (expectedArtifactIds.contains(artifactId)) {
+          MavenLog.LOG.warn("Artifact $artifactId is downloaded")
           actualEvents.add(artifactId)
         }
       }
@@ -128,7 +132,11 @@ abstract class MavenDomWithIndicesTestCase : MavenDomTestCase() {
 
     awaitConfiguration()
 
-    assertUnorderedElementsAreEqual(actualEvents, expectedArtifactIds)
+    val extraDownloaded = actualEvents - expectedArtifactIds
+    assertEmpty("Unexpected artifacts downloaded", extraDownloaded)
+
+    val notDownloaded = expectedArtifactIds - actualEvents
+    assertEmpty("Artifacts not downloaded", notDownloaded)
   }
 
   override suspend fun checkHighlighting() {

@@ -478,10 +478,11 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     return pluginIds.any { !pluginRequiresUltimatePluginButItsDisabled(it, idMap, contentModuleIdMap) }
   }
 
-  override fun isPluginRequiresUltimateButItIsDisabled(pluginId: PluginId): Boolean {
+  override fun isPluginRequiresUltimateButItIsDisabled(sessionId: String, pluginId: PluginId): Boolean {
     val idMap = buildPluginIdMap()
     val contentModuleIdMap = getPluginSet().buildContentModuleIdMap()
-    return pluginRequiresUltimatePluginButItsDisabled(pluginId, idMap, contentModuleIdMap)
+    val rootDescriptor = idMap[pluginId] ?: findSession(sessionId)?.dynamicPluginsToInstall[pluginId]?.pluginDescriptor ?: return false
+    return pluginRequiresUltimatePluginButItsDisabled(rootDescriptor, idMap, contentModuleIdMap)
   }
 
   override fun hasPluginRequiresUltimateButItsDisabled(pluginIds: List<PluginId>): Boolean {
@@ -795,13 +796,17 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
         if (looksLikePlatformPluginAlias(dependencyPluginId)) {
           continue
         }
+        if (session.isPluginDisabled(dependencyPluginId)) {
+          // FIXME IJPL-196672 I don't understand why this code exists and what it is supposed to do
+          //  (even if it is intended for something, it does not work properly)
+          continue
+        }
 
         val descriptor = pluginIdMap[dependencyPluginId]
         if (descriptor != null && !InstalledPluginsTableModel.isHidden(descriptor)) {
           descriptors.add(descriptor)
           LOG.warn("For ${entry.key} dependent plugin: ${descriptor.pluginId} not found")
         }
-        break
       }
     }
 

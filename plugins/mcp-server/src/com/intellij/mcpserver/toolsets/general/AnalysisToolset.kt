@@ -7,12 +7,9 @@ import com.intellij.analysis.problemsView.ProblemsCollector
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.lang.annotation.HighlightSeverity
-import com.intellij.mcpserver.McpServerBundle
-import com.intellij.mcpserver.McpToolset
+import com.intellij.mcpserver.*
 import com.intellij.mcpserver.annotations.McpDescription
 import com.intellij.mcpserver.annotations.McpTool
-import com.intellij.mcpserver.mcpFail
-import com.intellij.mcpserver.project
 import com.intellij.mcpserver.toolsets.Constants
 import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.mcpserver.util.resolveInProject
@@ -54,6 +51,7 @@ class AnalysisToolset : McpToolset {
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION)
     timeout: Int = Constants.MEDIUM_TIMEOUT_MILLISECONDS_VALUE,
   ): FileProblemsResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.collecting.file.problems", filePath))
     val project = currentCoroutineContext().project
     val projectDir = project.projectDirectory
 
@@ -109,6 +107,7 @@ class AnalysisToolset : McpToolset {
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION)
     timeout: Int = Constants.LONG_TIMEOUT_MILLISECONDS_VALUE,
   ): ProjectProblemsResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.checking.project.issues"))
     val project = currentCoroutineContext().project
 
     val problems = CopyOnWriteArrayList<ProjectProblem>()
@@ -146,6 +145,7 @@ class AnalysisToolset : McpToolset {
     |Returns structured information about each module including name and type.
   """)
   suspend fun get_project_modules(): ProjectModulesResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.listing.modules"))
     val project = currentCoroutineContext().project
 
     val modules = readAction {
@@ -167,6 +167,7 @@ class AnalysisToolset : McpToolset {
     |Returns structured information about project library names.
   """)
   suspend fun get_project_dependencies(): ProjectDependenciesResult {
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.checking.dependencies"))
     val project = currentCoroutineContext().project
 
     val dependencies = readAction {
