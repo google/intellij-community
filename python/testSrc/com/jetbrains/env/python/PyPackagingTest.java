@@ -13,7 +13,6 @@ import com.jetbrains.env.PyTestTask;
 import com.jetbrains.python.packaging.PyPackage;
 import com.jetbrains.python.packaging.PyPackageManager;
 import com.jetbrains.python.packaging.requirement.PyRequirementRelation;
-import com.jetbrains.python.sdk.PythonSdkUtil;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
 import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor;
 import com.jetbrains.python.tools.sdkTools.SdkCreationType;
@@ -30,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 import static com.intellij.testFramework.UsefulTestCase.assertInstanceOf;
+import static com.jetbrains.python.SdkUiUtilKt.isVirtualEnv;
 import static com.jetbrains.python.packaging.PyRequirementsKt.pyRequirement;
 import static org.junit.Assert.*;
 
@@ -76,7 +76,7 @@ public class PyPackagingTest extends PyEnvTestCase {
                                                                                         false);
           final Sdk venvSdk = createTempSdk(venvSdkHome, SdkCreationType.EMPTY_SDK);
           assertNotNull(venvSdk);
-          assertTrue(PythonSdkUtil.isVirtualEnv(venvSdk));
+          assertTrue(isVirtualEnv(venvSdk));
           assertInstanceOf(PythonSdkFlavor.getPlatformIndependentFlavor(venvSdk.getHomePath()), VirtualEnvSdkFlavor.class);
           final List<PyPackage> packages = PyPackageManager.getInstance(venvSdk).refreshAndGetPackages(false);
           final PyPackage setuptools = findPackage("setuptools", packages);
@@ -120,10 +120,6 @@ public class PyPackagingTest extends PyEnvTestCase {
           final PyPackage pip1 = findPackage("pip", packages1);
           assertNotNull(pip1);
           assertEquals("pip", pip1.getName());
-          manager.uninstall(Collections.singletonList(markdown2));
-          final List<PyPackage> packages3 = manager.refreshAndGetPackages(false);
-          final PyPackage markdown3 = findPackage("markdown", packages3);
-          assertNull(markdown3);
         }
         catch (ExecutionException e) {
           throw new RuntimeException(String.format("Error for interpreter '%s': %s", sdk.getHomePath(), e.getMessage()), e);

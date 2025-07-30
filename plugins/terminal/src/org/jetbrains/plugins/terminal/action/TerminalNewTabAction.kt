@@ -32,11 +32,13 @@ open class TerminalNewTabAction : TerminalPromotedDumbAwareAction(), ActionRemot
 
   override fun actionPerformed(e: AnActionEvent) {
     val project = e.project ?: return
+    val contentManager = e.getData(PlatformDataKeys.TOOL_WINDOW_CONTENT_MANAGER)
     val startupFusInfo = TerminalStartupFusInfo(TerminalOpeningWay.OPEN_NEW_TAB)
     TerminalToolWindowManager.getInstance(project).createNewTab(
       TerminalOptionsProvider.instance.terminalEngine,
       startupFusInfo,
-      null
+      null,
+      contentManager,
     )
   }
 

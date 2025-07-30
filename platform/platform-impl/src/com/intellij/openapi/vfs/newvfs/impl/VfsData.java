@@ -11,10 +11,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
 import com.intellij.openapi.vfs.newvfs.persistent.FSRecordsImpl;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
-import com.intellij.util.ArrayUtilRt;
-import com.intellij.util.BitUtil;
-import com.intellij.util.Functions;
-import com.intellij.util.ObjectUtils;
+import com.intellij.util.*;
 import com.intellij.util.concurrency.AtomicFieldUpdater;
 import com.intellij.util.containers.*;
 import com.intellij.util.keyFMap.KeyFMap;
@@ -26,9 +23,14 @@ import org.jetbrains.annotations.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.IntFunction;
 
 /**
- * The place where all the data is stored for VFS parts loaded into a memory: name-ids, flags, user data, children.
+ * Main part of VFS in-memory cache: flags, user data and children are all stored here.
+ * {@link VirtualFileSystemEntry} and {@link VirtualDirectoryImpl} objects mainly just store fileId, so they could be
+ * seen as 'pointers' into this cache.
+ * {@link com.intellij.openapi.vfs.newvfs.persistent.VirtualDirectoryCache} is another part of VFS in-memory cache, which caches
+ * {@link VirtualDirectoryImpl} objects.
  * <p>
  * The purpose is to avoid holding this data in separate immortal file/directory objects because that involves space overhead, significant
  * when there are hundreds of thousands of files.
@@ -43,14 +45,16 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  * <ol>
  * <li> The file has not been instantiated yet, so {@link #getFileById} returns null. </li>
  *
- * <li> A file is explicitly requested by calling getChildren or findChild on its parent. The parent initializes all the necessary data (in a thread-safe context)
- * and creates the file instance. See {@link Segment#initFileData(int, Object, VirtualDirectoryImpl)} </li>
+ * <li> A file is explicitly requested by calling getChildren or findChild on its parent. The parent initializes all the necessary
+ * data (in a thread-safe context) and creates the file instance.
+ * See {@link Segment#initFileData(int, Object, VirtualDirectoryImpl)} </li>
  *
  * <li> After that the file is live, an object representing it can be retrieved any time from its parent. File system roots are
  * kept on hard references in {@link PersistentFS} </li>
  *
- * <li> If a file is deleted (invalidated), then its data is not needed anymore, and should be removed. But this can only happen after
- * all the listener have been notified about the file deletion and have had their chance to look at the data the last time. See {@link #killInvalidatedFiles()} </li>
+ * <li> If a file is deleted (invalidated), then its data is not needed anymore, and should be removed. But this can only happen
+ * after all the listener has been notified about the file deletion and have had their chance to look at the data the last time.
+ * See {@link #killInvalidatedFiles()} </li>
  *
  * <li> The file with removed data is marked as "dead" (see {@link #deadMarker}), any access to it will throw {@link InvalidVirtualFileAccessException}
  * Dead ids won't be reused in the same session of the IDE. </li>
@@ -73,6 +77,8 @@ public final class VfsData {
   //TODO RC: FSRecords was quite optimized recently, probably caching is not needed anymore?
   //         indexingFlag/nameId caching was already removed -- need to think through about remaining (flag+modCount)
   //         field: on the first sight they look like an additional data, independent from persistent VFS data?
+  //         .children is another thing that could be less cached -- in many cases children could be accessed directly from
+  //         FSRecords?
 
   /** [segmentIndex -> Segment] */
   private final ConcurrentIntObjectMap<Segment> segments = ConcurrentCollectionFactory.createConcurrentIntObjectMap();
@@ -108,8 +114,7 @@ public final class VfsData {
     }, app);
   }
 
-  @NotNull
-  PersistentFSImpl owningPersistentFS() {
+  @NotNull PersistentFSImpl owningPersistentFS() {
     return owningPersistentFS;
   }
 
@@ -128,29 +133,38 @@ public final class VfsData {
     }
   }
 
-  @Nullable
-  VirtualFileSystemEntry getFileById(int id, @NotNull VirtualDirectoryImpl parent, boolean putToMemoryCache) {
+  /**
+   * @return a VirtualFileSystemEntry wrapper for the file data in the cache ({@link #segments}).
+   * If there is no data in {@link #segments} cache for given id yet -- returns null.
+   * If the file with given id was deleted -- throws {@link InvalidVirtualFileAccessException}.
+   * <p/>
+   * If putToMemoryCache=true, and the wrapper created is a directory -- it is also put into {@link PersistentFSImpl#dirByIdCache}.
+   * If the given id corresponds to a file, not a directory -- this param has no effect.
+   */
+  @Nullable VirtualFileSystemEntry getFileById(int id, @NotNull VirtualDirectoryImpl parent, boolean putToMemoryCache) {
     VirtualFileSystemEntry dir = owningPersistentFS.getCachedDir(id);
     if (dir != null) return dir;
 
-    Segment segment = getSegment(id, false);
+    Segment segment = getSegment(id, /*create: */ false);
     if (segment == null) return null;
 
     int offset = objectOffsetInSegment(id);
-    Object o = segment.objectFieldsArray.get(offset);
-    if (o == null) return null;
+    Object entryData = segment.objectFieldsArray.get(offset);
+    if (entryData == null) return null;
 
-    if (o == deadMarker) {
+    if (entryData == deadMarker) {
       throw reportDeadFileAccess(new VirtualFileImpl(id, segment, parent));
     }
 
-    if (o instanceof DirectoryData) {
+    if (entryData instanceof DirectoryData directoryData) {
       if (putToMemoryCache) {
-        return owningPersistentFS.getOrCacheDir(new VirtualDirectoryImpl(id, segment, (DirectoryData)o, parent, parent.getFileSystem()));
+        return owningPersistentFS.getOrCacheDir(new VirtualDirectoryImpl(id, segment, directoryData, parent, parent.getFileSystem()));
       }
-      VirtualFileSystemEntry entry = owningPersistentFS.getCachedDir(id);
-      if (entry != null) return entry;
-      return new VirtualDirectoryImpl(id, segment, (DirectoryData)o, parent, parent.getFileSystem());
+      else {
+        VirtualFileSystemEntry entry = owningPersistentFS.getCachedDir(id);
+        if (entry != null) return entry;
+        return new VirtualDirectoryImpl(id, segment, directoryData, parent, parent.getFileSystem());
+      }
     }
     return new VirtualFileImpl(id, segment, parent);
   }
@@ -182,8 +196,7 @@ public final class VfsData {
     return !invalidatedFileIds.get(id);
   }
 
-  @Nullable
-  VirtualDirectoryImpl getChangedParent(int id) {
+  @Nullable VirtualDirectoryImpl getChangedParent(int id) {
     return changedParents.get(id);
   }
 
@@ -258,8 +271,7 @@ public final class VfsData {
       }
     }
 
-    @NotNull
-    KeyFMap getUserMap(@NotNull VirtualFileSystemEntry file, int id) {
+    @NotNull KeyFMap getUserMap(@NotNull VirtualFileSystemEntry file, int id) {
       Object o = objectFieldsArray.get(objectOffsetInSegment(id));
       if (!(o instanceof KeyFMap)) {
         throw reportDeadFileAccess(file);
@@ -333,7 +345,7 @@ public final class VfsData {
       owningVfsData.changeParent(fileId, directory);
     }
 
-    //@GuardedBy("parent.DirectoryData")
+    //@GuardedBy("parent.directoryData")
     void initFileData(int fileId, @NotNull Object fileData, @NotNull VirtualDirectoryImpl parent) throws FileAlreadyCreatedException {
       int offset = objectOffsetInSegment(fileId);
 
@@ -341,6 +353,8 @@ public final class VfsData {
       if (existingData != null) {
         //RC: it seems like concurrency issue, but I can't find a specific location
         //MAYBE RC: don't throw the exception -- if an entry was already created, so be it, log warn and go on?
+        //TODO RC: why it is even an error? This could happen if the cached file entry was dropped by GC (it is a soft-ref),
+        //         or sometimes just by concurrency
 
         FSRecordsImpl vfsPeer = owningVfsData.owningPersistentFS.peer();
         int parentId = vfsPeer.getParent(fileId);
@@ -357,7 +371,7 @@ public final class VfsData {
           describeAlreadyCreatedFile(fileId)
           + " data: " + fileData
           + ", alreadyExistingData: " + existingData
-          + ", parentData: " + parentData + ", parent.data: " + parent.myData + " equals: " + (parentData == parent.myData)
+          + ", parentData: " + parentData + ", parent.data: " + parent.directoryData + " equals: " + (parentData == parent.directoryData)
           + ", synchronized(parentData): " + (parentData != null ? Thread.holdsLock(parentData) : "...")
         );
       }
@@ -392,45 +406,32 @@ public final class VfsData {
     }
   }
 
-  // non-final field accesses are synchronized on this instance, but this happens in VirtualDirectoryImpl
+  /**
+   * This class is mostly a data-holder: most operations are in {@link VirtualDirectoryImpl}.
+   *
+   * Non-final field modifications are synchronized on 'this' instance (but this is done in {@link VirtualDirectoryImpl})
+   */
   @ApiStatus.Internal
   public static final class DirectoryData {
     private static final AtomicFieldUpdater<DirectoryData, KeyFMap> USER_MAP_UPDATER =
       AtomicFieldUpdater.forFieldOfType(DirectoryData.class, KeyFMap.class);
     volatile @NotNull KeyFMap userMap = KeyFMap.EMPTY_MAP;
     /**
-     * sorted by {@link VfsData#getNameByFileId(int)}
-     * assigned under lock(this) only; never modified in-place
+     * assigned under lock(this) only; never modified in-place (=uses copy-on-write)
      *
-     * @see VirtualDirectoryImpl#findIndex(int[], CharSequence, boolean)
+     * @see VirtualDirectoryImpl#findIndexByName(ChildrenIds, CharSequence, boolean)
      */
-    volatile int @NotNull [] childrenIds = ArrayUtilRt.EMPTY_INT_ARRAY; // guarded by this
-    volatile boolean allChildrenLoaded;
+    //MAYBE RC:we don't really need to always _load and keep_ the children in memory. We could always load them from
+    //          FSRecordsImpl, and we could even iterate/search through FSRecordsImpl-stored children directly, unpacking
+    //          diff-compressed data on the way. This shouldn't be much slower than linear-search in in-memory int[],
+    //          but it allows to not waste memory on children lists that are not needed, which may be substantial
+    //          given: 1) we _never unload_ VfsData cache 2) most of VirtualDirectory we load we load _not_ to iterate
+    //          through it's children, but just to build a hierarchy, to access some leaf-file, e.g. during indexing
+    //          or during indexes lookups -- so we'll rarely/never actually use this VirtualDirectory.children.
+    volatile @NotNull ChildrenIds children = ChildrenIds.EMPTY;
 
-    // assigned under lock(this) only; accessed/modified map contents under lock(myAdoptedNames)
+    /** assigned under lock(this) only; accessed/modified map contents under lock(adoptedNames) */
     private volatile Set<CharSequence> adoptedNames;
-
-    VirtualFileSystemEntry @NotNull [] getFileChildren(@NotNull VirtualDirectoryImpl parent, boolean putToMemoryCache) {
-      int[] ids = childrenIds;
-      VirtualFileSystemEntry[] children = new VirtualFileSystemEntry[ids.length];
-      for (int i = 0; i < ids.length; i++) {
-        int childId = ids[i];
-        VirtualFileSystemEntry child = parent.getVfsData().getFileById(childId, parent, putToMemoryCache);
-        if (child == null) {
-          throw new AssertionError("No file for id " + childId + ", parentId = " + parent.myId);
-        }
-        children[i] = child;
-      }
-      return children;
-    }
-
-    boolean allChildrenLoaded() {
-      return allChildrenLoaded;
-    }
-
-    void setAllChildrenLoaded() {
-      allChildrenLoaded = true;
-    }
 
     boolean changeUserMap(@NotNull KeyFMap oldMap, @NotNull KeyFMap newMap) {
       return USER_MAP_UPDATER.compareAndSet(this, oldMap, newMap);
@@ -498,9 +499,7 @@ public final class VfsData {
       return adopted;
     }
 
-    @NotNull
-    @Unmodifiable
-    List<String> getAdoptedNames() {
+    @NotNull @Unmodifiable List<String> getAdoptedNames() {
       Set<CharSequence> adopted = adoptedNames;
       if (adopted == null) return Collections.emptyList();
       synchronized (adopted) {
@@ -518,9 +517,9 @@ public final class VfsData {
     @Override
     public @NonNls String toString() {
       return "DirectoryData{" +
-             "myUserMap=" + userMap +
-             ", myChildrenIds=" + Arrays.toString(childrenIds) +
-             ", myAdoptedNames=" + adoptedNames +
+             "userMap=" + userMap +
+             ", children=" + children +
+             ", adoptedNames=" + adoptedNames +
              '}';
     }
   }
@@ -528,6 +527,159 @@ public final class VfsData {
   public static final class FileAlreadyCreatedException extends RuntimeException {
     private FileAlreadyCreatedException(@NotNull String message) {
       super(message);
+    }
+  }
+
+  @ApiStatus.Internal
+  public static final class ChildrenIds {
+    public static final ChildrenIds EMPTY = new ChildrenIds(ArrayUtilRt.EMPTY_INT_ARRAY, /*sorted:*/ true, /*allLoaded: */ false);
+
+    private static final byte SORTED_BY_NAME_MASK = 0b01;
+    private static final byte ALL_CHILDREN_LOADED_MASK = 0b10;
+
+    private final int[] ids;
+    /** bitmask: SORTED_BY_NAME_MASK | ALL_CHILDREN_LOADED_MASK */
+    private final int flags;
+
+
+    public ChildrenIds(int[] ids,
+                       boolean sortedByName,
+                       boolean allChildrenLoaded) {
+      this(ids, (sortedByName ? SORTED_BY_NAME_MASK : 0) | (allChildrenLoaded ? ALL_CHILDREN_LOADED_MASK : 0));
+    }
+
+    private ChildrenIds(int[] ids,
+                        int flags) {
+      this.ids = ids;
+      this.flags = flags;
+    }
+
+    public int size() {
+      return ids.length;
+    }
+
+    public int id(int index) {
+      return ids[index];
+    }
+
+    public boolean isSorted() {
+      return (flags & SORTED_BY_NAME_MASK) != 0;
+    }
+
+    public boolean areAllChildrenLoaded() {
+      return (flags & ALL_CHILDREN_LOADED_MASK) != 0;
+    }
+
+    public IntOpenHashSet toIntSet() {
+      return new IntOpenHashSet(ids);
+    }
+
+    public VirtualFileSystemEntry @NotNull [] asFiles(@NotNull IntFunction<? extends VirtualFileSystemEntry> fileLoader) {
+      VirtualFileSystemEntry[] children = new VirtualFileSystemEntry[ids.length];
+      for (int i = 0; i < ids.length; i++) {
+        int id = ids[i];
+        VirtualFileSystemEntry child = fileLoader.apply(id);
+        if (child == null) {
+          throw new AssertionError("Bug: can't load file by id " + id);
+        }
+        children[i] = child;
+      }
+      return children;
+    }
+
+
+    public @NotNull ChildrenIds withAllChildrenLoaded(boolean allChildrenLoaded) {
+      if (areAllChildrenLoaded() == allChildrenLoaded) {
+        return this;
+      }
+      return new ChildrenIds(ids, isSorted(), allChildrenLoaded);
+    }
+
+    public @NotNull ChildrenIds withIds(int[] updatedIds) {
+      return new ChildrenIds(updatedIds, flags);
+    }
+
+    /** @return children sorted with the supplied comparator and fileLoader, regardless of current .sortedByName value */
+    public ChildrenIds sorted(@NotNull IntFunction<? extends VirtualFileSystemEntry> fileLoader,
+                              @NotNull Comparator<? super VirtualFileSystemEntry> comparator) {
+      //Since fileLoader/comparator is supplied externally, we can't rely on .sortedByName  -- it should be checked
+      // by this method's caller, and it's up to the caller to decide to trust it or not
+      if (ids.length <= 1) {
+        return new ChildrenIds(ids, /*sorted: */ true, areAllChildrenLoaded());
+      }
+
+      VirtualFileSystemEntry[] files = asFiles(fileLoader);
+      ContainerUtil.sort(files, comparator);
+
+      int[] sortedIds = new int[ids.length];
+      for (int i = 0; i < files.length; i++) {
+        sortedIds[i] = files[i].getId();
+      }
+      return new ChildrenIds(sortedIds, /*sorted: */ true, areAllChildrenLoaded());
+    }
+
+
+    /** linear O(N) search, -1 if not found */
+    public int indexOfId(int id) {
+      return ArrayUtil.indexOf(ids, id);
+    }
+
+    /**
+     * @return index of child with given name, with given namesComparator and namesLoader(fileId->fileName).
+     * If child with given name is not found, returns standard for binary search (-insertionIndex-1)
+     */
+    public int findIndexByName(@NotNull CharSequence name,
+                               @NotNull Comparator<? super CharSequence> namesComparator,
+                               @NotNull IntFunction<? extends CharSequence> nameLoader) {
+      if (!isSorted()) {
+        throw new IllegalStateException("Children must be sorted for binary search");
+      }
+      return ObjectUtils.binarySearch(
+        0, ids.length,
+        mid -> namesComparator.compare(nameLoader.apply(ids[mid]), name)
+      );
+    }
+
+
+    public @NotNull ChildrenIds insertAt(int index, int id) {
+      int[] updatedIds = ArrayUtil.insert(ids, index, id);
+      return withIds(updatedIds);
+    }
+
+    public @NotNull ChildrenIds appendId(int id) {
+      //if we append id -- most likely 'sorted' property is lost:
+      return appendId(id, /*stillSorted: */ false);
+    }
+
+    public @NotNull ChildrenIds appendId(int id, boolean stillSorted) {
+      int[] updatedIds = ArrayUtil.append(ids, id);
+      return new ChildrenIds(updatedIds, stillSorted, areAllChildrenLoaded());
+    }
+
+    public @NotNull ChildrenIds removeAt(int index) {
+      int[] updatedIds = ArrayUtil.remove(ids, index);
+      return withIds(updatedIds);
+    }
+
+    public @NotNull ChildrenIds removeIds(@NotNull IntSet idsToRemove) {
+      int[] newIds = new int[ids.length];
+      int newIdsCount = 0;
+      for (int id : ids) {
+        if (!idsToRemove.contains(id)) {
+          newIds[newIdsCount++] = id;
+        }
+      }
+      if (newIdsCount == newIds.length) {//no ids were skipped:
+        return this;
+      }
+
+      newIds = (newIdsCount == 0) ? ArrayUtil.EMPTY_INT_ARRAY : Arrays.copyOf(newIds, newIdsCount);
+      return withIds(newIds);
+    }
+
+    @Override
+    public String toString() {
+      return "Children[ids: " + Arrays.toString(ids) + ", sortedByName: " + isSorted() + ", allLoaded: " + areAllChildrenLoaded() + "]";
     }
   }
 }

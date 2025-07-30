@@ -2,6 +2,7 @@ package com.intellij.terminal.frontend
 
 import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.util.Key
 import com.intellij.terminal.session.*
 import com.intellij.terminal.session.dto.toDto
@@ -14,6 +15,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.future.await
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
 import org.jetbrains.plugins.terminal.fus.*
+import java.awt.event.KeyEvent
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import kotlin.time.TimeMark
@@ -24,6 +26,7 @@ class TerminalInput(
   private val sessionModel: TerminalSessionModel,
   startupFusInfo: TerminalStartupFusInfo?,
   coroutineScope: CoroutineScope,
+  private val encodingManager: TerminalKeyEncodingManager,
 ) {
   companion object {
     val DATA_KEY: DataKey<TerminalInput> = DataKey.Companion.create("TerminalInput")
@@ -72,6 +75,8 @@ class TerminalInput(
           if (latency != null) {
             typingLatencyReporter.update(latency)
           }
+
+          LOG.trace { "Input event sent: $event" }
         }
       }
       catch (e: CancellationException) {
@@ -116,6 +121,11 @@ class TerminalInput(
     doSendBytes(data, eventTime = null)
   }
 
+  fun sendEnter() {
+    val enterBytes = encodingManager.getCode(KeyEvent.VK_ENTER, 0)!!
+    sendBytes(enterBytes)
+  }
+
   private fun doSendBytes(data: ByteArray, eventTime: TimeMark?) {
     val writeBytesEvent = TerminalWriteBytesEvent(bytes = data)
     sendEvent(InputEventSubmission(writeBytesEvent, eventTime))
@@ -133,8 +143,14 @@ class TerminalInput(
     val event = TerminalResizeEvent(newSize.toDto())
     sendEvent(InputEventSubmission(event))
   }
+  
+  fun sendLinkClicked(isInAlternateBuffer: Boolean, hyperlinkId: TerminalHyperlinkId) {
+    sendEvent(InputEventSubmission(TerminalHyperlinkClickedEvent(isInAlternateBuffer, hyperlinkId)))
+  }
 
   private fun sendEvent(event: InputEventSubmission) {
+    LOG.trace { "Input event received: ${event.event}" }
+
     val result = bufferChannel.trySend(event)
 
     if (result.isClosed) {

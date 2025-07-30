@@ -280,6 +280,16 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     return myChildrenGetter.accessDiskWithCheckCanceled(file);
   }
 
+  private final DiskQueryRelay<Pair<VirtualFile, String>, FileAttributes.CaseSensitivity> caseSensitivityGetter = new DiskQueryRelay<>(
+    it -> super.fetchCaseSensitivity(it.first, it.second)
+  );
+
+  @Override
+  public FileAttributes.CaseSensitivity fetchCaseSensitivity(@NotNull VirtualFile parent,
+                                                             @NotNull String childName) {
+    return caseSensitivityGetter.accessDiskWithCheckCanceled(Pair.createNonNull(parent, childName));
+  }
+
   @Override
   public byte @NotNull [] contentsToByteArray(@NotNull VirtualFile file) throws IOException {
     if (SystemInfo.isUnix && file.is(VFileProperty.SPECIAL)) { // avoid opening FIFO files
@@ -372,7 +382,8 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
       return Collections.emptyMap();
     }
     try {
-      Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(10, dir.isCaseSensitive());
+      //We must return 'normal' (case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
+      Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(10, /*caseSensitive: */true);
 
       PlatformNioHelper.visitDirectory(Path.of(toIoPath(dir)), filter, (file, ioAttributesHolder) -> {
         try {

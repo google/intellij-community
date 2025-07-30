@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.yaml.backend` start
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "backend_resources",
@@ -32,7 +31,6 @@ jvm_library(
     "//platform/structure-view-impl:structureView-impl",
     "//spellchecker",
     "//platform/platform-impl:ide-impl",
-    "//xml/openapi:xml",
     "//json/backend",
     "//platform/indexing-impl",
     "//platform/editor-ui-ex:editor-ex",
@@ -76,7 +74,6 @@ jvm_library(
     "//spellchecker",
     "//spellchecker:spellchecker_test_lib",
     "//platform/platform-impl:ide-impl",
-    "//xml/openapi:xml",
     "//json/backend",
     "//json/backend/tests:tests_test_lib",
     "//platform/indexing-impl",
@@ -100,15 +97,20 @@ jvm_library(
     "//plugins/yaml:yaml_test_lib",
     "//platform/searchEverywhere/shared:searchEverywhere",
     "//platform/searchEverywhere/backend",
+    "//plugins/IntelliLang/backend",
   ],
   runtime_deps = [
     ":backend_resources",
     ":backend_test_resources",
   ]
 )
+### auto-generated section `build intellij.yaml.backend` end
+
+### auto-generated section `test intellij.yaml.backend` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "backend_test",
   runtime_deps = [":backend_test_lib"]
 )
-### auto-generated section `build intellij.yaml.backend` end
+### auto-generated section `test intellij.yaml.backend` end

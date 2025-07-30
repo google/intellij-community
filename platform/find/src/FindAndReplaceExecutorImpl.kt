@@ -3,6 +3,7 @@ package com.intellij.platform.find
 
 import com.intellij.find.FindModel
 import com.intellij.find.FindSettings
+import com.intellij.find.actions.ShowUsagesAction
 import com.intellij.find.findInProject.FindInProjectManager
 import com.intellij.find.impl.FindAndReplaceExecutor
 import com.intellij.find.impl.FindInProjectUtil
@@ -16,6 +17,7 @@ import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.CheckedDisposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ex.ProgressIndicatorEx
 import com.intellij.platform.project.projectId
@@ -37,7 +39,7 @@ private val LOG = logger<FindAndReplaceExecutorImpl>()
 open class FindAndReplaceExecutorImpl(val coroutineScope: CoroutineScope) : FindAndReplaceExecutor {
   private var validationJob: Job? = null
   private var findUsagesJob: Job? = null
-  private var currentSearchDisposable: Disposable? = null
+  private var currentSearchDisposable: CheckedDisposable? = null
 
   @OptIn(ExperimentalAtomicApi::class)
   override fun findUsages(
@@ -57,16 +59,23 @@ open class FindAndReplaceExecutorImpl(val coroutineScope: CoroutineScope) : Find
       findUsagesJob = coroutineScope.launch {
         val filesToScanInitially = previousUsages.mapNotNull { (it as? UsageInfoModel)?.model?.fileId?.virtualFile() }.toSet()
         currentSearchDisposable?.let { Disposer.dispose(it) }
-        currentSearchDisposable = Disposer.newDisposable(disposableParent, "Find in Project Search")
+        currentSearchDisposable = Disposer.newCheckedDisposable(disposableParent, "Find in Project Search")
 
-        FindRemoteApi.getInstance().findByModel(findModel, project.projectId(), filesToScanInitially.map { it.rpcId() })
-          .let {
+        FindRemoteApi.getInstance().findByModel(
+          findModel = findModel,
+          projectId = project.projectId(),
+          filesToScanInitially = filesToScanInitially.map { it.rpcId() },
+          maxUsagesCount = ShowUsagesAction.getUsagesPageSize()
+        ).let {
             if (shouldThrottle) it.throttledWithAccumulation()
             else it.map { event -> ThrottledOneItem(event) }
           }.collect { throttledItems ->
             throttledItems.items.forEach { item ->
               val usage = UsageInfoModel.createUsageInfoModel(project, item, this.childScope("UsageInfoModel.init"), onDocumentUpdated)
-              currentSearchDisposable?.let { parent -> Disposer.register(parent, usage) }
+              currentSearchDisposable?.let { parent ->
+                if (parent.isDisposed) return@collect
+                Disposer.register(parent, usage)
+              }
               onResult(usage)
             }
           }

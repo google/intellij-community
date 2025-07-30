@@ -25,6 +25,7 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -33,7 +34,7 @@ class PlatformUtilitiesTest {
 
   @Test
   fun `relaxing preventive actions leads to absence of lock`(): Unit = timeoutRunBlocking(context = Dispatchers.EDT) {
-    withContext(Dispatchers.ui(kind = UiDispatcherKind.RELAX)) {
+    withContext(Dispatchers.UiWithModelAccess) {
       assertThat(application.isWriteIntentLockAcquired).isFalse
       getGlobalThreadingSupport().runPreventiveWriteIntentReadAction {
         assertThat(application.isWriteIntentLockAcquired).isTrue
@@ -247,7 +248,7 @@ class PlatformUtilitiesTest {
   }
 
   @Test
-  fun `transferredWriteAction is not available on EDT`(): Unit = timeoutRunBlocking(context = Dispatchers.ui(UiDispatcherKind.RELAX)) {
+  fun `transferredWriteAction is not available on EDT`(): Unit = timeoutRunBlocking(context = Dispatchers.UiWithModelAccess) {
     assertThrows<AssertionError> {
       InternalThreading.invokeAndWaitWithTransferredWriteAction {
         fail<Nothing>()
@@ -331,5 +332,37 @@ class PlatformUtilitiesTest {
         lockCleanup()
       }
     }
+  }
+
+  @Test
+  fun `synchronous non-blocking read action does not cause thread starvation`(): Unit = timeoutRunBlocking {
+    val numberOfNonBlockingReadActions = Runtime.getRuntime().availableProcessors() * 2
+    val readActionCanFinish = Job(coroutineContext.job)
+    val readActionStarted = Job(coroutineContext.job)
+    launch(Dispatchers.Default) {
+      runReadAction {
+        readActionStarted.complete()
+        readActionCanFinish.asCompletableFuture().join()
+      }
+    }
+    launch(Dispatchers.Default) {
+      readActionStarted.join()
+      backgroundWriteAction {  }
+    }
+    readActionStarted.join()
+    delay(100) // let bg wa become pending
+    val counter = AtomicInteger(0)
+    coroutineScope {
+      repeat(numberOfNonBlockingReadActions) {
+        launch(Dispatchers.Default) {
+          ReadAction.nonBlocking(Callable {
+            counter.incrementAndGet()
+          }).executeSynchronously()
+        }
+      }
+      delay(100)
+      readActionCanFinish.complete()
+    }
+    assertThat(counter.get()).isEqualTo(numberOfNonBlockingReadActions)
   }
 }

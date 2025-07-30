@@ -52,7 +52,7 @@
                      implementationClass="com.jetbrains.python.requirements.inspections.tools.OutdatedRequirementInspection"/>
 
     <pluginSuggestionProvider order="first" implementation="com.jetbrains.python.suggestions.PycharmProSuggestionProvider"/>
-    <postStartupActivity implementation="com.jetbrains.python.sdk.poetry.PoetryPyProjectTomlPostStartupActivity"/>
+    <postStartupActivity implementation="com.jetbrains.python.poetry.PoetryPyProjectTomlPostStartupActivity"/>
 
     <!--Poetry project model-->
     <projectOpenProcessor implementation="com.jetbrains.python.projectModel.poetry.PoetryProjectOpenProcessor"/>
@@ -63,6 +63,8 @@
     <projectOpenProcessor implementation="com.jetbrains.python.projectModel.uv.UvProjectOpenProcessor"/>
     <externalSystemUnlinkedProjectAware implementation="com.jetbrains.python.projectModel.uv.UvUnlinkedProjectAware"/>
     <postStartupActivity implementation="com.jetbrains.python.projectModel.uv.UvProjectAware$UvSyncStartupActivity"/>
+
+    <virtualFileCustomDataProvider implementation="com.jetbrains.python.psi.PyLangLevelVirtualFileCustomDataProvider"/>
   </extensions>
 
   <projectListeners>
@@ -123,8 +125,6 @@
     <stripTrailingSpacesFilterFactory implementation="com.jetbrains.python.editor.PyStripTrailingSpacesFilterFactory"/>
     <completion.contributor language="Python"
                             implementationClass="com.jetbrains.python.testing.PyTestParameterCompletionContributor"/>
-
-    <projectService serviceImplementation="com.jetbrains.python.configuration.PyConfigurableInterpreterList"/>
 
     <projectService serviceImplementation="com.jetbrains.python.inspections.PyCompatibilityInspectionAdvertiserSettings"/>
     <projectService serviceImplementation="com.jetbrains.python.packaging.PyPackagingSettings"/>
@@ -238,10 +238,10 @@
     <localInspection language="Python" shortName="PyStubPackagesCompatibilityInspection" suppressId="PyStubPackagesCompatibility"
                      bundle="messages.PyPsiBundle" key="INSP.stub.packages.compatibility" groupKey="INSP.GROUP.python"
                      enabledByDefault="true" level="WARNING"
-                     implementationClass="com.jetbrains.python.codeInsight.typing.PyStubPackagesCompatibilityInspection"/>
+                     implementationClass="com.jetbrains.python.codeInsight.stubs.PyStubPackagesCompatibilityInspection"/>
     <localInspection language="Python" shortName="PyStubPackagesAdvertiser" suppressId="PyStubPackagesAdvertiser"
                      bundle="messages.PyPsiBundle" key="INSP.stub.packages" groupKey="INSP.GROUP.python" enabledByDefault="true"
-                     level="WARNING" implementationClass="com.jetbrains.python.codeInsight.typing.PyStubPackagesAdvertiser"/>
+                     level="WARNING" implementationClass="com.jetbrains.python.codeInsight.stubs.PyStubPackagesAdvertiser"/>
     <localInspection language="Python" shortName="PyRelativeImportInspection" suppressId="PyPackages" bundle="messages.PyPsiBundle"
                      key="INSP.NAME.relative.import" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING"
                      implementationClass="com.jetbrains.python.inspections.PyRelativeImportInspection"/>
@@ -860,7 +860,6 @@
 
     <!-- Experimental packaging extensions-->
     <pySdkProvider implementation="com.jetbrains.python.sdk.pipenv.PyPipEnvSdkProvider"/>
-    <packageManagerProvider implementation="com.jetbrains.python.sdk.pipenv.PyPipenvPackageManagerProvider"/>
 
     <pySdkProvider implementation="com.jetbrains.python.sdk.poetry.PoetrySdkProvider"/>
     <packageManagerProvider implementation="com.jetbrains.python.sdk.poetry.PyPoetryPackageManagerProvider"/>
@@ -871,6 +870,7 @@
 
     <pythonPackageManagerProvider implementation="com.jetbrains.python.packaging.pip.PipPackageManagerProvider" order="last"/>
     <pythonPackageManagerProvider implementation="com.jetbrains.python.packaging.conda.CondaPackageManagerProvider"/>
+    <pythonPackageManagerProvider implementation="com.jetbrains.python.packaging.pipenv.PipEnvPackageManagerProvider"/>
 
     <PyProjectDependenciesExtractorProvider implementation="com.jetbrains.python.sdk.poetry.PoetryDependenciesExtractorProvider"/>
     <PyProjectDependenciesExtractorProvider implementation="com.jetbrains.python.sdk.uv.UvDependenciesExtractorProvider"/>
@@ -891,8 +891,10 @@
 
     <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.WindowsSystemPythonProvider" os="windows"/>
 
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.AsdfSystemPythonProvider"/>
     <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.PyenvSystemPythonProvider"/>
-    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.UnixSystemPythonProvider"/>
+
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.UnixSystemPythonProvider" os="unix"/>
 
     <inspectionExtension implementation="com.jetbrains.python.sdk.configuration.suppressors.PyInterpreterInspectionSuppressor"/>
     <inspectionExtension implementation="com.jetbrains.python.inspections.PyUnresolvedReferenceDefaultInspectionExtension" order="last"/>
@@ -1086,6 +1088,24 @@
               icon="com.intellij.icons.AllIcons.General.Export"/>
       <action id="CondaUpdateEnvAction"
               class="com.jetbrains.python.packaging.conda.actions.CondaUpdateEnvAction"
+              icon="com.intellij.icons.AllIcons.Actions.Refresh"/>
+
+      <separator/>
+
+      <action id="PipSetDefaultRequirementsAction"
+              class="com.jetbrains.python.packaging.pip.actions.PipSetDefaultRequirementsAction"
+              icon="com.intellij.icons.AllIcons.General.GreenCheckmark"/>
+      <action id="PipUpdateEnvAction"
+              class="com.jetbrains.python.packaging.pip.actions.PipUpdateEnvAction"
+              icon="com.intellij.icons.AllIcons.Actions.Refresh"/>
+
+      <separator/>
+
+      <action id="PipEnvLockDependenciesAction"
+              class="com.jetbrains.python.packaging.pipenv.actions.PipEnvLockAction"
+              icon="com.intellij.icons.AllIcons.Diff.Lock"/>
+      <action id="PipEnvInstallDependenciesAction"
+              class="com.jetbrains.python.packaging.pipenv.actions.PipEnvInstallEnvAction"
               icon="com.intellij.icons.AllIcons.Actions.Refresh"/>
 
       <separator/>

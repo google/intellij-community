@@ -1,16 +1,14 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.cce.visitor
 
-import com.intellij.cce.core.CodeFragment
-import com.intellij.cce.core.CodeLine
-import com.intellij.cce.core.CodeToken
+import com.intellij.cce.core.*
 import com.intellij.cce.util.CompletionGolfTextUtil.isValuableString
 import com.intellij.cce.visitor.exceptions.PsiConverterException
 import com.intellij.lang.ASTNode
 import com.intellij.psi.PsiElement
 
 
-class LineCompletionVisitorHelper {
+class LineCompletionVisitorHelper(val maxPrefixLength: Int = 4) {
   private var codeFragment: CodeFragment? = null
   private val lines = mutableListOf<CodeLine>()
 
@@ -34,11 +32,20 @@ class LineCompletionVisitorHelper {
   }
 
   fun addElement(element: ASTNode) {
-    val text = element.text.take(MAX_PREFIX_LENGTH)
+    val text = element.text.take(maxPrefixLength)
     if (text.isValuableString()) {
       lines.find { it.offset <= element.startOffset && it.offset + it.text.length > element.startOffset }
         ?.takeIf { it.getChildren().all { it.offset != element.startOffset } }
         ?.addChild(CodeToken(text, element.startOffset))
+    }
+  }
+
+  fun addElement(element: ASTNode, psiElement: PsiElement) {
+    val text = element.text.take(maxPrefixLength)
+    if (text.isValuableString()) {
+      lines.find { it.offset <= element.startOffset && it.offset + it.text.length > element.startOffset }
+        ?.takeIf { it.getChildren().all { it.offset != element.startOffset } }
+        ?.addChild(CodeTokenWithPsi(text, element.startOffset, TokenProperties.UNKNOWN, psiElement))
     }
   }
 
@@ -54,5 +61,3 @@ class LineCompletionVisitorHelper {
     }
   }
 }
-
-private const val MAX_PREFIX_LENGTH: Int = 4

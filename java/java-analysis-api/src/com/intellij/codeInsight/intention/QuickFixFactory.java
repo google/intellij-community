@@ -311,6 +311,10 @@ public abstract class QuickFixFactory {
   public abstract @NotNull List<@NotNull LocalQuickFix> registerOrderEntryFixes(@NotNull PsiReference reference,
                                                                                 @NotNull List<? super IntentionAction> registrar);
 
+  public abstract @NotNull List<@NotNull LocalQuickFix> registerOrderEntryFixes(@NotNull PsiReference reference,
+                                                                                @NotNull PsiMember target,
+                                                                                @NotNull List<? super IntentionAction> registrar);
+
   /**
    * @param annotationMethods unused, could be empty array
    */
@@ -518,5 +522,9 @@ public abstract class QuickFixFactory {
   @ApiStatus.Experimental
   public abstract @NotNull IntentionAction createAddMainMethodFix(@NotNull PsiImplicitClass implicitClass);
 
-  public abstract @NotNull ModCommandAction createReplaceOnDemandImport(@NotNull PsiImportModuleStatement importModuleStatement, @NotNull @Nls String text);
+  public abstract @NotNull ModCommandAction createReplaceOnDemandImport(@NotNull PsiImportModuleStatement importModuleStatement,
+                                                                        @NotNull @Nls String text);
+
+  public abstract @Nullable ModCommandAction createRecordThisDelegateFix(PsiMethod psi);
+
 }

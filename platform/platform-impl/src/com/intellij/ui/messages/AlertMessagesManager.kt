@@ -2,6 +2,7 @@
 package com.intellij.ui.messages
 
 import com.intellij.BundleBase
+import com.intellij.CommonBundle
 import com.intellij.diagnostic.LoadingState
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
@@ -29,6 +30,7 @@ import java.awt.*
 import java.awt.event.ActionEvent
 import java.awt.event.MouseEvent
 import javax.accessibility.AccessibleContext
+import javax.accessibility.AccessibleRole
 import javax.swing.*
 import javax.swing.border.Border
 import javax.swing.plaf.basic.BasicHTML
@@ -133,6 +135,7 @@ class AlertDialog(project: Project?,
         }
       }
       myCloseButton.preferredSize = JBDimension(22, 22)
+      myCloseButton.accessibleContext.accessibleName = CommonBundle.message("button.without.mnemonic.close")
     }
     else {
       myCloseButton = null
@@ -354,6 +357,15 @@ class AlertDialog(project: Project?,
           }
           return super.getPreferredSize()
         }
+
+        override fun getAccessibleContext(): AccessibleContext? {
+          if (accessibleContext == null) {
+            accessibleContext = object : AccessibleJEditorPane() {
+              override fun getAccessibleRole(): AccessibleRole? = AccessibleRole.LABEL
+            }
+          }
+          return accessibleContext
+        }
       }, myMessage!!.replace("(\r\n|\n)".toRegex(), "<br/>"))
 
       messageComponent.font = JBFont.regular()
@@ -454,11 +466,10 @@ class AlertDialog(project: Project?,
     kit.styleSheet.addRule("a {color: " + ColorUtil.toHtmlColor(JBUI.CurrentTheme.Link.Foreground.ENABLED) + "}")
     component.editorKit = kit
     component.addHyperlinkListener(BrowserHyperlinkListener.INSTANCE)
-
-    if (BasicHTML.isHTMLString(message)) {
-      component.putClientProperty(AccessibleContext.ACCESSIBLE_NAME_PROPERTY,
-                                  StringUtil.unescapeXmlEntities(StringUtil.stripHtml(message!!, " ")))
-    }
+    component.putClientProperty(
+      AccessibleContext.ACCESSIBLE_NAME_PROPERTY,
+      if (BasicHTML.isHTMLString(message)) StringUtil.unescapeXmlEntities(StringUtil.stripHtml(message!!, " ")) else message
+    )
 
     component.text = message
 

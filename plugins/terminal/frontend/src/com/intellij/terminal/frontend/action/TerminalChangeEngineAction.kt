@@ -4,6 +4,7 @@ import com.intellij.configurationStore.saveSettingsForRemoteDevelopment
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.ui.ExperimentalUI
 import com.intellij.util.application
@@ -36,7 +37,8 @@ internal sealed class TerminalChangeEngineAction(private val engine: TerminalEng
       TerminalToolWindowManager.getInstance(project).createNewTab(
         TerminalOptionsProvider.instance.terminalEngine,
         startupFusInfo,
-        null
+        null,
+        e.getData(PlatformDataKeys.TOOL_WINDOW_CONTENT_MANAGER)
       )
     }
   }

@@ -225,6 +225,16 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
             runTest("../../../idea/tests/testData/inspectionsLocal/redundantWith/nested.kt");
         }
 
+        @TestMetadata("notApplicable_contextParameter.kt")
+        public void testNotApplicable_contextParameter() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantWith/notApplicable_contextParameter.kt");
+        }
+
+        @TestMetadata("notApplicable_contextParameterWithSubstitution.kt")
+        public void testNotApplicable_contextParameterWithSubstitution() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantWith/notApplicable_contextParameterWithSubstitution.kt");
+        }
+
         @TestMetadata("notApplicable_delegatedProperty.kt")
         public void testNotApplicable_delegatedProperty() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/redundantWith/notApplicable_delegatedProperty.kt");
@@ -16875,6 +16885,11 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
             @TestMetadata("blockBody.kt")
             public void testBlockBody() throws Exception {
                 runTest("../../../idea/tests/testData/inspectionsLocal/redundantNullableReturnType/function/blockBody.kt");
+            }
+
+            @TestMetadata("blockBodyNoReturn.kt")
+            public void testBlockBodyNoReturn() throws Exception {
+                runTest("../../../idea/tests/testData/inspectionsLocal/redundantNullableReturnType/function/blockBodyNoReturn.kt");
             }
 
             @TestMetadata("blockBodyReturnsNullable.kt")

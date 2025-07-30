@@ -3,8 +3,11 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
-  name = "custom",
-  opt_in = ["org.jetbrains.kotlin.analysis.api.KaNonPublicApi"]
+  name = "custom_k1",
+  opt_in = [
+    "org.jetbrains.kotlin.analysis.api.KaNonPublicApi",
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ]
 )
 
 jvm_library(
@@ -12,7 +15,7 @@ jvm_library(
   module_name = "kotlin.jvm-debugger.evaluation.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_k1",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",

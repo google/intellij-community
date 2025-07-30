@@ -27,6 +27,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.application.impl.TestOnlyThreading;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
@@ -63,6 +64,7 @@ import com.intellij.packageDependencies.DependencyValidationManager;
 import com.intellij.psi.PsiCompiledElement;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.impl.source.PsiConsistencyAssertions;
 import com.intellij.psi.util.PsiEditorUtil;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.psi.util.PsiUtilBase;
@@ -79,6 +81,7 @@ import com.intellij.util.gist.GistManagerImpl;
 import com.intellij.util.io.storage.HeavyProcessLatch;
 import com.intellij.util.ui.EDT;
 import io.opentelemetry.context.Context;
+import kotlin.Unit;
 import kotlinx.coroutines.CoroutineScope;
 import org.jdom.Element;
 import org.jetbrains.annotations.*;
@@ -215,8 +218,8 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @TestOnly
   public @NotNull List<HighlightInfo> getFileLevelHighlights(@NotNull Project project, @NotNull PsiFile psiFile) {
     assert ApplicationManager.getApplication().isUnitTestMode();
-    assertMyFile(psiFile.getProject(), psiFile);
-    assertMyFile(project, psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(project, psiFile);
     VirtualFile vFile = psiFile.getViewProvider().getVirtualFile();
     List<HighlightInfo> list = new ArrayList<>();
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
@@ -228,7 +231,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     return list;
   }
 
-  private void assertMyFile(@NotNull Project project, @NotNull PsiFile psiFile) {
+  private void assertFileFromMyProject(@NotNull Project project, @NotNull PsiFile psiFile) {
     if (project != myProject) {
       throw new IllegalStateException("my project is " + myProject + " but I was called with " + project);
     }
@@ -240,7 +243,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @Override
   public void cleanFileLevelHighlights(int group, @NotNull PsiFile psiFile) {
     ThreadingAssertions.assertEventDispatchThread();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       cleanFileLevelHighlights(fileEditor, group);
@@ -250,7 +253,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @Override
   public boolean hasFileLevelHighlights(int group, @NotNull PsiFile psiFile) {
     ApplicationManager.getApplication().assertReadAccessAllowed();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       List<HighlightInfo> infos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
@@ -296,7 +299,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @ApiStatus.Internal
   public void removeFileLevelHighlight(@NotNull PsiFile psiFile, @NotNull HighlightInfo info) {
     ThreadingAssertions.assertEventDispatchThread();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       List<HighlightInfo> infos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
@@ -332,7 +335,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @Override
   public void addFileLevelHighlight(int group, @NotNull HighlightInfo info, @NotNull PsiFile psiFile, @Nullable RangeHighlighter toReuse) {
     ThreadingAssertions.assertEventDispatchThread();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     FileEditorManager fileEditorManager = getFileEditorManager();
     for (FileEditor fileEditor : fileEditorManager.getAllEditorList(vFile)) {
@@ -384,7 +387,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
                                         @NotNull PsiFile psiFile,
                                         @Nullable RangeHighlighter toReuse) {
     ThreadingAssertions.assertEventDispatchThread();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     FileEditorManager fileEditorManager = getFileEditorManager();
     for (FileEditor fileEditor : fileEditorManager.getAllEditorList(vFile)) {
@@ -462,7 +465,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   @Override
   public @NotNull List<HighlightInfo> runMainPasses(@NotNull PsiFile psiFile, @NotNull Document document, @NotNull ProgressIndicator progress) {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
 
     GlobalInspectionContextBase.assertUnderDaemonProgress();
     // clear status maps to run passes from scratch so that refCountHolder won't conflict and try to restart itself on partially filled maps
@@ -529,8 +532,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     ThreadingAssertions.assertEventDispatchThread();
     assert !myDisposed;
     PsiUtilCore.ensureValid(psiFile);
-    assertMyFile(psiFile.getProject(), psiFile);
-    assert textEditor.getEditor().getDocument() == document : "Expected document "+document+" but one of the passed TextEditors points to a different document: "+textEditor.getEditor().getDocument();
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
+    Editor editor = textEditor.getEditor();
+    assert editor.getDocument() == document : "Expected document " + document +
+                                              " but the passed TextEditor points to a different document: " + editor.getDocument();
     Document associatedDocument = PsiDocumentManager.getInstance(myProject).getDocument(psiFile);
     assert associatedDocument == document : "Expected document " + document + " but the passed PsiFile points to a different document: " + associatedDocument;
     Application application = ApplicationManager.getApplication();
@@ -541,7 +546,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     boolean isDebugMode = !ApplicationManagerEx.isInStressTest();
     ((FileTypeManagerImpl)FileTypeManager.getInstance()).drainReDetectQueue();
     do {
-      EDT.dispatchAllInvocationEvents();
+      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+        EDT.dispatchAllInvocationEvents();
+        return Unit.INSTANCE;
+      });
       // refresh will fire write actions interfering with highlighting
       // heavy ops are bad, but VFS refresh is ok
     }
@@ -566,6 +574,8 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile); // todo IJPL-339 ???
 
     waitForUpdateFileStatusBackgroundQueueInTests(); // update the file status map before prohibiting its modifications
+    PsiDocumentManager.getInstance(myProject).commitAllDocuments();
+    PsiConsistencyAssertions.assertNoFileTextMismatch(psiFile, editor.getDocument(), null);
     FileStatusMap fileStatusMap = getFileStatusMap();
     fileStatusMap.runAllowingDirt(canChangeDocument, () -> {
       for (int ignoreId : passesToIgnore) {
@@ -619,7 +629,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
           if (System.currentTimeMillis() > start + 50) {
             TimeoutUtil.sleep(10);
           }
-          EDT.dispatchAllInvocationEvents();
+          TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+            EDT.dispatchAllInvocationEvents();
+            return Unit.INSTANCE;
+          });
           progress.checkCanceled();
           return progress.isRunning();
         });
@@ -783,7 +796,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @Override
   public void setImportHintsEnabled(@NotNull PsiFile psiFile, boolean value) {
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = psiFile.getVirtualFile();
     if (value) {
       myDisabledHintsFiles.remove(vFile);
@@ -802,7 +815,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @Override
   public void setHighlightingEnabled(@NotNull PsiFile psiFile, boolean value) {
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
 
     VirtualFile virtualFile = PsiUtilCore.getVirtualFile(psiFile);
     if (value) {
@@ -818,7 +831,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     if (!psiFile.isPhysical()) {
       return false;
     }
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     if (myDisabledHighlightingFiles.contains(PsiUtilCore.getVirtualFile(psiFile))) {
       return false;
     }
@@ -855,7 +868,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @Override
   public void restart(@NotNull PsiFile psiFile) {
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     Document document = psiFile.getViewProvider().getDocument();
     if (document == null) {
       return;
@@ -888,7 +901,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     if (myDisposed) {
       return false;
     }
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     Document document = psiFile.getViewProvider().getDocument();
     CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
     return document != null &&
@@ -902,7 +915,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     if (myDisposed) {
       return false;
     }
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
     Document document = psiFile.getViewProvider().getDocument();
     return document != null &&
@@ -1477,9 +1490,8 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     try (AccessToken ignored = ClientId.withExplicitClientId(ClientFileEditorManager.getClientId(fileEditor))) {
       Document document = editor == null ? FileDocumentManager.getInstance().getCachedDocument(virtualFile) : editor.getDocument();
       EditorColorsScheme scheme = editor == null ? null : editor.getColorsScheme();
-      CodeInsightContext context = editor != null
-                                   ? EditorContextManager.getEditorContext(editor, myProject)
-                                   : CodeInsightContexts.anyContext();
+      CodeInsightContext cachedContext = editor != null ? EditorContextManager.getCachedEditorContext(editor, myProject) : null;
+      CodeInsightContext context = cachedContext != null ? cachedContext : CodeInsightContexts.anyContext();
       PsiFile psiFileToSubmit = TextEditorBackgroundHighlighter.getCachedFileToHighlight(myProject, virtualFile, context);
       if (psiFileToSubmit == null || document == null) {
         String reason = document == null ? "queuePassesCreation: couldn't submit" +  virtualFile + " because document is null: fileEditor="+ fileEditor+" ("+ fileEditor.getClass()+")"
@@ -1668,7 +1680,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @Override
   public void autoImportReferenceAtCursor(@NotNull Editor editor, @NotNull PsiFile psiFile) {
-    assertMyFile(psiFile.getProject(), psiFile);
+    assertFileFromMyProject(psiFile.getProject(), psiFile);
     for (ReferenceImporter importer : ReferenceImporter.EP_NAME.getExtensionList()) {
       if (importer.isAddUnambiguousImportsOnTheFlyEnabled(psiFile) && importer.autoImportReferenceAtCursor(editor, psiFile)) break;
     }

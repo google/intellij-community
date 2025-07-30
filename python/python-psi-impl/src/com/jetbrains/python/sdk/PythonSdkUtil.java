@@ -24,6 +24,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.PlatformUtils;
+import com.intellij.util.SlowOperations;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.containers.ContainerUtil;
@@ -34,10 +35,7 @@ import com.jetbrains.python.module.PyModuleService;
 import com.jetbrains.python.psi.search.PySearchUtilBase;
 import com.jetbrains.python.sdk.skeleton.PySkeletonHeader;
 import com.jetbrains.python.venvReader.VirtualEnvReader;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Unmodifiable;
+import org.jetbrains.annotations.*;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -73,20 +71,38 @@ public final class PythonSdkUtil {
   private static final Key<PySkeletonHeader> CACHED_SKELETON_HEADER = Key.create("CACHED_SKELETON_HEADER");
 
   public static boolean isPythonSdk(@NotNull Sdk sdk) {
+    return isPythonSdk(sdk, false);
+  }
+
+  @ApiStatus.Internal
+  public static boolean isPythonSdk(@NotNull Sdk sdk, boolean allowRemoteInFreeTier) {
     if (!PyNames.PYTHON_SDK_ID_NAME.equals(sdk.getSdkType().getName())) {
       return false;
     }
 
     // PY-79923: Should explicitly filter sdks created while pro was active
-    if (PlatformUtils.isPyCharm() && !PlatformUtils.isDataSpell()) {
-      return !isRemote(sdk) || !PluginManagerCore.isDisabled(ULTIMATE_PLUGIN_ID);
+    if (isFreeTier()) {
+      return allowRemoteInFreeTier || (!isRemote(sdk));
     }
 
     return true;
   }
 
-  public static @Unmodifiable List<Sdk> getAllSdks() {
-    return ContainerUtil.filter(ProjectJdkTable.getInstance().getAllJdks(), PythonSdkUtil::isPythonSdk);
+  /**
+   * @return PyCharm with Pro mode disabled
+   */
+  @ApiStatus.Internal
+  public static boolean isFreeTier() {
+    return PlatformUtils.isPyCharm() && (!PlatformUtils.isDataSpell()) && PluginManagerCore.isDisabled(ULTIMATE_PLUGIN_ID);
+  }
+
+  public static @Unmodifiable @NotNull List<@NotNull Sdk> getAllSdks() {
+    return getAllSdks(false);
+  }
+
+  @ApiStatus.Internal
+  public static @Unmodifiable @NotNull List<@NotNull Sdk> getAllSdks(boolean allowRemoteInFreeTier) {
+    return ContainerUtil.filter(ProjectJdkTable.getInstance().getAllJdks(), sdk -> isPythonSdk(sdk, allowRemoteInFreeTier));
   }
 
   private static @Nullable PySkeletonHeader readSkeletonHeader(@NotNull VirtualFile file, @NotNull Sdk pythonSdk) {
@@ -364,7 +380,9 @@ public final class PythonSdkUtil {
    * @param binaryPath must point to a Python interpreter
    * @return if the surroundings look like a virtualenv installation, its root is returned (normally the grandparent of binaryPath).
    */
+  @RequiresBackgroundThread(generateAssertion = false)
   public static @Nullable File getVirtualEnvRoot(final @NotNull String binaryPath) {
+    SlowOperations.assertSlowOperationsAreAllowed();
     final File bin = new File(binaryPath).getParentFile();
     if (bin != null) {
       final String rootPath = bin.getParent();
@@ -464,6 +482,7 @@ public final class PythonSdkUtil {
     return libDir != null ? libDir.findChild(PyNames.SITE_PACKAGES) : null;
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
   public static boolean isVirtualEnv(@NotNull Sdk sdk) {
     final String path = sdk.getHomePath();
     return isVirtualEnv(path);
@@ -474,6 +493,7 @@ public final class PythonSdkUtil {
     return path != null && getVirtualEnvRoot(path) != null;
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
   public static @Nullable VirtualFile getCondaDirectory(@NotNull Sdk sdk) {
     final VirtualFile homeDirectory = sdk.getHomeDirectory();
     if (homeDirectory == null) return null;
@@ -481,11 +501,14 @@ public final class PythonSdkUtil {
     return homeDirectory.getParent().getParent();
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
   public static boolean isCondaVirtualEnv(@NotNull Sdk sdk) {
     return isCondaVirtualEnv(sdk.getHomePath());
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
   public static boolean isCondaVirtualEnv(@Nullable String sdkPath) {
+    SlowOperations.assertSlowOperationsAreAllowed();
     final VirtualFile condaMeta = findCondaMeta(sdkPath);
     if (condaMeta == null) {
       return false;
@@ -531,7 +554,10 @@ public final class PythonSdkUtil {
     return parent.findChild("envs") != null;
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
+  @ApiStatus.Internal
   public static @Nullable VirtualFile findCondaMeta(@Nullable String sdkPath) {
+    SlowOperations.assertSlowOperationsAreAllowed();
     if (sdkPath == null || CustomSdkHomePattern.isCustomPythonSdkHomePath(sdkPath)) {
       return null;
     }

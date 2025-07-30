@@ -4,9 +4,11 @@ package com.intellij.platform.searchEverywhere.frontend
 import com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereToggleAction
 import com.intellij.ide.actions.searcheverywhere.SearchListener
+import com.intellij.ide.actions.searcheverywhere.SplitSearchListener
 import com.intellij.ide.util.scopeChooser.ScopeDescriptor
 import com.intellij.platform.searchEverywhere.frontend.ui.SePopupContentPane
 import com.intellij.platform.searchEverywhere.frontend.vm.SePopupVm
+import com.intellij.platform.searchEverywhere.providers.SeLog
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.Future
@@ -14,11 +16,12 @@ import javax.swing.text.Document
 
 @ApiStatus.Internal
 class SePopupInstance(private val popupVm: SePopupVm,
-                      private val popupContentPane: SePopupContentPane): SearchEverywherePopupInstance {
+                      private val popupContentPane: SePopupContentPane,
+                      private val combinedListener: SeSearchStatePublisher): SearchEverywherePopupInstance {
   override fun getSearchText(): String = popupVm.searchPattern.value
 
   override fun setSearchText(searchText: String?) {
-    popupVm.searchPattern.value = searchText ?: ""
+    popupVm.setSearchText(searchText ?: "")
   }
 
   override fun getSearchFieldDocument(): Document = popupContentPane.searchFieldDocument
@@ -28,7 +31,11 @@ class SePopupInstance(private val popupVm: SePopupVm,
   }
 
   override fun addSearchListener(listener: SearchListener) {
-    TODO("Not yet implemented")
+    SeLog.warn("SearchListener is not supported in the split implementation. Please, use addSplitSearchListener instead.")
+  }
+
+  override fun addSplitSearchListener(listener: SplitSearchListener) {
+    combinedListener.addListener(listener)
   }
 
   fun getSelectedTabID(): String = popupVm.currentTab.tabId
@@ -48,7 +55,7 @@ class SePopupInstance(private val popupVm: SePopupVm,
 
   @ApiStatus.Internal
   override fun selectFirstItem() {
-    TODO("Not yet implemented")
+    popupContentPane.selectFirstItem()
   }
 
   @ApiStatus.Internal

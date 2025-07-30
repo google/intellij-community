@@ -1,16 +1,17 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.imports
 
-import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.resolution.*
+import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
+import org.jetbrains.kotlin.analysis.api.resolution.calls
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.idea.codeinsight.utils.isUnaryOperatorOnIntLiteralReference
-import org.jetbrains.kotlin.idea.references.*
-import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.idea.references.KDocReference
+import org.jetbrains.kotlin.idea.references.KtDefaultAnnotationArgumentReference
+import org.jetbrains.kotlin.idea.references.KtInvokeFunctionReference
+import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.unwrapParenthesesLabelsAndAnnotations
+import org.jetbrains.kotlin.psi.KtFile
 
 internal class UsedReference private constructor(val reference: KtReference) {
     fun KaSession.resolvesByNames(): Collection<Name> {
@@ -90,7 +91,7 @@ private fun KaSession.adjustSymbolIfNeeded(
     reference: KtReference,
     containingFile: KtFile = reference.element.containingKtFile,
 ): KaSymbol? = when {
-    reference.isImplicitReferenceToCompanion() -> {
+    reference.isImplicitReferenceToCompanion() && target !is KaTypeAliasSymbol -> {
         (target as? KaNamedClassSymbol)?.containingSymbol
     }
 
@@ -107,6 +108,6 @@ private fun KaSession.adjustSymbolIfNeeded(
         resolveTypeAliasedConstructorReference(reference, samClass, containingFile) ?: samClass
     }
 
-    else -> resolveTypeAliasedObjectAsInvokeCallReceiver(reference, target) ?: target
+    else -> target
 }
 

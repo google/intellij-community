@@ -6,9 +6,9 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.util.cancelOnDispose
 import com.jetbrains.python.packaging.PyPackageVersion
 import com.jetbrains.python.packaging.PyPackageVersionNormalizer
+import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
 import com.jetbrains.python.packaging.management.PythonRepositoryManager
-import com.jetbrains.python.packaging.requirement.PyRequirementRelation
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -35,7 +35,16 @@ abstract class PythonRepositoryManagerBase() : PythonRepositoryManager, Disposab
   }
 
 
-  override fun allPackages(): Set<String> = repositories.flatMap { it.getPackages() }.toSet()
+  override fun allPackages(): Set<String> {
+    if (repositories.size == 1)
+      return repositories.first().getPackages()
+
+    val result = mutableSetOf<String>()
+    for (repository in repositories) {
+      result.addAll(repository.getPackages())
+    }
+    return result
+  }
 
   override suspend fun getLatestVersion(packageName: String, repository: PyPackageRepository?): PyPackageVersion? {
     waitForInit()
@@ -43,19 +52,13 @@ abstract class PythonRepositoryManagerBase() : PythonRepositoryManager, Disposab
     return PyPackageVersionNormalizer.normalize(version)
   }
 
-  override suspend fun findPackageSpecification(
-    name: String,
-    version: String?,
-    relation: PyRequirementRelation,
-    repository: PyPackageRepository?,
-  ): PythonRepositoryPackageSpecification? {
-    waitForInit()
+  override suspend fun findPackageSpecification(requirement: PyRequirement, repository: PyPackageRepository?): PythonRepositoryPackageSpecification? {
     if (repository != null) {
-      return repository.findPackageSpecification(name, version, relation)
+      return repository.findPackageSpecification(requirement)
     }
-    return repositories.firstNotNullOfOrNull { it.findPackageSpecification(name, version, relation) }
+    waitForInit()
+    return repositories.firstNotNullOfOrNull { it.findPackageSpecification(requirement) }
   }
-
 
   //Some test on EDT so need to be inited on first create
   protected fun shouldBeInitInstantly(): Boolean = ApplicationManager.getApplication().isUnitTestMode

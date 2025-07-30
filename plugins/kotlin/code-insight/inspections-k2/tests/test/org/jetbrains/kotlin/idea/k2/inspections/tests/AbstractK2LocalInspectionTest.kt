@@ -10,10 +10,10 @@ import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.k2FileName
-import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationWithSdk
-import org.jetbrains.kotlin.idea.core.script.alwaysVirtualFile
+import org.jetbrains.kotlin.idea.core.script.k2.configurations.ScriptConfigurationWithSdk
 import org.jetbrains.kotlin.idea.core.script.k2.configurations.DefaultScriptConfigurationHandler
 import org.jetbrains.kotlin.idea.core.script.k2.configurations.getConfigurationResolver
+import org.jetbrains.kotlin.idea.core.script.v1.alwaysVirtualFile
 import org.jetbrains.kotlin.idea.fir.K2DirectiveBasedActionUtils
 import org.jetbrains.kotlin.idea.fir.invalidateCaches
 import org.jetbrains.kotlin.idea.inspections.AbstractLocalInspectionTest
@@ -101,10 +101,13 @@ abstract class AbstractK2LocalInspectionTest : AbstractLocalInspectionTest() {
         DefaultScriptConfigurationHandler(testProject, CoroutineScope(EmptyCoroutineContext)) {
         override suspend fun updateWorkspaceModel(configurationPerFile: Map<VirtualFile, ScriptConfigurationWithSdk>) {}
 
-        override fun isModuleExist(
+        override fun isScriptExist(
             project: Project,
             scriptFile: VirtualFile,
             definition: ScriptDefinition
-        ): Boolean = true
+        ): Boolean {
+            return true
+        }
+
     }
 }

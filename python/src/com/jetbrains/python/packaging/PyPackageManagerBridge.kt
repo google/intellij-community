@@ -3,7 +3,6 @@ package com.jetbrains.python.packaging
 
 import com.intellij.execution.ExecutionException
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.getOpenedProjects
@@ -13,7 +12,6 @@ import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.management.PythonPackageManager
 import com.jetbrains.python.packaging.management.ui.PythonPackageManagerUI
 import com.jetbrains.python.packaging.management.ui.installPyRequirementsBackground
-import com.jetbrains.python.packaging.requirement.PyRequirementRelation
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
@@ -28,13 +26,6 @@ internal open class PyPackageManagerBridge(sdk: Sdk) : PyTargetEnvironmentPackag
   override fun install(requirements: MutableList<PyRequirement>?, extraArgs: MutableList<String>) {
     runBlockingMaybeCancellable {
       packageManagerUI.installPyRequirementsBackground(requirements ?: emptyList(), extraArgs)
-    }
-  }
-
-  @Throws(ExecutionException::class)
-  override fun uninstall(packages: MutableList<PyPackage>) {
-    runBlockingMaybeCancellable {
-      packageManagerUI.uninstallPackagesBackground(packages.map { it.name })
     }
   }
 
@@ -67,10 +58,6 @@ internal open class PyPackageManagerBridge(sdk: Sdk) : PyTargetEnvironmentPackag
 
   override fun getPackages(): List<PyPackage> {
     return packageManagerUI.manager.listInstalledPackagesSnapshot().map { PyPackage(it.name, it.version) }
-  }
-
-  override fun getRequirements(module: Module): List<PyRequirement>? {
-    return packageManager.listDependencies().map { pyRequirement(it.name, PyRequirementRelation.EQ, it.version) }
   }
 
   private fun guessProject() = getOpenedProjects().firstOrNull() ?: ProjectManager.getInstance().defaultProject

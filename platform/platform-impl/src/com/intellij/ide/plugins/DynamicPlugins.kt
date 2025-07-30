@@ -565,9 +565,11 @@ object DynamicPlugins {
 
     if (options.checkImplementationDetailDependencies) {
       processImplementationDetailDependenciesOnPlugin(pluginDescriptor, pluginSet) { dependentDescriptor ->
-        dependentDescriptor.isMarkedForLoading = false
-        unloadPluginWithoutProgress(dependentDescriptor, UnloadPluginOptions(waitForClassloaderUnload = false,
-                                                                             checkImplementationDetailDependencies = false))
+        if (dependentDescriptor is PluginMainDescriptor) {
+          dependentDescriptor.isMarkedForLoading = false
+          unloadPluginWithoutProgress(dependentDescriptor, UnloadPluginOptions(waitForClassloaderUnload = false,
+                                                                               checkImplementationDetailDependencies = false))
+        }
         true
       }
     }
@@ -995,7 +997,13 @@ object DynamicPlugins {
         loadModules(
           modules = optionalDependenciesOnPlugin(dependencyPlugin = pluginDescriptor,
                                                  classLoaderConfigurator = classLoaderConfigurator,
-                                                 pluginSet = pluginSet).toList(),
+                                                 pluginSet = pluginSet).filter { descriptorImpl ->
+            when (descriptorImpl) {
+              is ContentModuleDescriptor if !pluginSet.isModuleEnabled(descriptorImpl.moduleName) -> false
+              is PluginMainDescriptor if !pluginSet.isPluginEnabled(descriptorImpl.pluginId) -> false
+              else -> true
+            }
+          }.toList(),
           app = app,
           listenerCallbacks = listenerCallbacks,
         )
@@ -1021,7 +1029,8 @@ object DynamicPlugins {
       processImplementationDetailDependenciesOnPlugin(pluginDescriptor, pluginSet) { dependentDescriptor ->
         val dependencies = dependentDescriptor.dependencies
         if (dependencies.all { it.isOptional || PluginManagerCore.getPlugin(it.pluginId) != null }) {
-          if (!loadPluginWithoutProgress(dependentDescriptor, checkImplementationDetailDependencies = false)) {
+          if (dependentDescriptor is PluginMainDescriptor &&
+              !loadPluginWithoutProgress(dependentDescriptor, checkImplementationDetailDependencies = false)) {
             implementationDetailsLoadedWithoutRestart = false
           }
         }
@@ -1396,6 +1405,10 @@ private fun doCheckExtensionsCanUnloadWithoutRestart(
 
     // special case Kotlin EPs registered via code in Kotlin compiler
     if (epName.startsWith("org.jetbrains.kotlin") && descriptor.pluginId.idString == "org.jetbrains.kotlin") {
+      continue
+    }
+    // Workaround until SID-207 fixed
+    if (epName.startsWith("Pythonid.template") && descriptor.pluginId.idString in listOf("com.intellij.python.django", "org.jetbrains.dbt")) {
       continue
     }
 

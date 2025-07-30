@@ -280,6 +280,8 @@
                     serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile"
                     preload="notHeadless"/>
 
+    <projectService serviceImplementation="com.intellij.ide.util.TreeFileChooserSupport"/>
+
     <projectService serviceImplementation="com.intellij.find.findInProject.FindInProjectManager"/>
     <projectService serviceImplementation="com.intellij.find.replaceInProject.ReplaceInProjectManager"/>
     <projectService serviceInterface="com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar"
@@ -662,7 +664,8 @@
     <codeInsight.completion.command.provider language="" implementationClass="com.intellij.codeInsight.completion.command.commands.DirectIntentionCommandProvider" order="last"/>
     <platform.backend.documentation.lookupElementTargetProvider
       implementation="com.intellij.codeInsight.completion.command.CommandCompletionDocumentationProvider"/>
-
+    <lookup.may.have.custom.preview.provider
+      implementation="com.intellij.codeInsight.completion.command.CommandCompletionLookupMayHaveCustomPreviewProvider"/>
     <nonWriteAccessTypedHandler implementation="com.intellij.codeInsight.completion.command.CommandCompletionNonWriteAccessTypedHandler" id="commandCompletion"/>
 
     <searchEverywhereClassifier implementation="com.intellij.ide.actions.DefaultSearchEverywhereClassifier"/>
@@ -1722,6 +1725,10 @@
               topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
     <listener class="com.intellij.codeInsight.completion.command.CommandCompletionListener"
               topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
+    <listener class="com.intellij.codeInsight.completion.command.CustomLookupIntentionPreviewListener"
+              topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
+    <listener class="com.intellij.util.indexing.ProjectEntityIndexingService"
+              topic="com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexListener"/>
   </projectListeners>
   <actions>
     <group id="Structure.ViewOptions" searchable="false" popup="true" icon="AllIcons.Actions.GroupBy"/>

@@ -7,6 +7,7 @@ import com.intellij.codeInsight.completion.command.CommandCompletionLookupElemen
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.HintManagerImpl
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
+import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection
 import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
@@ -235,6 +236,20 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
               String y = "1";
           }
       }""".trimIndent())
+  }
+
+  fun testOptimizeImport2() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      import java.util.List;.<caret>
+      
+      class A {
+          void foo() {
+              String y = "1";
+          }
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.any { element -> element.lookupString.contains("Optimize im", ignoreCase = true) })
   }
 
   fun testGenerateGetter() {
@@ -726,7 +741,9 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     myFixture.doHighlighting()
     myFixture.type(".")
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.contains("flip '=='", ignoreCase = true) })
+    val item = elements.first { element -> element.lookupString.contains("flip '=='", ignoreCase = true) }
+    assertEquals(TextRange(33, 37), (item.`as`(CommandCompletionLookupElement::class.java))?.highlighting?.range)
+    selectItem(item)
     myFixture.checkResult("""
       class A { 
         void foo() {
@@ -1008,6 +1025,20 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertTrue(elements.none { element -> element.lookupString.contains("Inline", ignoreCase = true) })
   }
 
+  fun testShowOnlyStrictWarning() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+        public class B {
+          public void someMethod(String s, String string..<caret>) {
+          }
+        }
+      """.trimIndent())
+    myFixture.enableInspections(UnusedDeclarationInspection())
+    myFixture.doHighlighting()
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.none { element -> element.lookupString.contains("Rename 's'", ignoreCase = true) })
+  }
+
   fun testDoNotCloseAfterPreview() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -1022,8 +1053,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertNotNull(lookupElement)
     val element = lookupElement.`as`(CommandCompletionLookupElement::class.java)
     assertNotNull(element)
-    assertTrue(element!!.hasPreview)
-    assertNotNull(element.preview)
+    assertNotNull(element?.preview)
     assertNotNull(lookup)
   }
 
@@ -1079,6 +1109,30 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }
       a<caret>""".trimIndent())
     myFixture.completeBasic()
+  }
+
+
+  fun testHighlightingFormat() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      import java.util.List;
+      .<caret>
+      class A {
+          void foo() {
+              String y = "1";
+          }
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    val lookupElement = elements.first { element ->
+      element.`as`(CommandCompletionLookupElement::class.java) != null &&
+      element.lookupString.contains("Reformat", ignoreCase = true)
+    }
+    val completionLookupElement = lookupElement.`as`(CommandCompletionLookupElement::class.java)
+    if (completionLookupElement == null) {
+      fail()
+      return
+    }
+    assertEquals(TextRange(0, 82), completionLookupElement.highlighting?.range)
   }
 
   private class TestHintManager : HintManagerImpl() {

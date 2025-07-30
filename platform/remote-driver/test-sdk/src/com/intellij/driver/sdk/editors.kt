@@ -102,13 +102,16 @@ fun Driver.logicalPosition(line: Int, column: Int, rdTarget: RdTarget = RdTarget
 }
 
 @Remote("com.intellij.openapi.fileEditor.FileEditor")
-interface FileEditor
+interface FileEditor {
+  fun getFile(): VirtualFile
+}
 
 @Remote("com.intellij.openapi.fileEditor.FileEditorManager")
 interface FileEditorManager {
   fun openFile(file: VirtualFile, focusEditor: Boolean, searchForOpen: Boolean): Array<FileEditor>
   fun getSelectedTextEditor(): Editor?
   fun setSelectedEditor(editor: FileEditor)
+  fun getAllEditors(): Array<FileEditor>
 }
 
 @Remote("com.intellij.openapi.editor.colors.EditorColorsScheme")
@@ -129,8 +132,8 @@ fun Driver.openEditor(file: VirtualFile, project: Project? = null): Array<FileEd
   }
 }
 
-fun Driver.openFile(relativePath: String, project: Project = singleProject(), waitForCodeAnalysis: Boolean = true) = step("Open file $relativePath") {
-  withContext {
+fun Driver.openFile(relativePath: String, project: Project = singleProject(), waitForCodeAnalysis: Boolean = true) {
+  step("Open file $relativePath") {
     val openedFile = if (!isRemDevMode) {
       val fileToOpen = findFile(relativePath = relativePath, project = project)
       if (fileToOpen == null) {

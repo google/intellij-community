@@ -32,6 +32,7 @@ import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.intellij.terminal.TerminalFontSizeProvider
 import com.intellij.terminal.frontend.fus.TerminalFusCursorPainterListener
 import com.intellij.terminal.frontend.fus.TerminalFusFirstOutputListener
+import com.intellij.terminal.frontend.hyperlinks.FrontendTerminalHyperlinkFacade
 import com.intellij.terminal.session.TerminalSession
 import com.intellij.ui.components.JBLayeredPane
 import com.intellij.util.asDisposable
@@ -48,6 +49,7 @@ import org.jetbrains.plugins.terminal.block.output.TerminalOutputEditorInputMeth
 import org.jetbrains.plugins.terminal.block.output.TerminalTextHighlighter
 import org.jetbrains.plugins.terminal.block.reworked.*
 import org.jetbrains.plugins.terminal.block.reworked.hyperlinks.TerminalHyperlinkHighlighter
+import org.jetbrains.plugins.terminal.block.reworked.hyperlinks.isSplitHyperlinksSupportEnabled
 import org.jetbrains.plugins.terminal.block.ui.*
 import org.jetbrains.plugins.terminal.block.ui.TerminalUi.useTerminalDefaultBackground
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils
@@ -94,11 +96,12 @@ internal class ReworkedTerminalView(
     Disposer.register(this) {
       coroutineScope.cancel()
     }
+    val hyperlinkScope = coroutineScope.childScope("ReworkedTerminalView hyperlink facades")
 
     sessionModel = TerminalSessionModelImpl()
     encodingManager = TerminalKeyEncodingManager(sessionModel, coroutineScope.childScope("TerminalKeyEncodingManager"))
 
-    terminalInput = TerminalInput(sessionFuture, sessionModel, startupFusInfo, coroutineScope.childScope("TerminalInput"))
+    terminalInput = TerminalInput(sessionFuture, sessionModel, startupFusInfo, coroutineScope.childScope("TerminalInput"), encodingManager)
 
     // Use the same instance of the listeners for both editors to report the metrics only once.
     // Usually, the cursor is painted or output received first in the output editor
@@ -123,6 +126,18 @@ internal class ReworkedTerminalView(
       fusFirstOutputListener,
       withTopAndBottomInsets = false,
     )
+    val alternateBufferHyperlinkFacade = if (isSplitHyperlinksSupportEnabled()) {
+      FrontendTerminalHyperlinkFacade(
+        isInAlternateBuffer = true,
+        editor = alternateBufferEditor,
+        outputModel = alternateBufferModel,
+        terminalInput = terminalInput,
+        coroutineScope = hyperlinkScope,
+      )
+    }
+    else {
+      null
+    }
 
     outputEditor = createOutputEditor(settings, parentDisposable = this)
     outputEditor.putUserData(TerminalInput.KEY, terminalInput)
@@ -151,12 +166,24 @@ internal class ReworkedTerminalView(
     terminalSearchController = TerminalSearchController(project)
 
     blocksModel = TerminalBlocksModelImpl(outputEditor.document)
-    val typeAhead = TerminalTypeAhead(outputModel, blocksModel)
+    val typeAhead = TerminalTypeAhead(outputModel, blocksModel, outputEditor)
     outputEditor.putUserData(TerminalTypeAhead.KEY, typeAhead)
     TerminalBlocksDecorator(outputEditor, blocksModel, scrollingModel, coroutineScope.childScope("TerminalBlocksDecorator"))
     outputEditor.putUserData(TerminalBlocksModel.KEY, blocksModel)
+    val outputHyperlinkFacade = if (isSplitHyperlinksSupportEnabled()) {
+      FrontendTerminalHyperlinkFacade(
+        isInAlternateBuffer = false,
+        editor = outputEditor,
+        outputModel = outputModel,
+        terminalInput = terminalInput,
+        coroutineScope = hyperlinkScope,
+      )
+    }
+    else {
+      null
+    }
 
-    outputEditor.putUserData(CompletionPhase.CUSTOM_CODE_COMPLETION_ACTION_ID, "Terminal.CommandCompletion")
+    outputEditor.putUserData(CompletionPhase.CUSTOM_CODE_COMPLETION_ACTION_ID, "Terminal.CommandCompletion.Gen2")
 
     val fusActivity = FrontendLatencyService.getInstance().startFrontendOutputActivity(
       outputEditor = outputEditor as EditorImpl,
@@ -169,7 +196,9 @@ internal class ReworkedTerminalView(
       project,
       sessionModel,
       outputModel,
+      outputHyperlinkFacade,
       alternateBufferModel,
+      alternateBufferHyperlinkFacade,
       blocksModel,
       settings,
       coroutineScope.childScope("TerminalSessionController"),
@@ -213,6 +242,10 @@ internal class ReworkedTerminalView(
 
   override fun getText(): CharSequence {
     return getCurEditor().document.immutableCharSequence
+  }
+
+  override fun getCurrentDirectory(): String? {
+    return sessionModel.terminalState.value.currentDirectory
   }
 
   override fun getTerminalSize(): TermSize? {
@@ -326,7 +359,9 @@ internal class ReworkedTerminalView(
 
     editor.highlighter = TerminalTextHighlighter { model.getHighlightings() }
 
-    TerminalHyperlinkHighlighter.install(project, model, editor, coroutineScope)
+    if (!isSplitHyperlinksSupportEnabled()) {
+      TerminalHyperlinkHighlighter.install(project, model, editor, coroutineScope)
+    }
 
     val cursorPainter = TerminalCursorPainter.install(editor, model, sessionModel, coroutineScope.childScope("TerminalCursorPainter"))
     if (fusCursorPainterListener != null) {

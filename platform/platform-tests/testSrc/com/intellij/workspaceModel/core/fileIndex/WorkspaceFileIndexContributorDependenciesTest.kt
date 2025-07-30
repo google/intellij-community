@@ -7,6 +7,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.SkipAddingToWatchedRoots
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.backend.workspace.toVirtualFileUrl
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.TestDisposable
@@ -54,7 +55,9 @@ class WorkspaceFileIndexContributorDependenciesTest {
     runBlocking { readAction { WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(customContentFileSetRoot) } }
     // initialize model
     val model = WorkspaceModel.getInstance(projectModel.project)
-    val parent = ParentTestEntity("parent property", NonPersistentEntitySource)
+    val parent = ParentTestEntity("parent property",
+                                  customContentFileSetRoot.toVirtualFileUrl(model.getVirtualFileUrlManager()),
+                                  NonPersistentEntitySource)
       .also { it.child = ChildTestEntity("child property", NonPersistentEntitySource) }
       .also { it.secondChild = SiblingEntity("sibling property", NonPersistentEntitySource) }
 
@@ -132,7 +135,10 @@ class WorkspaceFileIndexContributorDependenciesTest {
   @Test
   fun `child contributor should be called after its relative added`() = runBlocking {
     val model = WorkspaceModel.getInstance(projectModel.project)
-    val newParentEntity = ParentTestEntity("new parent property", NonPersistentEntitySource) {
+
+    val newParentEntity = ParentTestEntity("new parent property",
+                                           customContentFileSetRoot.toVirtualFileUrl(model.getVirtualFileUrlManager()),
+                                           NonPersistentEntitySource) {
       child = ChildTestEntity("new child property", NonPersistentEntitySource)
     }
 
@@ -162,7 +168,7 @@ class WorkspaceFileIndexContributorDependenciesTest {
     override val dependenciesOnOtherEntities: List<DependencyDescription<ChildTestEntity>>
       get() = listOf(
         DependencyDescription.OnParent(ParentTestEntity::class.java) { sequenceOfNotNull(it.child) },
-        DependencyDescription.OnRelative(SiblingEntity::class.java, ChildTestEntity::class.java) { sequenceOfNotNull(it.parent.child) }
+        DependencyDescription.OnEntity(SiblingEntity::class.java, ChildTestEntity::class.java) { sequenceOfNotNull(it.parent.child) }
       )
 
     override fun registerFileSets(entity: ChildTestEntity, registrar: WorkspaceFileSetRegistrar, storage: EntityStorage) {

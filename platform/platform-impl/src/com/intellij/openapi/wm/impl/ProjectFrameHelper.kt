@@ -135,6 +135,8 @@ abstract class ProjectFrameHelper internal constructor(
     frameHeaderHelper = coroutineScope.createFrameHeaderHelper(frame, frameDecorator, rootPane)
     installLinuxResizeHandler(coroutineScope, frame, glassPane)
 
+    glassPane.colorfulToolbar = { frameHeaderHelper.isColorfulToolbar() }
+
     frame.setFrameHelper(object : FrameHelper {
       override fun uiDataSnapshot(sink: DataSink) {
         return this@ProjectFrameHelper.uiDataSnapshot(sink)
@@ -338,7 +340,7 @@ abstract class ProjectFrameHelper internal constructor(
 
   suspend fun updateTitle(title: String, project: Project) {
     val titleInfoProviders = getTitleInfoProviders()
-    withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+    withContext(Dispatchers.UiWithModelAccess) {
       this@ProjectFrameHelper.title = title
       updateTitle(project = project, titleInfoProviders = titleInfoProviders)
     }
@@ -424,7 +426,7 @@ abstract class ProjectFrameHelper internal constructor(
 
     this.project = project
 
-    withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+    withContext(Dispatchers.UiWithModelAccess) {
       applyInitBounds()
 
       if (statusBar == null) {

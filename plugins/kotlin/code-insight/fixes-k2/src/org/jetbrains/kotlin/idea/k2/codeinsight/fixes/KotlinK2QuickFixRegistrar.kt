@@ -305,6 +305,10 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
 
         registerFactory(ImportQuickFixFactories.iteratorMissingFactory)
         registerFactory(ImportQuickFixFactories.iteratorAmbiguityFactory)
+        registerFactory(ImportQuickFixFactories.hasNextMissingFactory)
+        registerFactory(ImportQuickFixFactories.hasNextFunctionNoneApplicableFactory)
+        registerFactory(ImportQuickFixFactories.nextMissingFactory)
+        registerFactory(ImportQuickFixFactories.nextNoneApplicableFactory)
 
         registerFactory(ImportQuickFixFactories.delegateSpecialFunctionMissingFactory)
         registerFactory(ImportQuickFixFactories.delegateSpecialFunctionNoneApplicableFactory)
@@ -357,7 +361,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ReplaceCallFixFactories.unsafeInfixCallFactory)
         registerFactory(ReplaceCallFixFactories.unsafeOperatorCallFactory)
         registerFactory(ReplaceCallFixFactories.unsafeImplicitInvokeCallFactory)
-        registerFactory(UnresolvedInvocationQuickFixFactories.changeToPropertyAccessQuickFixFactory)
+        registerFactory(UnresolvedInvocationQuickFixFactories.functionExpectedChangeToPropertyAccessQuickFixFactory)
+        registerFactory(UnresolvedInvocationQuickFixFactories.wrongReceiverChangeToPropertyAccessQuickFixFactory)
         registerFactory(UnresolvedInvocationQuickFixFactories.removeParentInvocationQuickFixFactory)
         registerFactory(UnresolvedInvocationQuickFixFactories.addInterpolationPrefixFixFactory)
         registerFactory(UnresolvedInvocationQuickFixFactories.removeInvocationQuickFixFactory)

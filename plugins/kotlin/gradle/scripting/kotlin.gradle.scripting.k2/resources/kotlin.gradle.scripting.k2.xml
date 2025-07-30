@@ -3,6 +3,7 @@
     <module name="kotlin.gradle.scripting.shared"/>
     <module name="kotlin.gradle.gradle-java"/>
     <module name="kotlin.base.scripting.k2"/>
+    <module name="kotlin.base.scripting.shared"/>
     <plugin id="org.jetbrains.plugins.gradle"/>
   </dependencies>
 
@@ -21,8 +22,7 @@
                     serviceImplementation="org.jetbrains.kotlin.gradle.scripting.k2.roots.GradleBuildRootsLocatorImpl"/>
     <externalSystemTaskNotificationListener implementation="org.jetbrains.kotlin.gradle.scripting.k2.importing.KotlinDslSyncListener"/>
 
-    <editorNotificationProvider
-            implementation="org.jetbrains.kotlin.gradle.scripting.k2.IndexScriptDependenciesSourcesNotificationProvider"/>
+    <attachSourcesProvider implementation="org.jetbrains.kotlin.gradle.scripting.k2.AttachGradleScriptDependenciesSourcesProvider"/>
     <editorNotificationProvider implementation="org.jetbrains.kotlin.gradle.scripting.k2.GradleScriptNotificationProvider"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.gradle.scripting.k2.inspections.KotlinOptionsToCompilerOptionsInspection"

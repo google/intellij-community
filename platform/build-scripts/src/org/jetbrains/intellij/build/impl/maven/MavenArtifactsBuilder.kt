@@ -129,10 +129,8 @@ open class MavenArtifactsBuilder(protected val context: BuildContext) {
       "fleet.util.logging.slf4j",
       "fleet.util.multiplatform",
       "fleet.fastutil",
-      // endregion
-
-      // region Fleet Language Server Protocol modules allowed for publication - https://youtrack.jetbrains.com/issue/IJI-2644
-      "fleet.lsp.protocol",
+      "fleet.lsp.protocol", // Fleet Language Server Protocol modules allowed for publication - https://youtrack.jetbrains.com/issue/IJI-2644
+      "fleet.ktor.network.tls",
       // endregion
     )
   }
@@ -370,9 +368,6 @@ private fun Model.setOrFailIfAlreadySet(name: String, value: String, getter: Mod
 
 private fun generatePomXmlData(artifactData: MavenArtifactData, file: Path, context: BuildContext) {
   val pomModel = Model()
-  // From https://central.sonatype.org/publish/requirements/#project-name-description-and-url:
-  // A common and acceptable practice for name is to assemble it from the coordinates using Maven properties
-  pomModel.name = "${pomModel.groupId}:${pomModel.artifactId}"
   pomModel.organization = Organization().apply {
     name = "JetBrains"
     url = "https://jetbrains.team"
@@ -388,6 +383,9 @@ private fun generatePomXmlData(artifactData: MavenArtifactData, file: Path, cont
   pomModel.setOrFailIfAlreadySet("GroupId", value = artifactData.coordinates.groupId, { groupId }, { groupId = it })
   pomModel.setOrFailIfAlreadySet("ArtifactId", value = artifactData.coordinates.artifactId, { artifactId }, { artifactId = it })
   pomModel.setOrFailIfAlreadySet("Version", value = artifactData.coordinates.version, { version }) { version = it }
+  // From https://central.sonatype.org/publish/requirements/#project-name-description-and-url:
+  // A common and acceptable practice for name is to assemble it from the coordinates using Maven properties
+  pomModel.name = "${pomModel.groupId}:${pomModel.artifactId}"
   artifactData.dependencies.forEach {
     pomModel.addDependency(createDependencyTag(it))
   }

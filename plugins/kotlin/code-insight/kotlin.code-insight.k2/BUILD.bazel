@@ -1,15 +1,16 @@
 ### auto-generated section `build kotlin.code-insight.k2` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_kotlin-code-insight-k2",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
     "org.jetbrains.kotlin.analysis.api.KaIdeApi",
-  ]
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ],
+  x_context_receivers = True
 )
 
 jvm_resources(
@@ -23,7 +24,7 @@ jvm_library(
   module_name = "kotlin.code-insight.k2",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_kotlin-code-insight-k2",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -89,7 +90,7 @@ jvm_library(
   name = "kotlin-code-insight-k2_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_kotlin-code-insight-k2",
   associates = [":kotlin-code-insight-k2"],
   deps = [
     "@lib//:kotlin-stdlib",
@@ -164,13 +165,17 @@ jvm_library(
     "//java/testFramework",
     "//plugins/kotlin/base/statistics",
     "//plugins/kotlin/bundled-compiler-plugins-support",
-    "//plugins/kotlin/base/scripting.k2",
+    "//plugins/kotlin/base/scripting/scripting.k2",
   ],
   runtime_deps = [":kotlin-code-insight-k2_resources"]
 )
+### auto-generated section `build kotlin.code-insight.k2` end
+
+### auto-generated section `test kotlin.code-insight.k2` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "kotlin-code-insight-k2_test",
   runtime_deps = [":kotlin-code-insight-k2_test_lib"]
 )
-### auto-generated section `build kotlin.code-insight.k2` end
+### auto-generated section `test kotlin.code-insight.k2` end

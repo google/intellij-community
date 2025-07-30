@@ -240,7 +240,7 @@ sealed interface EelExecApi {
    * Do not use pty, but redirect `stderr` to [to]
    */
   @ApiStatus.Experimental
-  data class RedirectStdErr(val to: RedirectTo) : InteractionOptions
+  class RedirectStdErr(val to: RedirectTo) : InteractionOptions
 
   @ApiStatus.Experimental
   enum class RedirectTo {
@@ -274,6 +274,10 @@ interface EelExecWindowsApi : EelExecApi {
 suspend fun EelExecApi.where(exe: String): EelPath? {
   return this.findExeFilesInPath(exe).firstOrNull()
 }
+
+@ApiStatus.Experimental
+fun EelExecApi.spawnProcess(exe: EelPath, vararg args: String): EelExecApiHelpers.SpawnProcess =
+  spawnProcess(exe.toString()).args(*args)
 
 @ApiStatus.Experimental
 fun EelExecApi.spawnProcess(exe: String, vararg args: String): EelExecApiHelpers.SpawnProcess =

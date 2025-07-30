@@ -316,8 +316,9 @@ internal class WorkspaceFileIndexDataImpl(
   }
 
   private fun <E : WorkspaceEntity> processChangesByContributor(contributor: WorkspaceFileIndexContributor<E>,
-                                                                storageKind: EntityStorageKind,
-                                                                event: VersionedStorageChange) {
+                                                                event: VersionedStorageChange,
+                                                                storeRegistrar: StoreFileSetsRegistrarImpl,
+                                                                removeRegistrar: RemoveFileSetsRegistrarImpl) {
     val removedEntities = LinkedHashSet<E>()
     val addedEntities = LinkedHashSet<E>()
     val entitiesInStorage = LinkedHashSet<E>()
@@ -333,17 +334,20 @@ internal class WorkspaceFileIndexDataImpl(
                                                                                     event, removedEntities, addedEntities)
         is DependencyDescription.OnChild<*, *> -> collectEntitiesWithChangedChild(dependency as DependencyDescription.OnChild<E, *>,
                                                                                   event, removedEntities, addedEntities)
-        is DependencyDescription.OnRelative<*, *> -> collectEntitiesWithChangedRelative(dependency as DependencyDescription.OnRelative<E, *>,
-                                                                                        event,
-                                                                                        removedEntities,
-                                                                                        addedEntities,
-                                                                                        entitiesInStorage,
-                                                                                        entitiesNotInStorage)
+        is DependencyDescription.OnEntity<*, *> -> processOnEntityDependency(dependency as DependencyDescription.OnEntity<E, *>,
+                                                                             event,
+                                                                             removedEntities,
+                                                                             addedEntities,
+                                                                             entitiesInStorage,
+                                                                             entitiesNotInStorage)
+        is DependencyDescription.OnReference<*, *> -> processOnReference(dependency,
+                                                                         event,
+                                                                         removedEntities as MutableSet<WorkspaceEntity>,
+                                                                         addedEntities as MutableSet<WorkspaceEntity>,
+        )
       }
     }
 
-    val removeRegistrar = RemoveFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
-    val storeRegistrar = StoreFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
     WorkspaceFileIndexDataMetrics.registerFileSetsTimeNanosec.addMeasuredTime {
       for (removed in removedEntities) {
         contributor.registerFileSets(removed, removeRegistrar, event.storageBefore)
@@ -362,49 +366,77 @@ internal class WorkspaceFileIndexDataImpl(
     }
   }
 
+  private fun <R : WorkspaceEntityWithSymbolicId, E : WorkspaceEntityWithSymbolicId> processOnReference(
+    dependencyDescription: DependencyDescription.OnReference<R, E>,
+    event: VersionedStorageChange,
+    removedEntities: MutableSet<WorkspaceEntity>,
+    addedEntities: MutableSet<WorkspaceEntity>,
+  ) {
+    val previousDependencies = mutableSetOf<SymbolicEntityId<R>>()
+    val actualDependencies = mutableSetOf<SymbolicEntityId<R>>()
+
+
+    event.getChanges(dependencyDescription.referenceHolderClass).asSequence().forEach { change ->
+      change.oldEntity?.let {
+        dependencyDescription.referencedEntitiesGetter(it).toCollection(previousDependencies)
+      }
+      change.newEntity?.let {
+        dependencyDescription.referencedEntitiesGetter(it).toCollection(actualDependencies)
+      }
+    }
+
+    // everything in actual dependencies but not in previous is considered new
+    // everything in previous but not in actual dependencies is considered removed
+
+    (actualDependencies - previousDependencies).mapNotNullTo(addedEntities) { it.resolve(event.storageAfter) }
+
+    (previousDependencies - actualDependencies)
+      // check if any reference holder is still references removed entity
+      .filter { event.storageAfter.referrers(it, dependencyDescription.referenceHolderClass).none() }
+      .mapNotNullTo(removedEntities) { it.resolve(event.storageBefore) }
+  }
+
   /**
-   * This method searches for entities [E] that were affected by the change of relative [R].
+   * This method searches for entities [R] that were affected by the change of entity [E].
    *
    * Example:
    *
-   * Suppose we have entities A, B, C in [affectedByRemovalEntities] and E, F, G in [affectedByAdditionEntities] and we have B and F actually in storage.
+   * Suppose we add entities A, B, C into [removedEntities] and E, F, G in [addedEntities] and we have B and F actually in storage.
    * We remove file sets for A, B, C, but we need to register a file set for B, so entity B will be in [entitiesToKeep].
    * By the same logic we register file sets for E, F, G, but we need to remove file sets for E and G, so they will in [entitiesToRemove].
    *
-   * [entitiesToRemove] = [affectedByAdditionEntities] - [entitiesInCurrentStorage]
+   * [entitiesToRemove] = [addedEntities] - [entitiesInCurrentStorage]
    *
-   * [entitiesToKeep] = [entitiesInCurrentStorage] intersect [affectedByRemovalEntities]
+   * [entitiesToKeep] = [removedEntities] intersect [affectedByRemovalEntities]
    *
-   * Note that this method is only responsible for collecting the affected entities [E] and does not work with file sets.
    */
-  private fun <E: WorkspaceEntity, R: WorkspaceEntity> collectEntitiesWithChangedRelative(dependency: DependencyDescription.OnRelative<E, R>,
-                                                                                          event: VersionedStorageChange,
-                                                                                          removedEntities: MutableSet<E>,
-                                                                                          addedEntities: MutableSet<E>,
-                                                                                          entitiesToKeep: MutableSet<E>,
-                                                                                          entitiesToRemove: MutableSet<E>) {
-    // file sets will be removed
-    val affectedBySiblingRemoval = mutableSetOf<E>()
-    // file sets will be added
-    val affectedBySiblingAddition = mutableSetOf<E>()
-    event.getChanges(dependency.relativeClass).asSequence().forEach { change ->
+  private fun <R: WorkspaceEntity, E: WorkspaceEntity> processOnEntityDependency(dependency: DependencyDescription.OnEntity<R, E>,
+                                                                                 event: VersionedStorageChange,
+                                                                                 removedEntities: MutableSet<R>,
+                                                                                 addedEntities: MutableSet<R>,
+                                                                                 entitiesToKeep: MutableSet<R>,
+                                                                                 entitiesToRemove: MutableSet<R>) {
+    var onEntityDependencyApplied = false
+    event.getChanges(dependency.entityClass).asSequence().forEach { change ->
+      onEntityDependencyApplied = true
       change.oldEntity?.let {
-        dependency.entityGetter(it).toCollection(affectedBySiblingRemoval)
+        dependency.resultGetter(it).toCollection(removedEntities)
       }
       change.newEntity?.let {
-        dependency.entityGetter(it).toCollection(affectedBySiblingAddition)
+        dependency.resultGetter(it).toCollection(addedEntities)
       }
     }
-    val entitiesInCurrentStorage = event.storageAfter.entities(dependency.entityClass).toSet()
 
-    if (affectedBySiblingRemoval.isNotEmpty()) {
-      entitiesToKeep.addAll(affectedBySiblingRemoval.intersect(entitiesInCurrentStorage))
+    if (onEntityDependencyApplied) {
+      val entitiesInCurrentStorage = event.storageAfter.entities(dependency.resultClass).toSet()
+
+      if (removedEntities.isNotEmpty()) {
+        entitiesToKeep.addAll(removedEntities.intersect(entitiesInCurrentStorage))
+      }
+      if (addedEntities.isNotEmpty()) {
+        entitiesToRemove.addAll(addedEntities - entitiesInCurrentStorage)
+      }
     }
-    if (affectedBySiblingAddition.isNotEmpty()) {
-      entitiesToRemove.addAll(affectedBySiblingAddition - entitiesInCurrentStorage)
-    }
-    removedEntities.addAll(affectedBySiblingRemoval)
-    addedEntities.addAll(affectedBySiblingAddition)
   }
 
   private fun <E : WorkspaceEntity, P : WorkspaceEntity> collectEntitiesWithChangedParent(dependency: DependencyDescription.OnParent<E, P>,
@@ -448,10 +480,18 @@ internal class WorkspaceFileIndexDataImpl(
   override fun onEntitiesChanged(event: VersionedStorageChange,
                                  storageKind: EntityStorageKind) = WorkspaceFileIndexDataMetrics.onEntitiesChangedTimeNanosec.addMeasuredTime {
     ThreadingAssertions.assertWriteAccess()
+    val removeRegistrar = RemoveFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
+    val storeRegistrar = StoreFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
     contributorList.filter { it.storageKind == storageKind }.forEach { 
-      processChangesByContributor(it, storageKind, event)
+      processChangesByContributor(it, event, storeRegistrar, removeRegistrar)
     }
     resetFileCache()
+    if (storeRegistrar.storedFileSets.isNotEmpty() || removeRegistrar.removedFileSets.isNotEmpty()) {
+      val changeLog = WorkspaceFileIndexChangedEventImpl(project,
+                                                         removedFileSets = removeRegistrar.removedFileSets.values,
+                                                         storedFileSets = storeRegistrar.storedFileSets.values,)
+      project.messageBus.syncPublisher(WorkspaceFileIndexListener.TOPIC).workspaceFileIndexChanged(changeLog)
+    }
   }
 
   override fun updateDirtyEntities() {
@@ -620,6 +660,9 @@ private class RemoveFileSetsRegistrarImpl(
   private val fileSets: MutableMap<VirtualFile, StoredFileSetCollection>,
   private val fileSetsByPackagePrefix: PackagePrefixStorage,
 ) : WorkspaceFileSetRegistrar {
+
+  val removedFileSets = mutableMapOf<VirtualFile, WorkspaceFileSet>()
+
   override fun registerFileSet(root: VirtualFileUrl, kind: WorkspaceFileKind, entity: WorkspaceEntity, customData: WorkspaceFileSetData?) {
     val rootFile = root.virtualFile
     if (rootFile == null) {
@@ -631,6 +674,21 @@ private class RemoveFileSetsRegistrarImpl(
   }
 
   override fun registerFileSet(root: VirtualFile, kind: WorkspaceFileKind, entity: WorkspaceEntity, customData: WorkspaceFileSetData?) {
+    val fileSetToRemove = fileSets[root]
+    if (fileSetToRemove != null) {
+      when (fileSetToRemove) {
+        is MultipleWorkspaceFileSets -> {
+          fileSetToRemove.forEach { fileSet ->
+            if (fileSet is WorkspaceFileSetImpl) {
+              removedFileSets.putIfAbsent(root, fileSet)
+              return@forEach
+            }
+          }
+        }
+        is WorkspaceFileSetImpl -> removedFileSets.putIfAbsent(root, fileSetToRemove)
+        else -> {}
+      }
+    }
     fileSets.removeValueIf(root) { it is WorkspaceFileSetImpl && isOriginatedFrom(it, entity) }
     if (customData is JvmPackageRootDataInternal) {
       fileSetsByPackagePrefix.removeByPrefixAndPointer(customData.packagePrefix, entity.createPointer())
@@ -709,6 +767,9 @@ private class StoreFileSetsRegistrarImpl(
   private val fileSets: MutableMap<VirtualFile, StoredFileSetCollection>,
   private val fileSetsByPackagePrefix: PackagePrefixStorage,
 ) : WorkspaceFileSetRegistrar {
+
+  val storedFileSets = mutableMapOf<VirtualFile, WorkspaceFileSet>()
+
   override fun registerFileSet(
     root: VirtualFileUrl,
     kind: WorkspaceFileKind,
@@ -759,6 +820,7 @@ private class StoreFileSetsRegistrarImpl(
       recursive = recursive,
     )
     fileSets.putValue(root, fileSet)
+    storedFileSets.putIfAbsent(root, fileSet)
     if (customData is JvmPackageRootDataInternal) {
       fileSetsByPackagePrefix.addFileSet(customData.packagePrefix, fileSet)
     }

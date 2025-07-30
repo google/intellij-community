@@ -5,15 +5,18 @@ import org.jetbrains.plugins.textmate.Constants
 import org.jetbrains.plugins.textmate.language.syntax.SyntaxNodeDescriptor
 import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateSelectorWeigher
 import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateWeigh
+import org.jetbrains.plugins.textmate.regex.DefaultRegexProvider
 import org.jetbrains.plugins.textmate.regex.MatchData
 import org.jetbrains.plugins.textmate.regex.RegexFactory
+import org.jetbrains.plugins.textmate.regex.RegexProvider
+import org.jetbrains.plugins.textmate.regex.TextMateByteOffset
 import org.jetbrains.plugins.textmate.regex.TextMateString
 
 interface TextMateSyntaxMatcher {
   fun matchRule(
     syntaxNodeDescriptor: SyntaxNodeDescriptor,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     priority: TextMateWeigh.Priority,
@@ -24,7 +27,7 @@ interface TextMateSyntaxMatcher {
   fun matchStringRegex(
     keyName: Constants.StringKey,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     lexerState: TextMateLexerState,
@@ -35,14 +38,18 @@ interface TextMateSyntaxMatcher {
 }
 
 class TextMateSyntaxMatcherImpl(
-  private val regexFactory: RegexFactory,
+  private val regexProvider: RegexProvider,
   private val mySelectorWeigher: TextMateSelectorWeigher,
 ) : TextMateSyntaxMatcher {
+
+  @Deprecated("Use TextMateSyntaxMatcherImpl(RegexFactory, TextMateSelectorWeigher)")
+  constructor(regexFactory: RegexFactory,
+              weigher: TextMateSelectorWeigher) : this(DefaultRegexProvider(regexFactory), weigher)
 
   override fun matchRule(
     syntaxNodeDescriptor: SyntaxNodeDescriptor,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     priority: TextMateWeigh.Priority,
@@ -77,7 +84,7 @@ class TextMateSyntaxMatcherImpl(
   override fun matchStringRegex(
     keyName: Constants.StringKey,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     lexerState: TextMateLexerState,
@@ -91,7 +98,7 @@ class TextMateSyntaxMatcherImpl(
     else {
       regex
     }
-    return regexFactory.regex(regexString).use { regexFacade ->
+    return regexProvider.withRegex(regexString) { regexFacade ->
       regexFacade.match(string = string,
                         byteOffset = byteOffset,
                         matchBeginPosition = matchBeginPosition,
@@ -101,13 +108,13 @@ class TextMateSyntaxMatcherImpl(
   }
 
   override fun <T> matchingString(s: CharSequence, body: (TextMateString) -> T): T {
-    return regexFactory.string(s).use(body)
+    return regexProvider.withString(s, body)
   }
 
   private fun matchFirstChild(
     syntaxNodeDescriptor: SyntaxNodeDescriptor,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     priority: TextMateWeigh.Priority,
@@ -120,7 +127,7 @@ class TextMateSyntaxMatcherImpl(
         TextMateLexerState.notMatched(syntaxNodeDescriptor)
       }
       else {
-        regexFactory.regex(match).use { regex ->
+        regexProvider.withRegex(match) { regex ->
           val matchData = regex.match(string, byteOffset, matchBeginPosition, matchBeginString, checkCancelledCallback)
           TextMateLexerState(syntaxNodeDescriptor, matchData, priority, byteOffset, string)
         }
@@ -132,7 +139,7 @@ class TextMateSyntaxMatcherImpl(
         TextMateLexerState.notMatched(syntaxNodeDescriptor)
       }
       else {
-        regexFactory.regex(begin).use { regex ->
+        regexProvider.withRegex(begin) { regex ->
           val matchData = regex.match(string, byteOffset, matchBeginPosition, matchBeginString, checkCancelledCallback)
           TextMateLexerState(syntaxNodeDescriptor, matchData, priority, byteOffset, string)
         }
@@ -169,7 +176,7 @@ class TextMateSyntaxMatcherImpl(
   private fun matchInjections(
     syntaxNodeDescriptor: SyntaxNodeDescriptor,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     currentScope: TextMateScope,

@@ -36,7 +36,6 @@ import com.intellij.xdebugger.impl.breakpoints.XBreakpointUtil
 import com.intellij.xdebugger.impl.rpc.XBreakpointId
 import com.intellij.xdebugger.impl.rpc.XBreakpointTypeId
 import com.intellij.xdebugger.impl.rpc.models.findValue
-import com.intellij.xdebugger.impl.rpc.toRpc
 import fleet.rpc.core.toRpc
 import fleet.util.channels.use
 import kotlinx.coroutines.*
@@ -44,9 +43,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
-import org.jetbrains.concurrency.Promise
+import org.jetbrains.concurrency.asDeferred
 import org.jetbrains.concurrency.await
-import org.jetbrains.concurrency.resolvedPromise
 import java.util.concurrent.atomic.AtomicInteger
 
 private val LOG = logger<BackendXBreakpointTypeApi>()
@@ -153,7 +151,7 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
 
       val breakpoint = createBreakpointByVariant(project, singleVariant, position, request)
       LOG.info("[$requestId] Created breakpoint: $breakpoint, returning XLineBreakpointInstalledResponse")
-      return XLineBreakpointInstalledResponse(breakpoint.toRpc())
+      return XLineBreakpointInstalledResponse(breakpoint.breakpointId)
     }
 
     LOG.info("[$requestId] Multiple variants found (${variants.size}), creating selection dialog")
@@ -181,7 +179,7 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
         LOG.info("[$requestId] Received variant selection: $receivedResponse Selected variant: ${variant.text}" +
                  "[$requestId] Created breakpoint from selected variant: $breakpoint")
 
-        it.send(breakpoint.toRpc())
+        it.send(breakpoint.breakpointId)
       }
     }
 
@@ -217,6 +215,26 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     edtWriteAction {
       XDebuggerManager.getInstance(breakpoint.project).breakpointManager.removeBreakpoint(breakpoint)
       LOG.info("[$requestId] Breakpoint removed: $breakpointId")
+    }
+  }
+
+  override suspend fun rememberRemovedBreakpoint(breakpointId: XBreakpointId) {
+    val requestId = requestCounter.getAndIncrement()
+    LOG.info("[$requestId] Remembering removed breakpoint: $breakpointId")
+    val breakpoint = breakpointId.findValue() ?: return
+    edtWriteAction {
+      (XDebuggerManager.getInstance(breakpoint.project).breakpointManager as XBreakpointManagerImpl).rememberRemovedBreakpoint(breakpoint)
+      LOG.info("[$requestId] Remembered removed breakpoint: $breakpointId")
+    }
+  }
+
+  override suspend fun restoreRemovedBreakpoint(projectId: ProjectId) {
+    val requestId = requestCounter.getAndIncrement()
+    LOG.info("[$requestId] Restoring removed breakpoint in $projectId")
+    val project = projectId.findProjectOrNull() ?: return
+    edtWriteAction {
+      val restored = (XDebuggerManager.getInstance(project).breakpointManager as XBreakpointManagerImpl).restoreLastRemovedBreakpoint()
+      LOG.info("[$requestId] Restored removed breakpoint: ${(restored as? XBreakpointBase<*, *, *>)?.breakpointId}")
     }
   }
 
@@ -263,18 +281,18 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
   @RequiresReadLock
   private fun computeBreakpointsLineRawInfo(project: Project, position: XSourcePosition, editor: Editor): BreakpointsLineRawInfo {
     val lineBreakpointTypes = XBreakpointUtil.getAvailableLineBreakpointTypes(project, position, editor)
-    val variantsPromise: Promise<List<XLineBreakpointType<*>.XLineBreakpointVariant>> = if (lineBreakpointTypes.isNotEmpty()) {
-      XDebuggerUtilImpl.getLineBreakpointVariants(project, lineBreakpointTypes, position)
+    val variantsPromise = if (lineBreakpointTypes.isNotEmpty()) {
+      XDebuggerUtilImpl.getLineBreakpointVariants(project, lineBreakpointTypes, position).asDeferred()
     }
     else {
-      resolvedPromise(listOf())
+      CompletableDeferred(listOf())
     }
     return BreakpointsLineRawInfo(lineBreakpointTypes, variantsPromise)
   }
 
   private class BreakpointsLineRawInfo(
     private val types: List<XBreakpointType<*, *>>,
-    private val variantsPromise: Promise<List<XLineBreakpointType<*>.XLineBreakpointVariant>>,
+    private val variantsPromise: Deferred<List<XLineBreakpointType<*>.XLineBreakpointVariant>>,
   ) {
     suspend fun toDto(): XBreakpointsLineInfo {
       return XBreakpointsLineInfo(types.map { XBreakpointTypeId(it.id) }, singleBreakpointVariant = variantsPromise.await().size == 1)

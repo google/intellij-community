@@ -1,9 +1,9 @@
 load("@rules_java//java:defs.bzl", "java_binary")
 load("//build:compiler-options.bzl", "create_kotlinc_options")
 
-create_kotlinc_options(name= "k8", jvm_target = 8)
-create_kotlinc_options(name= "k11", jvm_target = 11)
-create_kotlinc_options(name = "k17", jvm_target = 17)
+create_kotlinc_options(name= "k8", jvm_target = "8")
+create_kotlinc_options(name= "k11", jvm_target = "11")
+create_kotlinc_options(name = "k17", jvm_target = "17")
 
 java_binary(
     name = "monorepo-jvm-builder",
@@ -135,7 +135,6 @@ jvm_library(
     "//platform/xdebugger-api:debugger",
     "//platform/xdebugger-impl:debugger-impl",
     "//xml/impl",
-    "//xml/openapi:xml",
     "//community-resources:customization",
     "//java/plugin",
     "//plugins/copyright",
@@ -192,7 +191,6 @@ jvm_library(
     "//plugins/stream-debugger:java-debugger-streams",
     "@lib//:jgoodies-common",
     "//plugins/editorconfig:editorconfig-plugin-main",
-    "//plugins/changeReminder",
     "//plugins/sh",
     "//plugins/terminal/sh",
     "//plugins/gradle-maven:gradle-java-maven",
@@ -229,8 +227,6 @@ jvm_library(
     "//platform/new-users-onboarding",
     "//plugins/kotlin/onboarding-promoter",
     "//platform/execution-process-elevation",
-    "//plugins/github/community",
-    "//plugins/gitlab/gitlab-community:vcs-gitlab-community",
     "//plugins/gitlab/gitlab-yaml:vcs-gitlab-yaml",
     "//plugins/yaml",
     "//platform/compose",
@@ -266,13 +262,15 @@ jvm_library(
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   deps = [
+    "//spellchecker",
+    "//spellchecker:spellchecker_test_lib",
     "//java/java-tests:tests_test_lib",
     "//plugins/junit/java-tests:java-tests_test_lib",
     "//jvm/jvm-analysis-java-tests:analysis-java-tests_test_lib",
     "//plugins/svn4idea:vcs-svn-tests_test_lib",
     "//plugins/tasks/tasks-tests:tests_test_lib",
     "//xml/dom-tests:dom-tests_test_lib",
-    "//plugins/IntelliLang/IntelliLang-tests:langInjection-tests_test_lib",
+    "//plugins/IntelliLang/tests:tests_test_lib",
     "//xml/tests:tests_test_lib",
     "//jps/model-serialization:model-serialization-tests_test_lib",
     "//plugins/ui-designer/jps-plugin:java-guiForms-jps",
@@ -411,7 +409,6 @@ jvm_library(
     "//platform/xdebugger-api:debugger",
     "//platform/xdebugger-impl:debugger-impl",
     "//xml/impl",
-    "//xml/openapi:xml",
     "//community-resources:customization",
     "//java/plugin",
     "//plugins/copyright",
@@ -468,7 +465,6 @@ jvm_library(
     "//plugins/stream-debugger:java-debugger-streams",
     "@lib//:jgoodies-common",
     "//plugins/editorconfig:editorconfig-plugin-main",
-    "//plugins/changeReminder",
     "//plugins/sh",
     "//plugins/terminal/sh",
     "//plugins/gradle-maven:gradle-java-maven",
@@ -505,8 +501,6 @@ jvm_library(
     "//platform/new-users-onboarding",
     "//plugins/kotlin/onboarding-promoter",
     "//platform/execution-process-elevation",
-    "//plugins/github/community",
-    "//plugins/gitlab/gitlab-community:vcs-gitlab-community",
     "//plugins/gitlab/gitlab-yaml:vcs-gitlab-yaml",
     "//plugins/yaml",
     "//platform/compose",
@@ -539,8 +533,6 @@ jvm_library(
 ### auto-generated section `build intellij.idea.community.main` end
 
 ### auto-generated section `build intellij.idea.community.main.android` start
-load("@rules_jvm//:jvm.bzl", "jvm_library")
-
 jvm_library(
   name = "main-android",
   visibility = ["//visibility:public"],

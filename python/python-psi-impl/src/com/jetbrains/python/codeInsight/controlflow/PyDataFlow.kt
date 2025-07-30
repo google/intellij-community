@@ -5,10 +5,11 @@ import com.intellij.codeInsight.controlflow.Instruction
 import com.intellij.openapi.util.Version
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.findParentOfType
 import com.jetbrains.python.codeInsight.dataflow.scope.ScopeUtil
+import com.jetbrains.python.getEffectiveLanguageLevel
 import com.jetbrains.python.psi.*
 import com.jetbrains.python.psi.impl.PyEvaluator
-import com.jetbrains.python.psi.impl.PythonLanguageLevelPusher
 import com.jetbrains.python.psi.impl.stubs.evaluateVersionsForElement
 import com.jetbrains.python.psi.types.PyNeverType
 import com.jetbrains.python.psi.types.TypeEvalContext
@@ -19,7 +20,7 @@ import java.util.*
 class PyDataFlow(scopeOwner: ScopeOwner, controlFlow: ControlFlow, private val context: TypeEvalContext) : ControlFlow by controlFlow {
   private val reachability: BooleanArray = BooleanArray(instructions.size)
   private val languageVersion = run {
-    val languageLevel = PythonLanguageLevelPusher.getLanguageLevelForFile(scopeOwner.containingFile)
+    val languageLevel = getEffectiveLanguageLevel(scopeOwner.containingFile)
     Version(languageLevel.majorVersion, languageLevel.minorVersion, 0)
   }
 
@@ -88,7 +89,16 @@ class PyDataFlow(scopeOwner: ScopeOwner, controlFlow: ControlFlow, private val c
  * - calls to functions annotated with `NoReturn`
  */
 fun PsiElement.isUnreachableForInspection(context: TypeEvalContext): Boolean {
-  return isUnreachableByControlFlow(context) && !isFirstTerminatingStatement(context)
+  return PyUtil.getParameterizedCachedValue(this, context) { isUnreachableForInspectionNoCache(it) }
+}
+
+private fun PsiElement.isUnreachableForInspectionNoCache(context: TypeEvalContext): Boolean {
+  if (parent is PyElement && parent.isUnreachableForInspection(context)) return true
+  return isUnreachableByControlFlow(context) && when (this) {
+    is PyStatementList -> !(statements.firstOrNull()?.isIgnoredUnreachableStatement(context) ?: true)
+    is PyStatement -> !this.isIgnoredUnreachableStatement(context)
+    else -> false
+  }
 }
 
 /**
@@ -128,12 +138,11 @@ fun PsiElement.findInstructionNumber(flow: Array<Instruction>): Int {
   return -1
 }
 
-private fun PsiElement.isFirstTerminatingStatement(context: TypeEvalContext): Boolean {
-  if (this.isTerminatingStatement(context)) {
-    val prevSibling = prevSiblingOfType<PyElement>() ?: return true
-    return !prevSibling.isTerminatingStatement(context) && !prevSibling.isUnreachableByControlFlow(context)
-  }
-  return false
+private fun PyStatement.isIgnoredUnreachableStatement(context: TypeEvalContext): Boolean {
+  val parentBlock = this.parent as? PyStatementList ?: return false
+  if (parentBlock.statements[0] != this) return false
+  val parentCompoundStatement = parentBlock.findParentOfType<PyStatement>() ?: return false
+  return !parentCompoundStatement.isUnreachableByControlFlow(context) && isTerminatingStatement(context)
 }
 
 private fun PsiElement.isTerminatingStatement(context: TypeEvalContext): Boolean {

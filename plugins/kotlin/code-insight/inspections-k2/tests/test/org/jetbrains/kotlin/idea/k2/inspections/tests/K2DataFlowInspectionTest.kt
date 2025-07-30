@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.test.TestMetadata
 class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     fun testAlwaysZero() = doTest()
     @Suppress("ClassExplicitlyAnnotation")
-    fun testAnnotationInJava() {
+    fun testAnnotationInJavaK2() {
         myFixture.addClass("""
             import java.lang.annotation.Annotation;
 
@@ -73,7 +73,8 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     }
     fun testJavaMethods() = doTest()
     fun testJavaConstant() = doTest()
-    fun testJavaType() = doTest()
+    fun testJavaTypeK2() = doTest()
+    fun testJavaClassGetSimpleName() = doTest()
     fun testLambda() = doTest()
     fun testLanguageConstructs() = doTest()
     fun testLastIndex() = doTest()

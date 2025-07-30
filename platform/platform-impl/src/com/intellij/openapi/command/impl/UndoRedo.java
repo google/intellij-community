@@ -2,11 +2,13 @@
 package com.intellij.openapi.command.impl;
 
 import com.intellij.ide.IdeBundle;
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.undo.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorState;
 import com.intellij.openapi.fileEditor.FileEditorStateLevel;
+import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.NlsContexts.DialogMessage;
@@ -81,7 +83,11 @@ abstract class UndoRedo {
 
   boolean execute(boolean drop, boolean disableConfirmation) {
     if (!undoableGroup.isUndoable()) {
-      undoProblemReport.reportNonUndoable(undoableGroup.getAffectedDocuments());
+      String operationName = Objects.requireNonNull(
+        CommandProcessor.getInstance().getCurrentCommandName(),
+        "performing undo/redo operation outside command context"
+      );
+      undoProblemReport.reportNonUndoable(operationName, undoableGroup.getAffectedDocuments());
       return false;
     }
 
@@ -112,7 +118,7 @@ abstract class UndoRedo {
     else {
       if (!shouldMove && editor != null && restore(getBeforeState(), true)) {
         setBeforeState(new EditorAndState(editor, editor.getState(FileEditorStateLevel.UNDO)));
-        if (!Registry.is("ide.undo.transparent.caret.movement")) {
+        if (!isCaretMovementUndoTransparent()) {
           return true;
         }
       }
@@ -352,5 +358,13 @@ abstract class UndoRedo {
       }
     }
     return reference2Ranges;
+  }
+
+  /**
+   * Returns {@code true} if caret movement is not a separate undo step, see IJPL-28593
+   */
+  private static boolean isCaretMovementUndoTransparent() {
+    return Registry.is("ide.undo.transparent.caret.movement") ||
+           AdvancedSettings.getBoolean("editor.undo.transparent.caret.movement");
   }
 }

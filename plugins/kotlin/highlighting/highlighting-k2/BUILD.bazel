@@ -1,15 +1,16 @@
 ### auto-generated section `build kotlin.highlighting.k2` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_kotlin-highlighting-k2",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.analysis.api.KaIdeApi",
     "org.jetbrains.kotlin.analysis.api.KaNonPublicApi",
-  ]
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ],
+  x_context_receivers = True
 )
 
 jvm_resources(
@@ -23,7 +24,7 @@ jvm_library(
   module_name = "kotlin.highlighting.k2",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_kotlin-highlighting-k2",
   deps = [
     "//java/java-indexing-api:indexing",
     "//platform/indexing-api:indexing",
@@ -56,12 +57,12 @@ jvm_library(
     "//plugins/kotlin/kotlin.searching/base",
     "//plugins/kotlin/kotlin.searching:searching-k2",
     "//plugins/kotlin/base/analysis",
-    "//plugins/kotlin/base/scripting",
-    "//plugins/kotlin/base/scripting.k2",
+    "//plugins/kotlin/base/scripting/scripting.k2",
     "@lib//:kotlinc-kotlin-scripting-common",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "//platform/util/coroutines",
     "//plugins/kotlin/code-insight/impl-base",
+    "//plugins/kotlin/base/scripting/scripting.shared",
   ],
   runtime_deps = [":kotlin-highlighting-k2_resources"]
 )
@@ -70,7 +71,7 @@ jvm_library(
   name = "kotlin-highlighting-k2_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_kotlin-highlighting-k2",
   associates = [":kotlin-highlighting-k2"],
   deps = [
     "//java/java-indexing-api:indexing",
@@ -121,9 +122,7 @@ jvm_library(
     "//platform/workspace/jps",
     "//platform/backend",
     "//plugins/kotlin/base/analysis",
-    "//plugins/kotlin/base/scripting",
-    "//plugins/kotlin/base/scripting:scripting_test_lib",
-    "//plugins/kotlin/base/scripting.k2",
+    "//plugins/kotlin/base/scripting/scripting.k2",
     "@lib//:kotlinc-kotlin-scripting-common",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
@@ -131,12 +130,17 @@ jvm_library(
     "//plugins/kotlin/gradle/gradle-java:gradle-java_test_lib",
     "//platform/util/coroutines",
     "//plugins/kotlin/code-insight/impl-base",
+    "//plugins/kotlin/base/scripting/scripting.shared",
   ],
   runtime_deps = [":kotlin-highlighting-k2_resources"]
 )
+### auto-generated section `build kotlin.highlighting.k2` end
+
+### auto-generated section `test kotlin.highlighting.k2` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "kotlin-highlighting-k2_test",
   runtime_deps = [":kotlin-highlighting-k2_test_lib"]
 )
-### auto-generated section `build kotlin.highlighting.k2` end
+### auto-generated section `test kotlin.highlighting.k2` end

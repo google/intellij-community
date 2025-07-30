@@ -17,12 +17,13 @@ enum class HunspellDescriptor(
   UKRAINIAN(LanguageISO.UK, isGplLicensed = true, 2);
 
   override val storageDescriptor: String by lazy { "$storageName.jar" }
-  override val storageName: String by lazy { "hunspell-$iso-jvm-${GraziePlugin.Hunspell.version}" }
+  override val storageName: String by lazy { "hunspell-$iso-${GraziePlugin.Hunspell.version}" }
   override val file: Path by lazy { Path(storageName).resolve(DICTIONARY_DIR).resolve("$iso.dic") }
-  override val url: String by lazy { "${GraziePlugin.Hunspell.url}/hunspell-$iso-jvm/${GraziePlugin.Hunspell.version}/$storageDescriptor" }
+  override val url: String by lazy { "${GraziePlugin.Hunspell.url}/hunspell-$iso/${GraziePlugin.Hunspell.version}/$storageDescriptor" }
 
   companion object {
     private const val DICTIONARY_DIR: String = "dictionary"
+    private const val RULE_DIR: String = "rule"
 
     /**
      * Filter that is used to unpack hunspell jar dictionary.
@@ -30,8 +31,8 @@ enum class HunspellDescriptor(
      */
     fun filenameFilter(): FilenameFilter {
       return FilenameFilter { dir, name ->
-        dir.name == HunspellDescriptor.DICTIONARY_DIR ||
-        dir.parent == HunspellDescriptor.DICTIONARY_DIR ||
+        dir.name == HunspellDescriptor.DICTIONARY_DIR || dir.parent == HunspellDescriptor.DICTIONARY_DIR ||
+        dir.name == RULE_DIR || dir.parent == RULE_DIR ||
         name.startsWith("GPL") || name.equals("license") || name.equals("notice")
       }
     }

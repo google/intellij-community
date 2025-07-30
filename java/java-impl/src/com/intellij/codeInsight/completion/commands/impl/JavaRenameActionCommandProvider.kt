@@ -10,7 +10,7 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.parentOfType
 
-class JavaRenameActionCommandProvider: AbstractRenameActionCommandProvider() {
+public class JavaRenameActionCommandProvider: AbstractRenameActionCommandProvider() {
   override fun findRenameOffset(offset: Int, psiFile: PsiFile): Int? {
     var currentOffset = offset
     if (currentOffset == 0) return null
@@ -28,7 +28,7 @@ class JavaRenameActionCommandProvider: AbstractRenameActionCommandProvider() {
     val method = element.parentOfType<PsiMethod>()
     if (method != null &&
         (method.identifyingElement?.textRange?.endOffset == currentOffset ||
-        method.parameterList.textRange.endOffset == currentOffset ||
+        method.parameterList.textRange?.endOffset == currentOffset ||
         method.body?.rBrace?.textRange?.endOffset == currentOffset)) return method.identifyingElement?.textRange?.endOffset
 
     val psiClass = element.parentOfType<PsiClass>()

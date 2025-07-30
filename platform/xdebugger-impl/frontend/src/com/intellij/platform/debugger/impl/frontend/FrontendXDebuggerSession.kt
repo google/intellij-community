@@ -62,7 +62,6 @@ class FrontendXDebuggerSession private constructor(
   override val consoleView: ConsoleView?,
 ) : XDebugSessionProxy {
   private val cs = scope.childScope("Session ${sessionDto.id}")
-  private val localEditorsProvider = sessionDto.editorsProviderDto.editorsProvider
   private val eventsDispatcher = EventDispatcher.create(XDebugSessionListener::class.java)
   override val id: XDebugSessionId = sessionDto.id
 
@@ -118,12 +117,10 @@ class FrontendXDebuggerSession private constructor(
   override val isSuspended: Boolean
     get() = sessionState.value.isSuspended
 
-  override val editorsProvider: XDebuggerEditorsProvider =
-    localEditorsProvider
-    ?: FrontendXDebuggerEditorsProvider(sessionDto.editorsProviderDto.fileTypeId,
-                                        documentIdProvider = { frontendDocumentId, expression, position, mode ->
-                                          XDebugSessionApi.getInstance().createDocument(frontendDocumentId, id, expression, position, mode)
-                                        })
+  override val editorsProvider: XDebuggerEditorsProvider = getEditorsProvider(
+    cs, sessionDto.editorsProviderDto, documentIdProvider = { frontendDocumentId, expression, position, mode ->
+    XDebugSessionApi.getInstance().createDocument(frontendDocumentId, sessionDto.id, expression, position, mode)
+  })
 
   override val isLibraryFrameFilterSupported: Boolean = sessionDto.isLibraryFrameFilterSupported
 
@@ -271,8 +268,14 @@ class FrontendXDebuggerSession private constructor(
           sessionTabDeferred.complete(this)
           proxy.onTabInitialized(this)
           showTab()
-          runContentDescriptor?.coroutineScope?.awaitCancellationAndInvoke {
+          val descriptorScope = runContentDescriptor?.coroutineScope
+          // don't subscribe on additional tabs if we have [ExecutionEnvironment] (it means this is Monolith)
+          if (descriptorScope != null && tabInfo.executionEnvironmentProxyDto?.executionEnvironment == null) {
+            subscribeOnAdditionalTabs(descriptorScope, project, this@apply, tabInfo.additionalTabsComponentManagerId)
+          }
+          descriptorScope?.awaitCancellationAndInvoke {
             tabInfo.tabClosedCallback.send(Unit)
+            tabInfo.tabClosedCallback.close()
           }
           pausedFlow.toFlow().collectLatest { paused ->
             if (paused == null) return@collectLatest

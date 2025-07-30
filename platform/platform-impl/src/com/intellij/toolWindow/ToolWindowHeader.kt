@@ -233,8 +233,7 @@ abstract class ToolWindowHeader internal constructor(
 
   private fun manageWestPanelTabComponentAndToolbar(init: Boolean) {
     if (init) {
-      val allowDnd = ClientProperty.isTrue(toolWindow.component as Component?, ToolWindowContentUi.ALLOW_DND_FOR_TABS)
-      westPanel.growFirst = allowDnd
+      westPanel.growFirst = ToolWindowContentUi.isTabsReorderingAllowed(toolWindow)
       westPanel.setComponents(contentUi.tabComponent, sideComponent)
       contentUi.connectTabToolbar()
     }
@@ -250,12 +249,12 @@ abstract class ToolWindowHeader internal constructor(
 
   override fun addNotify() {
     super.addNotify()
-    toolWindow.component.addPropertyChangeListener(ToolWindowContentUi.ALLOW_DND_FOR_TABS.toString(), this)
+    toolWindow.component.addPropertyChangeListener(ToolWindowContentUi.ALLOW_TABS_REORDERING.toString(), this)
     manageWestPanelTabComponentAndToolbar(true)
   }
 
   override fun removeNotify() {
-    toolWindow.component.removePropertyChangeListener(ToolWindowContentUi.ALLOW_DND_FOR_TABS.toString(), this)
+    toolWindow.component.removePropertyChangeListener(ToolWindowContentUi.ALLOW_TABS_REORDERING.toString(), this)
     super.removeNotify()
     manageWestPanelTabComponentAndToolbar(false)
   }

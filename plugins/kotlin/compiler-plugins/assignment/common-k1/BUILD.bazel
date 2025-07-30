@@ -3,8 +3,11 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  opt_in = ["org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi"]
+  name = "custom_kotlin-compiler-plugins-assignment-common-k1",
+  opt_in = [
+    "org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi",
+    "com.intellij.openapi.util.IntellijInternalApi",
+  ]
 )
 
 jvm_resources(
@@ -18,7 +21,7 @@ jvm_library(
   module_name = "kotlin.compiler-plugins.assignment.common.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_kotlin-compiler-plugins-assignment-common-k1",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -29,7 +32,6 @@ jvm_library(
     "//platform/core-api:core",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/project-structure",
-    "//plugins/kotlin/base/scripting",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/common",
     "//platform/core-impl",
@@ -39,7 +41,7 @@ jvm_library(
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/base/fe10/analysis",
     "//platform/lang-impl",
-    "//plugins/kotlin/base/scripting.k1",
+    "//plugins/kotlin/base/scripting/scripting.k1",
   ],
   runtime_deps = [":kotlin-compiler-plugins-assignment-common-k1_resources"]
 )

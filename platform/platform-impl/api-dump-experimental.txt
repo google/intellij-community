@@ -247,11 +247,6 @@ f:com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.UnknownFeaturesC
 - com.intellij.openapi.components.PersistentStateComponent
 - *:getUnknownFeaturesOfType(java.lang.String):java.util.Set
 - *:unregisterUnknownFeature(com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.UnknownFeature):Z
-f:com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl
-- com.intellij.openapi.vfs.newvfs.persistent.PersistentFS
-- com.intellij.openapi.Disposable
-- *:offlineByDefault(com.intellij.openapi.vfs.VirtualFile,Z):V
-- *s:setOfflineByDefault(com.intellij.openapi.vfs.VirtualFile,Z):V
 a:com.intellij.openapi.wm.impl.FrameTitleBuilder
 - *:getFileTitleAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.openapi.wm.impl.IdeBackgroundUtil
@@ -269,6 +264,8 @@ c:com.intellij.openapi.wm.impl.status.IdeStatusBarImpl
 c:com.intellij.openapi.wm.impl.welcomeScreen.TabbedWelcomeScreen
 - com.intellij.openapi.wm.impl.welcomeScreen.AbstractWelcomeScreen
 - *:selectTab(com.intellij.openapi.wm.WelcomeScreenTab):V
+*:com.intellij.toolWindow.ToolWindowSplitContentProvider
+- a:createContentCopy(com.intellij.openapi.project.Project,com.intellij.ui.content.Content):com.intellij.ui.content.Content
 *a:com.intellij.ui.ToolbarActionTracker
 - com.intellij.openapi.Disposable
 - sf:ARROW_SHIFT:I
@@ -355,18 +352,6 @@ c:com.intellij.ui.content.impl.ContentManagerImpl
 - com.intellij.ui.content.ContentManager
 - java.beans.PropertyChangeListener
 - *:<init>(Z,com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,com.intellij.ui.content.impl.ContentManagerImpl$ContentUiProducer):V
-*f:com.intellij.ui.content.tabs.TabbedContentAction$SplitTabAction
-- com.intellij.ui.content.tabs.TabbedContentAction
-- <init>(com.intellij.ui.content.ContentManager,Z):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
-*f:com.intellij.ui.content.tabs.TabbedContentAction$UnsplitTabAction
-- com.intellij.ui.content.tabs.TabbedContentAction
-- <init>(com.intellij.ui.content.ContentManager):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.ui.dsl.builder.ButtonKt
 - *sf:whenStateChangedFromUi(com.intellij.ui.dsl.builder.Cell,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):com.intellij.ui.dsl.builder.Cell
 - *bs:whenStateChangedFromUi$default(com.intellij.ui.dsl.builder.Cell,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.ui.dsl.builder.Cell
@@ -425,6 +410,8 @@ f:com.intellij.ui.dsl.builder.components.ValidationTooltipKt
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ui.dsl.builder.components.ValidationType
 - s:values():com.intellij.ui.dsl.builder.components.ValidationType[]
+f:com.intellij.ui.render.RenderersKt
+- *sf:fontInfoRenderer(Z):javax.swing.ListCellRenderer
 *f:com.intellij.ui.split.SplitComponentFactory
 - *sf:Companion:com.intellij.ui.split.SplitComponentFactory$Companion
 - f:createComponent(com.intellij.ui.split.SplitComponentModel):com.intellij.openapi.ui.ComponentContainer
@@ -459,8 +446,6 @@ f:com.intellij.ui.dsl.builder.components.ValidationTooltipKt
 *f:com.intellij.ui.split.SplitComponentProvider$Companion
 f:com.intellij.util.SwingBindingsKt
 - *sf:bindSelectedTabIn(javax.swing.JTabbedPane,kotlinx.coroutines.flow.MutableStateFlow,kotlinx.coroutines.CoroutineScope):V
-- *sf:bindTextIn(javax.swing.text.JTextComponent,kotlinx.coroutines.flow.MutableStateFlow,kotlinx.coroutines.CoroutineScope):V
-- *sf:bindTextOnShow(javax.swing.text.JTextComponent,kotlinx.coroutines.flow.MutableStateFlow,java.lang.String):V
 *f:com.intellij.util.ui.RestartDialogImpl
 - *sf:Companion:com.intellij.util.ui.RestartDialogImpl$Companion
 - <init>():V

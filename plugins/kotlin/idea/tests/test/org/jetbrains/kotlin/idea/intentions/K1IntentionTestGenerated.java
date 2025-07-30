@@ -7814,6 +7814,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         public void testVarargs() throws Exception {
             runTest("testData/intentions/convertReceiverToParameter/varargs.kt");
         }
+
+        @TestMetadata("withRename.kt")
+        public void testWithRename() throws Exception {
+            runTest("testData/intentions/convertReceiverToParameter/withRename.kt");
+        }
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
@@ -11823,6 +11828,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("notApplicableAlias.kt")
         public void testNotApplicableAlias() throws Exception {
             runTest("testData/intentions/introduceImportAlias/notApplicableAlias.kt");
+        }
+
+        @TestMetadata("notApplicableInstanceMember.kt")
+        public void testNotApplicableInstanceMember() throws Exception {
+            runTest("testData/intentions/introduceImportAlias/notApplicableInstanceMember.kt");
         }
 
         @TestMetadata("notApplicableLocalClass.kt")

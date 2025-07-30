@@ -10727,6 +10727,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/redundantNullableReturnType/function/blockBody.kt");
             }
 
+            @TestMetadata("blockBodyNoReturn.kt")
+            public void testBlockBodyNoReturn() throws Exception {
+                runTest("testData/inspectionsLocal/redundantNullableReturnType/function/blockBodyNoReturn.kt");
+            }
+
             @TestMetadata("blockBodyReturnsNullable.kt")
             public void testBlockBodyReturnsNullable() throws Exception {
                 runTest("testData/inspectionsLocal/redundantNullableReturnType/function/blockBodyReturnsNullable.kt");
@@ -11394,6 +11399,16 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
         @TestMetadata("nested.kt")
         public void testNested() throws Exception {
             runTest("testData/inspectionsLocal/redundantWith/nested.kt");
+        }
+
+        @TestMetadata("notApplicable_contextParameter.kt")
+        public void testNotApplicable_contextParameter() throws Exception {
+            runTest("testData/inspectionsLocal/redundantWith/notApplicable_contextParameter.kt");
+        }
+
+        @TestMetadata("notApplicable_contextParameterWithSubstitution.kt")
+        public void testNotApplicable_contextParameterWithSubstitution() throws Exception {
+            runTest("testData/inspectionsLocal/redundantWith/notApplicable_contextParameterWithSubstitution.kt");
         }
 
         @TestMetadata("notApplicable_delegatedProperty.kt")

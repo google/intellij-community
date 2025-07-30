@@ -26,7 +26,7 @@ import com.intellij.platform.workspace.storage.url.MutableVirtualFileUrlIndex
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlIndex
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.ExceptionUtil
-import com.intellij.util.Java11Shim
+import com.intellij.util.containers.Java11Shim
 import com.intellij.util.ObjectUtils
 import com.intellij.util.containers.CollectionFactory
 import com.intellij.util.containers.ConcurrentLongObjectMap
@@ -74,7 +74,7 @@ internal open class ImmutableEntityStorageImpl(
 
   // I suppose that we can use some kind of array of arrays to get a quicker access (just two accesses by-index)
   // However, it's not implemented currently because I'm not sure about threading.
-  private val entityCache: ConcurrentLongObjectMap<WorkspaceEntity> = Java11Shim.INSTANCE.createConcurrentLongObjectMap()
+  private val entityCache: ConcurrentLongObjectMap<WorkspaceEntity> = Java11Shim.createConcurrentLongObjectMap()
 
   override fun <T> cached(query: StorageQuery<T>): T {
     return snapshotCache.cached(query, this, null).value

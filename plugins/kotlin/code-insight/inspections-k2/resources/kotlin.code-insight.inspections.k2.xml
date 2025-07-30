@@ -576,7 +576,7 @@
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
                      enabledByDefault="true"
-                     level="WARNING"
+                     level="WEAK WARNING"
                      key="inspection.simplifiable.call.chain.display.name" bundle="messages.KotlinBundle"
                      />
 
@@ -752,14 +752,6 @@
                      level="INFORMATION"
                      language="kotlin"
                      key="inspection.add.operator.modifier.display.name" bundle="messages.KotlinBundle"/>
-
-    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.RunBlockingInSuspendFunctionInspection"
-                     groupPath="Kotlin"
-                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
-                     enabledByDefault="true"
-                     level="WARNING"
-                     language="kotlin"
-                     key="inspection.run.blocking.in.suspend.function.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.diagnosticBased.KotlinUnreachableCodeInspection"
                      groupPath="Kotlin"

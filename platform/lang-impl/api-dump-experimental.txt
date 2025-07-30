@@ -185,7 +185,6 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
 *a:com.intellij.codeInsight.completion.command.commands.AbstractFormatCodeCompletionCommand
 - com.intellij.codeInsight.completion.command.CompletionCommand
-- com.intellij.codeInsight.completion.command.CompletionCommandWithPreview
 - <init>():V
 - f:execute(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):V
 - a:findTargetToRefactor(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
@@ -249,6 +248,13 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
 - a:findMoveClassOffset(I,com.intellij.psi.PsiFile):java.lang.Integer
 - p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
+*a:com.intellij.codeInsight.completion.command.commands.AbstractOptimizeImportCompletionCommandProvider
+- com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
+- <init>():V
+- p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
+- a:getTextRangeImportList(com.intellij.psi.PsiFile,I):com.intellij.openapi.util.TextRange
+- p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
+- a:isImportList(com.intellij.psi.PsiFile,I):Z
 *a:com.intellij.codeInsight.completion.command.commands.AbstractRenameActionCommandProvider
 - com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - <init>():V
@@ -264,7 +270,6 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - f:supportsReadOnly():Z
 *c:com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - com.intellij.codeInsight.completion.command.CommandProvider
-- com.intellij.openapi.project.DumbAware
 - <init>(java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List):V
 - b:<init>(java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - p:createCommand(com.intellij.codeInsight.completion.command.CommandCompletionProviderContext):com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
@@ -281,7 +286,6 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - f:setActionId(java.lang.String):V
 *c:com.intellij.codeInsight.completion.command.commands.ActionCompletionCommand
 - com.intellij.codeInsight.completion.command.CompletionCommand
-- com.intellij.codeInsight.completion.command.CompletionCommandWithPreview
 - com.intellij.openapi.project.DumbAware
 - <init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List):V
 - b:<init>(java.lang.String,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.Integer,com.intellij.codeInsight.completion.command.HighlightInfoLookup,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
@@ -623,6 +627,7 @@ com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager
 - *a:getCurrentlyShownPopupInstance():com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
 *:com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
 - a:addSearchListener(com.intellij.ide.actions.searcheverywhere.SearchListener):V
+- a:addSplitSearchListener(com.intellij.ide.actions.searcheverywhere.SplitSearchListener):V
 - a:closePopup():V
 - a:getSearchFieldDocument():javax.swing.text.Document
 - a:getSearchText():java.lang.String
@@ -632,9 +637,23 @@ f:com.intellij.ide.actions.searcheverywhere.SearchEverywhereUI
 - com.intellij.ide.actions.searcheverywhere.SearchEverywherePopupInstance
 - com.intellij.ide.util.gotoByName.QuickSearchComponent
 - com.intellij.openapi.actionSystem.UiDataProvider
+- *:addSplitSearchListener(com.intellij.ide.actions.searcheverywhere.SplitSearchListener):V
 - *:selectFirstItem():V
 com.intellij.ide.actions.searcheverywhere.SearchListener
 - *:standardSearchFoundNoResults(com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor):V
+*a:com.intellij.ide.actions.searcheverywhere.SplitSearchAdapter
+- com.intellij.ide.actions.searcheverywhere.SplitSearchListener
+- <init>():V
+- elementsAdded(java.util.Map):V
+- elementsRemoved(I):V
+- searchFinished(I):V
+- searchStarted(java.lang.String,java.lang.String):V
+*:com.intellij.ide.actions.searcheverywhere.SplitSearchListener
+- a:elementsAdded(java.util.Map):V
+- elementsRemoved(I):V
+- a:searchFinished(I):V
+- a:searchStarted(java.lang.String,java.lang.String):V
+- toSearchListener():com.intellij.ide.actions.searcheverywhere.SearchListener
 *a:com.intellij.ide.fileTemplates.actions.CustomCreateFromTemplateAction
 - com.intellij.ide.actions.CreateFileFromTemplateAction
 - p:<init>(java.lang.String):V

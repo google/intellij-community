@@ -1,5 +1,11 @@
 ### auto-generated section `build intellij.java.analysis.impl` start
+load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+create_kotlinc_options(
+  name = "custom_analysis-impl",
+  x_explicit_api_mode = "strict"
+)
 
 jvm_resources(
   name = "analysis-impl_resources",
@@ -12,6 +18,7 @@ jvm_library(
   module_name = "intellij.java.analysis.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  kotlinc_opts = ":custom_analysis-impl",
   deps = [
     "//java/java-indexing-api:indexing",
     "//platform/analysis-api:analysis",
@@ -47,6 +54,7 @@ jvm_library(
     "//java/codeserver/highlighting",
     "//java/codeserver/core",
     "//platform/refactoring",
+    "//xml/xml-analysis-api:analysis",
   ],
   exports = [
     "//platform/analysis-impl",

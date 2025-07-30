@@ -24,7 +24,7 @@ import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.platform.diagnostic.telemetry.TracerLevel;
 import com.intellij.platform.diagnostic.telemetry.helpers.TraceKt;
 import com.intellij.util.ExceptionUtil;
-import com.intellij.util.Java11Shim;
+import com.intellij.util.containers.Java11Shim;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ConcurrentLongObjectMap;
@@ -61,10 +61,10 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   private static final Map<ProgressIndicator, Set<Thread>> threadsUnderIndicator = new HashMap<>(); // guarded by threadsUnderIndicator
   // the active indicator for the thread id
   private static final ConcurrentLongObjectMap<ProgressIndicator> currentIndicators =
-    Java11Shim.INSTANCE.createConcurrentLongObjectMap();
+    Java11Shim.Companion.createConcurrentLongObjectMap();
   // top-level indicators for the thread id
   private static final ConcurrentLongObjectMap<ProgressIndicator> threadTopLevelIndicators =
-    Java11Shim.INSTANCE.createConcurrentLongObjectMap();
+    Java11Shim.Companion.createConcurrentLongObjectMap();
   // threads which are running under canceled indicator
   private static final Set<Thread> threadsUnderCanceledIndicator = new HashSet<>(); // guarded by threadsUnderIndicator
 

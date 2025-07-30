@@ -3,12 +3,14 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  jvm_target = 11,
+  name = "custom_storage",
+  jvm_target = "11",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi",
     "com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi",
-  ]
+  ],
+  x_explicit_api_mode = "strict"
 )
 
 jvm_resources(
@@ -22,7 +24,7 @@ jvm_library(
   module_name = "intellij.platform.workspace.storage",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_storage",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:guava",

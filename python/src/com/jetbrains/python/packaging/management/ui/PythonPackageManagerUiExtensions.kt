@@ -7,6 +7,7 @@ import com.jetbrains.python.packaging.PyPackageInstallUtils.confirmAndInstall
 import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.management.PythonPackageInstallRequest
+import com.jetbrains.python.packaging.management.findPackageSpecification
 import com.jetbrains.python.packaging.pyRequirement
 import com.jetbrains.python.packaging.requirement.PyRequirementVersionSpec
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
@@ -30,7 +31,7 @@ suspend fun PythonPackageManagerUI.updatePackagesByNamesBackground(
   packages: List<String>,
 ): List<PythonPackage>? {
   val specifications = packages.mapNotNull {
-    manager.findPackageSpecificationWithVersionSpec(it)
+    manager.findPackageSpecification(it)
   }
   return updatePackagesBackground(specifications)
 }
@@ -66,10 +67,25 @@ suspend fun PythonPackageManagerUI.installPyRequirementsBackground(
   //Wait here to load spec
   manager.waitForInit()
   val specifications = packages.mapNotNull {
-    manager.findPackageSpecificationWithVersionSpec(it.name, it.versionSpecs.firstOrNull())
+    manager.repositoryManager.findPackageSpecification(it)
   }
-  return installPackagesBackground(PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications(specifications),
-                                   options = options)
+  return installPackagesRequestBackground(PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications(specifications),
+                                          options = options)
+}
+
+
+@ApiStatus.Internal
+suspend fun PythonPackageManagerUI.installPackagesBackground(
+  packages: List<String>,
+  options: List<String> = emptyList(),
+): List<PythonPackage>? {
+  //Wait here to load spec
+  manager.waitForInit()
+  val specifications = packages.mapNotNull {
+    manager.findPackageSpecification(it)
+  }
+  return installPackagesRequestBackground(PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications(specifications),
+                                          options = options)
 }
 
 /**

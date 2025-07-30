@@ -21,6 +21,9 @@
     <editorActionHandler action="Replace" implementationClass="com.intellij.terminal.frontend.action.TerminalReplaceHandler"
                          id="terminalReplace" order="first"/>
 
+    <toolWindow.splitContentProvider toolWindowId="terminal"
+                                     implementationClass="com.intellij.terminal.frontend.TerminalToolWindowSplitContentProvider"/>
+
     <applicationService
       serviceInterface="org.jetbrains.plugins.terminal.fus.FrontendLatencyService"
       serviceImplementation="com.intellij.terminal.frontend.fus.FrontendLatencyServiceImpl"/>
@@ -69,6 +72,9 @@
     </action>
     <action id="Terminal.CommandCompletion" class="com.intellij.terminal.frontend.action.TerminalCommandCompletionAction">
       <keyboard-shortcut first-keystroke="TAB" keymap="$default"/>
+    </action>
+    <action id="Terminal.CommandCompletion.Gen2" class="com.intellij.terminal.frontend.action.TerminalCommandCompletionActionGen2"
+            use-shortcut-of="CodeCompletion">
     </action>
     <action id="Terminal.EnterCommandCompletion" class="com.intellij.terminal.frontend.action.TerminalCompletionEnterAction">
       <keyboard-shortcut first-keystroke="ENTER" keymap="$default"/>
@@ -119,14 +125,6 @@
       <reference ref="Terminal.Find"/>
       <reference ref="Terminal.NewTab"/>
       <reference ref="Terminal.CloseTab"/>
-      <separator/>
-      <reference ref="Terminal.SplitVertically"/>
-      <reference ref="Terminal.SplitHorizontally"/>
-      <reference ref="PreviousTab"/>
-      <reference ref="NextTab"/>
-      <reference ref="Terminal.MoveToolWindowTabRight"/>
-      <reference ref="Terminal.MoveToolWindowTabLeft"/>
-      <reference ref="ShowContent"/>
       <separator/>
       <reference ref="Terminal.CopySelectedText"/>
       <reference ref="Terminal.Paste"/>

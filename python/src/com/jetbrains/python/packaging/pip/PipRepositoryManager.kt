@@ -9,7 +9,6 @@ import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
 import com.jetbrains.python.packaging.cache.PythonSimpleRepositoryCache
 import com.jetbrains.python.packaging.common.PythonPackageDetails
-import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
 import com.jetbrains.python.packaging.repository.PyPIPackageRepository
 import com.jetbrains.python.packaging.repository.PyPackageRepositories
 import com.jetbrains.python.packaging.repository.PyPackageRepository
@@ -27,8 +26,8 @@ internal class PipRepositoryManager(override val project: Project) : PythonRepos
   private val packageDetailsCache = Caffeine.newBuilder()
     .maximumSize(200)
     .expireAfterWrite(Duration.ofHours(1))
-    .build<Pair<String, PyPackageRepository?>, PyResult<PythonPackageDetails>> { (packageName, repository) ->
-      (repository ?: PyPIPackageRepository).buildPackageDetails(packageName)
+    .build<Pair<String, PyPackageRepository>, PyResult<PythonPackageDetails>> { (packageName, repository) ->
+      (repository).buildPackageDetails(packageName)
     }
 
   init {
@@ -37,8 +36,8 @@ internal class PipRepositoryManager(override val project: Project) : PythonRepos
   }
 
 
-  override suspend fun getPackageDetails(spec: PythonRepositoryPackageSpecification): PyResult<PythonPackageDetails> {
-    return packageDetailsCache.get(spec.name to spec.repository)
+  override suspend fun getPackageDetails(packageName: String, repository: PyPackageRepository?): PyResult<PythonPackageDetails> {
+    return packageDetailsCache.get(packageName to (repository ?: PyPIPackageRepository))
   }
 
   @Throws(IOException::class)
@@ -59,7 +58,7 @@ internal class PipRepositoryManager(override val project: Project) : PythonRepos
   }
 
   override suspend fun getVersions(packageName: String, repository: PyPackageRepository?): List<String>? {
-    val details = packageDetailsCache.get(packageName to repository).getOrNull() ?: return null
+    val details = packageDetailsCache.get(packageName to (repository ?: PyPIPackageRepository)).getOrNull() ?: return null
     return details.availableVersions
   }
 

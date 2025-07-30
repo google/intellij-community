@@ -34,6 +34,16 @@ interface EditorContextManager {
       val editorContextManager = getInstance(project)
       return editorContextManager.getEditorContexts(editor).mainContext
     }
+
+    @ApiStatus.Internal
+    @JvmStatic
+    fun getCachedEditorContext(editor: Editor, project: Project): CodeInsightContext? {
+      if (!isSharedSourceSupportEnabled(project)) {
+        return defaultContext()
+      }
+      val editorContextManager = getInstance(project)
+      return editorContextManager.getCachedEditorContexts(editor)?.mainContext
+    }
   }
 
   /**
@@ -85,4 +95,6 @@ class SingleEditorContext(override val mainContext: CodeInsightContext) : Editor
   override fun contains(context: CodeInsightContext): Boolean {
     return context == mainContext
   }
+
+  override fun toString(): String = "SingleEditorContext($mainContext)"
 }

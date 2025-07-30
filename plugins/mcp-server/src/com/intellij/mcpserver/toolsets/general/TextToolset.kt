@@ -9,6 +9,7 @@ import com.intellij.mcpserver.*
 import com.intellij.mcpserver.annotations.McpDescription
 import com.intellij.mcpserver.annotations.McpTool
 import com.intellij.mcpserver.toolsets.Constants
+import com.intellij.mcpserver.toolsets.Constants.MAX_USAGE_TEXT_CHARS
 import com.intellij.mcpserver.util.*
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.writeCommandAction
@@ -53,10 +54,9 @@ class TextToolset : McpToolset {
     val project = currentCoroutineContext().project
     val resolvedPath = project.resolveInProject(pathInProject)
 
+    val file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
+               ?: mcpFail("File $resolvedPath doesn't exist or can't be opened")
     val originalText = readAction {
-      val file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
-                 ?: mcpFail("File $resolvedPath doesn't exist or can't be opened")
-
       if (file.fileType.isBinary) mcpFail("File $resolvedPath is binary")
       file.readText()
     }
@@ -104,9 +104,9 @@ class TextToolset : McpToolset {
     currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.replacing.text.in.file", pathInProject, oldText, newText))
     val project = currentCoroutineContext().project
     val resolvedPath = project.resolveInProject(pathInProject)
+    val file: VirtualFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
+                            ?: mcpFail("file not found: $pathInProject")
     val (document, text) = readAction {
-      val file: VirtualFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
-                              ?: mcpFail("file not found: $pathInProject")
       val document = FileDocumentManager.getInstance().getDocument(file) ?: mcpFail("Could not get document for $file")
       document to document.text
     }
@@ -241,9 +241,9 @@ class TextToolset : McpToolset {
       val startLineStartOffset = document.getLineStartOffset(startLineNumber)
       val endLineNumber = document.getLineNumber(textRange.endOffset)
       val endLineEndOffset = document.getLineEndOffset(endLineNumber)
-      val textBeforeOccurrence = document.getText(TextRange(startLineStartOffset, textRange.startOffset))
-      val textInner = document.getText(TextRange(textRange.startOffset, textRange.endOffset))
-      val textAfterOccurrence = document.getText(TextRange(textRange.endOffset, endLineEndOffset))
+      val textBeforeOccurrence = document.getText(TextRange(startLineStartOffset, textRange.startOffset)).take(MAX_USAGE_TEXT_CHARS)
+      val textInner = document.getText(TextRange(textRange.startOffset, textRange.endOffset)).take(MAX_USAGE_TEXT_CHARS)
+      val textAfterOccurrence = document.getText(TextRange(textRange.endOffset, endLineEndOffset)).take(MAX_USAGE_TEXT_CHARS)
       UsageInfoEntry(projectDir.relativizeIfPossible(file), startLineNumber + 1, "$textBeforeOccurrence||$textInner||$textAfterOccurrence")
     }
 
@@ -263,7 +263,8 @@ class TextToolset : McpToolset {
     val entries: List<UsageInfoEntry>,
     @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
     val probablyHasMoreMatchingEntries: Boolean = false,
+    @property:McpDescription(Constants.TIMED_OUT_DESCRIPTION)
     @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
-    val timedOut: Boolean = false
+    val timedOut: Boolean? = false
   )
 }

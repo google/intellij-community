@@ -18,7 +18,6 @@ internal object LibrariesRequiredForWorkspace {
   val workspaceJpsEntities = ModuleLibrary("intellij.platform.workspace.jps")
   private val intellijJava = ModuleLibrary("intellij.java")
 
-  private val kotlinBaseScripting = ModuleLibrary("kotlin.base.scripting")
   private val rider = ModuleLibrary("intellij.rider")
   private val riderUnityPlugin = ModuleLibrary("intellij.rider.plugins.unity")
   private val riderModel = ModuleLibrary("intellij.rider.model.generated")
@@ -45,9 +44,6 @@ internal object LibrariesRequiredForWorkspace {
       }
       "kotlin.base.facet" -> {
         listOf(intellijJava, kotlinJpsCommon)
-      }
-      "kotlin.base.scripting" -> {
-        listOf(kotlinBaseScripting)
       }
       "intellij.bazel.plugin" -> {
         listOf(bazelCommons)
@@ -142,7 +138,11 @@ private fun addDependencyFromCompilationOutput(model: ModifiableRootModel, libra
     val sharedClassesRootVirtualFile = classesRootVirtualFile?.parent
     assertNotNull("Cannot find $sharedClassesRootVirtualFile. Possibly, project was not compiled", sharedClassesRootVirtualFile)
     VfsUtil.markDirtyAndRefresh(false, true, true, sharedClassesRootVirtualFile)
-    classpathRootVirtualFile = sharedClassesRootVirtualFile?.children?.find { it.name == classpathFolder }
+    // mark dirty and refresh above is not enough, it does not add "new" files to the VFS
+    VfsUtil.iterateChildrenRecursively(sharedClassesRootVirtualFile!!, null) {
+      true
+    }
+    classpathRootVirtualFile = sharedClassesRootVirtualFile.children?.find { it.name == classpathFolder }
     assertNotNull("Cannot find $classpathFolder in $sharedClassesRootVirtualFile. Possibly, project was partially compiled", classpathRootVirtualFile)
   }
   VfsUtil.markDirtyAndRefresh(false, true, true, classpathRootVirtualFile)

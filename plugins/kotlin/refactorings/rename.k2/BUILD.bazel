@@ -1,16 +1,17 @@
 ### auto-generated section `build kotlin.refactorings.rename.k2` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_rename.k2",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
     "org.jetbrains.kotlin.analysis.api.KaIdeApi",
-  ]
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ],
+  x_context_receivers = True
 )
 
 jvm_resources(
@@ -24,7 +25,7 @@ jvm_library(
   module_name = "kotlin.refactorings.rename.k2",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_rename.k2",
   deps = [
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-analysis-api",
@@ -52,7 +53,7 @@ jvm_library(
   name = "rename.k2_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_rename.k2",
   associates = [":rename.k2"],
   deps = [
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -93,9 +94,13 @@ jvm_library(
   ],
   runtime_deps = [":rename.k2_resources"]
 )
+### auto-generated section `build kotlin.refactorings.rename.k2` end
+
+### auto-generated section `test kotlin.refactorings.rename.k2` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "rename.k2_test",
   runtime_deps = [":rename.k2_test_lib"]
 )
-### auto-generated section `build kotlin.refactorings.rename.k2` end
+### auto-generated section `test kotlin.refactorings.rename.k2` end

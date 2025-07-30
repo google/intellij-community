@@ -1,4 +1,9 @@
 <idea-plugin package="org.jetbrains.kotlin.idea.base.fir.projectStructure">
+  <dependencies>
+    <module name="kotlin.base.scripting.k2"/>
+    <module name="kotlin.base.fir.analysis-api-platform"/>
+  </dependencies>
+
   <extensions defaultExtensionNs="com.intellij">
     <projectService serviceImplementation="org.jetbrains.kotlin.idea.base.fe10.projectStructure.K1KotlinLibraryDeduplicator"
                     serviceInterface="org.jetbrains.kotlin.idea.base.projectStructure.KotlinLibraryDeduplicator"/>
@@ -14,11 +19,7 @@
   <extensionPoints>
     <extensionPoint
             qualifiedName="org.jetbrains.kotlin.k2KaModuleFactory"
-            interface="org.jetbrains.kotlin.idea.base.fir.projectStructure.K2KaModuleFactory"
+            interface="org.jetbrains.kotlin.idea.base.fir.projectStructure.FirKaModuleFactory"
             dynamic="true"/>
   </extensionPoints>
-
-  <dependencies>
-    <module name="kotlin.base.fir.analysis-api-platform"/>
-  </dependencies>
 </idea-plugin>

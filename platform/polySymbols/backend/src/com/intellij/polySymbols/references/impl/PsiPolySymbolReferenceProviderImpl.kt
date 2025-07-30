@@ -19,20 +19,26 @@ import com.intellij.polySymbols.highlighting.impl.getDefaultProblemMessage
 import com.intellij.polySymbols.inspections.PolySymbolProblemQuickFixProvider
 import com.intellij.polySymbols.inspections.impl.PolySymbolInspectionToolMappingEP
 import com.intellij.polySymbols.query.PolySymbolMatch
-import com.intellij.polySymbols.query.PolySymbolReferenceProviderListener
+import com.intellij.polySymbols.references.PsiPolySymbolReferenceProviderListener
 import com.intellij.polySymbols.references.PolySymbolReference
 import com.intellij.polySymbols.references.PolySymbolReferenceProblem
 import com.intellij.polySymbols.references.PolySymbolReferenceProblem.ProblemKind
+import com.intellij.polySymbols.references.PsiPolySymbolReferenceCacheInfoProvider
 import com.intellij.polySymbols.references.PsiPolySymbolReferenceProvider
+import com.intellij.polySymbols.search.PolySymbolReferenceHints
 import com.intellij.polySymbols.utils.asSingleSymbol
 import com.intellij.polySymbols.utils.hasOnlyExtensions
 import com.intellij.polySymbols.utils.nameSegments
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.CachedValueProvider
+import com.intellij.psi.util.CachedValuesManager
+import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.util.SmartList
 import com.intellij.util.application
 import com.intellij.util.containers.MultiMap
 import org.jetbrains.annotations.Nls
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 internal val IJ_IGNORE_REFS: PolySymbolProperty<Boolean> = PolySymbolProperty["ij-no-psi-refs"]
 
@@ -45,8 +51,21 @@ class PsiPolySymbolReferenceProviderImpl : PsiSymbolReferenceProvider {
     emptyList()
 
   internal fun getSymbolOffsetsAndReferences(element: PsiExternalReferenceHost, hints: PsiSymbolReferenceHints): Pair<MultiMap<Int, PolySymbol>, List<PolySymbolReference>> {
-    val publisher = application.messageBus.syncPublisher(PolySymbolReferenceProviderListener.TOPIC)
-    publisher.beforeProvideReferences(element, hints)
+    val target = hints.target
+    val cacheKeys =
+      PsiPolySymbolReferenceCacheInfoProvider.getCacheKeys(element, target)
+
+    return CachedValuesManager.getCachedValue(element) {
+      CachedValueProvider.Result.create(ConcurrentHashMap<Any, Pair<MultiMap<Int, PolySymbol>, List<PolySymbolReference>>>(),
+                                        element.containingFile, PsiModificationTracker.MODIFICATION_COUNT)
+    }.computeIfAbsent(cacheKeys) {
+      getSymbolOffsetsAndReferencesNoCache(element, target)
+    }
+  }
+
+  private fun getSymbolOffsetsAndReferencesNoCache(element: PsiExternalReferenceHost, targetSymbol: Symbol?): Pair<MultiMap<Int, PolySymbol>, List<PolySymbolReference>> {
+    val publisher = application.messageBus.syncPublisher(PsiPolySymbolReferenceProviderListener.TOPIC)
+    publisher.beforeProvideReferences(element, targetSymbol)
 
     try {
       val beans = PsiPolySymbolReferenceProviders.byLanguage(element.getLanguage()).byHostClass(element.javaClass)
@@ -56,15 +75,16 @@ class PsiPolySymbolReferenceProviderImpl : PsiSymbolReferenceProvider {
         @Suppress("UNCHECKED_CAST")
         val provider = bean.instance as PsiPolySymbolReferenceProvider<PsiExternalReferenceHost>
         val showProblems = provider.shouldShowProblems(element)
-        val offsetsFromProvider = provider.getOffsetsToReferencedSymbols(element, hints)
+        val offsetsFromProvider = provider.getOffsetsToReferencedSymbols(element)
         result.addAll(offsetsFromProvider.flatMap { (offset, symbol) ->
           getReferences(element, offset, symbol, showProblems)
         })
         offsets.putAllValues(offsetsFromProvider)
       }
       return Pair(offsets, result)
-    } finally {
-      publisher.afterProvideReferences(element, hints)
+    }
+    finally {
+      publisher.afterProvideReferences(element, targetSymbol)
     }
   }
 

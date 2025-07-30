@@ -40,6 +40,8 @@ class GeneratorPreferences(properties: Properties) : Preferences(properties) {
 }
 
 fun main(args: Array<String>) {
+    copyBootstrapArtifactsToMavenRepositoryIfExists()
+    
     val preferences = GeneratorPreferences.parse(args)
 
     val communityRoot = generateSequence(File(".").canonicalFile) { it.parentFile }.first {
@@ -50,8 +52,13 @@ fun main(args: Array<String>) {
 
     val resolverSettings = readJpsResolverSettings(communityRoot, monorepoRoot)
 
-    communityRoot.resolve("plugins/kotlin/base/plugin/testResources/kotlincKotlinCompilerCliVersion.txt")
-        .writeText(preferences.kotlincVersion)
+    val kotlinCompilerCliVersion = communityRoot.resolve("plugins/kotlin/base/plugin/testResources/kotlincKotlinCompilerCliVersion.txt")
+    val kotlinCompilerCliOldVersion = kotlinCompilerCliVersion.readText()
+    kotlinCompilerCliVersion.writeText(preferences.kotlincArtifactVersion)
+    val kotlinDependenciesBazelFile = communityRoot.resolve("plugins/kotlin/kotlin_test_dependencies.bzl")
+    kotlinDependenciesBazelFile.writeText(
+        kotlinDependenciesBazelFile.readText()
+            .replace(kotlinCompilerCliOldVersion, preferences.kotlincArtifactVersion))
 
     fun processRoot(root: File, isCommunity: Boolean) {
         println("Processing kotlinc libraries in root: $root")

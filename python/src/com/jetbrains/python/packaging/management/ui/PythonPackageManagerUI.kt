@@ -46,7 +46,7 @@ class PythonPackageManagerUI(val manager: PythonPackageManager, val sink: ErrorS
   /**
    * @return List of all installed packages or null if the operation was failed.
    */
-  suspend fun installPackagesBackground(
+  suspend fun installPackagesRequestBackground(
     installRequest: PythonPackageInstallRequest,
     options: List<String> = emptyList(),
   ): List<PythonPackage>? {
@@ -99,6 +99,13 @@ class PythonPackageManagerUI(val manager: PythonPackageManager, val sink: ErrorS
     return executeCommand(progressTitle
     ) {
       manager.uninstallPackage(*packages.toTypedArray())
+    }
+  }
+
+  suspend fun syncBackground() {
+    val progressTitle = PyBundle.message("python.packaging.sync.packages")
+    executeCommand(progressTitle) {
+      manager.sync()
     }
   }
 

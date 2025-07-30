@@ -14,15 +14,13 @@ import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.evaluation.ExpressionInfo
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator.XEvaluationCallback
+import com.intellij.xdebugger.frame.XNamedValue
 import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.evaluate.quick.XDebuggerDocumentOffsetEvaluator
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueHintType
 import com.intellij.xdebugger.impl.rpc.XStackFrameId
-import com.intellij.xdebugger.impl.rpc.models.BackendXValueModel
-import com.intellij.xdebugger.impl.rpc.models.BackendXValueModelsManager
-import com.intellij.xdebugger.impl.rpc.models.XStackFrameModel
-import com.intellij.xdebugger.impl.rpc.models.findValue
+import com.intellij.xdebugger.impl.rpc.models.*
 import fleet.rpc.core.RpcFlow
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.*
@@ -118,7 +116,20 @@ internal suspend fun BackendXValueModel.toXValueDto(): XValueDto {
     canBeModified = xValue.modifierAsync.thenApply { modifier -> modifier != null }.asDeferred(),
     valueMarkupFlow,
     xValueModel.presentation.toRpc(),
-    xValueModel.getEvaluatorDtoFlow().toRpc()
+    xValueModel.getEvaluatorDtoFlow().toRpc(),
+    (xValue as? XNamedValue)?.name,
+  )
+}
+
+internal fun BackendXValueGroupModel.toXValueGroupDto(): XValueGroupDto {
+  return XValueGroupDto(
+    id,
+    xValueGroup.name,
+    xValueGroup.icon?.rpcId(),
+    xValueGroup.isAutoExpand,
+    xValueGroup.isRestoreExpansion,
+    xValueGroup.separator,
+    xValueGroup.comment
   )
 }
 

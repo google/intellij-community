@@ -979,6 +979,17 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
       }
       return null;
     });
+    multi(CLASS_NOT_ACCESSIBLE, error -> {
+      PsiClass aClass = error.context();
+      String name = aClass.getQualifiedName();
+      if (name != null) {
+        PsiJavaCodeReferenceElement ref = JavaPsiFacade.getElementFactory(error.project()).createReferenceFromText(name, error.psi());
+        List<IntentionAction> fixes = new ArrayList<>();
+        myFactory.registerOrderEntryFixes(ref, aClass, fixes);
+        return fixes;
+      }
+      return List.of();
+    });
     fix(CLASS_EXTENDS_SEALED_LOCAL, error -> myFactory.createConvertLocalToInnerAction(error.context()));
     fix(CLASS_EXTENDS_SEALED_ANOTHER_PACKAGE, error -> {
       if (error.context().superClass().getContainingFile() instanceof PsiClassOwner classOwner) {
@@ -1118,6 +1129,7 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
     fix(RECORD_CONSTRUCTOR_STRONGER_ACCESS, error -> addModifierFix(error.psi(), error.context().toPsiModifier()));
     fix(RECORD_ACCESSOR_NON_PUBLIC, error -> addModifierFix(error.psi(), PsiModifier.PUBLIC));
     fix(RECORD_ACCESSOR_WRONG_RETURN_TYPE, error -> myFactory.createMethodReturnFix(error.psi(), error.context().lType(), false));
+    fix(RECORD_NO_CONSTRUCTOR_CALL_IN_NON_CANONICAL, error -> myFactory.createRecordThisDelegateFix(error.psi()));
     fix(RECORD_CANONICAL_CONSTRUCTOR_WRONG_PARAMETER_TYPE, error -> {
       PsiParameter parameter = error.psi();
       PsiMethod method = (PsiMethod)parameter.getDeclarationScope();

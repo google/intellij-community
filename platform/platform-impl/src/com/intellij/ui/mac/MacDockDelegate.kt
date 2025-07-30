@@ -7,8 +7,7 @@ import com.intellij.ide.SystemDock
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
-import com.intellij.openapi.application.UiDispatcherKind
-import com.intellij.openapi.application.ui
+import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
@@ -20,7 +19,7 @@ import java.awt.*
 
 internal suspend fun createMacDelegate(): SystemDock {
   // todo get rid of UI dispatcher here
-  val recentProjectsMenu = withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+  val recentProjectsMenu = withContext(Dispatchers.UiWithModelAccess) {
     val dockMenu = PopupMenu("DockMenu")
     val recentProjectsMenu = Menu("Recent Projects")
     runCatching {
@@ -43,7 +42,7 @@ private class MacDockDelegate(private val recentProjectsMenu: Menu) : SystemDock
   override suspend fun updateRecentProjectsMenu() {
     val projectListActionProvider = serviceAsync<RecentProjectListActionProvider>()
     // todo get rid of UI dispatcher here
-    withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+    withContext(Dispatchers.UiWithModelAccess) {
       recentProjectsMenu.removeAll()
       for (action in projectListActionProvider.getActions()) {
         if (action !is ProjectToolbarWidgetPresentable) {

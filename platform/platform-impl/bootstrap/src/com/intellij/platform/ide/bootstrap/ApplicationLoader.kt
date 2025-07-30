@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("ApplicationLoader")
 @file:Internal
-@file:Suppress("RAW_RUN_BLOCKING", "ReplaceJavaStaticMethodWithKotlinAnalog")
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.diagnostic.*
@@ -75,6 +74,7 @@ private val LOG: Logger
 
 fun initApplication(context: InitAppContext) {
   context.appRegistered.complete(Unit)
+  @Suppress("RAW_RUN_BLOCKING")
   runBlocking {
     context.appLoaded.join()
   }
@@ -99,16 +99,13 @@ internal suspend fun loadApp(
       }
 
       span("app component registration") {
-        app.registerComponents(modules = pluginSet.getEnabledModules(), app = app)
+        app.registerComponents(pluginSet.getEnabledModules(), app)
       }
       // ApplicationManager.getApplication may be used in ApplicationInitializedListener constructor
       ApplicationManager.setApplication(app)
     }
 
-    val languageAndRegionTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) {
-      null
-    }
-    else {
+    val languageAndRegionTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) null else {
       async(CoroutineName("language and region")) {
         euaDocumentDeferred.await()?.let {
           getLanguageAndRegionDialogIfNeeded(it)
@@ -116,22 +113,18 @@ internal suspend fun loadApp(
       }
     }
     
-    val euaTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) {
-      null
-    }
-    else {
+    val euaTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) null else {
       async(CoroutineName("eua document")) {
-        prepareShowEuaIfNeededTask(document = euaDocumentDeferred.await(), appInfoDeferred = appInfoDeferred, asyncScope = asyncScope)
+        prepareShowEuaIfNeededTask(euaDocumentDeferred.await(), appInfoDeferred, asyncScope)
       }
     }
-
 
     initServiceContainerJob.join()
 
     val initTelemetryJob = launch(CoroutineName("opentelemetry configuration")) {
       try {
         TelemetryManager.setTelemetryManager(
-          TelemetryManagerImpl(coroutineScope = app.getCoroutineScope(), isUnitTestMode = app.isUnitTestMode))
+          TelemetryManagerImpl(app.getCoroutineScope(), app.isUnitTestMode))
       }
       catch (e: CancellationException) {
         throw e
@@ -146,10 +139,7 @@ internal suspend fun loadApp(
       ideFingerprint()
     }
 
-    val loadIconMapping = if (app.isHeadlessEnvironment) {
-      null
-    }
-    else {
+    val loadIconMapping = if (app.isHeadlessEnvironment) null else {
       launch(CoroutineName("icon mapping loading")) {
         runCatching {
           app.serviceAsync<IconMapLoader>().preloadIconMapping()
@@ -161,7 +151,7 @@ internal suspend fun loadApp(
       initConfigurationStore(app, args)
     }
 
-    val applicationStarter = createAppStarter(args = args, asyncScope = this@span)
+    val applicationStarter = createAppStarter(args, asyncScope = this@span)
 
     launch(CoroutineName("app pre-initialization")) {
       initConfigurationStoreJob.join()
@@ -171,29 +161,20 @@ internal suspend fun loadApp(
       }
 
       val preloadJob = launch(CoroutineName("critical services preloading")) {
-        preloadCriticalServices(
-          app = app,
-          asyncScope = asyncScope,
-          appRegistered = appRegisteredJob,
-          initAwtToolkitAndEventQueueJob = initAwtToolkitAndEventQueueJob,
-        )
+        preloadCriticalServices(app, preloadScope = this, asyncScope, appRegisteredJob, initAwtToolkitAndEventQueueJob)
+
         asyncScope.launch {
           launch {
             app.serviceAsync<LogLevelConfigurationManager>()
           }
 
           if (!app.isHeadlessEnvironment) {
-            preloadNonHeadlessServices(app = app, initLafJob = initLafJob)
+            preloadNonHeadlessServices(app, initLafJob)
           }
         }
       }
 
-      val cssInit = initLafManagerAndCss(
-        app = app,
-        asyncScope = asyncScope,
-        initLafJob = initLafJob,
-        loadIconMapping = loadIconMapping,
-      )
+      val cssInit = initLafManagerAndCss(app, asyncScope, initLafJob, loadIconMapping)
 
       if (!app.isHeadlessEnvironment) {
         euaTaskDeferred?.await()?.let {
@@ -229,11 +210,11 @@ internal suspend fun loadApp(
       val appInitializedListeners = appInitListeners.await()
       span("app initialized callback") {
         // An async scope here is intended for FLOW. FLOW!!! DO NOT USE the surrounding main scope.
-        callAppInitialized(listeners = appInitializedListeners)
+        callAppInitialized(scope = this, appInitializedListeners)
       }
 
       app.getCoroutineScope().launch {
-        executeAsyncAppInitListeners()
+        executeAsyncAppInitListeners(scope = this)
       }
     }
 
@@ -248,7 +229,7 @@ internal suspend fun loadApp(
 
       // doesn't block app start-up
       span("post app init tasks") {
-        runPostAppInitTasks()
+        runPostAppInitTasks(scope = this)
       }
 
       app.getCoroutineScope().launch {
@@ -266,6 +247,7 @@ internal suspend fun loadApp(
   }
 }
 
+@Suppress("ReplaceJavaStaticMethodWithKotlinAnalog", "CanConvertToMultiDollarString")
 private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "com.jetbrains.rdserver.unattendedHost.logs.BackendMessagePoolExporter\$MyAppListener",
   "com.intellij.settingsSync.SettingsSynchronizerApplicationInitializedListener",
@@ -282,7 +264,7 @@ private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "org.jetbrains.kotlin.idea.base.plugin.K2UnsupportedPluginsNotificationActivity",
 )
 
-private fun CoroutineScope.executeAsyncAppInitListeners() {
+private fun executeAsyncAppInitListeners(scope: CoroutineScope) {
   val point = ExtensionPointName<ApplicationActivity>("com.intellij.applicationActivity")
   for (extension in point.filterableLazySequence()) {
     val pluginId = extension.pluginDescriptor.pluginId
@@ -295,7 +277,7 @@ private fun CoroutineScope.executeAsyncAppInitListeners() {
     }
 
     val listener = extension.instance ?: continue
-    launch(CoroutineName(className)) {
+    scope.launch(CoroutineName(className)) {
       listener.execute()
     }
   }
@@ -407,10 +389,7 @@ private suspend fun initLafManagerAndCss(app: ApplicationImpl, asyncScope: Corou
       }
     }
 
-    if (app.isHeadlessEnvironment) {
-      null
-    }
-    else {
+    if (app.isHeadlessEnvironment) null else {
       asyncScope.launch {
         // preload EditorColorsManager only when LafManager is ready - that's why out of coroutineScope
         initGlobalStyleSheet()
@@ -481,14 +460,14 @@ fun getAppInitializedListeners(app: Application): List<ApplicationInitializedLis
   return extensions
 }
 
-private fun CoroutineScope.runPostAppInitTasks() {
-  launch(CoroutineName("create locator file") + Dispatchers.IO) {
+private fun runPostAppInitTasks(scope: CoroutineScope) {
+  scope.launch(CoroutineName("create locator file") + Dispatchers.IO) {
     createAppLocatorFile()
   }
 
   if (!AppMode.isLightEdit()) {
     // this functionality should be used only by plugin functionality used after start-up
-    launch(CoroutineName("system properties setting")) {
+    scope.launch(CoroutineName("system properties setting")) {
       SystemPropertyBean.initSystemProperties()
     }
   }
@@ -526,9 +505,8 @@ private suspend fun createAppStarter(args: List<String>, asyncScope: CoroutineSc
   }
 }
 
-private fun createDefaultAppStarter(): ApplicationStarter {
-  return if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
-}
+private fun createDefaultAppStarter(): ApplicationStarter =
+  if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
 
 @VisibleForTesting
 internal fun createAppLocatorFile() {
@@ -582,9 +560,9 @@ private suspend fun handleExternalCommand(args: List<String>, currentDirectory: 
 }
 
 @VisibleForTesting
-fun CoroutineScope.callAppInitialized(listeners: List<ApplicationInitializedListener>) {
+fun callAppInitialized(scope: CoroutineScope, listeners: List<ApplicationInitializedListener>) {
   for (listener in listeners) {
-    launch(CoroutineName(listener::class.java.name)) {
+    scope.launch(CoroutineName(listener::class.java.name)) {
       listener.execute()
     }
   }

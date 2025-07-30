@@ -9,19 +9,15 @@ import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
+import com.intellij.terminal.frontend.hyperlinks.FrontendTerminalHyperlinkFacade
 import com.intellij.terminal.session.*
 import com.intellij.terminal.session.dto.toState
-import com.intellij.terminal.session.dto.toStyleRange
 import com.intellij.terminal.session.dto.toTerminalState
 import com.intellij.util.EventDispatcher
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.DisposableWrapperList
 import kotlinx.coroutines.*
-import org.jetbrains.plugins.terminal.block.reworked.TerminalAliasesStorage
-import org.jetbrains.plugins.terminal.block.reworked.TerminalBlocksModel
-import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
-import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
-import org.jetbrains.plugins.terminal.block.reworked.TerminalShellIntegrationEventsListener
+import org.jetbrains.plugins.terminal.block.reworked.*
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.isReworkedTerminalEditor
 import org.jetbrains.plugins.terminal.fus.*
 import java.awt.Toolkit
@@ -32,7 +28,9 @@ internal class TerminalSessionController(
   private val project: Project,
   private val sessionModel: TerminalSessionModel,
   private val outputModel: TerminalOutputModel,
+  private val outputHyperlinkFacade: FrontendTerminalHyperlinkFacade?,
   private val alternateBufferModel: TerminalOutputModel,
+  private val alternateBufferHyperlinkFacade: FrontendTerminalHyperlinkFacade?,
   private val blocksModel: TerminalBlocksModel,
   private val settings: JBTerminalSystemSettingsProviderBase,
   private val coroutineScope: CoroutineScope,
@@ -86,6 +84,8 @@ internal class TerminalSessionController(
           outputModel.restoreFromState(event.outputModelState.toState())
           alternateBufferModel.restoreFromState(event.alternateBufferState.toState())
           blocksModel.restoreFromState(event.blocksModelState.toState())
+          outputHyperlinkFacade?.restoreFromState(event.outputHyperlinksState)
+          alternateBufferHyperlinkFacade?.restoreFromState(event.alternateBufferHyperlinksState)
         }
       }
       is TerminalContentUpdatedEvent -> {
@@ -140,7 +140,16 @@ internal class TerminalSessionController(
       is TerminalAliasesReceivedEvent -> {
         terminalAliasesStorage.setAliasesInfo(event.aliases)
       }
+      is TerminalHyperlinksChangedEvent -> {
+        withContext(edtContext) {
+          getCurrentHyperlinkFacade(event)?.updateHyperlinks(event)
+        }
+      }
     }
+  }
+
+  private fun getCurrentHyperlinkFacade(event: TerminalHyperlinksChangedEvent): FrontendTerminalHyperlinkFacade? {
+    return if (event.isInAlternateBuffer) alternateBufferHyperlinkFacade else outputHyperlinkFacade
   }
 
   private suspend fun updateOutputModel(block: (TerminalOutputModel) -> Unit) {
@@ -161,8 +170,7 @@ internal class TerminalSessionController(
   private fun updateOutputModelContent(model: TerminalOutputModel, event: TerminalContentUpdatedEvent) {
     val startTime = TimeSource.Monotonic.markNow()
 
-    val styles = event.styles.map { it.toStyleRange() }
-    model.updateContent(event.startLineLogicalIndex, event.text, styles)
+    model.updateContent(event)
 
     val latencyData = DurationAndTextLength(duration = startTime.elapsedNow(), textLength = event.text.length)
     documentUpdateLatencyReporter.update(latencyData)

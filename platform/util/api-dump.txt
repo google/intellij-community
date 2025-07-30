@@ -142,6 +142,8 @@ com.intellij.openapi.util.io.ByteSequence
 - a:length():I
 - a:subSequence(I,I):com.intellij.openapi.util.io.ByteSequence
 - a:toBytes():B[]
+e:com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
+- s:fromBoolean(Z):com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 Fc:com.intellij.openapi.util.io.FileUtil
 - s:findFirstPathThatExist(java.lang.String[]):java.nio.file.Path
 - s:findPathsByMask(java.util.regex.Pattern,java.nio.file.Path):java.util.List
@@ -438,6 +440,11 @@ com.intellij.util.io.KeyDescriptor
 - com.intellij.util.io.DataExternalizer
 - a:getHashCode(java.lang.Object):I
 - a:save(java.io.DataOutput,java.lang.Object):V
+f:com.intellij.util.io.URLUtil
+- sf:DATA_URI_PATTERN_OPTIMIZED:java.util.regex.Pattern
+- sf:FILE_URL_PATTERN_OPTIMIZED:java.util.regex.Pattern
+- sf:URL_PATTERN_OPTIMIZED:java.util.regex.Pattern
+- sf:URL_WITH_PARENS_PATTERN_OPTIMIZED:java.util.regex.Pattern
 com.intellij.util.io.storage.RecordIdIterator
 - a:hasNextId():Z
 - a:nextId():I

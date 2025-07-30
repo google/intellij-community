@@ -205,8 +205,8 @@ object CommunityRepositoryModules {
     },
     pluginAuto(listOf("intellij.performanceTesting")),
     pluginAuto(listOf("intellij.performanceTesting.ui")),
-    githubPlugin("intellij.vcs.github.community", productCode = "IC"),
-    gitlabPlugin("intellij.vcs.gitlab.community", productCode = "IC"),
+    pluginAuto(listOf("intellij.vcs.github")),
+    pluginAuto(listOf("intellij.vcs.gitlab")),
     pluginAuto(listOf("intellij.compilation.charts")) { spec ->
       spec.withModule("intellij.compilation.charts.jps")
     },
@@ -626,30 +626,6 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.javaFX.jps")
       spec.withModule("intellij.javaFX.common", "javaFX-common.jar")
       spec.withModule("intellij.javaFX.sceneBuilder", "rt/sceneBuilderBridge.jar")
-    }
-  }
-
-  fun githubPlugin(mainModuleName: String, productCode: String): PluginLayout {
-    return plugin(mainModuleName) { spec ->
-      spec.directoryName = "vcs-github-$productCode"
-      spec.mainJarName = "vcs-github.jar"
-      spec.withModules(listOf(
-        "intellij.vcs.github"
-      ))
-      spec.withCustomVersion { _, version, _ ->
-        PluginVersionEvaluatorResult(pluginVersion = "$version-$productCode")
-      }
-    }
-  }
-
-  // inspired by CommunityRepositoryModules.githubPlugin
-  fun gitlabPlugin(mainModuleName: String, productCode: String): PluginLayout {
-    return plugin(mainModuleName) { spec ->
-      spec.directoryName = "vcs-gitlab-$productCode"
-      spec.mainJarName = "vcs-gitlab.jar"
-      spec.withCustomVersion { _, version, _ ->
-        PluginVersionEvaluatorResult(pluginVersion = "$version-$productCode")
-      }
     }
   }
 

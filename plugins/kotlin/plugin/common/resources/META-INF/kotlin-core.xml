@@ -19,6 +19,10 @@
             interface="org.jetbrains.kotlin.idea.configuration.KotlinProjectConfigurator"
             dynamic="true"/>
     <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.kotlinCompilerVersionProvider"
+            interface="org.jetbrains.kotlin.idea.base.plugin.KotlinCompilerVersionProvider"
+            dynamic="true"/>
+    <extensionPoint
             qualifiedName="org.jetbrains.kotlin.newFileHook"
             interface="org.jetbrains.kotlin.idea.base.projectStructure.NewKotlinFileHook"
             dynamic="true"/>
@@ -65,9 +69,6 @@
             qualifiedName="org.jetbrains.kotlin.projectStructureInsightsProvider"
             interface="org.jetbrains.kotlin.idea.base.projectStructure.ProjectStructureInsightsProvider"
             dynamic="true"/>
-    <extensionPoint qualifiedName="org.jetbrains.kotlin.smartEnterProcessorFixer" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
-      <with attribute="implementationClass" implements="com.intellij.lang.SmartEnterProcessorWithFixers$Fixer"/>
-    </extensionPoint>
     <extensionPoint
             qualifiedName="org.jetbrains.kotlin.supportAvailability"
             interface="org.jetbrains.kotlin.idea.codeinsight.utils.KotlinSupportAvailability"
@@ -161,9 +162,6 @@
 
     <lang.floatingToolbar language="kotlin"/>
 
-    <lang.foldingBuilder
-            language="kotlin"
-            implementationClass="org.jetbrains.kotlin.idea.KotlinFoldingBuilder"/>
     <stacktrace.fold substring="at kotlinx.coroutines."/>
 
     <codeInsight.linkHandler
@@ -204,9 +202,6 @@
     <stripTrailingSpacesFilterFactory implementation="org.jetbrains.kotlin.idea.editor.KotlinStripTrailingSpacesFilterFactory"/>
 
     <search.topHitProvider implementation="org.jetbrains.kotlin.idea.editor.KotlinEditorOptionsTopHitProvider"/>
-
-    <psi.classFileDecompiler implementation="org.jetbrains.kotlin.analysis.decompiler.psi.KotlinClassFileDecompiler"/>
-    <psi.classFileDecompiler implementation="org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInDecompiler"/>
 
     <moduleConfigurationEditorProvider implementation="org.jetbrains.kotlin.idea.roots.ui.NonJvmKotlinModuleEditorsProvider"/>
 
@@ -360,15 +355,6 @@
     <lang.unwrapDescriptor
             language="kotlin"
             implementationClass="org.jetbrains.kotlin.idea.codeInsight.unwrap.KotlinUnwrapDescriptor"/>
-
-    <statementUpDownMover
-            id="ktExpression"
-            order="before declaration"
-            implementation="org.jetbrains.kotlin.idea.codeInsight.upDownMover.KotlinExpressionMover"/>
-    <statementUpDownMover
-            id="ktDeclaration"
-            order="before ktExpression"
-            implementation="org.jetbrains.kotlin.idea.codeInsight.upDownMover.KotlinDeclarationMover"/>
 
     <moveLeftRightHandler language="kotlin" implementationClass="org.jetbrains.kotlin.idea.codeInsight.KotlinMoveLeftRightHandler"/>
 

@@ -69,6 +69,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
+import static com.intellij.codeInsight.multiverse.CodeInsightContexts.isSharedSourceSupportEnabled;
 import static com.intellij.reference.SoftReference.dereference;
 import static com.intellij.util.ObjectUtils.notNull;
 
@@ -85,14 +86,12 @@ public class ClsFileImpl extends PsiBinaryFileImpl
 
   private static final Key<Document> CLS_DOCUMENT_LINK_KEY = Key.create("cls.document.link");
 
-  @SuppressWarnings("GrazieInspection")
   private final Object myMirrorLock = new Object();  // NOTE: one absolutely MUST NOT hold PsiLock under the mirror lock
   private final Object myStubLock = new Object();
 
   private final boolean myIsForDecompiling;
   private volatile SoftReference<StubTree> myStub;
   private volatile Reference<TreeElement> myMirrorFileElement;
-  private volatile ClsPackageStatementImpl myPackageStatement;
 
   public ClsFileImpl(@NotNull FileViewProvider viewProvider) {
     this(viewProvider, false);
@@ -303,8 +302,8 @@ public class ClsFileImpl extends PsiBinaryFileImpl
           PsiFileFactory factory = PsiFileFactory.getInstance(getManager().getProject());
           PsiFile mirror = factory.createFileFromText(fileName, JavaLanguage.INSTANCE, mirrorText, false, false, true);
           mirror.putUserData(PsiUtil.FILE_LANGUAGE_LEVEL_KEY, getLanguageLevel());
-          CodeInsightContextManagerImpl contextManager = CodeInsightContextManagerImpl.getInstanceImpl(getProject());
-          if (contextManager.isSharedSourceSupportEnabled()) {
+          if (isSharedSourceSupportEnabled(getProject())) {
+            CodeInsightContextManagerImpl contextManager = CodeInsightContextManagerImpl.getInstanceImpl(getProject());
             CodeInsightContext context = contextManager.getCodeInsightContext(getViewProvider());
             contextManager.setCodeInsightContext(mirror.getViewProvider(), context);
           }
@@ -502,7 +501,6 @@ public class ClsFileImpl extends PsiBinaryFileImpl
     synchronized (myMirrorLock) {
       putUserData(CLS_DOCUMENT_LINK_KEY, null);
       myMirrorFileElement = null;
-      myPackageStatement = null;
     }
   }
 
@@ -561,11 +559,6 @@ public class ClsFileImpl extends PsiBinaryFileImpl
     catch (Throwable e) {
       throw new ClsFormatException(file.getPath() + ": " + e.getMessage(), e);
     }
-  }
-
-  private static String getPackageName(String internalName) {
-    int p = internalName.lastIndexOf('/');
-    return p > 0 ? internalName.substring(0, p).replace('/', '.') : "";
   }
 
   static class FileContentPair extends Pair<VirtualFile, ClassReader> {

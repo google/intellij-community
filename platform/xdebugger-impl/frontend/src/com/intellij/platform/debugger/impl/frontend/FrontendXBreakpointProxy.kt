@@ -61,7 +61,11 @@ internal open class FrontendXBreakpointProxy(
    */
   private val _state: MutableStateFlow<XBreakpointDtoState> = MutableStateFlow(dto.initialState)
 
-  private val editorsProvider = dto.localEditorsProvider ?: createFrontendEditorsProvider()
+  private val editorsProvider = dto.editorsProviderDto?.let {
+    getEditorsProvider(cs, it, documentIdProvider = { frontendDocumentId, expression, position, mode ->
+      XBreakpointApi.getInstance().createDocument(frontendDocumentId, id, expression, position, mode)
+    })
+  }
 
   protected val currentState: XBreakpointDtoState get() = _state.value
 
@@ -129,13 +133,6 @@ internal open class FrontendXBreakpointProxy(
     _onBreakpointChange(this)
   }
 
-  private fun createFrontendEditorsProvider(): FrontendXDebuggerEditorsProvider? {
-    val fileTypeId = dto.editorsProviderFileTypeId ?: return null
-    return FrontendXDebuggerEditorsProvider(fileTypeId) { frontendDocumentId, expression, position, mode ->
-      XBreakpointApi.getInstance().createDocument(frontendDocumentId, id, expression, position, mode)
-    }
-  }
-
   override fun getDisplayText(): String = currentState.displayText
 
   override fun getShortText(): @NlsSafe String {
@@ -155,7 +152,11 @@ internal open class FrontendXBreakpointProxy(
   override fun getGroup(): String? = currentState.group
 
   override fun setGroup(group: String?) {
-    // TODO IJPL-185322
+    updateStateIfNeeded(newValue = group,
+                        getter = { it.group },
+                        copy = { it.copy(group = group) }) { requestId ->
+      XBreakpointApi.getInstance().setGroup(id, requestId, group)
+    }
   }
 
   override fun getIcon(): Icon {
@@ -274,8 +275,22 @@ internal open class FrontendXBreakpointProxy(
       return false
     }
 
-    // TODO: support timestamp
-    return currentState == other.currentState
+    val dependentBreakpointManager = FrontendXDebuggerManager.getInstance(project).breakpointsManager.dependentBreakpointManager
+    val otherState = other.currentState
+
+    // A lot of fields in [XBreakpointDtoState] should not be compared
+    return currentState.logMessage == otherState.logMessage &&
+           currentState.logStack == otherState.logStack &&
+           currentState.isLogExpressionEnabled == otherState.isLogExpressionEnabled &&
+           currentState.logExpression == otherState.logExpression &&
+           currentState.isConditionEnabled == otherState.isConditionEnabled &&
+           currentState.conditionExpression == otherState.conditionExpression &&
+           currentState.enabled == otherState.enabled &&
+           currentState.suspendPolicy == otherState.suspendPolicy &&
+           currentState.group == otherState.group &&
+           currentState.lineBreakpointInfo == otherState.lineBreakpointInfo &&
+           dependentBreakpointManager.getMasterBreakpoint(this) == dependentBreakpointManager.getMasterBreakpoint(other) &&
+           dependentBreakpointManager.isLeaveEnabled(this) == dependentBreakpointManager.isLeaveEnabled(other)
   }
 
   override fun getEditorsProvider(): XDebuggerEditorsProvider? {

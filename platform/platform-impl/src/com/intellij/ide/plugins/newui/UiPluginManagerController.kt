@@ -28,9 +28,9 @@ import javax.swing.JComponent
 interface UiPluginManagerController {
   fun isEnabled(): Boolean
   fun getTarget(): PluginSource
-  fun getPlugins(): List<PluginUiModel>
+  suspend fun getPlugins(): List<PluginUiModel>
   fun getVisiblePlugins(showImplementationDetails: Boolean): List<PluginUiModel>
-  fun initSession(sessionId: String): InitSessionResult
+  suspend fun initSession(sessionId: String): InitSessionResult
   fun getInstalledPlugins(): List<PluginUiModel>
   fun getUpdates(): List<PluginUiModel>
   fun isPluginDisabled(pluginId: PluginId): Boolean
@@ -38,34 +38,32 @@ interface UiPluginManagerController {
   fun loadPluginDetails(model: PluginUiModel): PluginUiModel?
   fun loadPluginReviews(pluginId: PluginId, page: Int): List<PluginReviewComment>?
   fun loadPluginMetadata(externalPluginId: String): IntellijPluginMetadata?
-  fun closeSession(sessionId: String)
+  suspend fun closeSession(sessionId: String)
   fun uninstallDynamicPlugin(parentComponent: JComponent?, sessionId: String, pluginId: PluginId, isUpdate: Boolean): Boolean
   fun deletePluginFiles(pluginId: PluginId)
-  fun tryUnloadPluginIfAllowed(parentComponent: JComponent?, pluginId: PluginId, isUpdate: Boolean): Boolean
   fun allowLoadUnloadWithoutRestart(pluginId: PluginId): Boolean
   fun getPlugin(id: PluginId): PluginUiModel?
   fun allowLoadUnloadSynchronously(pluginId: PluginId): Boolean
   fun performUninstall(sessionId: String, pluginId: PluginId): Boolean
   fun performInstallOperation(installPluginRequest: InstallPluginRequest, parentComponent: JComponent?, modalityState: ModalityState?, progressIndicator: ProgressIndicator?, pluginEnabler: PluginEnabler, installCallback: (InstallPluginResult) -> Unit)
   fun applySession(sessionId: String, parent: JComponent? = null, project: Project?): ApplyPluginsStateResult
-  fun updatePluginDependencies(sessionId: String): Set<PluginId>
-  fun isModified(sessionId: String): Boolean
+  suspend fun updatePluginDependencies(sessionId: String): Set<PluginId>
   fun enablePlugins(sessionId: String, descriptorIds: List<PluginId>, enable: Boolean, project: Project?): SetEnabledStateResult
   fun prepareToUninstall(pluginsToUninstall: List<PluginId>): PrepareToUninstallResult
-  fun isBundledUpdate(pluginIds: List<PluginId>): Boolean
+  suspend fun isBundledUpdate(pluginIds: List<PluginId>): Boolean
   fun isPluginRequiresUltimateButItIsDisabled(sessionId: String, pluginId: PluginId): Boolean
   fun hasPluginRequiresUltimateButItsDisabled(pluginIds: List<PluginId>): Boolean
   fun enableRequiredPlugins(sessionId: String, pluginId: PluginId): Set<PluginId>
   fun getCustomRepoPlugins(): List<PluginUiModel>
-  fun getCustomRepositoryPluginMap(): Map<String, List<PluginUiModel>>
-  fun isDisabledInDiff(sessionId: String, pluginId: PluginId): Boolean
-  fun getErrors(sessionId: String, pluginId: PluginId): CheckErrorsResult
+  suspend fun getCustomRepositoryPluginMap(): Map<String, List<PluginUiModel>>
+  suspend fun isDisabledInDiff(sessionId: String, pluginId: PluginId): Boolean
+  suspend fun getErrors(sessionId: String, pluginId: PluginId): CheckErrorsResult
   fun isPluginInstalled(pluginId: PluginId): Boolean
   fun hasPluginsAvailableForEnableDisable(pluginIds: List<PluginId>): Boolean
   fun setEnableStateForDependencies(sessionId: String, descriptorIds: Set<PluginId>, enable: Boolean): SetEnabledStateResult
   fun filterPluginsRequiringUltimateButItsDisabled(pluginIds: List<PluginId>): List<PluginId>
   fun findPluginNames(pluginIds: List<PluginId>): List<String>
-  fun findPlugin(pluginId: PluginId): PluginUiModel?
+  suspend fun findPlugin(pluginId: PluginId): PluginUiModel?
 
   fun getLastCompatiblePluginUpdateModel(pluginId: PluginId, buildNumber: String? = null, indicator: ProgressIndicator? = null): PluginUiModel?
   fun getLastCompatiblePluginUpdate(allIds: Set<PluginId>, throwExceptions: Boolean, buildNumber: String? = null): List<IdeCompatibleUpdate>
@@ -76,14 +74,16 @@ interface UiPluginManagerController {
   fun getAllVendors(): Set<String>
   fun getPluginInstallationState(pluginId: PluginId): PluginInstallationState
   fun getPluginInstallationStates(): Map<PluginId, PluginInstallationState>
-  fun checkPluginCanBeDownloaded(pluginUiModel: PluginUiModel, progressIndicator: ProgressIndicator?): Boolean
+  suspend fun checkPluginCanBeDownloaded(pluginUiModel: PluginUiModel, progressIndicator: ProgressIndicator?): Boolean
   fun setPluginStatus(sessionId: String, pluginIds: List<PluginId>, enable: Boolean)
   fun getApplyError(sessionId: String): String?
 
   suspend fun loadErrors(sessionId: String): Map<PluginId, CheckErrorsResult>
+  suspend fun isModified(sessionId: String): Boolean
 
   suspend fun resetSession(sessionId: String, removeSession: Boolean, parentComponent: JComponent? = null): Map<PluginId, Boolean>
   suspend fun isPluginEnabled(pluginId: PluginId): Boolean
+  suspend fun findInstalledPlugins(plugins: Set<PluginId>): Map<PluginId, PluginUiModel>
 
   companion object {
     val EP_NAME: ExtensionPointName<UiPluginManagerController> = ExtensionPointName<UiPluginManagerController>("com.intellij.uiPluginManagerController")

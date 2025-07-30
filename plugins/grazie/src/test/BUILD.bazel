@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.grazie.tests` start
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "grazie-tests_test_resources",
@@ -30,6 +29,8 @@ jvm_library(
     "@lib//:kotlin-test",
     "//java/testFramework",
     "@lib//:grazie-tests-ai-grazie-spell-hunspell-de",
+    "@lib//:grazie-tests-ai-grazie-spell-hunspell-ru",
+    "@lib//:grazie-tests-ai-grazie-spell-hunspell-uk",
     "@lib//:grazie-tests-org-jetbrains-intellij-deps-languagetool-languagetool-core",
     "@lib//:grazie-tests-org-jetbrains-intellij-deps-languagetool-language-ru",
     "@lib//:grazie-tests-org-jetbrains-intellij-deps-languagetool-language-de",
@@ -58,13 +59,16 @@ jvm_library(
     "//platform/testFramework/junit5:junit5_test_lib",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
-    "//images/backend.svg",
   ],
   runtime_deps = [":grazie-tests_test_resources"]
 )
+### auto-generated section `build intellij.grazie.tests` end
+
+### auto-generated section `test intellij.grazie.tests` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "grazie-tests_test",
   runtime_deps = [":grazie-tests_test_lib"]
 )
-### auto-generated section `build intellij.grazie.tests` end
+### auto-generated section `test intellij.grazie.tests` end

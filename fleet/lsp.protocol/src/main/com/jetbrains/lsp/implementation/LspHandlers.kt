@@ -32,7 +32,7 @@ interface LspHandlersBuilder {
 
     fun <Notification> notification(
         notifcationType: NotificationType<Notification>,
-        handler: suspend CoroutineScope.(Notification) -> Unit,
+        handler: suspend context(LspHandlerContext) CoroutineScope.(Notification) -> Unit,
     )
 }
 
@@ -68,8 +68,26 @@ class LspRequestHandler<Params, Result, Error>(
 
 class LspNotificationHandler<Params>(
     val notificationType: NotificationType<Params>,
-    val handler: suspend CoroutineScope.(Params) -> Unit,
+    val handler: suspend context(LspHandlerContext) CoroutineScope.(Params) -> Unit,
 )
+
+interface LspHandlersMiddleware {
+  fun <P, R, E> requestHandler(handler: LspRequestHandler<P, R, E>): LspRequestHandler<P, R, E>
+
+  fun <P> notificationHandler(handler: LspNotificationHandler<P>): LspNotificationHandler<P>
+
+  companion object {
+    val IDENTITY: LspHandlersMiddleware = object : LspHandlersMiddleware {
+      override fun <P, R, E> requestHandler(handler: LspRequestHandler<P, R, E>): LspRequestHandler<P, R, E> {
+        return handler
+      }
+
+      override fun <P> notificationHandler(handler: LspNotificationHandler<P>): LspNotificationHandler<P> {
+        return handler
+      }
+    }
+  }
+}
 
 fun lspHandlers(builder: LspHandlersBuilder.() -> Unit): LspHandlers {
     val requests = mutableMapOf<String, LspRequestHandler<*, *, *>>()
@@ -85,7 +103,7 @@ fun lspHandlers(builder: LspHandlersBuilder.() -> Unit): LspHandlers {
 
         override fun <Notification> notification(
             notifcationType: NotificationType<Notification>,
-            handler: suspend CoroutineScope.(Notification) -> Unit,
+            handler: suspend context(LspHandlerContext) CoroutineScope.(Notification) -> Unit,
         ) {
             notifications[notifcationType.method] = LspNotificationHandler(notifcationType, handler)
         }

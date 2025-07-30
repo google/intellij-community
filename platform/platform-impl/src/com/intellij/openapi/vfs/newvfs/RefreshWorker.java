@@ -52,6 +52,7 @@ import java.util.function.Consumer;
 import static com.intellij.util.SystemProperties.getBooleanProperty;
 import static com.intellij.util.containers.CollectionFactory.createFilePathMap;
 import static com.intellij.util.containers.CollectionFactory.createFilePathSet;
+import static com.intellij.util.containers.FastUtilHashingStrategies.getCaseInsensitiveStringStrategy;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 final class RefreshWorker {
@@ -69,7 +70,7 @@ final class RefreshWorker {
    * Temporary flag, to investigate performance issues linked to the transition to {@link BatchingFileSystem},
    * remove afterward.
    */
-  private static final boolean USE_LEGACY_LOCAL_FS_METHOD = getBooleanProperty("vfs.RefreshWorker.USE_LEGACY_LOCAL_FS_METHOD", true);
+  private static final boolean USE_LEGACY_LOCAL_FS_METHOD = getBooleanProperty("vfs.RefreshWorker.USE_LEGACY_LOCAL_FS_METHOD", false);
 
   private final boolean myIsRecursive;
   private final boolean myParallel;
@@ -238,42 +239,53 @@ final class RefreshWorker {
     VirtualFile[] vfsChildren = snapshot.first;
     List<String> vfsNames = snapshot.second;
 
-    Map<String, FileAttributes> dirList;
+    boolean dirIsCaseSensitive = dir.isCaseSensitive();
+
+    Map<String, FileAttributes> childrenWithAttributes;
     t = System.nanoTime();
     if (fs instanceof BatchingFileSystem) {
-      Map<String, FileAttributes> rawDirList = computeAllChildrenAttributes((BatchingFileSystem)fs, dir, null);
-      //TODO RC: why do we adjust map case-sensitivity here -- but don't adjust it in the branch below?
-      //         Seems like there is a reason for dirList to be a case-(in)sensitive map -- at least in getAttributes()
-      //         it is used .get(vFile.getName()), there vFile.getName() may return a name in different case from that
-      //         is in the dirList
-      dirList = adjustCaseSensitivity(rawDirList, dir.isCaseSensitive());
+      childrenWithAttributes = adjustCaseSensitivity(
+        computeAllChildrenAttributes((BatchingFileSystem)fs, dir, /*filter: */null),
+        dirIsCaseSensitive
+      );
     }
     else {
-      dirList = new HashMap<>();
-      for (String name : fs.list(dir)) {
-        dirList.put(name, null);
+      String[] childrenNames = fs.list(dir);
+      childrenWithAttributes = createFilePathMap(childrenNames.length, dirIsCaseSensitive);
+      for (String name : childrenNames) {
+        childrenWithAttributes.put(name, null);
+      }
+      if(childrenWithAttributes.size()!=childrenNames.length){
+        //TODO RC: seems like dir.isCaseSensitive() is wrong/outdated (i.e. actual dir case-sensitivity is different from
+        //         FS-default, and it wasn't yet determined).
+        //         We should re-query dir.case-sensitivity
       }
     }
     myIoTime.addAndGet(System.nanoTime() - t);
 
-    Set<String> newNames = new HashSet<>(dirList.keySet());//TODO RC: why it is not case-(in)sensitive?
+    Set<String> newNames = createFilePathSet(childrenWithAttributes.keySet(), dirIsCaseSensitive);
     vfsNames.forEach(newNames::remove);
 
-    Set<String> deletedNames = new HashSet<>(vfsNames);//TODO RC: why it is not case-(in)sensitive?
-    dirList.keySet().forEach(deletedNames::remove);
+    Set<String> deletedNames = createFilePathSet(vfsNames, dirIsCaseSensitive);
+    childrenWithAttributes.keySet().forEach(deletedNames::remove);
 
-    ObjectOpenCustomHashSet<String> actualNames = dir.isCaseSensitive() ?
+    ObjectOpenCustomHashSet<String> actualNames = dirIsCaseSensitive ?
                                                   null :
-                                                  (ObjectOpenCustomHashSet<String>)createFilePathSet(dirList.keySet(), false);
+                                                  new ObjectOpenCustomHashSet<>(
+                                                    childrenWithAttributes.keySet(),
+                                                    getCaseInsensitiveStringStrategy()
+                                                  );
     if (LOG.isTraceEnabled()) {
       LOG.trace("current=" + vfsNames + " +" + newNames + " -" + deletedNames);
     }
 
-    List<ChildInfo> newKids = newNames.isEmpty() && deletedNames.isEmpty() ? List.of() : new ArrayList<>(newNames.size());
+    List<ChildInfo> newKids = newNames.isEmpty() && deletedNames.isEmpty() ?
+                              List.of() :
+                              new ArrayList<>(newNames.size());
     for (String newName : newNames) {
       if (VfsUtil.isBadName(newName)) continue;
       FakeVirtualFile child = new FakeVirtualFile(dir, newName);
-      FileAttributes attributes = getAttributes(fs, dirList, child);
+      FileAttributes attributes = getAttributes(fs, childrenWithAttributes, child);
       if (attributes != null) {
         newKids.add(childRecord(fs, child, attributes, false));
       }
@@ -282,7 +294,7 @@ final class RefreshWorker {
     List<Pair<VirtualFile, FileAttributes>> existingMap = new ArrayList<>(vfsChildren.length - deletedNames.size());
     for (VirtualFile child : vfsChildren) {
       if (!deletedNames.contains(child.getName())) {
-        existingMap.add(new Pair<>(child, getAttributes(fs, dirList, child)));
+        existingMap.add(new Pair<>(child, getAttributes(fs, childrenWithAttributes, child)));
       }
     }
 
@@ -318,33 +330,38 @@ final class RefreshWorker {
 
   private boolean partialDirRefresh(List<VFileEvent> events, NewVirtualFileSystem fs, VirtualDirectoryImpl dir) {
     var t = System.nanoTime();
-    Pair<List<VirtualFile>, List<String>> snapshot = ReadAction.compute(() -> new Pair<>(dir.getCachedChildren(), dir.getSuspiciousNames()));
+    Pair<List<VirtualFile>, List<String>> snapshot = ReadAction.compute(
+      () -> new Pair<>(dir.getCachedChildren(), dir.getSuspiciousNames())
+    );
     myVfsTime.addAndGet(System.nanoTime() - t);
     List<VirtualFile> cached = snapshot.first;
     List<String> wanted = snapshot.second;
 
-    Set<String> names = createFilePathSet(wanted, dir.isCaseSensitive());
+    boolean dirIsCaseSensitive = dir.isCaseSensitive();
+    Set<String> names = createFilePathSet(wanted, dirIsCaseSensitive);
     for (VirtualFile file : cached) names.add(file.getName());
 
-    Map<String, FileAttributes> dirList = null;
+    Map<String, FileAttributes> childrenWithAttributes = null;
     if (fs instanceof BatchingFileSystem batchingFileSystem) {
       t = System.nanoTime();
-      Map<String, FileAttributes> rawDirList = computeAllChildrenAttributes(batchingFileSystem, dir, names);
+      childrenWithAttributes = adjustCaseSensitivity(
+        computeAllChildrenAttributes(batchingFileSystem, dir, names),
+        dirIsCaseSensitive
+      );
       myIoTime.addAndGet(System.nanoTime() - t);
-      dirList = adjustCaseSensitivity(rawDirList, dir.isCaseSensitive());
     }
 
     ObjectOpenCustomHashSet<String> actualNames;
-    if (dir.isCaseSensitive() || cached.isEmpty()) {
+    if (dirIsCaseSensitive || cached.isEmpty()) {
       actualNames = null;
     }
-    else if (dirList != null) {
-      actualNames = (ObjectOpenCustomHashSet<String>)createFilePathSet(dirList.keySet(), /*caseSensitive: */ false);
+    else if (childrenWithAttributes != null) {
+      actualNames = (ObjectOpenCustomHashSet<String>)createFilePathSet(childrenWithAttributes.keySet(), /*caseSensitive: */ false);
     }
     else {
       t = System.nanoTime();
-      String[] rawList = fs.list(dir);
-      actualNames = (ObjectOpenCustomHashSet<String>)createFilePathSet(rawList, /*caseSensitive: */ false);
+      String[] childrenNames = fs.list(dir);
+      actualNames = (ObjectOpenCustomHashSet<String>)createFilePathSet(childrenNames, /*caseSensitive: */ false);
       myIoTime.addAndGet(System.nanoTime() - t);
     }
 
@@ -356,7 +373,7 @@ final class RefreshWorker {
     for (String newName : wanted) {
       if (VfsUtil.isBadName(newName)) continue;
       FakeVirtualFile child = new FakeVirtualFile(dir, newName);
-      FileAttributes attributes = getAttributes(fs, dirList, child);
+      FileAttributes attributes = getAttributes(fs, childrenWithAttributes, child);
       if (attributes != null) {
         newKids.add(childRecord(fs, child, attributes, /*canonicalize: */ true));
       }
@@ -364,7 +381,7 @@ final class RefreshWorker {
 
     List<Pair<VirtualFile, FileAttributes>> existingMap = cached.isEmpty() ? List.of() : new ArrayList<>(cached.size());
     for (VirtualFile child : cached) {
-      existingMap.add(new Pair<>(child, getAttributes(fs, dirList, child)));
+      existingMap.add(new Pair<>(child, getAttributes(fs, childrenWithAttributes, child)));
     }
 
     clearFsCache(fs);
@@ -389,15 +406,23 @@ final class RefreshWorker {
   }
 
   /** Converts a case-sensitive rawDirList map into case-insensitive, if toCaseSensitive=false, leaves the map as-is otherwise */
-  private static @NotNull Map<String, FileAttributes> adjustCaseSensitivity(@NotNull Map<String, FileAttributes> rawDirList,
+  private static @NotNull Map<String, FileAttributes> adjustCaseSensitivity(@NotNull Map<String, FileAttributes> childrenWithAttributes,
                                                                             boolean toCaseSensitive) {
     if (toCaseSensitive) {
-      return rawDirList;
+      return childrenWithAttributes;
     }
     else {
-      Map<String, FileAttributes> filtered = createFilePathMap(rawDirList.size(), /*caseSensitive: */ false);
-      filtered.putAll(rawDirList);
-      return filtered;
+      Map<String, FileAttributes> childrenWithAttributesCaseInsensitive = createFilePathMap(
+        childrenWithAttributes.size(),
+        /*caseSensitive: */ false
+      );
+      childrenWithAttributesCaseInsensitive.putAll(childrenWithAttributes);
+      if (childrenWithAttributesCaseInsensitive.size() != childrenWithAttributes.size()) {
+        //TODO RC: seems like a conflict if dir.isCaseSensitive() is wrong/outdated (i.e. actual dir case-sensitivity
+        //         is different from FS-default, and it wasn't yet determined).
+        //         We should re-query dir.case-sensitivity
+      }
+      return childrenWithAttributesCaseInsensitive;
     }
   }
 
@@ -423,7 +448,7 @@ final class RefreshWorker {
 
   /**
    * If attributes are computed in a cancellable context, then single-thread refresh gets a performance degradation.
-   * The reason is {@link com.intellij.openapi.vfs.DiskQueryRelay#accessDiskWithCheckCanceled(Object)},
+   * The reason is {@link DiskQueryRelay#accessDiskWithCheckCanceled(Object)},
    * which starts constant exchanging messages with an IO thread.
    * The non-cancellable section here is merely a reification of the existing implicit assumption on cancellability,
    * so it does not make anything worse.
@@ -440,7 +465,8 @@ final class RefreshWorker {
     if (USE_LEGACY_LOCAL_FS_METHOD
         && (fs instanceof LocalFileSystemImpl localFileSystem) ) {
       String[] childrenNames = Cancellation.computeInNonCancelableSection(() -> localFileSystem.listWithCaching(dir, filter));
-      Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(childrenNames.length, dir.isCaseSensitive());
+      //map will be transformed to case-(in)sensitive up-the-stack anyway:
+      Map<String, FileAttributes> childrenWithAttributes = new HashMap<>(childrenNames.length);
       for (String childName : childrenNames) {
         childrenWithAttributes.put(childName, null);
       }
@@ -571,9 +597,9 @@ final class RefreshWorker {
 
     events.add(new VFileCreateEvent(myRequestor, parent, childName, attributes.isDirectory(), attributes, symlinkTarget, children));
 
-    VFileEvent event = ((PersistentFSImpl)myPersistence).generateCaseSensitivityChangedEventForUnknownCase(parent, childName);
-    if (event != null) {
-      events.add(event);
+    VFileEvent caseSensitivityChangingEvent = ((PersistentFSImpl)myPersistence).determineCaseSensitivityAndPrepareUpdate(parent, childName);
+    if (caseSensitivityChangingEvent != null) {
+      events.add(caseSensitivityChangingEvent);
     }
   }
 

@@ -654,6 +654,8 @@
       implementationClass="com.intellij.openapi.wm.impl.welcomeScreen.survey.IdeSurveyCollector"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.openapi.wm.impl.welcomeScreen.statistics.WelcomeScreenCounterUsageCollector"/>
+    <statistics.counterUsagesCollector
+      implementationClass="com.intellij.openapi.wm.impl.welcomeScreen.statistics.WslPromoPanelUsageCollector"/>
     <welcomeTabFactory id="CustomizeWelcomeTab" implementation="com.intellij.openapi.wm.impl.welcomeScreen.CustomizeTabFactory"
                        order="after ProjectsWelcomeTab"/>
     <welcomeTabFactory id="PluginsWelcomeTab" implementation="com.intellij.openapi.wm.impl.welcomeScreen.PluginsTabFactory"
@@ -1532,6 +1534,8 @@
     <notificationGroup id="Diff Changes Loading Error" displayType="BALLOON" hideFromSettings="true"/>
     <notificationGroup id="System shortcuts conflicts" displayType="STICKY_BALLOON" bundle="messages.KeyMapBundle"
                        key="notification.group.shortcut.conflicts"/>
+    <notificationGroup id="Paid Plugins" displayType="STICKY_BALLOON" bundle="messages.IdeBundle"
+                       key="notification.group.paid.plugins"/>
     <notificationGroup id="Required Plugins" displayType="STICKY_BALLOON" bundle="messages.IdeBundle"
                        key="notification.group.required.plugins"/>
     <notificationGroup id="System Health" displayType="STICKY_BALLOON" bundle="messages.IdeBundle" key="notification.group.system.health"
@@ -1642,6 +1646,7 @@
     <advancedSetting id="ide.tree.collapse.recursively" default="true" groupKey="group.advanced.settings.project.view"/>
     <advancedSetting id="project.view.do.not.autoscroll.to.libraries" default="false" groupKey="group.advanced.settings.project.view"/>
     <advancedSetting id="ide.open.readme.md.on.startup" default="true" groupKey="group.advanced.settings.startup"/>
+    <advancedSetting id="editor.undo.transparent.caret.movement" default="false" groupKey="group.advanced.settings.editor"/>
     <advancedSetting id="editor.skip.copy.and.cut.for.empty.selection" default="false" groupKey="group.advanced.settings.editor"/>
     <advancedSetting id="editor.skip.selecting.line.after.copy.empty.selection" default="false" groupKey="group.advanced.settings.editor"/>
     <advancedSetting id="editor.paste.line.copied.from.empty.selection"

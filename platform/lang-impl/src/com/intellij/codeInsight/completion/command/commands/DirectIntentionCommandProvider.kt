@@ -30,6 +30,7 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.lang.annotation.HighlightSeverity.INFORMATION
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.modcommand.ActionContext
+import com.intellij.modcommand.Presentation
 import com.intellij.modcommand.PsiBasedModCommandAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
@@ -177,7 +178,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
       }
       val offsetProvider = IntentionCommandOffsetProvider.EP_NAME.forLanguage(language)
 
-      val result: MutableMap<String, CompletionCommand> = mutableMapOf()
+      val result: MutableMap<String, CompletionCommandWithErrorLevel> = mutableMapOf()
       try {
         val intentionCommandSkipper = IntentionCommandSkipper.EP_NAME.forLanguage(psiFile.language)
         val injectedLanguageManager = InjectedLanguageManager.getInstance(psiFile.project)
@@ -233,16 +234,17 @@ internal class DirectIntentionCommandProvider : CommandProvider {
               //necessary to be compatible with call site
               editor.caretModel.moveToOffset(offset)
               topLevelEditor.caretModel.moveToOffset(offset)
-              for (i in 0..fixes.size - 1) {
+              for (i in 0..<fixes.size) {
                 val action = QuickFixWrapper.wrap(descriptor, i)
                 if (action is EmptyIntentionAction) continue
                 if (intentionCommandSkipper != null && intentionCommandSkipper.skip(action, psiFile, currentOffset)) continue
                 if (!isInjected && !ShowIntentionActionsHandler.availableFor(topLevelFile, topLevelEditor, topLevelOffset, action)) continue
                 if (isInjected && !ShowIntentionActionsHandler.availableFor(psiFile, editor, currentOffset, action)) continue
-                val priority = if (level.getSeverity(null) == INFORMATION) 70 else 80
-                val icon = if (level.getSeverity(null) == INFORMATION) AllIcons.Actions.IntentionBulbGrey else AllIcons.Actions.IntentionBulb
+                val isInfo = level.getSeverity(null) == INFORMATION
+                val priority = if (isInfo) 70 else 80
+                val icon = if (isInfo) AllIcons.Actions.IntentionBulbGrey else AllIcons.Actions.IntentionBulb
 
-                result[toolId + ":" + action.text] = (DirectInspectionFixCompletionCommand(
+                result[toolId + ":" + action.text] = CompletionCommandWithErrorLevel(DirectInspectionFixCompletionCommand(
                   inspectionId = toolId,
                   presentableName = action.text,
                   priority = priority,
@@ -251,7 +253,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
                   targetOffset = currentOffset,
                   previewProvider = {
                     computePreview(psiFile, action, editor, offset)
-                  }))
+                  }), if (isInfo) ErrorLevel.INFO else ErrorLevel.WARNING)
               }
             }
           }
@@ -264,8 +266,19 @@ internal class DirectIntentionCommandProvider : CommandProvider {
         thisLogger().error("Can't collect inspections", e)
       }
 
+      var strictRange = false
+      for (commandWithLevel in result.values) {
+        if (commandWithLevel.level == ErrorLevel.WARNING && commandWithLevel.command.highlightInfo?.range?.endOffset == offset) {
+          strictRange = true
+          break
+        }
+      }
 
-      return@readAction result.values.toList()
+      if (strictRange) {
+        return@readAction result.values.map { it.command }.filter { it.highlightInfo?.range?.contains(offset - 1) == true }.toList()
+      }
+
+      return@readAction result.values.map { it.command }.toList()
     }
   }
 
@@ -439,7 +452,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
             if (intention.action is EmptyIntentionAction ||
                 intentionCommandSkipper != null && intentionCommandSkipper.skip(intention.action, psiFile, currentOffset)) continue
             val intentionCommand =
-              IntentionCompletionCommand(intention, 50, intention.icon ?: AllIcons.Actions.IntentionBulbGrey, calculateIntentionHighlighting(intention, editor, psiFile, offset), currentOffset) {
+              IntentionCompletionCommand(intention, 50, AllIcons.Actions.IntentionBulbGrey, calculateIntentionHighlighting(intention, editor, psiFile, offset), currentOffset) {
                 editor.caretModel.moveToOffset(currentOffset)
                 computePreview(psiFile, intention.action, editor, currentOffset)
               }
@@ -469,14 +482,23 @@ internal class DirectIntentionCommandProvider : CommandProvider {
     }
     val modCommandAction = intentionAction.asModCommandAction() ?: return null
     if (modCommandAction is PsiBasedModCommandAction<*>) {
-      modCommandAction.getElement(ActionContext.from(editor, psiFile))?.let {
-        return HighlightInfoLookup(it.textRange.intersection(TextRange(it.textRange.startOffset, currentOffset)),
-          EditorColors.SEARCH_RESULT_ATTRIBUTES, 0)
-      }
+      modCommandAction.getPresentation(ActionContext.from(editor, psiFile))
+        ?.rangesToHighlight()
+        ?.firstOrNull { highlightRange ->
+          highlightRange.highlightingKind() == Presentation.HighlightingKind.APPLICABLE_TO_RANGE  &&
+          highlightRange.range.startOffset <= currentOffset
+        }
+        ?.let {
+          return HighlightInfoLookup(it.range().intersection(TextRange(it.range().startOffset, currentOffset)),
+                                     EditorColors.SEARCH_RESULT_ATTRIBUTES, 0)
+        }
     }
     return null
   }
 }
+
+private class CompletionCommandWithErrorLevel(val command: CompletionCommand, val level: ErrorLevel)
+private enum class ErrorLevel { INFO, WARNING }
 
 internal fun getLineRange(psiFile: PsiFile, offset: Int): TextRange {
   val document = psiFile.fileDocument

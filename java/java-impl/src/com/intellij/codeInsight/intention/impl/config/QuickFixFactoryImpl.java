@@ -721,6 +721,13 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   }
 
   @Override
+  public @NotNull List<@NotNull LocalQuickFix> registerOrderEntryFixes(@NotNull PsiReference reference,
+                                                                       @NotNull PsiMember target,
+                                                                       @NotNull List<? super IntentionAction> registrar) {
+    return OrderEntryFix.registerFixes(reference, target, registrar);
+  }
+
+  @Override
   public @NotNull IntentionAction createAddMissingRequiredAnnotationParametersFix(final @NotNull PsiAnnotation annotation,
                                                                                   final PsiMethod @NotNull [] annotationMethods,
                                                                                   final @NotNull Collection<String> missedElements) {
@@ -1125,6 +1132,11 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @Override
   public @NotNull ModCommandAction createReplaceOnDemandImport(@NotNull PsiImportModuleStatement importModuleStatement, @NotNull @Nls String text) {
     return new ReplaceOnDemandImportAction(importModuleStatement, text);
+  }
+
+  @Override
+  public @Nullable ModCommandAction createRecordThisDelegateFix(@NotNull PsiMethod psi) {
+    return RecordThisDelegateFix.create(psi);
   }
 
   private static class ReplaceOnDemandImportAction extends PsiUpdateModCommandAction<PsiImportModuleStatement> {

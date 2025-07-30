@@ -3,14 +3,15 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_ide-laf-bridge-styling",
   opt_in = [
     "androidx.compose.ui.ExperimentalComposeUiApi",
     "androidx.compose.foundation.ExperimentalFoundationApi",
     "org.jetbrains.jewel.foundation.ExperimentalJewelApi",
     "org.jetbrains.jewel.foundation.InternalJewelApi",
-  ]
+  ],
+  x_context_receivers = True,
+  x_explicit_api_mode = "strict"
 )
 
 jvm_resources(
@@ -24,7 +25,7 @@ jvm_library(
   module_name = "intellij.platform.jewel.markdown.ideLafBridgeStyling",
   visibility = ["//visibility:public"],
   srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_ide-laf-bridge-styling",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",

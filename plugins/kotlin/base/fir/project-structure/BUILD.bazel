@@ -1,16 +1,17 @@
 ### auto-generated section `build kotlin.base.fir.project-structure` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_project-structure",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.analysis.api.KaPlatformInterface",
     "org.jetbrains.kotlin.analysis.api.KaExperimentalApi",
     "org.jetbrains.kotlin.analysis.api.KaImplementationDetail",
-  ]
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ],
+  x_context_receivers = True
 )
 
 jvm_resources(
@@ -24,7 +25,7 @@ jvm_library(
   module_name = "kotlin.base.fir.project-structure",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_project-structure",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/lang-core",
@@ -46,6 +47,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-jps-common",
     "@lib//:fastutil-min",
     "//java/openapi:java",
+    "//plugins/kotlin/base/scripting/scripting.k2",
   ],
   runtime_deps = [":project-structure_resources"]
 )
@@ -54,7 +56,7 @@ jvm_library(
   name = "project-structure_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_project-structure",
   associates = [":project-structure"],
   deps = [
     "@lib//:kotlin-stdlib",
@@ -95,19 +97,22 @@ jvm_library(
     "//plugins/gradle:gradle-tests_test_lib",
     "//plugins/groovy",
     "//plugins/groovy:groovy_test_lib",
-    "//plugins/kotlin/base/scripting",
-    "//plugins/kotlin/base/scripting:scripting_test_lib",
     "//plugins/kotlin/idea/tests:tests_test_lib",
     "//plugins/kotlin/base/platforms",
     "@lib//:kotlinc-kotlin-jps-common",
     "@lib//:fastutil-min",
     "//java/openapi:java",
+    "//plugins/kotlin/base/scripting/scripting.k2",
   ],
   runtime_deps = [":project-structure_resources"]
 )
+### auto-generated section `build kotlin.base.fir.project-structure` end
+
+### auto-generated section `test kotlin.base.fir.project-structure` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "project-structure_test",
   runtime_deps = [":project-structure_test_lib"]
 )
-### auto-generated section `build kotlin.base.fir.project-structure` end
+### auto-generated section `test kotlin.base.fir.project-structure` end

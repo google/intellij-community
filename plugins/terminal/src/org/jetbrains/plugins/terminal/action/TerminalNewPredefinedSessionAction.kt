@@ -120,6 +120,7 @@ class TerminalNewPredefinedSessionAction : DumbAwareAction(), ActionRemoteBehavi
   ) : DumbAwareAction(presentableName, null, icon) {
     override fun actionPerformed(e: AnActionEvent) {
       val project = e.project ?: return
+      val contentManager = e.getData(PlatformDataKeys.TOOL_WINDOW_CONTENT_MANAGER)
 
       val tabState = TerminalTabState()
       tabState.myTabName = templateText
@@ -128,7 +129,8 @@ class TerminalNewPredefinedSessionAction : DumbAwareAction(), ActionRemoteBehavi
       TerminalToolWindowManager.getInstance(project).createNewTab(
         TerminalOptionsProvider.instance.terminalEngine,
         startupFusInfo,
-        tabState
+        tabState,
+        contentManager,
       )
     }
   }

@@ -3,7 +3,7 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
-  name = "custom",
+  name = "custom_build-scripts",
   opt_in = [
     "kotlin.RequiresOptIn",
     "kotlinx.serialization.ExperimentalSerializationApi",
@@ -16,7 +16,7 @@ jvm_library(
   module_name = "intellij.platform.buildScripts",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_build-scripts",
   deps = [
     "//platform/build-scripts/downloader",
     "@lib//:commons-compress",
@@ -31,7 +31,7 @@ jvm_library(
     "//jps/model-impl",
     "//platform/util/xmlDom",
     "//jps/jps-builders:build",
-    "@rules_jvm//jps-builders-6:build-javac-rt",
+    "@community//build:build-javac-rt",
     "//jps/model-serialization",
     "//platform/runtime/repository",
     "//platform/testFramework/core",
@@ -86,7 +86,7 @@ jvm_library(
     "//libraries/io",
     "@lib//:netty-tcnative-boringssl",
     "//platform/util/coroutines",
-    "@rules_jvm//zip",
+    "@community//build:zip",
     "@lib//:com-jetbrains-fus-reporting-configuration",
     "@lib//:com-jetbrains-fus-reporting-serialization-kotlin",
     "@lib//:com-jetbrains-fus-reporting-model",

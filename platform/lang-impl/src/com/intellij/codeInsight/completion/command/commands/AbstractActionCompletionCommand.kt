@@ -39,7 +39,7 @@ open class ActionCommandProvider(
   val priority: Int? = null,
   val previewText: @Nls String?,
   val synonyms: List<String> = emptyList()
-) : CommandProvider, DumbAware {
+) : CommandProvider {
 
   /**
    * Creates and returns a list of completion commands based on the provided context.
@@ -146,7 +146,7 @@ open class ActionCompletionCommand(
   override val priority: Int? = null,
   override val highlightInfo: HighlightInfoLookup? = null,
   override val synonyms: List<String> = emptyList()
-) : CompletionCommand(), DumbAware, CompletionCommandWithPreview {
+) : CompletionCommand(), DumbAware {
 
   override val presentableName: @Nls String = presentableActionName
     .replaceFirst("_", "")
@@ -177,8 +177,8 @@ open class ActionCompletionCommand(
     ActionUtil.performAction(action, event)
   }
 
-  override fun getPreview(): IntentionPreviewInfo? {
-    if (previewText == null) return null
+  override fun getPreview(): IntentionPreviewInfo {
+    if (previewText == null) return IntentionPreviewInfo.EMPTY
     return IntentionPreviewInfo.Html(previewText)
   }
 }

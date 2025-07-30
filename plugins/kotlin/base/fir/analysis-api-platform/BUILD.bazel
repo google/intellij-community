@@ -1,15 +1,16 @@
 ### auto-generated section `build kotlin.base.fir.analysis-api-platform` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  context_receivers = True,
+  name = "custom_analysis-api-platform",
   opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
     "org.jetbrains.kotlin.analysis.api.KaPlatformInterface",
-  ]
+    "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
+  ],
+  x_context_receivers = True
 )
 
 jvm_resources(
@@ -23,7 +24,7 @@ jvm_library(
   module_name = "kotlin.base.fir.analysis-api-platform",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_analysis-api-platform",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -63,7 +64,7 @@ jvm_library(
   name = "analysis-api-platform_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_analysis-api-platform",
   associates = [":analysis-api-platform"],
   deps = [
     "//platform/analysis-api:analysis",
@@ -111,8 +112,6 @@ jvm_library(
     "//platform/backend/workspace",
     "//platform/platform-api:ide",
     "//platform/analysis-impl",
-    "//plugins/kotlin/base/scripting",
-    "//plugins/kotlin/base/scripting:scripting_test_lib",
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/kotlin.searching:searching-k2",
     "//java/java-psi-impl:psi-impl",
@@ -121,9 +120,13 @@ jvm_library(
   ],
   runtime_deps = [":analysis-api-platform_resources"]
 )
+### auto-generated section `build kotlin.base.fir.analysis-api-platform` end
+
+### auto-generated section `test kotlin.base.fir.analysis-api-platform` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "analysis-api-platform_test",
   runtime_deps = [":analysis-api-platform_test_lib"]
 )
-### auto-generated section `build kotlin.base.fir.analysis-api-platform` end
+### auto-generated section `test kotlin.base.fir.analysis-api-platform` end

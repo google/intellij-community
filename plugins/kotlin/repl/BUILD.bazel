@@ -3,7 +3,7 @@ load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
+  name = "custom_repl",
   opt_in = [
     "org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi",
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
@@ -21,7 +21,7 @@ jvm_library(
   module_name = "kotlin.repl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_repl",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -41,7 +41,6 @@ jvm_library(
     "//plugins/kotlin/base/facet",
     "//platform/editor-ui-ex:editor-ex",
     "//plugins/kotlin/base/project-structure",
-    "//plugins/kotlin/base/scripting",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/base/fe10/analysis",
@@ -58,7 +57,8 @@ jvm_library(
     "//java/execution/impl",
     "//platform/execution-impl",
     "//plugins/kotlin/jsr223",
-    "//plugins/kotlin/base/scripting.k1",
+    "//plugins/kotlin/base/scripting/scripting.k1",
+    "//plugins/kotlin/base/scripting/scripting.shared",
   ],
   runtime_deps = [":repl_resources"]
 )

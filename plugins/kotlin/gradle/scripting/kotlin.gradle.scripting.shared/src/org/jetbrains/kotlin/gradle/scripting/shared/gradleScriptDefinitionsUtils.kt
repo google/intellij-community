@@ -5,12 +5,11 @@ import KotlinGradleScriptingBundle
 import com.intellij.gradle.toolingExtension.util.GradleVersionUtil.isGradleAtLeast
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import com.intellij.platform.workspace.storage.EntitySource
 import org.jetbrains.kotlin.config.LanguageVersion
-import org.jetbrains.kotlin.idea.core.script.KotlinScriptEntitySource
-import org.jetbrains.kotlin.idea.core.script.loadDefinitionsFromTemplatesByPaths
-import org.jetbrains.kotlin.idea.core.script.scriptingDebugLog
-import org.jetbrains.kotlin.idea.core.script.scriptingInfoLog
+import org.jetbrains.kotlin.idea.core.script.shared.definition.loadDefinitionsFromTemplatesByPaths
+import org.jetbrains.kotlin.idea.core.script.v1.scriptingDebugLog
+import org.jetbrains.kotlin.idea.core.script.v1.scriptingInfoLog
 import org.jetbrains.kotlin.scripting.definitions.ScriptCompilationConfigurationFromDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.getEnvironment
@@ -283,7 +282,7 @@ val ScriptCompilationConfigurationKeys.gradle: GradleScriptCompilationConfigurat
 val GradleScriptCompilationConfigurationKeys.externalProjectPath: PropertiesCollection.Key<String?> by PropertiesCollection.key()
 
 
-data class KotlinGradleScriptModuleEntitySource(override val virtualFileUrl: VirtualFileUrl) : KotlinScriptEntitySource(virtualFileUrl)
+object KotlinGradleScriptEntitySource : EntitySource
 
 class GradleScriptModelData(
     val models: Collection<GradleScriptModel>,

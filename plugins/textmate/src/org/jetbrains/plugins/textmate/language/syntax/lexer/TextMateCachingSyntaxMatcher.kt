@@ -7,22 +7,22 @@ import org.jetbrains.plugins.textmate.Constants
 import org.jetbrains.plugins.textmate.language.syntax.SyntaxNodeDescriptor
 import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateWeigh
 import org.jetbrains.plugins.textmate.regex.MatchData
+import org.jetbrains.plugins.textmate.regex.TextMateByteOffset
 import org.jetbrains.plugins.textmate.regex.TextMateString
 import java.util.concurrent.TimeUnit
 
+@Deprecated("Use TextMateCachingSyntaxMatcherCore instead")
 class TextMateCachingSyntaxMatcher(private val delegate: TextMateSyntaxMatcher) : TextMateSyntaxMatcher {
-  companion object {
-    private val CACHE = Caffeine.newBuilder()
-      .maximumSize(100000)
-      .expireAfterAccess(1, TimeUnit.MINUTES)
-      .executor(Dispatchers.Default.asExecutor())
-      .build<MatchKey, TextMateLexerState>()
-  }
+  private val CACHE = Caffeine.newBuilder()
+    .maximumSize(10000)
+    .expireAfterAccess(1, TimeUnit.MINUTES)
+    .executor(Dispatchers.Default.asExecutor())
+    .build<MatchKey, TextMateLexerState>()
 
   override fun matchRule(
     syntaxNodeDescriptor: SyntaxNodeDescriptor,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     priority: TextMateWeigh.Priority,
@@ -31,7 +31,6 @@ class TextMateCachingSyntaxMatcher(private val delegate: TextMateSyntaxMatcher) 
   ): TextMateLexerState {
     return CACHE.get(
       MatchKey(syntaxNodeDescriptor, string, byteOffset, matchBeginPosition, matchBeginString, priority, currentScope)) {
-      requireNotNull(it)
       delegate.matchRule(syntaxNodeDescriptor = it.syntaxNodeDescriptor,
                          string = it.string,
                          byteOffset = it.byteOffset,
@@ -46,7 +45,7 @@ class TextMateCachingSyntaxMatcher(private val delegate: TextMateSyntaxMatcher) 
   override fun matchStringRegex(
     keyName: Constants.StringKey,
     string: TextMateString,
-    byteOffset: Int,
+    byteOffset: TextMateByteOffset,
     matchBeginPosition: Boolean,
     matchBeginString: Boolean,
     lexerState: TextMateLexerState,
@@ -62,7 +61,7 @@ class TextMateCachingSyntaxMatcher(private val delegate: TextMateSyntaxMatcher) 
   private data class MatchKey(
     val syntaxNodeDescriptor: SyntaxNodeDescriptor,
     val string: TextMateString,
-    val byteOffset: Int,
+    val byteOffset: TextMateByteOffset,
     val matchBeginPosition: Boolean,
     val matchBeginString: Boolean,
     val priority: TextMateWeigh.Priority,

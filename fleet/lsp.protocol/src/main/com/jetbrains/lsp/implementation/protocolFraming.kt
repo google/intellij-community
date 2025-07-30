@@ -130,7 +130,7 @@ fun main() {
         request(Initialize) { initParams ->
             InitializeResult(
                 capabilities = ServerCapabilities(
-                    textDocumentSync = TextDocumentSync(TextDocumentSyncKind.Incremental),
+                    textDocumentSync = TextDocumentSyncKind.Incremental,
                 ),
                 serverInfo = InitializeResult.ServerInfo(
                     name = "IntelliJ Analyzer",

@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.images` start
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "images_resources",
@@ -35,6 +34,8 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//platform/statistics",
     "//platform/util/coroutines",
+    "//xml/xml-psi-impl:psi-impl",
+    "//xml/xml-psi-api:psi",
   ],
   runtime_deps = [":images_resources"]
 )
@@ -70,12 +71,18 @@ jvm_library(
     "//platform/statistics",
     "//platform/statistics:statistics_test_lib",
     "//platform/util/coroutines",
+    "//xml/xml-psi-impl:psi-impl",
+    "//xml/xml-psi-api:psi",
   ],
   runtime_deps = [":images_resources"]
 )
+### auto-generated section `build intellij.platform.images` end
+
+### auto-generated section `test intellij.platform.images` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "images_test",
   runtime_deps = [":images_test_lib"]
 )
-### auto-generated section `build intellij.platform.images` end
+### auto-generated section `test intellij.platform.images` end

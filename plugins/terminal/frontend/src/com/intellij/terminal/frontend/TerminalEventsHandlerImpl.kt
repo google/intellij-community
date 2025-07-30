@@ -2,6 +2,7 @@
 package com.intellij.terminal.frontend
 
 import com.google.common.base.Ascii
+import com.intellij.codeInsight.AutoPopupController
 import com.intellij.codeInsight.inline.completion.InlineCompletion
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.codeInsight.lookup.impl.BackspaceHandler
@@ -10,7 +11,9 @@ import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.codeInsight.lookup.impl.LookupTypedHandler
 import com.intellij.ide.DataManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.util.PsiUtilBase
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.intellij.terminal.session.TerminalState
@@ -18,6 +21,7 @@ import com.jediterm.terminal.emulator.mouse.MouseButtonCodes
 import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags
 import com.jediterm.terminal.emulator.mouse.MouseFormat
 import com.jediterm.terminal.emulator.mouse.MouseMode
+import org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.Companion.REWORKED_TERMINAL_COMPLETION_POPUP
 import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalUsageLocalStorage
@@ -26,6 +30,7 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
+import java.io.File
 import java.nio.charset.Charset
 import javax.swing.SwingUtilities
 import kotlin.math.abs
@@ -57,7 +62,9 @@ internal open class TerminalEventsHandlerImpl(
     get() = editor.getUserData(TerminalVfsSynchronizer.KEY)
 
   override fun keyTyped(e: TimedKeyEvent) {
-    updateLookupOnTyping(e.original.keyChar)
+    LOG.trace { "Key typed event received: ${e.original}" }
+    val charTyped = e.original.keyChar
+    updateLookupOnTyping(charTyped)
     val selectionModel = editor.selectionModel
     if (selectionModel.hasSelection()) {
       selectionModel.removeSelection()
@@ -65,25 +72,47 @@ internal open class TerminalEventsHandlerImpl(
 
     if (ignoreNextKeyTypedEvent) {
       e.original.consume()
+      LOG.trace { "Key event ignored: ${e.original}" }
       return
     }
-    if (!Character.isISOControl(e.original.keyChar)) { // keys filtered out here will be processed in processTerminalKeyPressed
+    if (!Character.isISOControl(charTyped)) { // keys filtered out here will be processed in processTerminalKeyPressed
       try {
         if (processCharacter(e)) {
           e.original.consume()
+          LOG.trace { "Key event consumed: ${e.original}" }
         }
       }
       catch (ex: Exception) {
         LOG.error("Error sending typed key to emulator", ex)
       }
     }
+    val lookup = LookupManager.getActiveLookup(editor)
+    // Added to guarantee that the carets are synchronized after type-ahead.
+    // Essential for correct lookup behavior.
+    val moveCaretAction = { editor.caretModel.moveToOffset(outputModel.cursorOffsetState.value) }
+    if (editor.caretModel.offset != outputModel.cursorOffsetState.value) {
+      if (lookup != null) {
+        lookup.performGuardedChange(moveCaretAction)
+      }
+      else {
+        moveCaretAction()
+      }
+    }
+    val project = editor.project
+    if (project != null && typeAhead?.isDisabled() == false &&
+        (Character.isLetterOrDigit(charTyped) || charTyped == '-' || charTyped == File.separatorChar) &&
+        Registry.`is`(REWORKED_TERMINAL_COMPLETION_POPUP)) {
+      AutoPopupController.getInstance(project).scheduleAutoPopup(editor)
+    }
   }
 
   override fun keyPressed(e: TimedKeyEvent) {
+    LOG.trace { "Key pressed event received: ${e.original}" }
     ignoreNextKeyTypedEvent = false
     if (processTerminalKeyPressed(e)) {
       e.original.consume()
       ignoreNextKeyTypedEvent = true
+      LOG.trace { "Key event consumed: ${e.original}" }
     }
   }
 
@@ -98,15 +127,17 @@ internal open class TerminalEventsHandlerImpl(
 
       val keyCode = e.original.keyCode
       val keyChar = e.original.keyChar
-      updateLookupOnAction(keyCode)
       if (isNoModifiers(e.original) && keyCode == KeyEvent.VK_BACK_SPACE) {
         typeAhead?.backspace()
       }
+      // All typeAhead updates should be done before calling updateLookupOnAction
+      updateLookupOnAction(keyCode)
 
       // numLock does not change the code sent by keypad VK_DELETE,
       // although it send the char '.'
       if (keyCode == KeyEvent.VK_DELETE && keyChar == '.') {
         terminalInput.sendBytes(byteArrayOf('.'.code.toByte()))
+        LOG.trace { "Key event skipped (numLock on): ${e.original}" }
         return true
       }
       // CTRL + Space is not handled in KeyEvent; handle it manually
@@ -145,11 +176,13 @@ internal open class TerminalEventsHandlerImpl(
 
   private fun processCharacter(e: TimedKeyEvent): Boolean {
     if (isAltPressedOnly(e.original) && settings.altSendsEscape()) {
+      LOG.trace { "Key event skipped (alt pressed only): ${e.original}" }
       return false
     }
     val keyChar = e.original.keyChar
     if (keyChar == '`' && e.original.modifiersEx and InputEvent.META_DOWN_MASK != 0) {
       // Command + backtick is a short-cut on Mac OSX, so we shouldn't type anything
+      LOG.trace { "Key event skipped (command + backtick): ${e.original}" }
       return false
     }
     val typedString = keyChar.toString()

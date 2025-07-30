@@ -28,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -41,7 +40,7 @@ import static com.jetbrains.python.sdk.PySdkExtKt.showSdkExecutionException;
  * @deprecated This class and all its inheritors are deprecated. Everything should work via {@link PyTargetEnvironmentPackageManager}
  */
 @Deprecated(forRemoval = true)
-public class PyPackageManagerImpl extends PyPackageManagerImplBase {
+public abstract class PyPackageManagerImpl extends PyPackageManagerImplBase {
   private static final Logger LOG = Logger.getInstance(PyPackageManagerImpl.class);
 
   @Override
@@ -59,11 +58,6 @@ public class PyPackageManagerImpl extends PyPackageManagerImplBase {
 
   protected PyPackageManagerImpl(final @NotNull Sdk sdk) {
     super(sdk);
-  }
-
-  @Override
-  public void install(@NotNull String requirementString) throws ExecutionException {
-    install(Collections.singletonList(PyRequirementParser.fromLine(requirementString)), Collections.emptyList());
   }
 
   @Override
@@ -110,32 +104,6 @@ public class PyPackageManagerImpl extends PyPackageManagerImplBase {
     }
     finally {
       LOG.debug("Packages cache is about to be refreshed because these requirements were installed: " + requirements);
-      refreshPackagesSynchronously();
-    }
-  }
-
-  @Override
-  public void uninstall(@NotNull List<PyPackage> packages) throws ExecutionException {
-    final List<String> args = new ArrayList<>();
-    try {
-      args.add(UNINSTALL);
-      boolean canModify = true;
-      for (PyPackage pkg : packages) {
-        if (canModify) {
-          final String location = pkg.getLocation();
-          if (location != null) {
-            canModify = Files.isWritable(Paths.get(location));
-          }
-        }
-        args.add(pkg.getName());
-      }
-      getHelperResult(args, !canModify, true);
-    }
-    catch (PyExecutionException e) {
-      throw PyExecutionExceptionExtKt.copyWith(e, "pip", args);
-    }
-    finally {
-      LOG.debug("Packages cache is about to be refreshed because these packages were uninstalled: " + packages);
       refreshPackagesSynchronously();
     }
   }

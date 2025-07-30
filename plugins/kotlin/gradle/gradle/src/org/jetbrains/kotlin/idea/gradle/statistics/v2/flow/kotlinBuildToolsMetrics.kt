@@ -37,6 +37,7 @@ enum class KotlinBuildToolFusMetricName(val metric: KotlinBuildToolFusMetric<*>)
     KOTLIN_PROGRESSIVE_MODE(KotlinBuildToolBooleanOverrideFusMetric("KOTLIN_PROGRESSIVE_MODE")),
     KOTLIN_KTS_USED(KotlinBuildToolBooleanFusMetric("KOTLIN_KTS_USED")),
     KOTLIN_INCREMENTAL_NATIVE_ENABLED(KotlinBuildToolBooleanFusMetric("KOTLIN_INCREMENTAL_NATIVE_ENABLED")),
+    KMP_TOP_LEVEL_DEPENDENCIES_BLOCK(KotlinBuildToolBooleanFusMetric("KMP_TOP_LEVEL_DEPENDENCIES_BLOCK")),
 
     JS_GENERATE_EXTERNALS(KotlinBuildToolBooleanFusMetric("JS_GENERATE_EXTERNALS")),
 
@@ -50,6 +51,9 @@ enum class KotlinBuildToolFusMetricName(val metric: KotlinBuildToolFusMetric<*>)
     ENABLED_STWMS_GC(KotlinBuildToolBooleanFusMetric("ENABLED_STWMS_GC")),
     ENABLED_PMCS_GC(KotlinBuildToolBooleanFusMetric("ENABLED_PMCS_GC")),
     ENABLED_CMS_GC(KotlinBuildToolBooleanFusMetric("ENABLED_CMS_GC")),
+
+    // Swift export
+    ENABLED_SWIFT_EXPORT(KotlinBuildToolBooleanFusMetric("ENABLED_SWIFT_EXPORT")),
 
     //Build reports
     FILE_BUILD_REPORT(KotlinBuildToolBooleanFusMetric("FILE_BUILD_REPORT")),
@@ -158,6 +162,7 @@ enum class KotlinBuildToolFusMetricName(val metric: KotlinBuildToolFusMetric<*>)
     PROJECT_PATH(PathFusMetric("PROJECT_PATH")),
 
     OS_TYPE(OverrideRegexStringFusMetric("OS_TYPE","(Windows|Windows |Windows Server |Mac|Linux|FreeBSD|Solaris|Other|Mac OS X)\\d*")),
+    OS_VERSION(VersionStringFusMetric("OS_VERSION")),
 
     IDES_INSTALLED(ConcatenatedAllowedListValuesStringFusMetric("IDES_INSTALLED",listOf("AS", "OC", "CL", "IU", "IC", "WC"))),
 

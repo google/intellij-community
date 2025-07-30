@@ -4,9 +4,9 @@ package com.intellij.execution.eel
 import com.intellij.execution.process.AnsiStreamingLexer
 
 // Removes ESC chars
-internal class CleanBuffer {
+internal class CleanBuffer(private val junkToDrop: Char? = null) {
   private companion object {
-    val NEW_LINES_EMPTY_CHARS = Regex("(\r?\n| |\t|\\s)")
+    val NEW_LINES_EMPTY_CHARS = Regex("(\r|\n| |\t|\\s|\\p{Z})")
     val OS_COMMAND_SET_TITLE = Regex("\\x1b]0;[^\\x1b\\x07]+(:?\\x9C|\\x07|\\x1b\\x5c)")
   }
 
@@ -15,11 +15,14 @@ internal class CleanBuffer {
   fun add(line: String) {
     lexer.append(line)
     while (true) {
-      val s = lexer.nextText
+      var s = lexer.nextText
       if (s == null) {
         break
       }
       else {
+        if (junkToDrop != null) {
+          s = s.replace(junkToDrop, ' ')
+        }
         val str = s.replace(NEW_LINES_EMPTY_CHARS, "")
         buffer.append(str)
         val title = OS_COMMAND_SET_TITLE.find(buffer)

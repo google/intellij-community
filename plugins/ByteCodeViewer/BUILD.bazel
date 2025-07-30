@@ -1,6 +1,11 @@
 ### auto-generated section `build intellij.java.byteCodeViewer` start
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+create_kotlinc_options(
+  name = "custom_java-byteCodeViewer",
+  x_explicit_api_mode = "strict"
+)
 
 jvm_resources(
   name = "java-byteCodeViewer_resources",
@@ -13,6 +18,7 @@ jvm_library(
   module_name = "intellij.java.byteCodeViewer",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  kotlinc_opts = ":custom_java-byteCodeViewer",
   deps = [
     "@lib//:asm",
     "//platform/analysis-api:analysis",
@@ -38,6 +44,7 @@ jvm_library(
   name = "java-byteCodeViewer_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
+  kotlinc_opts = ":custom_java-byteCodeViewer",
   associates = [":java-byteCodeViewer"],
   deps = [
     "@lib//:asm",
@@ -61,9 +68,13 @@ jvm_library(
   ],
   runtime_deps = [":java-byteCodeViewer_resources"]
 )
+### auto-generated section `build intellij.java.byteCodeViewer` end
+
+### auto-generated section `test intellij.java.byteCodeViewer` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "java-byteCodeViewer_test",
   runtime_deps = [":java-byteCodeViewer_test_lib"]
 )
-### auto-generated section `build intellij.java.byteCodeViewer` end
+### auto-generated section `test intellij.java.byteCodeViewer` end

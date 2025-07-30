@@ -50,12 +50,11 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
 
   private val lightBreakpoints: ConcurrentMap<LightBreakpointPosition, FrontendXLightLineBreakpoint> = ConcurrentCollectionFactory.createConcurrentMap()
 
+  private var lastRemovedBreakpoint: XBreakpointProxy? = null
+
   // TODO[IJPL-160384]: support persistance between sessions
   override val breakpointsDialogSettings: XBreakpointsDialogState?
     get() = _breakpointsDialogSettings
-
-  override val allGroups: Set<String>
-    get() = setOf() // TODO: implement groups
 
 
   override val dependentBreakpointManager: XDependentBreakpointManagerProxy =
@@ -115,10 +114,9 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
    *
    * [addBreakpoint] is not called in parallel, to have only one source of truth and avoid races.
    */
-  override suspend fun awaitBreakpointCreation(breakpointDto: XBreakpointDto): XBreakpointProxy? {
-    return findOrAwaitElement(breakpointsChangedWithReplay, logMessage = breakpointDto.id.toString()) {
-      val breakpointId = breakpointDto.id
-      val currentBreakpoint = breakpoints[breakpointDto.id]
+  override suspend fun awaitBreakpointCreation(breakpointId: XBreakpointId): XBreakpointProxy? {
+    return findOrAwaitElement(breakpointsChangedWithReplay, logMessage = breakpointId.toString()) {
+      val currentBreakpoint = breakpoints[breakpointId]
       if (currentBreakpoint != null) {
         Ref.create(currentBreakpoint)
       }
@@ -281,22 +279,35 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
   }
 
   override fun getLastRemovedBreakpoint(): XBreakpointProxy? {
-    // TODO: Send through RPC
-    return null
+    return lastRemovedBreakpoint
   }
 
   override fun removeBreakpoint(breakpoint: XBreakpointProxy) {
-    log.info("Breakpoint removal request from frontend: ${breakpoint.id}")
     if (breakpoint.isDefaultBreakpoint()) {
       // removing default breakpoint should just disable it
       breakpoint.setEnabled(false);
     }
     else {
+      log.info("Breakpoint removal request from frontend: ${breakpoint.id}")
       removeBreakpointLocally(breakpoint.id)
       breakpointsChanged.tryEmit(Unit)
       cs.launch {
         XBreakpointTypeApi.getInstance().removeBreakpoint(breakpoint.id)
       }
+    }
+  }
+
+  override fun rememberRemovedBreakpoint(breakpoint: XBreakpointProxy) {
+    lastRemovedBreakpoint = breakpoint
+    cs.launch {
+      XBreakpointTypeApi.getInstance().rememberRemovedBreakpoint(breakpoint.id)
+    }
+  }
+
+  override fun restoreRemovedBreakpoint(breakpoint: XBreakpointProxy) {
+    lastRemovedBreakpoint = null
+    cs.launch {
+      XBreakpointTypeApi.getInstance().restoreRemovedBreakpoint(breakpoint.project.projectId())
     }
   }
 

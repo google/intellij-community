@@ -1,11 +1,13 @@
 ### auto-generated section `build intellij.platform.settings.local` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@community//build:tests-options.bzl", "jps_test")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
-  name = "custom",
-  opt_in = ["com.intellij.util.xmlb.SettingsInternalApi"]
+  name = "custom_settings-local",
+  opt_in = [
+    "com.intellij.openapi.util.IntellijInternalApi",
+    "com.intellij.util.xmlb.SettingsInternalApi",
+  ]
 )
 
 jvm_resources(
@@ -19,7 +21,7 @@ jvm_library(
   module_name = "intellij.platform.settings.local",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_settings-local",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -52,7 +54,7 @@ jvm_library(
   name = "settings-local_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
-  kotlinc_opts = ":custom",
+  kotlinc_opts = ":custom_settings-local",
   associates = [":settings-local"],
   deps = [
     "@lib//:kotlin-stdlib",
@@ -92,9 +94,13 @@ jvm_library(
   ],
   runtime_deps = [":settings-local_resources"]
 )
+### auto-generated section `build intellij.platform.settings.local` end
+
+### auto-generated section `test intellij.platform.settings.local` start
+load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
   name = "settings-local_test",
   runtime_deps = [":settings-local_test_lib"]
 )
-### auto-generated section `build intellij.platform.settings.local` end
+### auto-generated section `test intellij.platform.settings.local` end

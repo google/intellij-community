@@ -25,6 +25,7 @@ import com.intellij.platform.searchEverywhere.SeActionItemPresentation
 import com.intellij.platform.searchEverywhere.SeTargetItemPresentation
 import com.intellij.platform.searchEverywhere.SeTextSearchItemPresentation
 import com.intellij.platform.searchEverywhere.frontend.AutoToggleAction
+import com.intellij.platform.searchEverywhere.frontend.SeSearchStatePublisher
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.files.SeTargetItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.text.SeTextSearchItemPresentationRenderer
@@ -42,12 +43,10 @@ import com.intellij.ui.dsl.gridLayout.VerticalAlign
 import com.intellij.ui.dsl.gridLayout.builders.RowsGridBuilder
 import com.intellij.ui.popup.list.GroupedItemsListRenderer
 import com.intellij.ui.scale.JBUIScale.scale
-import com.intellij.util.bindTextIn
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.StartupUiUtil.isWaylandToolkit
 import com.intellij.util.ui.UIUtil
-import com.intellij.util.ui.launchOnShow
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -67,6 +66,7 @@ import kotlin.math.roundToInt
 @Internal
 class SePopupContentPane(private val project: Project?, private val vm: SePopupVm,
                          private val resizePopupHandler: (Dimension) -> Unit,
+                         private val searchStatePublisher: SeSearchStatePublisher,
                          initPopupExtendedSize: Dimension?,
                          onShowFindToolWindow: () -> Unit) : JPanel(), Disposable, UiDataProvider {
   val preferableFocusedComponent: JComponent get() = textField
@@ -78,7 +78,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     vm.currentTabIndex,
     vm.coroutineScope,
     vm.ShowInFindToolWindowAction(onShowFindToolWindow)
-  )
+  ) { updatePopupWidthIfNecessary() }
 
   private val textField = object : SeTextField() {
     override fun getAccessibleContext(): AccessibleContext {
@@ -89,8 +89,9 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     }
   }
   private val hintHelper = HintHelper(textField)
+  private val minWidth = Registry.intValue("search.everywhere.new.minimum.width", 700)
 
-  private val resultListModel = SeResultListModel { resultList.selectionModel }
+  private val resultListModel = SeResultListModel(searchStatePublisher) { resultList.selectionModel }
   private val resultList: JBList<SeResultListRow> = JBList(resultListModel)
   private val resultsScrollPane = createListPane(resultList)
 
@@ -102,8 +103,6 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
   var isCompactViewMode: Boolean = true
     private set
   var popupExtendedSize: Dimension? = initPopupExtendedSize
-
-  private val minWidth = Registry.intValue("search.everywhere.new.minimum.width", 700)
 
   init {
     layout = GridLayout()
@@ -144,13 +143,13 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     // hide resultsScrollPane and extendedInfoContainer
     updateViewMode()
 
-    textField.launchOnShow("Search Everywhere text field text binding") {
-      withContext(Dispatchers.EDT) {
-        textField.text = vm.searchPattern.value
-        textField.selectAll()
+    textField.text = vm.searchPattern.value
+    textField.selectAll()
+    textField.document.addDocumentListener(object : DocumentAdapter() {
+      override fun textChanged(e: javax.swing.event.DocumentEvent) {
+        vm.setSearchText(textField.text)
       }
-      textField.bindTextIn(vm.searchPattern, this)
-    }
+    })
 
     addHistoryExtensionToTextField()
 
@@ -160,11 +159,15 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
           resultListModel.reset()
         }
         it.searchResults.filterNotNull()
-      }.collectLatest { throttledResultEventFlow ->
+      }.collectLatest { searchContext ->
+        val searchId = searchContext.searchId
+        val throttledResultEventFlow = searchContext.resultsFlow
+
         coroutineScope {
           withContext(Dispatchers.EDT) {
             isSearchCompleted.store(false)
             resultListModel.invalidate()
+            searchStatePublisher.searchStarted(searchId, textField.text, vm.currentTab.tabId)
 
             if (vm.searchPattern.value.isNotEmpty()) {
               hintHelper.setSearchInProgress(true)
@@ -183,6 +186,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
               SeLog.log(SeLog.THROTTLING) { "Throttled flow completed" }
               isSearchCompleted.store(true)
               resultListModel.removeLoadingItem()
+              searchStatePublisher.searchStoppedProducingResults(searchId, resultListModel.size, true)
 
               if (!resultListModel.isValid || resultListModel.isEmpty) {
                 if (!textField.text.isEmpty() &&
@@ -206,7 +210,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
               hintHelper.setSearchInProgress(false)
               val wasFrozen = resultListModel.freezer.isEnabled
 
-              resultListModel.addFromThrottledEvent(event)
+              resultListModel.addFromThrottledEvent(searchId, event)
 
               // Freeze back if it was frozen before
               if (wasFrozen) resultListModel.freezer.enable()
@@ -265,6 +269,16 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
           }.collect { (isScrolledAlmostToAnEnd, isValidList) ->
             tabVm.shouldLoadMore = isScrolledAlmostToAnEnd || !isValidList
           }
+        }
+      }
+    }
+
+    vm.coroutineScope.launch {
+      vm.currentTabFlow.flatMapLatest {
+        it.resultsHitBackPressureFlow
+      }.collect { (searchId, stabilized) ->
+        withContext(Dispatchers.EDT) {
+          searchStatePublisher.searchStoppedProducingResults(searchId, resultListModel.size, false)
         }
       }
     }
@@ -357,6 +371,13 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
           elementsSelected(indices, modifiers)
         }
       }.registerCustomShortcutSet(newShortcutSet, this, this)
+    }
+  }
+
+  @Internal
+  fun selectFirstItem() {
+    vm.coroutineScope.launch(Dispatchers.EDT) {
+     elementsSelected(intArrayOf(0), 0)
     }
   }
 
@@ -662,7 +683,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     if (compact == isCompactViewMode) return
     isCompactViewMode = compact
 
-    resizePopupHandler(calcPreferredSize(isCompactViewMode))
+    updatePopupSize()
   }
 
   fun getExpandedSize(): Dimension {
@@ -681,14 +702,28 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     return Dimension(JBUI.scale(minWidth), minimumHeight)
   }
 
-  private fun calcPreferredSize(compact: Boolean): Dimension {
+  private fun updatePopupWidthIfNecessary() {
+    if (!isShowing || popupExtendedSize != null) return
+    if (headerPane.width < headerPane.preferredSize.width) updatePopupSize()
+  }
+
+  private fun updatePopupSize() {
+    if (!isShowing) return
+    resizePopupHandler(calcPreferredSize(isCompactViewMode, true))
+  }
+
+  private fun calcPreferredSize(compact: Boolean, avoidWidthDecreasing: Boolean = false): Dimension {
     val preferredHeight = if (compact) {
       headerPane.preferredSize.height + textField.preferredSize.height
     }
     else {
       popupExtendedSize?.height ?: JBUI.CurrentTheme.BigPopup.maxListHeight()
     }
-    return Dimension(popupExtendedSize?.width ?: resultsScrollPane.preferredSize.width, preferredHeight)
+
+    val preferredWidth = popupExtendedSize?.width ?: maxOf(resultsScrollPane.preferredSize.width,
+                                                           headerPane.preferredSize.width,
+                                                           if (avoidWidthDecreasing) headerPane.width else 0)
+    return Dimension(preferredWidth, preferredHeight)
   }
 
   private fun logTabSwitchedEvent(e: AnActionEvent) {

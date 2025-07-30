@@ -7,6 +7,8 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.actionSystem.KeyboardShortcut
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.event.EditorMouseListener
@@ -77,15 +79,21 @@ internal abstract class TerminalEventDispatcher(
   }
 
   private fun dispatchKeyEvent(e: TimedKeyEvent) {
+    LOG.trace { "Key event received: ${e.original}" }
+
     if (!skipAction(e.original)) {
       if (e.original.id != KeyEvent.KEY_TYPED || !ignoreNextKeyTypedEvent) {
         ignoreNextKeyTypedEvent = false
         handleKeyEvent(e)
       }
+      else {
+        LOG.trace { "Key event skipped (key typed ignored): ${e.original}" }
+      }
     }
     else {
       // KeyEvent will be handled by action system, so we need to remember that the next KeyTyped event is not needed
       ignoreNextKeyTypedEvent = true
+      LOG.trace { "Key event skipped (there is an action for it): ${e.original}" }
     }
   }
 
@@ -98,6 +106,7 @@ internal abstract class TerminalEventDispatcher(
       IdeEventQueue.getInstance().addDispatcher(this, parentDisposable)
       sendShortcutAction.register(editor.contentComponent, getActionsToSkip())
       myRegistered = true
+      LOG.trace { "Dispatcher registered: start capturing key events" }
     }
   }
 
@@ -108,6 +117,7 @@ internal abstract class TerminalEventDispatcher(
       sendShortcutAction.unregister(editor.contentComponent)
       actionsToSkip = emptyList()
       myRegistered = false
+      LOG.trace { "Dispatcher unregistered: finish capturing key events" }
     }
   }
 
@@ -188,6 +198,19 @@ internal abstract class TerminalEventDispatcher(
       "ResizeToolWindowUp",
       "ResizeToolWindowDown",
       "MaximizeToolWindow",
+      // Tool Window tabs manipulation actions
+      "NextTab",
+      "PreviousTab",
+      "ShowContent",
+      "TW.CloseOtherTabs",
+      "TW.CloseAllTabs",
+      "TW.SplitRight",
+      "TW.SplitDown",
+      "TW.SplitAndMoveRight",
+      "TW.SplitAndMoveDown",
+      "TW.Unsplit",
+      "TW.MoveToNextSplitter",
+      "TW.MoveToPreviousSplitter",
       // terminal actions, but included here because they're not essential
       "TerminalIncreaseFontSize",
       "TerminalDecreaseFontSize",
@@ -200,11 +223,6 @@ internal abstract class TerminalEventDispatcher(
     @Language("devkit-action-id")
     @NonNls
     private val TERMINAL_ACTIONS = listOf(
-      // not exactly terminal actions, but we want these to always work anyway
-      "NextTab",
-      "PreviousTab",
-      "ShowContent",
-      // true terminal actions
       "Terminal.Escape",
       "Terminal.CopySelectedText",
       "Terminal.Paste",
@@ -215,20 +233,18 @@ internal abstract class TerminalEventDispatcher(
       "Terminal.RenameSession",
       "Terminal.NewTab",
       "Terminal.CloseTab",
-      "Terminal.SplitVertically",
-      "Terminal.SplitHorizontally",
-      "Terminal.NextSplitter",
-      "Terminal.PrevSplitter",
       "Terminal.MoveToolWindowTabLeft",
       "Terminal.MoveToolWindowTabRight",
       "Terminal.ClearBuffer",
       "Terminal.Find",
-      "Terminal.CommandCompletion",
+      "Terminal.CommandCompletion.Gen2",
       "Terminal.EnterCommandCompletion",
       "Terminal.UpCommandCompletion",
       "Terminal.DownCommandCompletion",
       "Terminal.InsertInlineCompletion",
     )
+
+    private val LOG = logger<TerminalEventDispatcher>()
   }
 }
 

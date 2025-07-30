@@ -3,7 +3,9 @@ package com.intellij.workspaceModel.core.fileIndex
 
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.workspace.storage.EntityStorage
+import com.intellij.platform.workspace.storage.SymbolicEntityId
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.ApiStatus
 
@@ -95,16 +97,30 @@ sealed interface DependencyDescription<E : WorkspaceEntity> {
   ) : DependencyDescription<E>
 
   /**
-   * Indicates that the contributor must be called for the entities [E] when any relative entity of type [R] is added, removed or replaced.
+   * Indicates that the contributor must be called for the entities [R] when any entity of type [E] is added, removed or replaced.
    */
-  data class OnRelative<E : WorkspaceEntity, R : WorkspaceEntity>(
-    /** Type of relative entity */
-    val relativeClass: Class<R>,
-    /** Type of entity [E] which has a dependency on relative [R] */
+  data class OnEntity<R : WorkspaceEntity, E : WorkspaceEntity>(
+    /** Type of entity */
     val entityClass: Class<E>,
-    /** Computes entities by the relative */
-    val entityGetter: (R) -> Sequence<E>
-  ) : DependencyDescription<E>
+    /** Type of entity [R] which has a dependency on entity [E] */
+    val resultClass: Class<R>,
+    /** Computes entities*/
+    val resultGetter: (E) -> Sequence<R>
+  ) : DependencyDescription<R>
+
+  /**
+   * Indicates that the contributor must be called for the entities [R] when any entity of type [E] adds the first
+   * or remove the last reference to [R].
+   */
+  @ApiStatus.Experimental
+  data class OnReference<R: WorkspaceEntityWithSymbolicId, E: WorkspaceEntityWithSymbolicId>(
+    /** Type that could contain references to [R] */
+    val referenceHolderClass: Class<E>,
+    /** Type for which a contributor should be called */
+    val resultClass: Class<R>,
+    /** Computes references */
+    val referencedEntitiesGetter: (E) -> Sequence<SymbolicEntityId<R>>
+  ): DependencyDescription<R>
 }
 
 /**

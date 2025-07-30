@@ -1137,6 +1137,11 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
     }
   }
 
+  @ApiStatus.Internal
+  public boolean isScopeSelected(FindPopupScopeUI.ScopeType scopeType) {
+    return mySelectedScope == scopeType;
+  }
+
   private void findSettingsChanged() {
     if (isShowing()) {
       ScrollingUtil.ensureSelectionExists(myResultsPreviewTable);
@@ -1228,7 +1233,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
           FindPopupItem newItem;
           boolean merged = !myHelper.isReplaceState() && recentItem != null && recentItem.getUsage().merge(usage);
           if (!merged) {
-            if (usage instanceof UsageInfo2UsageAdapter) {
+            if (usage instanceof UsageInfo2UsageAdapter && !FindKey.isEnabled()) {
               ((UsageInfo2UsageAdapter)usage).updateCachedPresentation();
             }
 
@@ -1238,7 +1243,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
           else {
             // recompute presentation of a merged instance
             UsageInfoAdapter recentItemUsage = recentItem.getUsage();
-            if (recentItemUsage instanceof UsageInfo2UsageAdapter) {
+            if (recentItemUsage instanceof UsageInfo2UsageAdapter && !FindKey.isEnabled()) {
               ((UsageInfo2UsageAdapter)recentItemUsage).updateCachedPresentation();
             }
             UsagePresentation recentUsagePresentation = UsagePresentationProvider.getPresentation(recentItemUsage, project, scope);
@@ -1314,7 +1319,6 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
       }
 
       public void onFinish() {
-        FindUsagesCollector.recordSearchFinished(System.currentTimeMillis() - startTime.get(), resultsCount.get(), ShowUsagesAction.getUsagesPageSize());
         ApplicationManager.getApplication().invokeLater(() -> {
           if (!isCancelled()) {
             boolean isEmpty = resultsCount.get() == 0;
@@ -1322,6 +1326,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
               showEmptyText(FindBundle.message("message.nothingFound"), true);
             }
           }
+          FindUsagesCollector.recordSearchFinished(System.currentTimeMillis() - startTime.get(), resultsCount.get(), ShowUsagesAction.getUsagesPageSize());
           onStop(hash);
         }, state);
       }
@@ -1543,9 +1548,8 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
       }
       myLoadingHash = 0;
 
-      //noinspection HardCodedStringLiteral
       showEmptyText(message, false);
-      if(backendValidator.isFinished) {
+      if (backendValidator.isFinished) {
         header.loadingIcon.setIcon(EmptyIcon.ICON_16);
       }
       myHelper.onSearchStop();

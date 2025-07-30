@@ -297,7 +297,7 @@ open class ActionToolbarImpl @JvmOverloads constructor(
       }
 
       launchOnceOnShow("ActionToolbarImpl.updateActionsOnAdd") {
-        withContext(Dispatchers.ui(UiDispatcherKind.RELAX)) {
+        withContext(Dispatchers.UiWithModelAccess) {
           // a first update really
           if (myForcedUpdateRequested && myLastUpdate == null) {
             @Suppress("DEPRECATION")
@@ -1004,7 +1004,7 @@ open class ActionToolbarImpl @JvmOverloads constructor(
       else {
         val icon = AnimatedIcon.Default.INSTANCE
         label.setIcon(EmptyIcon.create(icon.iconWidth, icon.iconHeight))
-        EdtScheduler.getInstance().schedule(Registry.intValue("actionSystem.toolbar.progress.icon.delay", 500), UiDispatcherKind.STRICT) {
+        EdtScheduler.getInstance().schedule(Registry.intValue("actionSystem.toolbar.progress.icon.delay", 500), CoroutineSupport.UiDispatcherKind.STRICT) {
           label.setIcon(icon)
         }
       }

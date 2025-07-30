@@ -93,8 +93,15 @@ public class BuildContextImpl implements BuildContext {
     options.add("-module-name");
     options.add(CLFlags.KOTLIN_MODULE_NAME.getMandatoryScalarValue(flags));
 
-    options.add("-no-stdlib");
-    options.add("-no-reflect");
+    if (KotlinCompilerConfig.ENABLE_INCREMENTAL_COMPILATION) {
+      options.add("-Xenable-incremental-compilation");
+    }
+    if (!KotlinCompilerConfig.INCLUDE_STDLIB) {
+      options.add("-no-stdlib");
+    }
+    if (!KotlinCompilerConfig.INCLUDE_REFLECTION) {
+      options.add("-no-reflect");
+    }
 
     String apiVersion = CLFlags.API_VERSION.getOptionalScalarValue(flags);
     if (apiVersion != null) {
@@ -131,6 +138,19 @@ public class BuildContextImpl implements BuildContext {
     }
     else if (warn != null) {
       throw new IllegalArgumentException("unsupported kotlinc warning option: " + warn);
+    }
+
+    if (CLFlags.X_ALLOW_RESULT_RETURN_TYPE.isFlagSet(flags)) {
+      options.add("-Xallow-result-return-type");
+    }
+    if (CLFlags.X_STRICT_JAVA_NULLABILITY_ASSERTIONS.isFlagSet(flags)) {
+      options.add("-Xstrict-java-nullability-assertions");
+    }
+    if (CLFlags.X_WASM_ATTACH_JS_EXCEPTION.isFlagSet(flags)) {
+      options.add("-Xwasm-attach-js-exception");
+    }
+    if ("+InlineClasses".equals(CLFlags.X_X_LANGUAGE.getOptionalScalarValue(flags))) {
+      options.add("-XXLanguage:+InlineClasses");
     }
 
     StringBuilder cp = new StringBuilder();
