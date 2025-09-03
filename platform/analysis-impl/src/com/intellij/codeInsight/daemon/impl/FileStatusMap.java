@@ -3,9 +3,9 @@ package com.intellij.codeInsight.daemon.impl;
 
 import com.intellij.codeHighlighting.Pass;
 import com.intellij.codeInsight.multiverse.CodeInsightContext;
+import com.intellij.codeInsight.multiverse.CodeInsightContextUtil;
 import com.intellij.codeInsight.multiverse.CodeInsightContexts;
 import com.intellij.codeInsight.multiverse.EditorContextManager;
-import com.intellij.codeInsight.multiverse.FileViewProviderUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -74,12 +74,11 @@ public final class FileStatusMap implements Disposable {
   public static @Nullable("null means the file is clean") TextRange getDirtyTextRange(@NotNull Document document,
                                                                                       @NotNull PsiFile psiFile,
                                                                                       int passId) {
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
+    CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
     return getDirtyTextRange(document, context, psiFile, passId);
   }
 
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public static @Nullable("null means the file is clean") TextRange getDirtyTextRange(@NotNull Document document,
                                                                                       @NotNull CodeInsightContext context,
                                                                                       @NotNull PsiFile psiFile,
@@ -97,8 +96,7 @@ public final class FileStatusMap implements Disposable {
     setErrorFoundFlag(document, CodeInsightContexts.anyContext(), errorFound);
   }
 
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public void setErrorFoundFlag(@NotNull Document document, @NotNull CodeInsightContext context, boolean errorFound) {
     //GHP has found error. Flag is used by ExternalToolPass to decide whether to run or not
     synchronized(myDocumentToStatusMap) {
@@ -147,8 +145,7 @@ public final class FileStatusMap implements Disposable {
     markFileUpToDate(document, CodeInsightContexts.anyContext(), passId, null);
   }
 
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public void markFileUpToDate(@NotNull Document document, @NotNull CodeInsightContext context, int passId, ProgressIndicator indicator) {
     synchronized (myDocumentToStatusMap) {
       FileStatus status = myDocumentToStatusMap.getOrCreateStatus(document, context);
@@ -196,15 +193,14 @@ public final class FileStatusMap implements Disposable {
    * @return null for up-to-date file, whole file for untouched or entirely dirty file, range(usually code block) for the dirty region (optimization)
    */
   public @Nullable TextRange getFileDirtyScope(@NotNull Document document, @NotNull PsiFile psiFile, int passId) {
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
+    CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
     return getFileDirtyScope(document, context, psiFile, passId);
   }
 
   /**
    * @return null for up-to-date file, whole file for untouched or entirely dirty file, range(usually code block) for the dirty region (optimization)
    */
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public @Nullable TextRange getFileDirtyScope(@NotNull Document document,
                                                @NotNull CodeInsightContext context,
                                                @NotNull PsiFile psiFile,
@@ -287,8 +283,7 @@ public final class FileStatusMap implements Disposable {
   }
 
   // todo IJPL-339 do we need context here?
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public boolean allDirtyScopesAreNull(@NotNull Document document, @NotNull CodeInsightContext context) {
     synchronized (myDocumentToStatusMap) {
       FileStatus status = myDocumentToStatusMap.getStatusOrNull(document, context);
@@ -326,69 +321,6 @@ public final class FileStatusMap implements Disposable {
       myAllowDirt = old;
     }
   }
-
-  static final RangeMarker WHOLE_FILE_DIRTY_MARKER =
-    new RangeMarker() {
-      @Override
-      public @NotNull Document getDocument() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public int getStartOffset() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public int getEndOffset() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean isValid() {
-        return false;
-      }
-
-      @Override
-      public void setGreedyToLeft(boolean greedy) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void setGreedyToRight(boolean greedy) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean isGreedyToRight() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean isGreedyToLeft() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void dispose() {
-        // ignore
-      }
-
-      @Override
-      public <T> T getUserData(@NotNull Key<T> key) {
-        return null;
-      }
-
-      @Override
-      public <T> void putUserData(@NotNull Key<T> key, @Nullable T value) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public @NonNls String toString() {
-        return "WHOLE_FILE";
-      }
-    };
 
   // logging
   private static final ConcurrentMap<Thread, Integer> threads = CollectionFactory.createConcurrentWeakMap();

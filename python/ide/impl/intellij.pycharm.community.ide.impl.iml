@@ -33,7 +33,7 @@
     <orderEntry type="module" module-name="intellij.python.sdk" />
     <orderEntry type="module" module-name="intellij.platform.vcs" />
     <orderEntry type="module" module-name="intellij.featuresTrainer" />
-    <orderEntry type="module" module-name="intellij.python.featuresTrainer" />
+    <orderEntry type="module" module-name="intellij.python.featuresTrainer" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.platform.util.progress" />
     <orderEntry type="library" name="kotlinx-coroutines-core" level="project" />
     <orderEntry type="library" name="http-client" level="project" />
@@ -51,5 +51,6 @@
     <orderEntry type="module" module-name="intellij.python.hatch" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
+    <orderEntry type="library" name="io.github.z4kn4fein.semver.jvm" level="project" />
   </component>
 </module>

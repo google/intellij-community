@@ -134,6 +134,7 @@
                     testServiceImplementation="com.jetbrains.python.codeInsight.completion.DummyRemoteFilePathRetrievalService"/>
 
     <applicationService serviceImplementation="com.jetbrains.python.sdk.PySdkSettings"/>
+    <applicationService serviceImplementation="com.jetbrains.python.packaging.pip.PypiPackageCache"/>
     <applicationService serviceImplementation="com.jetbrains.python.packaging.PyPackageService"/>
     <applicationService serviceInterface="com.jetbrains.python.module.PyModuleService"
                         serviceImplementation="com.jetbrains.python.module.PyModuleServiceImpl"/>
@@ -248,9 +249,11 @@
     <localInspection language="Python" shortName="PyPandasSeriesToListInspection" suppressId="PyPackages" bundle="messages.PyPsiBundle"
                      key="INSP.pandas.series.values.replace.with.tolist" enabledByDefault="true" level="WARNING"
                      implementationClass="com.jetbrains.python.inspections.PyPandasSeriesToListInspection" groupKey="INSP.GROUP.pandas"/>
-    <localInspection language="Python" shortName="PyPandasTruthValueIsAmbiguousInspection" suppressId="PyPackages" bundle="messages.PyPsiBundle"
+    <localInspection language="Python" shortName="PyPandasTruthValueIsAmbiguousInspection" suppressId="PyPackages"
+                     bundle="messages.PyPsiBundle"
                      key="INSP.pandas.truth.value.is.ambiguous.df" enabledByDefault="true" level="WARNING"
-                     implementationClass="com.jetbrains.python.inspections.PyPandasTruthValueIsAmbiguousInspection" groupKey="INSP.GROUP.pandas"/>
+                     implementationClass="com.jetbrains.python.inspections.PyPandasTruthValueIsAmbiguousInspection"
+                     groupKey="INSP.GROUP.pandas"/>
 
     <listSplitJoinContext language="Python" implementationClass="com.jetbrains.python.codeInsight.editorActions.PyListSplitJoinContext"/>
 
@@ -516,9 +519,6 @@
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.python.debugger.statistics.PyDataViewerCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.python.community.impl.installer.BinaryInstallerUsagesCollector"/>
 
-    <notificationGroup id="Python Stub Packages Advertiser" displayType="STICKY_BALLOON" bundle="messages.PyBundle"
-                       key="code.insight.stub.package.advertiser.notifications.group.title"/>
-
     <!-- Code-insight IDE bridge -->
     <applicationService serviceInterface="com.jetbrains.python.PythonRuntimeService"
                         serviceImplementation="com.jetbrains.python.PythonRuntimeServiceImpl"/>
@@ -556,27 +556,44 @@
                  description="Use project location as a working directory for the packaging tool execution."/>
     <registryKey key="python.packaging.tool.upload.project" defaultValue="false"
                  description="Upload project files and use this location as a working directory for the packaging tool execution."/>
+
     <notificationGroup id="Python Debugger" displayType="TOOL_WINDOW" toolWindowId="Debug" bundle="messages.PyBundle"
                        key="debug.notification.group"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PythonDebuggerIdsHolder"/>
+
     <notificationGroup id="Python SDK Updater" displayType="BALLOON" bundle="messages.PyBundle"
                        key="python.sdk.updater.notifications.group.title"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PythonSDKUpdaterIdsHolder"/>
+
     <notificationGroup id="Sync Python requirements" displayType="BALLOON" bundle="messages.PyBundle" key="python.requirements.balloon"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.SyncPythonRequirementsIdsHolder"/>
+
     <notificationGroup id="CythonWarning" displayType="BALLOON" bundle="messages.PyBundle" key="notification.group.cython"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.CythonWarningIdsHolder"/>
+
     <notificationGroup id="Python Compatibility Inspection Advertiser" displayType="STICKY_BALLOON" isLogByDefault="false"
                        bundle="messages.PyBundle" key="python.compatibility.inspection.advertiser.notifications.group.title"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PythonCompatibilityInspectionAdvertiserIdsHolder"/>
+
     <notificationGroup id="Package requirements" displayType="BALLOON" isLogByDefault="false" bundle="messages.PyBundle"
                        key="notification.group.package.requirements"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PackageRequirementsIdsHolder"/>
+
     <notificationGroup id="Pipfile Watcher" displayType="STICKY_BALLOON" isLogByDefault="false" bundle="messages.PyBundle"
                        key="python.sdk.pipenv.pip.file.watcher"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PipfileWatcherIdsHolder"/>
+
     <notificationGroup id="ConfiguredPythonInterpreter" displayType="BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
                        key="sdk.has.been.configured.notification.name"/>
-    <notificationGroup id="Packaging" displayType="BALLOON" bundle="messages.PyBundle" key="notification.group.packaging"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.ConfiguredPythonInterpreterIdsHolder"/>
+
     <notificationGroup id="PythonPackages" displayType="TOOL_WINDOW" toolWindowId="Python Packages"
                        bundle="messages.PyBundle" key="notification.group.packaging.toolwindow"/>
-    <notificationGroup id="pyproject.toml Watcher" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
-                       key="python.sdk.poetry.pip.file.watcher"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PythonPackagesIdsHolder"/>
+
     <notificationGroup id="Python interpreter installation" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
                        key="python.sdk.installation.notification.group"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.PythonInterpreterInstallationIdsHolder"/>
 
     <toolWindow id="Python Packages" anchor="bottom"
                 icon="com.jetbrains.python.icons.PythonIcons.Python.PythonPackages"
@@ -622,6 +639,8 @@
 
     <notificationGroup id="Black Formatter Integration" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
                        key="black.configurable.name"/>
+    <statistics.notificationIdsHolder implementation="com.jetbrains.python.statistics.BlackFormatterIntegrationIdsHolder"/>
+
     <dependencyCollector kind="python" implementation="com.jetbrains.python.packaging.PyDependencyCollector"/>
 
     <!-- Parameter Info -->
@@ -649,6 +668,8 @@
                  description="When disabled stripes minor version to look for prebuilt skeletons"/>
     <registryKey key="python.activate.virtualenv.on.run" defaultValue="true"
                  description="Whether enabled activates virtualenv before script execution and passes environment to the process"/>
+
+    <registryKey key="python.typing.strict.unions" defaultValue="true" description="Enable strict union types semantics"/>
 
     <!-- uv -->
     <configurationType implementation="com.jetbrains.python.sdk.uv.run.UvRunConfigurationType"/>
@@ -752,17 +773,13 @@
                     interface="com.jetbrains.python.run.target.ConnectionCredentialsToTargetConfigurationConverter"
                     dynamic="true"/>
 
-    <extensionPoint qualifiedName="Pythonid.PythonPackagingToolwindowActionProvider"
-                    interface="com.jetbrains.python.packaging.toolwindow.actions.PythonPackagingToolwindowActionProvider"
-                    dynamic="true"/>
-
     <extensionPoint qualifiedName="Pythonid.pythonPackageManagerProvider"
                     interface="com.jetbrains.python.packaging.management.PythonPackageManagerProvider"
                     dynamic="true"/>
 
-    <extensionPoint qualifiedName="Pythonid.PyProjectDependenciesExtractorProvider"
-                    dynamic="true"
-                    interface="com.jetbrains.python.packaging.PythonDependenciesExtractorProvider"/>
+    <extensionPoint qualifiedName="Pythonid.pythonSdkReadOnlyProvider"
+                    interface="com.jetbrains.python.sdk.readOnly.PythonSdkReadOnlyProvider"
+                    dynamic="true"/>
 
     <extensionPoint qualifiedName="Pythonid.customProcessHandlerProvider"
                     interface="com.jetbrains.python.run.PyCustomProcessHandlerProvider"
@@ -786,6 +803,20 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="Pythonid">
+    <evoTreeElementProvider id="UvEvoProvider"
+                            order="first"
+                            implementation="com.jetbrains.python.uv.sdk.evolution.UvSelectSdkProvider"/>
+
+    <evoTreeElementProvider id="PoetryEvoProvider"
+                            implementation="com.jetbrains.python.poetry.sdk.evolution.PoetrySelectSdkProvider"/>
+
+    <evoTreeElementProvider id="CondaEvoProvider"
+                            implementation="com.jetbrains.python.conda.sdk.evolution.CondaSelectSdkProvider"/>
+
+    <evoTreeElementProvider id="AdvancedEvoProvider"
+                            order="before AutoconfigEvoProvider,last"
+                            implementation="com.jetbrains.python.sdk.evolution.AdvancedSelectSdkProvider"/>
+
     <pyReferenceCustomTargetChecker implementation="com.jetbrains.python.testing.pyTestFixtures.PyTestFixtureTargetChecker"/>
 
     <!--stdlib-->
@@ -861,8 +892,10 @@
     <!-- Experimental packaging extensions-->
     <pySdkProvider implementation="com.jetbrains.python.sdk.pipenv.PyPipEnvSdkProvider"/>
 
+
+    <pythonSdkReadOnlyProvider implementation="com.jetbrains.python.sdk.readOnly.PythonSystemSdkReadOnlyProvider"/>
+
     <pySdkProvider implementation="com.jetbrains.python.sdk.poetry.PoetrySdkProvider"/>
-    <packageManagerProvider implementation="com.jetbrains.python.sdk.poetry.PyPoetryPackageManagerProvider"/>
     <pythonPackageManagerProvider implementation="com.jetbrains.python.sdk.poetry.PoetryPackageManagerProvider"/>
 
     <pySdkProvider implementation="com.jetbrains.python.sdk.uv.UvSdkProvider"/>
@@ -872,38 +905,37 @@
     <pythonPackageManagerProvider implementation="com.jetbrains.python.packaging.conda.CondaPackageManagerProvider"/>
     <pythonPackageManagerProvider implementation="com.jetbrains.python.packaging.pipenv.PipEnvPackageManagerProvider"/>
 
-    <PyProjectDependenciesExtractorProvider implementation="com.jetbrains.python.sdk.poetry.PoetryDependenciesExtractorProvider"/>
-    <PyProjectDependenciesExtractorProvider implementation="com.jetbrains.python.sdk.uv.UvDependenciesExtractorProvider"/>
-
     <PythonPackageRequiresExtractorProvider implementation="com.jetbrains.python.poetry.packaging.PoetryRequiresExtractorProvider"/>
     <PythonPackageRequiresExtractorProvider implementation="com.jetbrains.python.uv.packaging.UvPackageRequiresExtractorProvider"/>
 
-    <PythonPackageRequirementsTreeExtractorProvider implementation="com.jetbrains.python.poetry.packaging.PoetryPackageRequirementsTreeExtractorProvider"/>
-    <PythonPackageRequirementsTreeExtractorProvider implementation="com.jetbrains.python.uv.packaging.UvPackageRequirementsTreeExtractorProvider"/>
-
+    <PythonPackageRequirementsTreeExtractorProvider
+      implementation="com.jetbrains.python.poetry.packaging.PoetryPackageRequirementsTreeExtractorProvider"/>
+    <PythonPackageRequirementsTreeExtractorProvider
+      implementation="com.jetbrains.python.uv.packaging.UvPackageRequirementsTreeExtractorProvider"/>
 
 
     <systemPythonProvider implementation="com.jetbrains.python.sdk.uv.UvSystemPythonProvider"/>
     <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.LegacySystemPythonProvider"/>
 
-    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.BrewSystemPythonProvider" os="mac"/>
-    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.MacSystemPythonProvider" os="mac"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.BrewSystemPythonProvider"
+                          os="mac"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.MacSystemPythonProvider"
+                          os="mac"/>
 
-    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.WindowsSystemPythonProvider" os="windows"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.WindowsSystemPythonProvider"
+                          os="windows"/>
 
     <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.AsdfSystemPythonProvider"/>
     <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.PyenvSystemPythonProvider"/>
 
-    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.UnixSystemPythonProvider" os="unix"/>
+    <systemPythonProvider implementation="com.intellij.python.community.services.systemPython.impl.providers.UnixSystemPythonProvider"
+                          os="unix"/>
 
     <inspectionExtension implementation="com.jetbrains.python.sdk.configuration.suppressors.PyInterpreterInspectionSuppressor"/>
     <inspectionExtension implementation="com.jetbrains.python.inspections.PyUnresolvedReferenceDefaultInspectionExtension" order="last"/>
 
     <runConfigurationEditorExtension implementation="com.jetbrains.python.run.PyRunConfigurationTargetOptions"/>
 
-    <PythonPackagingToolwindowActionProvider implementation="com.jetbrains.python.packaging.pip.PipPackagingToolwindowActionProvider"/>
-    <PythonPackagingToolwindowActionProvider
-      implementation="com.jetbrains.python.packaging.conda.CondaPackagingToolwindowActionProvider"/>
   </extensions>
 
   <actions resource-bundle="messages.PyBundle">

@@ -78,16 +78,10 @@ abstract class MavenNewProjectWizardStep<ParentStep>(parent: ParentStep) :
   }
 
   protected fun <T : AbstractMavenModuleBuilder> linkMavenProject(project: Project, builder: T, configure: (T) -> Unit = {}): Module? {
-    val sdk = jdkIntent?.prepareJdk()
-    builder.moduleJdk = sdk
     builder.name = parentStep.name
     builder.contentEntryPath = "${parentStep.path}/${parentStep.name}"
 
     builder.isCreatingNewProject = context.isCreatingNewProject
-
-    if (context.isCreatingNewProject) {
-      context.projectJdk = sdk
-    }
 
     builder.parentProject = parentData
     builder.aggregatorProject = parentData

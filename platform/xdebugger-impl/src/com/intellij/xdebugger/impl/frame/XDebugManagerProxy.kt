@@ -4,9 +4,11 @@ package com.intellij.xdebugger.impl.frame
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
+import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerProxy
 import com.intellij.xdebugger.impl.rpc.XDebugSessionId
+import com.intellij.xdebugger.impl.rpc.XExecutionStackId
 import com.intellij.xdebugger.impl.rpc.XValueId
 import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.ApiStatus
@@ -23,6 +25,7 @@ import org.jetbrains.annotations.ApiStatus
 interface XDebugManagerProxy {
   fun isEnabled(): Boolean
   suspend fun <T> withId(value: XValue, session: XDebugSessionProxy, block: suspend (XValueId) -> T): T
+  suspend fun <T> withId(value: XExecutionStack, session: XDebugSessionProxy, block: suspend (XExecutionStackId) -> T): T
   fun getCurrentSessionProxy(project: Project): XDebugSessionProxy?
   fun getSessionIdByContentDescriptor(project: Project, descriptor: RunContentDescriptor): XDebugSessionId?
   fun getCurrentSessionFlow(project: Project): Flow<XDebugSessionProxy?>
@@ -30,7 +33,13 @@ interface XDebugManagerProxy {
 
   fun getBreakpointManagerProxy(project: Project): XBreakpointManagerProxy
 
-  fun canShowInlineDebuggerData(xValue: XValue): Boolean
+  /**
+   * Returns `true` if the given [xValue] is presented on BE.
+   * In monolith mode, this method always returns `true`;
+   * in split mode, it returns `true` if the given [xValue]
+   * has an access to ID used to find the relevant backend counterpart.
+   */
+  fun hasBackendCounterpart(xValue: XValue): Boolean
 
   fun findSessionProxy(project: Project, sessionId: XDebugSessionId): XDebugSessionProxy? {
     return getSessions(project).firstOrNull { it.id == sessionId }

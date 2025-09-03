@@ -10,11 +10,13 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
+import com.intellij.usageView.UsageInfo
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.remoteApiDescriptor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.jetbrains.annotations.ApiStatus.Internal
 
 @Internal
@@ -84,4 +86,6 @@ data class FindInFilesResult(
   val backgroundColor: ColorId?,
   val tooltipText: @NlsContexts.Tooltip String?,
   val iconId: IconId?,
+  val fileLength: Int,
+  @Transient val usageInfos: List<UsageInfo> = emptyList(),
 )

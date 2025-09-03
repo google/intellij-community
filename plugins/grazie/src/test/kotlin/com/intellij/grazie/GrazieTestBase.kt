@@ -8,15 +8,19 @@ import com.intellij.grazie.ide.inspection.grammar.GrazieInspection
 import com.intellij.grazie.jlanguage.Lang
 import com.intellij.grazie.remote.HunspellDescriptor
 import com.intellij.grazie.spellcheck.GrazieCheckers
+import com.intellij.grazie.style.StyleInspection
 import com.intellij.grazie.text.TextChecker
 import com.intellij.grazie.text.TextContent
 import com.intellij.grazie.text.TextExtractor
 import com.intellij.grazie.text.TextProblem
 import com.intellij.grazie.utils.filterFor
 import com.intellij.lang.Language
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.ExtensionPointName
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiPlainText
@@ -33,7 +37,7 @@ import kotlin.io.path.Path
 abstract class GrazieTestBase : BasePlatformTestCase() {
   companion object {
     val inspectionTools by lazy {
-      arrayOf<LocalInspectionTool>(GrazieInspection(), SpellCheckingInspection())
+      arrayOf<LocalInspectionTool>(GrazieInspection(), SpellCheckingInspection(), StyleInspection())
     }
 
     /**
@@ -42,19 +46,67 @@ abstract class GrazieTestBase : BasePlatformTestCase() {
      * Please use [enableProofreadingFor] if a test requires a specific language
      */
     val enabledLanguages = setOf(Lang.AMERICAN_ENGLISH)
-    val enabledRules = setOf("LanguageTool.EN.COMMA_WHICH", "LanguageTool.EN.UPPERCASE_SENTENCE_START")
-  }
+    val enabledRules = setOf("LanguageTool.EN.COMMA_WHICH", "LanguageTool.EN.UPPERCASE_SENTENCE_START", "LanguageTool.DE.MANNSTUNDE")
+    val hunspellLangs: Set<Lang> = setOf(Lang.GERMANY_GERMAN, Lang.AUSTRIAN_GERMAN, Lang.SWISS_GERMAN, Lang.RUSSIAN, Lang.UKRAINIAN)
 
-  private val hunspellLangs: Set<Lang> = setOf(Lang.GERMANY_GERMAN, Lang.AUSTRIAN_GERMAN, Lang.SWISS_GERMAN, Lang.RUSSIAN, Lang.UKRAINIAN)
+    @JvmStatic
+    fun maskSaxParserFactory(disposable: Disposable) {
+      val saxParserKey = "javax.xml.parsers.SAXParserFactory"
+      val oldSaxParserFactory = System.setProperty(saxParserKey, "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl")
+      Disposer.register(disposable) {
+        if (oldSaxParserFactory != null) System.setProperty(saxParserKey, oldSaxParserFactory)
+        else System.clearProperty(saxParserKey)
+      }
+    }
+
+    fun loadLangs(langs: Collection<Lang>, project: Project) {
+      langs.filter { it in hunspellLangs }.forEach { loadLang(it, project) }
+    }
+
+    fun unloadLangs(project: Project) {
+      hunspellLangs.forEach { unloadLang(it.iso, project) }
+    }
+
+    private fun loadLang(lang: Lang, project: Project) {
+      val zipPath = PathManager.getResourceRoot(
+        PathManager::class.java.classLoader,
+        "dictionary/${lang.iso.name.lowercase()}.aff"
+      )
+      if (zipPath == null) {
+        fail("Hunspell-${lang.iso} not found in classpath")
+      }
+      val zip = Path(zipPath!!)
+      if (!Files.exists(zip)) {
+        fail("Hunspell-${lang.iso} not found in classpath")
+      }
+      val outputDir = GrazieDynamic.getLangDynamicFolder(lang).resolve(lang.hunspellRemote!!.storageName)
+      Files.createDirectories(outputDir)
+      ZipUtil.extract(zip, outputDir, HunspellDescriptor.filenameFilter())
+      getInstance(project).spellChecker!!.addDictionary(lang.dictionary!!)
+    }
+
+    private fun unloadLang(iso: LanguageISO, project: Project) {
+      val lang = Lang.entries.find { it.iso == iso }!!
+      getInstance(project).removeDictionary(getDictionaryPath(lang))
+    }
+
+    private fun getDictionaryPath(lang: Lang): String {
+      return GrazieDynamic.getLangDynamicFolder(lang).resolve(lang.hunspellRemote!!.file).toString()
+    }
+  }
 
   protected open val additionalEnabledRules: Set<String> = emptySet()
 
   protected open val additionalEnabledContextLanguages: Set<Language> = emptySet()
 
+  protected open val enableGrazieChecker: Boolean = false
+
   override fun getBasePath() = "community/plugins/grazie/src/test/testData"
 
   override fun setUp() {
     super.setUp()
+    maskSaxParserFactory(testRootDisposable)
+    if (enableGrazieChecker) Registry.get("spellchecker.grazie.enabled").setValue(true, testRootDisposable)
     myFixture.enableInspections(*inspectionTools)
 
     enableProofreadingFor(enabledLanguages)
@@ -67,7 +119,7 @@ abstract class GrazieTestBase : BasePlatformTestCase() {
     try {
       GrazieConfig.update { GrazieConfig.State() }
       service<GrazieCheckers>().awaitConfiguration()
-      hunspellLangs.forEach { unloadLang(it.iso) }
+      unloadLangs(project)
     }
     catch (e: Throwable) {
       addSuppressedException(e)
@@ -80,7 +132,7 @@ abstract class GrazieTestBase : BasePlatformTestCase() {
   protected fun enableProofreadingFor(languages: Set<Lang>) {
     // Load langs manually to prevent potential deadlock
     val enabledLanguages = languages + GrazieConfig.get().enabledLanguages
-    enabledLanguages.filter { it in hunspellLangs }.toMutableList().forEach { loadLang(it) }
+    loadLangs(enabledLanguages, project)
 
     GrazieConfig.update { state ->
       val checkingContext = state.checkingContext.copy(
@@ -105,11 +157,6 @@ abstract class GrazieTestBase : BasePlatformTestCase() {
     myFixture.checkHighlighting(true, false, false)
   }
 
-  protected fun runHighlightTestForFileUsingGrazieSpellchecker(file: String) {
-    Registry.get("spellchecker.grazie.enabled").setValue(true, testRootDisposable)
-    runHighlightTestForFile(file)
-  }
-
   fun plain(vararg texts: String) = plain(texts.toList())
 
   fun plain(texts: List<String>): Collection<PsiElement> {
@@ -124,37 +171,5 @@ abstract class GrazieTestBase : BasePlatformTestCase() {
         }
       }
     }
-  }
-
-  private fun loadLang(lang: Lang) {
-    val zipPath = PathManager.getResourceRoot(
-      PathManager::class.java.classLoader,
-      "dictionary/${lang.iso.name.lowercase()}.aff"
-    )
-    if (zipPath == null) {
-      fail("Hunspell-${lang.iso} not found in classpath")
-    }
-    val zip = Path(zipPath!!)
-    if (!Files.exists(zip)) {
-      fail("Hunspell-${lang.iso} not found in classpath")
-    }
-    val outputDir = GrazieDynamic.getLangDynamicFolder(lang).resolve(lang.hunspellRemote!!.storageName)
-    Files.createDirectories(outputDir)
-    ZipUtil.extract(zip, outputDir, HunspellDescriptor.filenameFilter())
-    getInstance(project).spellChecker!!.addDictionary(lang.dictionary!!)
-  }
-
-  private fun unloadLang(iso: LanguageISO) {
-    try {
-      val lang = Lang.entries.find { it.iso == iso }!!
-      getInstance(project).removeDictionary(getDictionaryPath(lang))
-    }
-    catch (e: Throwable) {
-      addSuppressedException(e)
-    }
-  }
-
-  private fun getDictionaryPath(lang: Lang): String {
-    return GrazieDynamic.getLangDynamicFolder(lang).resolve(lang.hunspellRemote!!.file).toString()
   }
 }

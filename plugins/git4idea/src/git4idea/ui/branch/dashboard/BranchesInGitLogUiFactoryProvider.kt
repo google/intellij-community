@@ -24,6 +24,7 @@ import com.intellij.vcs.log.VcsLogFilterCollection
 import com.intellij.vcs.log.VcsLogProvider
 import com.intellij.vcs.log.VcsLogRootFilter
 import com.intellij.vcs.log.data.VcsLogData
+import com.intellij.vcs.log.data.roots
 import com.intellij.vcs.log.impl.*
 import com.intellij.vcs.log.impl.VcsLogManager.BaseVcsLogUiFactory
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil.jumpToBranch
@@ -229,12 +230,12 @@ internal class BranchesVcsLogUi(
       }
     }
 
-    override fun navigateTo(navigatable: BranchNodeDescriptor.LogNavigatable, focus: Boolean) {
+    override fun navigateTo(navigatable: VcsLogNavigatable, focus: Boolean) {
       val navigateSilently = false
+      val repositoryRoot = navigatable.repository?.root
       when (navigatable) {
-        BranchNodeDescriptor.Head -> jumpToBranch(VcsLogUtil.HEAD, navigateSilently, focus)
-        is BranchNodeDescriptor.Branch -> jumpToBranch(navigatable.branchInfo.branchName, navigateSilently, focus)
-        is BranchNodeDescriptor.Ref -> jumpToRefOrHash(navigatable.refInfo.refName, navigateSilently, focus)
+        is VcsLogNavigatable.Branch -> jumpToBranch(repositoryRoot, navigatable.branchName, navigateSilently, focus)
+        is VcsLogNavigatable.Ref -> jumpToRefOrHash(repositoryRoot, navigatable.refName, navigateSilently, focus)
       }
     }
   }
@@ -266,16 +267,6 @@ fun VcsLogFilterUiEx.filterBy(branches: List<String>) {
     newFilters = newFilters.with(VcsLogFilterObject.fromBranches(branches))
   }
   filters = newFilters
-}
-
-@ApiStatus.Internal
-fun VcsLogUiEx.navigateTo(navigatable: BranchNodeDescriptor.LogNavigatable, focus: Boolean) {
-  val navigateSilently = false
-  when (navigatable) {
-    BranchNodeDescriptor.Head -> jumpToBranch(VcsLogUtil.HEAD, navigateSilently, focus)
-    is BranchNodeDescriptor.Branch -> jumpToBranch(navigatable.branchInfo.branchName, navigateSilently, focus)
-    is BranchNodeDescriptor.Ref -> jumpToRefOrHash(navigatable.refInfo.refName, navigateSilently, focus)
-  }
 }
 
 @ApiStatus.Internal

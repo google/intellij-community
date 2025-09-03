@@ -357,7 +357,7 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
     boolean executeInBulk = finalTargetOffsetPos > STRIP_TRAILING_SPACES_BULK_MODE_LINES_LIMIT * 2;
     // Document must be unblocked by now. If not, some Save handler attempted to modify PSI
     // which should have been caught by assertion in com.intellij.pom.core.impl.PomModelImpl.runTransaction
-    DocumentUtil.writeInRunUndoTransparentAction(() -> {
+    DocumentUtil.writeInRunUndoTransparentAction(() ->
       DocumentUtil.executeInBulk(this, executeInBulk, () -> {
         int pos = finalTargetOffsetPos;
         while (pos > 0) {
@@ -365,8 +365,8 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
           int startOffset = targetOffsets[--pos];
           deleteString(startOffset, endOffset);
         }
-      });
-    });
+      })
+    );
     return markAsNeedsStrippingLater;
   }
 
@@ -485,7 +485,7 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
     return collectGuardedBlocks();
   }
 
-  private @NotNull List<RangeMarker> collectGuardedBlocks() {
+  private @NotNull @UnmodifiableView List<RangeMarker> collectGuardedBlocks() {
     List<RangeMarker> blocks = new ArrayList<>();
     myPersistentRangeMarkers.processAll(GuardedBlock.processor(block -> {
       blocks.add(block);
@@ -1135,9 +1135,7 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
   }
 
   private void fireDocumentFullUpdated() {
-    fullUpdateListeners.forEach(listener -> {
-      listener.onFullUpdateDocument(this);
-    });
+    fullUpdateListeners.forEach(listener -> listener.onFullUpdateDocument(this));
   }
 
   @ApiStatus.Internal
@@ -1233,13 +1231,9 @@ public final class DocumentImpl extends UserDataHolderBase implements DocumentEx
   @Override
   public boolean processRangeMarkersOverlappingWith(int start, int end, @NotNull Processor<? super RangeMarker> processor) {
     TextRange interval = new ProperTextRange(start, end);
-    MarkupIterator<RangeMarkerEx> iterator = IntervalTreeImpl
-      .mergingOverlappingIterator(myRangeMarkers, interval, myPersistentRangeMarkers, interval, RangeMarker.BY_START_OFFSET);
-    try {
+    try(MarkupIterator<RangeMarkerEx> iterator = IntervalTreeImpl
+          .mergingOverlappingIterator(myRangeMarkers, interval, myPersistentRangeMarkers, interval, (byte)0, RangeMarker.BY_START_OFFSET)) {
       return ContainerUtil.process(iterator, processor);
-    }
-    finally {
-      iterator.dispose();
     }
   }
 

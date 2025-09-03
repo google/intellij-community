@@ -1284,7 +1284,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     if (recycled == null) {
       // create new
       if (isFileLevel) {
-        highlighter = createOrReuseFakeFileLevelHighlighter(MANAGED_HIGHLIGHT_INFO_GROUP, newInfo, null, markup);
+        highlighter = createOrReuseFakeFileLevelHighlighter(MANAGED_HIGHLIGHT_INFO_GROUP, newInfo, null, markup, session.getProject(), context);
         newInfo.setHighlighter(highlighter);
         ((HighlightingSessionImpl)session).addFileLevelHighlight(newInfo, highlighter);
       }
@@ -1305,7 +1305,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       highlighter = oldInfo.getHighlighter();
       newInfo.setHighlighter(highlighter);
       if (isFileLevel) {
-        highlighter = createOrReuseFakeFileLevelHighlighter(MANAGED_HIGHLIGHT_INFO_GROUP, newInfo, highlighter, markup);
+        highlighter = createOrReuseFakeFileLevelHighlighter(MANAGED_HIGHLIGHT_INFO_GROUP, newInfo, highlighter, markup, session.getProject(), context);
         ((HighlightingSessionImpl)session).replaceFileLevelHighlight(oldInfo, newInfo, highlighter);
       }
       else {
@@ -1319,7 +1319,12 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     range2markerCache.put(finalInfoRange, highlighter);
   }
 
-  public static @NotNull RangeHighlighterEx createOrReuseFakeFileLevelHighlighter(int group, @NotNull HighlightInfo info, @Nullable RangeHighlighterEx toReuse, @NotNull MarkupModel markupModel) {
+  public static @NotNull RangeHighlighterEx createOrReuseFakeFileLevelHighlighter(int group,
+                                                                                  @NotNull HighlightInfo info,
+                                                                                  @Nullable RangeHighlighterEx toReuse,
+                                                                                  @NotNull MarkupModel markupModel,
+                                                                                  @NotNull Project project,
+                                                                                  @Nullable CodeInsightContext context) {
     Document document = markupModel.getDocument();
     RangeHighlighterEx highlighter = toReuse != null && toReuse.isValid() ? toReuse
              : (RangeHighlighterEx)markupModel.addRangeHighlighter(0, document.getTextLength(), DaemonCodeAnalyzerEx.FILE_LEVEL_FAKE_LAYER, null, HighlighterTargetArea.EXACT_RANGE);
@@ -1331,6 +1336,9 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     // and which will make possible to calculate correct `info.getActualEndOffset()`
     //info.setHighlighter(highlighter);
     info.setGroup(group);
+    if (context != null) {
+      CodeInsightContextHighlightingUtil.installCodeInsightContext(highlighter, project, context);
+    }
     return highlighter;
   }
 

@@ -74,6 +74,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -156,6 +157,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   private final ThreadLocal<Boolean> myImpatientReader = ThreadLocal.withInitial(() -> false);
 
+  private final AtomicInteger backgroundWriteActionCounter = new AtomicInteger(0);
+
   private final long myStartTime = System.currentTimeMillis();
   private boolean mySaveAllowed;
   private volatile boolean myExitInProgress;
@@ -220,6 +223,20 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     myLastDisposable = null;
   }
 
+  private final SynchronizedClearableLazy<IComponentStore> componentStoreValue = new SynchronizedClearableLazy<>(() -> {
+    return getService(IComponentStore.class);
+  });
+
+  @Override
+  public @NotNull IComponentStore getComponentStore() {
+    return componentStoreValue.get();
+  }
+
+  @TestOnly
+  public void componentStoreImplChanged() {
+    componentStoreValue.drop();
+  }
+
   private static void registerFakeServices(ApplicationImpl app) {
     app.registerServiceInstance(TransactionGuard.class, app.myTransactionGuard, fakeCorePluginDescriptor);
     app.registerServiceInstance(Application.class, app, fakeCorePluginDescriptor);
@@ -259,14 +276,21 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     return myImpatientReader.get();
   }
 
-  @TestOnly
+  @VisibleForTesting
   public void disposeContainer() {
-    cancelAndJoinBlocking(this);
-    runWriteAction(() -> {
-      startDispose();
-      Disposer.dispose(this);
-    });
-    Disposer.assertIsEmpty();
+    // NonCancellable will override context Job
+    CoroutineContext coroutineContext = ThreadContext.currentThreadContext();
+    try (var ignored = Cancellation.withNonCancelableSection()) {
+      cancelAndJoinBlocking(this, coroutineContext);
+      runWriteAction(() -> {
+        startDispose();
+        Disposer.dispose(this);
+      });
+      Disposer.assertIsEmpty();
+    }
+    catch (Throwable t) {
+      logErrorDuringExit("Failed to dispose the container", t);
+    }
   }
 
   @Override
@@ -429,7 +453,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     //noinspection deprecation
     myDispatcher.getMulticaster().applicationExiting();
 
-    IComponentStore componentStore = getServiceIfCreated(IComponentStore.class);
+    IComponentStore componentStore = componentStoreValue.getValueIfInitialized();
     super.dispose();
     if (componentStore != null) {
       try {
@@ -803,15 +827,17 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
           logErrorDuringExit("Failed to close and dispose all projects", e);
         }
       }
-      try (var ignored = Cancellation.withNonCancelableSection()) {
+
+      try {
+        // can't report OT after the container disposal
         scope.close();
         exitSpan.end();
-        //noinspection TestOnlyProblems
-        disposeContainer();
       }
-      catch (Throwable t) {
-        logErrorDuringExit("Failed to dispose the container", t);
+      catch (Throwable e) {
+        logErrorDuringExit("Failed to report the telemtetry", e);
       }
+
+      disposeContainer();
 
       if (!success || isUnitTestMode()) {
         return null;
@@ -1412,15 +1438,13 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     app.lock.addWriteActionListener(app.appListenerDispatcherWrapper);
     app.lock.setLegacyIndicatorProvider(myLegacyIndicatorProvider);
     app.lock.setErrorHandler(lockingErrorHandler);
-    if (ThreadingRuntimeFlagsKt.getInstallSuvorovProgress()) {
-      SwingUtilities.invokeLater(() -> {
-        SuvorovProgress.INSTANCE.init(app);
-        app.lock.setLockAcquisitionInterceptor((deferred) -> {
-          SuvorovProgress.dispatchEventsUntilComputationCompletes(deferred);
-          return Unit.INSTANCE;
-        });
+    SwingUtilities.invokeLater(() -> {
+      SuvorovProgress.INSTANCE.init(app);
+      app.lock.setLockAcquisitionInterceptor((deferred) -> {
+        SuvorovProgress.dispatchEventsUntilComputationCompletes(deferred);
+        return Unit.INSTANCE;
       });
-    }
+    });
 
     app.addApplicationListener(new ApplicationListener() {
       @Override

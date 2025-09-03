@@ -13,8 +13,9 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
+import com.intellij.util.SlowOperations
 import com.intellij.util.ThrowableRunnable
-import com.intellij.util.application
+import com.intellij.util.concurrency.AppScheduledExecutorService
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.ui.EDT
@@ -127,6 +128,15 @@ internal fun <T> rethrowCheckedExceptions(f: ThrowableComputable<T, *>): () -> T
 @TestOnly
 @ApiStatus.Experimental
 object TestOnlyThreading {
+
+  /**
+   * When called on EDT under write-intent lock, executes [action] with released write-intent lock. After termination, takes write-intent lock back.
+   * This method is needed to help background write action to proceed in tests.
+   * The typical (and expected) use-case is to wrap synchronous event dispatch (like [com.intellij.util.ui.UIUtil.dispatchAllInvocationEvents]) into this function.
+   * The reason is that synchronous dispatch is often used to execute write actions stuck in the Event Queue, so with background write actions we need to release write-intent lock to help them proceed.
+   *
+   * Please note that in tests it is more appropriate to use [com.intellij.testFramework.PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue]
+   */
   @JvmStatic
   fun <T> releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(action: () -> T): T {
     val application = ApplicationManager.getApplication()
@@ -182,6 +192,20 @@ object InternalThreading {
     assert(lock.isWriteAccessAllowed()) { "Transferring of write action is permitted only if write lock is acquired" }
     assert(!EDT.isCurrentThreadEdt()) { "Transferring of write action is permitted only on background thread" }
     val exceptionRef = Ref.create<Throwable?>()
+    val capturedRunnable = AppScheduledExecutorService.captureContextCancellationForRunnableThatDoesNotOutliveContextScope {
+      try {
+        lock.allowTakingLocksInsideAndRun {
+          // we can appear here if someone tries to acquire a read action in a forced slow-op section
+          // the users have no control over computations that run inside transferred write action, hence we reset the slow-op section
+          SlowOperations.startSection(SlowOperations.RESET).use {
+            (TransactionGuard.getInstance() as TransactionGuardImpl).performUserActivity(runnable)
+          }
+        }
+      }
+      catch (e: Throwable) {
+        exceptionRef.set(e)
+      }
+    }
     lock.transferWriteActionAndBlock({ toRun: RunnableWithTransferredWriteAction ->
                                        val event = TransferredWriteActionEvent(toRun)
                                        try {
@@ -191,15 +215,7 @@ object InternalThreading {
                                        catch (e: InterruptedException) {
                                          exceptionRef.set(e)
                                        }
-                                     }) {
-      try {
-        lock.allowTakingLocksInsideAndRun {
-          (TransactionGuard.getInstance() as TransactionGuardImpl).performUserActivity(runnable)
-        }
-      } catch (e: Throwable) {
-        exceptionRef.set(e)
-      }
-    }
+                                     }, capturedRunnable)
     exceptionRef.get()?.let { throw it }
   }
 

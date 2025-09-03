@@ -9,19 +9,24 @@ import com.intellij.ide.plugins.getTags
 import com.intellij.ide.plugins.newui.UiPluginManager.Companion.getInstance
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.ui.LicensingFacade
 import com.intellij.util.PlatformUtils
+import com.intellij.util.containers.ContainerUtil
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import java.text.DecimalFormat
 import java.util.*
+import kotlin.text.startsWith
 
 /**
  * A lightweight model for representing plugin information in the UI.
  * This interface contains only the subset of plugin metadata needed for display purposes.
  */
 @ApiStatus.Internal
+@IntellijInternalApi
 interface PluginUiModel {
   val pluginId: PluginId
 
@@ -138,6 +143,7 @@ interface PluginUiModel {
   @get:NlsSafe
   val untilBuild: String?
 
+  val isDisableAllowed: Boolean
 
   fun addDependency(id: PluginId, optional: Boolean)
 
@@ -196,6 +202,7 @@ fun PluginUiModel.presentableRating(): String? {
 
 @NlsSafe
 @ApiStatus.Internal
+@IntellijInternalApi
 fun PluginUiModel.presentableDownloads(): String? {
   val downloads = this.downloads ?: return null
   if (downloads.isBlank()) return null
@@ -230,7 +237,7 @@ fun PluginUiModel.presentableSize(): String? {
 
 @ApiStatus.Internal
 fun PluginUiModel.calculateTags(): List<String> {
-  return this.getDescriptor().getTags()
+  return this.getDescriptor().getTags().customizeIfNeeded(pluginId)
 }
 
 @ApiStatus.Internal
@@ -247,7 +254,12 @@ fun PluginUiModel.calculateTags(sessionId: String): List<String> {
       }
     }
   }
-  return result
+  return result.customizeIfNeeded(pluginId)
+}
+
+private fun List<String>.customizeIfNeeded(pluginId: PluginId): List<String> {
+  val customization = PluginInstallationCustomization.findPluginInstallationCustomization(pluginId) ?: return this
+  return customization.customizeTags(this)
 }
 
 @NlsSafe

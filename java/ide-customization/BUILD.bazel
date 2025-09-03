@@ -11,7 +11,7 @@ jvm_library(
   name = "ide-customization",
   module_name = "intellij.java.ide.customization",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "//java/java-psi-api:psi",
     "//platform/core-api:core",
@@ -20,6 +20,7 @@ jvm_library(
     "//platform/util:util-ui",
     "//java/java-features-trainer:featuresTrainer",
     "//platform/platform-impl:ide-impl",
+    "//platform/lang-core",
   ],
   runtime_deps = [
     ":ide-customization_resources",

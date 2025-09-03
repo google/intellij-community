@@ -18,6 +18,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.fileChooser.impl.FileChooserUtil
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
@@ -34,6 +35,7 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.ToolWindowId
@@ -161,6 +163,7 @@ object ProjectUtil {
   suspend fun openOrImportAsync(file: Path, options: OpenProjectTask = OpenProjectTask()): Project? {
     if (!options.forceOpenInNewFrame) {
       findAndFocusExistingProjectForPath(file)?.let {
+        LOG.info("Reusing already opened project $file")
         return it
       }
     }
@@ -178,10 +181,12 @@ object ProjectUtil {
         virtualFileResult = Result.success(it)
       } ?: return null
       if (provider.canOpenProject(virtualFile)) {
+        LOG.info("Opening project at $file with strong project info holder $provider")
         return chooseProcessorAndOpenAsync(mutableListOf(provider), virtualFile, options)
       }
     }
     if (isValidProjectPath(file)) {
+      LOG.info("Opening existing project with .idea at $file")
       // see OpenProjectTest.`open valid existing project dir with inability to attach using OpenFileAction` test about why `runConfigurators = true` is specified here
       return (serviceAsync<ProjectManager>() as ProjectManagerEx).openProjectAsync(file, options.copy(runConfigurators = true))
     }
@@ -194,6 +199,7 @@ object ProjectUtil {
           for (child in directoryStream) {
             val childPath = child.toString()
             if (childPath.endsWith(ProjectFileType.DOT_DEFAULT_EXTENSION)) {
+              LOG.info("Opening project with IPR lookup at child path $childPath")
               return openProject(Path.of(childPath), options)
             }
           }
@@ -218,8 +224,10 @@ object ProjectUtil {
       }
     }
     if (processors.isEmpty()) {
+      LOG.info("No processor found for project in $file")
       return null
     }
+    LOG.info("Processors found for project in $file: ${ processors.joinToString { it.name} }")
 
     val project: Project?
     if (processors.size == 1 && processors[0] is PlatformProjectOpenProcessor) {
@@ -314,6 +322,8 @@ object ProjectUtil {
         }
       }
     }
+
+    LOG.info("Using processor ${processor.name} to open the project at ${virtualFile.path}")
 
     try {
       return processor.openProjectAsync(virtualFile, options.projectToClose, options.forceOpenInNewFrame)
@@ -480,8 +490,15 @@ object ProjectUtil {
   @JvmStatic
   @RequiresEdt
   fun focusProjectWindow(project: Project?, stealFocusIfAppInactive: Boolean = false) {
-    val frame = WindowManager.getInstance().getFrame(project) ?: return
+    LOG.trace { "focusProjectWindow: project=$project stealFocusIfAppInactive=$stealFocusIfAppInactive" }
+
+    val frame = WindowManager.getInstance().getFrame(project) ?: run {
+      LOG.trace { "focusProjectWindow: unable to get frame for project" }
+      return
+    }
     val appIsActive = getActiveWindow() != null
+
+    LOG.trace { "focusProjectWindow: appIsActive=$appIsActive" }
 
     // On macOS, `j.a.Window#toFront` restores the frame if needed.
     // On X Window, restoring minimized frame can steal focus from an active application, so we do it only when the IDE is active.
@@ -529,14 +546,14 @@ object ProjectUtil {
 
   suspend fun openOrImportFilesAsync(list: List<Path>, location: String, projectToClose: Project? = null): Project? {
     for (file in list) {
-      FUSProjectHotStartUpMeasurer.reportProjectPath(file)
-      openOrImportAsync(file = file, options = OpenProjectTask {
-        this.projectToClose = projectToClose
-        forceOpenInNewFrame = true
-      })?.also {
+      FUSProjectHotStartUpMeasurer.withProjectContextElement(file) {
+        openOrImportAsync(file = file, options = OpenProjectTask {
+          this.projectToClose = projectToClose
+          forceOpenInNewFrame = true
+        })
+      }?.also {
         return it
       }
-      FUSProjectHotStartUpMeasurer.resetProjectPath()
     }
 
     var result: Project? = null
@@ -546,17 +563,18 @@ object ProjectUtil {
       }
 
       LOG.debug { "$location: open file $file" }
-      FUSProjectHotStartUpMeasurer.reportProjectPath(file)
       if (projectToClose == null) {
         val processor = CommandLineProjectOpenProcessor.getInstanceIfExists()
         if (processor != null) {
-          val opened = processor.openProjectAndFile(file = file, tempProject = false)
+          val opened = FUSProjectHotStartUpMeasurer.withProjectContextElement(file) {
+            processor.openProjectAndFile(file = file, tempProject = false)
+          }
           if (opened != null) {
             if (result == null) {
               result = opened
             }
             else {
-              FUSProjectHotStartUpMeasurer.openingMultipleProjects()
+              FUSProjectHotStartUpMeasurer.openingMultipleProjects(false, list.size, false)
             }
           }
         }
@@ -689,7 +707,7 @@ object ProjectUtil {
   fun getProjectForComponent(component: Component?): Project? = getProjectForWindow(ComponentUtil.getWindow(component))
 
   @JvmStatic
-  fun getActiveProject(): Project? = getProjectForWindow(getActiveWindow())
+  fun getActiveProject(): Project? = getProjectForWindow(getActiveWindow())?.takeIf { !it.isDisposed }
 
   @JvmStatic
   fun getOpenProjects(): Array<Project> = ProjectUtilCore.getOpenProjects()
@@ -707,13 +725,15 @@ object ProjectUtil {
 
     val project = if (canAttach) {
       val options = createOptionsToOpenDotIdeaOrCreateNewIfNotExists(file, currentProject).copy(
-        forceReuseFrame = forceReuseFrame
-      )
+        forceReuseFrame = forceReuseFrame,
+        projectRootDir = file,
+        )
       (serviceAsync<ProjectManager>() as ProjectManagerEx).openProjectAsync(file, options)
     }
     else {
       val options = OpenProjectTask().withProjectToClose(currentProject).copy(
-        forceReuseFrame = forceReuseFrame
+        forceReuseFrame = forceReuseFrame,
+        projectRootDir = file,
       )
       openOrImportAsync(file, options)
     }
@@ -756,6 +776,6 @@ fun <T> runUnderModalProgressIfIsEdt(task: suspend CoroutineScope.() -> T): T {
 
 private fun getActiveWindow(): Window? {
   val window = KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
-  if (window is DisposableWindow && window.isWindowDisposed) return null
+  LOG.trace { "getActiveWindow: active window is $window" }
   return window
 }

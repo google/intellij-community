@@ -13,7 +13,6 @@ import com.intellij.ide.DataManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.editor.ex.EditorEx
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.util.PsiUtilBase
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.intellij.terminal.session.TerminalState
@@ -21,10 +20,12 @@ import com.jediterm.terminal.emulator.mouse.MouseButtonCodes
 import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags
 import com.jediterm.terminal.emulator.mouse.MouseFormat
 import com.jediterm.terminal.emulator.mouse.MouseMode
-import org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.Companion.REWORKED_TERMINAL_COMPLETION_POPUP
+import org.jetbrains.plugins.terminal.TerminalOptionsProvider
+import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
 import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalUsageLocalStorage
+import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.isOutputModelEditor
 import java.awt.Point
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -64,7 +65,7 @@ internal open class TerminalEventsHandlerImpl(
   override fun keyTyped(e: TimedKeyEvent) {
     LOG.trace { "Key typed event received: ${e.original}" }
     val charTyped = e.original.keyChar
-    updateLookupOnTyping(charTyped)
+
     val selectionModel = editor.selectionModel
     if (selectionModel.hasSelection()) {
       selectionModel.removeSelection()
@@ -86,6 +87,9 @@ internal open class TerminalEventsHandlerImpl(
         LOG.error("Error sending typed key to emulator", ex)
       }
     }
+
+    updateLookupOnTyping(charTyped)
+
     val lookup = LookupManager.getActiveLookup(editor)
     // Added to guarantee that the carets are synchronized after type-ahead.
     // Essential for correct lookup behavior.
@@ -100,8 +104,11 @@ internal open class TerminalEventsHandlerImpl(
     }
     val project = editor.project
     if (project != null && typeAhead?.isDisabled() == false &&
+        lookup == null &&
+        editor.isOutputModelEditor &&
         (Character.isLetterOrDigit(charTyped) || charTyped == '-' || charTyped == File.separatorChar) &&
-        Registry.`is`(REWORKED_TERMINAL_COMPLETION_POPUP)) {
+        TerminalCommandCompletion.isEnabled() &&
+        TerminalOptionsProvider.instance.showCompletionPopupAutomatically) {
       AutoPopupController.getInstance(project).scheduleAutoPopup(editor)
     }
   }
@@ -424,6 +431,9 @@ internal open class TerminalEventsHandlerImpl(
     return command.toByteArray(Charset.forName(charset))
   }
 
+  /**
+   * Should be called after typeahead is updated the document.
+   */
   private fun updateLookupOnTyping(charTyped: Char) {
     val project = editor.project ?: return
     val lookup = LookupManager.getActiveLookup(editor)

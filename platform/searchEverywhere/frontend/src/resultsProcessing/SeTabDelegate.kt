@@ -19,6 +19,7 @@ import com.intellij.platform.searchEverywhere.providers.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
+import com.intellij.platform.searchEverywhere.utils.SeResultsCountBalancer
 import com.intellij.platform.searchEverywhere.utils.initAsync
 import fleet.kernel.DurableRef
 import kotlinx.coroutines.*
@@ -40,16 +41,30 @@ class SeTabDelegate(
   private val providers = initAsync(scope) {
     initializeProviders(project, providerIds, initEvent, sessionRef, logLabel)
   }
-  private val providersAndLimits = providerIds.associateWith { Int.MAX_VALUE }
-
   suspend fun getProvidersIdToName(): Map<SeProviderId, @Nls String> = providers.getValue().getProvidersIdToName()
 
   fun getItems(params: SeParams, disabledProviders: List<SeProviderId>? = null): Flow<SeResultEvent> {
-    val accumulator = SeResultsAccumulator(providersAndLimits)
     val disabledProviders = fixDisabledProviders(disabledProviders)
 
     return flow {
+      val initializedProviders = providers.getValue()
+
+      val allEssentialProviders = initializedProviders.essentialProviderIds
+      val remoteEssentialProviders = initializedProviders.getRemoteProviderIds().toSet().intersect(allEssentialProviders)
+      val localProviders = initializedProviders.getLocalProviderIds().toSet()
+      val localEssentialProviders = allEssentialProviders.intersect(localProviders)
+      val localNonEssentialProviders = localProviders.subtract(allEssentialProviders)
+
+      // We shouldn't block remoteProviderIds because they may miss some results after equality check on the Backend
+      val balancer = SeResultsCountBalancer("FE",
+                                            nonBlockedProviderIds = remoteEssentialProviders,
+                                            highPriorityProviderIds = localEssentialProviders,
+                                            lowPriorityProviderIds = localNonEssentialProviders)
+
+      val accumulator = SeResultsAccumulator()
+
       disabledProviders?.forEach {
+        balancer.end(it)
         emit(SeResultEndEvent(it))
       }
 
@@ -57,10 +72,12 @@ class SeTabDelegate(
         when (transferEvent) {
           is SeTransferEnd -> {
             SeLog.log(ITEM_EMIT) { "Tab delegate for ${logLabel} ends: ${transferEvent.providerId.value}" }
+            balancer.end(transferEvent.providerId)
             SeResultEndEvent(transferEvent.providerId)
           }
           is SeTransferItem -> {
             val itemData = transferEvent.itemData
+            balancer.add(itemData)
 
             val checkedItemData = if (equalityChecker != null) {
               equalityChecker.checkAndUpdateIfNeeded(itemData)
@@ -100,6 +117,10 @@ class SeTabDelegate(
    */
   suspend fun canBeShownInFindResults(): Boolean {
     return providers.getValue().canBeShownInFindResults()
+  }
+
+  suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {
+    return providers.getValue().getUpdatedPresentation(item)
   }
 
   suspend fun openInFindToolWindow(
@@ -145,6 +166,9 @@ class SeTabDelegate(
       return localProviders.values.flatMap { it.getTypeVisibilityStates(index) ?: emptyList() } +
              (frontendProvidersFacade?.getTypeVisibilityStates(index) ?: emptyList())
     }
+
+    fun getLocalProviderIds(): List<SeProviderId> = localProviders.keys.toList()
+    fun getRemoteProviderIds(): List<SeProviderId> = frontendProvidersFacade?.providerIds ?: emptyList()
 
     fun getItems(params: SeParams, disabledProviders: List<SeProviderId>, mapToResultEvent: suspend (SeEqualityChecker?, SeTransferEvent) -> SeResultEvent?): Flow<SeResultEvent> {
       return channelFlow {
@@ -201,6 +225,16 @@ class SeTabDelegate(
       val frontedProviders = frontendProvidersFacade?.providerIds?.filter { !disabledProviders.contains(it) }
                              ?: emptyList()
       return localProviders.toList() + frontedProviders
+    }
+
+    suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {
+      val localItem = item.fetchItemIfExists()
+      return if (localItem != null) {
+        localItem.presentation()
+      }
+      else {
+        frontendProvidersFacade?.getUpdatedPresentation(item)
+      }
     }
   }
 

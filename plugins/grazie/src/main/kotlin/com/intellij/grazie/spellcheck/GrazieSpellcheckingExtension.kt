@@ -1,6 +1,10 @@
 package com.intellij.grazie.spellcheck
 
+import ai.grazie.nlp.langs.Language
 import ai.grazie.nlp.langs.LanguageWithVariant
+import ai.grazie.nlp.tokenizer.Tokenizer
+import ai.grazie.nlp.utils.checkedEndExclusive
+import ai.grazie.rules.common.KnownPhrases
 import ai.grazie.spell.Speller
 import ai.grazie.spell.text.TextSpeller
 import ai.grazie.spell.text.Typo
@@ -14,72 +18,83 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil.BombedCharSequence
-import com.intellij.psi.ElementManipulators
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
+import com.intellij.psi.SyntaxTraverser
 import com.intellij.spellchecker.grazie.GrazieSpellCheckerEngine
-import com.intellij.spellchecker.inspections.SpellCheckingInspection
-import com.intellij.spellchecker.inspections.SpellCheckingInspection.SpellCheckingScope.Code
+import com.intellij.spellchecker.inspections.IdentifierSplitter.MINIMAL_TYPO_LENGTH
+import com.intellij.spellchecker.inspections.SpellCheckingInspection.SpellCheckingScope.Comments
+import com.intellij.spellchecker.inspections.SpellCheckingInspection.SpellCheckingScope.Literals
+import com.intellij.spellchecker.inspections.SpellCheckingInspection.getSpellcheckingStrategy
 import com.intellij.spellchecker.inspections.SpellcheckingExtension
 import com.intellij.spellchecker.inspections.SpellcheckingExtension.SpellCheckingResult
 import com.intellij.spellchecker.inspections.SpellcheckingExtension.SpellingTypo
+import com.intellij.spellchecker.tokenizer.SpellcheckingStrategy
+import com.intellij.util.containers.ContainerUtil
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.function.Consumer
 
+private val DOMAINS = TextContent.TextDomain.ALL
 
 class GrazieSpellcheckingExtension : SpellcheckingExtension {
 
-  override fun spellcheck(element: PsiElement, session: LocalInspectionToolSession, consumer: Consumer<SpellingTypo>): SpellCheckingResult {
-    if (!Registry.`is`("spellchecker.grazie.enabled", false)) return SpellCheckingResult.Ignored
-    ProgressManager.checkCanceled()
-    if (element is PsiWhiteSpace) return SpellCheckingResult.Checked
+  private val knownPhrases = ContainerUtil.createConcurrentSoftValueMap<Language, KnownPhrases>()
 
-    val texts = sortByPriority(TextExtractor.findTextsAt(element, allDomains()), session.priorityRange)
-    val textSpeller = getTextSpeller(element.project) ?: return SpellCheckingResult.Ignored
-    if (texts.isNotEmpty()) {
-      texts
-        .map { it to findTypos(it, session, textSpeller) }
-        .flatMap { mapTypo(it.first, it.second) }
-        .filter { belongsToPsiElement(element, it) }
-        .forEach { consumer.accept(it) }
-      return SpellCheckingResult.Checked
+  override fun spellcheck(element: PsiElement, session: LocalInspectionToolSession, consumer: Consumer<SpellingTypo>): SpellCheckingResult {
+    val strategy = getSpellcheckingStrategy(element)
+    if (!strategy.useTextLevelSpellchecking()) return SpellCheckingResult.Ignored
+
+    if (element is PsiWhiteSpace) return SpellCheckingResult.Checked
+    ProgressManager.checkCanceled()
+
+    val texts = sortByPriority(TextExtractor.findTextsExactlyAt(element, DOMAINS), session.priorityRange)
+    if (texts.isEmpty()) {
+      if (hasTextAround(element, strategy)) return SpellCheckingResult.Checked
+      return SpellCheckingResult.Ignored
     }
 
-    val strategy = SpellCheckingInspection.getSpellcheckingStrategy(element)
-    if (strategy.elementFitsScope(element, setOf(Code))) return SpellCheckingResult.Ignored
-
-    val range = ElementManipulators.getManipulator(element)?.getRangeInElement(element) ?: TextRange(0, element.textLength)
-    val text = range.substring(element.text)
-    textSpeller.checkText(text)
-      .map { SimpleTypo(it.word, mapRange(it.range).shiftRight(range.startOffset), element) }
+    val textSpeller = getTextSpeller(element.project) ?: return SpellCheckingResult.Ignored
+    texts.asSequence()
+      .map { it to findTypos(it, session, textSpeller) }
+      .flatMap { mapTypo(it.first, it.second, element) }
+      .filterNot { it.word.length < MINIMAL_TYPO_LENGTH }
       .forEach { consumer.accept(it) }
     return SpellCheckingResult.Checked
   }
 
   private fun getTextSpeller(project: Project): TextSpeller? {
     val speller = project.service<GrazieSpellCheckerEngine>().getSpeller() ?: return null
-    return TextSpeller(listOf(object : Speller by speller {
-      override fun languages(): List<LanguageWithVariant> = GrazieConfig.get().enabledLanguages.mapNotNull { it.withVariant }
-    }))
+    val enabledLanguages = GrazieConfig.get().enabledLanguages.mapNotNull { it.withVariant }
+
+    return object : TextSpeller(listOf(object : Speller by speller {
+      override fun languages(): List<LanguageWithVariant> = enabledLanguages
+    })) {
+      override fun ignoreInContext(word: Tokenizer.Token, text: CharSequence): Boolean {
+        return super.ignoreInContext(word, text) || isRangeCoveredByValidPhrase(word, text)
+      }
+
+      private fun isRangeCoveredByValidPhrase(word: Tokenizer.Token, text: CharSequence): Boolean {
+        return enabledLanguages
+          .asSequence()
+          .map { it.base }
+          .filter { it in KnownPhrases.SUPPORTED_LANGUAGES }
+          .map { lang -> knownPhrases.computeIfAbsent(lang) { KnownPhrases.forLanguage(lang) } }
+          .any {
+            ProgressManager.checkCanceled()
+            it.isRangeCoveredByValidPhrase(text, word.range.first, word.range.checkedEndExclusive)
+          }
+      }
+    }
   }
 
-  private fun belongsToPsiElement(element: PsiElement, typo: SpellingTypo): Boolean {
-    return typo.range.intersectsStrict(TextRange(0, element.text.length))
-  }
-
-  private fun allDomains(): Set<TextContent.TextDomain> = TextContent.TextDomain.entries.toSet()
-
-  private fun mapTypo(text: TextContent, typos: List<Typo>): List<SpellingTypo> {
-    val range = text.commonParent.textRange
-    return typos.map {
-      SimpleTypo(
-        it.word,
-        text.textRangeToFile(mapRange(it.range)).shiftLeft(range.startOffset),
-        text.commonParent
-      )
+  private fun mapTypo(text: TextContent, typos: List<Typo>, element: PsiElement): List<SimpleTypo> {
+    val psiRange = element.textRange
+    return typos.mapNotNull {
+      val range = text.textRangeToFile(mapRange(it.range))
+      if (!psiRange.contains(range)) return@mapNotNull null
+      SimpleTypo(it.word, range.shiftLeft(element.textRange.startOffset), element)
     }
   }
 
@@ -98,6 +113,19 @@ class GrazieSpellcheckingExtension : SpellcheckingExtension {
         }
       })
     }
+  }
+
+  private fun hasTextAround(element: PsiElement, strategy: SpellcheckingStrategy): Boolean =
+    strategy.elementFitsScope(element, setOf(Literals, Comments)) && childHasText(element)
+
+  private fun childHasText(root: PsiElement): Boolean {
+    if (root.firstChild == null) return false
+    for (element in SyntaxTraverser.psiTraverser(root)) {
+      if (TextExtractor.findTextsExactlyAt(element, DOMAINS).isNotEmpty()) {
+        return true
+      }
+    }
+    return false
   }
 }
 

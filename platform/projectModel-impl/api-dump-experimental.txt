@@ -1,4 +1,15 @@
 *:com.intellij.workspaceModel.core.fileIndex.DependencyDescription
+*f:com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnArbitraryEntity
+- com.intellij.workspaceModel.core.fileIndex.DependencyDescription
+- <init>(java.lang.Class,kotlin.jvm.functions.Function1):V
+- f:component1():java.lang.Class
+- f:component2():kotlin.jvm.functions.Function1
+- f:copy(java.lang.Class,kotlin.jvm.functions.Function1):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnArbitraryEntity
+- bs:copy$default(com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnArbitraryEntity,java.lang.Class,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnArbitraryEntity
+- equals(java.lang.Object):Z
+- f:getDependantEntitiesGetter():kotlin.jvm.functions.Function1
+- f:getEntityClass():java.lang.Class
+- hashCode():I
 *f:com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnChild
 - com.intellij.workspaceModel.core.fileIndex.DependencyDescription
 - <init>(java.lang.Class,kotlin.jvm.functions.Function1):V
@@ -9,19 +20,6 @@
 - equals(java.lang.Object):Z
 - f:getChildClass():java.lang.Class
 - f:getParentGetter():kotlin.jvm.functions.Function1
-- hashCode():I
-*f:com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnEntity
-- com.intellij.workspaceModel.core.fileIndex.DependencyDescription
-- <init>(java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1):V
-- f:component1():java.lang.Class
-- f:component2():java.lang.Class
-- f:component3():kotlin.jvm.functions.Function1
-- f:copy(java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnEntity
-- bs:copy$default(com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnEntity,java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnEntity
-- equals(java.lang.Object):Z
-- f:getEntityClass():java.lang.Class
-- f:getResultClass():java.lang.Class
-- f:getResultGetter():kotlin.jvm.functions.Function1
 - hashCode():I
 *f:com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnParent
 - com.intellij.workspaceModel.core.fileIndex.DependencyDescription
@@ -36,16 +34,14 @@
 - hashCode():I
 *f:com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference
 - com.intellij.workspaceModel.core.fileIndex.DependencyDescription
-- <init>(java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1):V
+- <init>(java.lang.Class,kotlin.jvm.functions.Function1):V
 - f:component1():java.lang.Class
-- f:component2():java.lang.Class
-- f:component3():kotlin.jvm.functions.Function1
-- f:copy(java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference
-- bs:copy$default(com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference,java.lang.Class,java.lang.Class,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference
+- f:component2():kotlin.jvm.functions.Function1
+- f:copy(java.lang.Class,kotlin.jvm.functions.Function1):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference
+- bs:copy$default(com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference,java.lang.Class,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.workspaceModel.core.fileIndex.DependencyDescription$OnReference
 - equals(java.lang.Object):Z
 - f:getReferenceHolderClass():java.lang.Class
 - f:getReferencedEntitiesGetter():kotlin.jvm.functions.Function1
-- f:getResultClass():java.lang.Class
 - hashCode():I
 *e:com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 - java.lang.Enum
@@ -58,6 +54,8 @@
 - *sf:Companion:com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex$Companion
 - a:findFileSet(com.intellij.openapi.vfs.VirtualFile,Z,Z,Z,Z,Z,Z):com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSet
 - a:findFileSetWithCustomData(com.intellij.openapi.vfs.VirtualFile,Z,Z,Z,Z,Z,Z,java.lang.Class):com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetWithCustomData
+- *a:findFileSets(com.intellij.openapi.vfs.VirtualFile,Z,Z,Z,Z,Z,Z):java.util.List
+- *a:findFileSetsWithCustomData(com.intellij.openapi.vfs.VirtualFile,Z,Z,Z,Z,Z,Z,java.lang.Class):java.util.List
 - a:getContentFileSetRoot(com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.openapi.vfs.VirtualFile
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 - a:isInContent(com.intellij.openapi.vfs.VirtualFile):Z

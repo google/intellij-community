@@ -30,6 +30,7 @@ kotlin {
   compilerOptions.freeCompilerArgs = listOf(
     "-Xlambdas=class",
     "-Xconsistent-data-class-copy-visibility",
+    "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks",
   )
   jvm {}
   pluginManager.withPlugin("fleet-build-jps-module-plugin") {
@@ -53,7 +54,7 @@ kotlin {
       isTransitive = false
       exclude(group = "org.slf4j", module = "slf4j-jdk14")
     }
-    implementation(project(":util-logging-api"))
+    implementation(project(":fleet.util.logging.api"))
   }
   // KOTLIN__MARKER_END
 }

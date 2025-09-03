@@ -2,7 +2,6 @@
 package com.intellij.util.indexing
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
@@ -215,9 +214,14 @@ class UnindexedFilesScanner (
 
     val triggerA = forceReindexingTrigger
     val triggerB = oldTask.forceReindexingTrigger
-    val mergedPredicate = BiPredicate { f: IndexedFile, stamp: FileIndexingStamp ->
-      (triggerA != null && triggerA.test(f, stamp)) ||
-      (triggerB != null && triggerB.test(f, stamp))
+
+    val mergedPredicate = if (triggerA == null && triggerB == null) {
+      null
+    } else {
+      BiPredicate { f: IndexedFile, stamp: FileIndexingStamp ->
+        (triggerA != null && triggerA.test(f, stamp)) ||
+        (triggerB != null && triggerB.test(f, stamp))
+      }
     }
     return UnindexedFilesScanner(
       myProject,
@@ -249,11 +253,8 @@ class UnindexedFilesScanner (
           .collectIndexableFilesConcurrently(orderedProviders)
       }
       finally {
-        ReadAction.run<Throwable> {
-          // read action ensures that service won't be disposed and storage inside won't be closed
-          myProject.getServiceIfCreated(ProjectIndexingDependenciesService::class.java)
-            ?.completeToken(scanningRequest, scanningIterators.isFullIndexUpdate())
-        }
+        myProject.getServiceIfCreated(ProjectIndexingDependenciesService::class.java)
+          ?.completeToken(scanningRequest, scanningIterators.isFullIndexUpdate())
       }
     }
 

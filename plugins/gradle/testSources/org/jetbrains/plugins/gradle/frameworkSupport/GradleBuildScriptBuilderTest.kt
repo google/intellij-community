@@ -482,4 +482,43 @@ class GradleBuildScriptBuilderTest : GradleBuildScriptBuilderTestCase() {
       }
     }
   }
+
+  @Test
+  fun `test build script with kotlin java block`() {
+    assertBuildScript("""
+      group = 'testing'
+      version = '1.0'
+      
+      java {
+          withSourcesJar()
+      }
+      
+      kotlin {
+          jvmToolchain(21)
+          jvm()
+      }
+    """.trimIndent(), """
+      group = "testing"
+      version = "1.0"
+      
+      java {
+          withSourcesJar()
+      }
+      
+      kotlin {
+          jvmToolchain(21)
+          jvm()
+      }
+    """.trimIndent()) {
+      addGroup("testing")
+      addVersion("1.0")
+      withKotlinJvmToolchain(21)
+      withKotlin {
+        call("jvm")
+      }
+      withJava {
+        call("withSourcesJar")
+      }
+    }
+  }
 }

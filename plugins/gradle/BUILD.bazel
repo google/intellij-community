@@ -45,7 +45,6 @@ jvm_library(
     "@lib//:ion",
     "@lib//:stream_ex",
     "//platform/statistics",
-    "//platform/inspect",
     "@lib//:fastutil-min",
     "@lib//:commons-cli",
     "//platform/workspace/storage",
@@ -77,7 +76,6 @@ jvm_library(
     "@lib//:slf4j-api",
     "@lib//:slf4j-jdk14",
     "@lib//:gradle",
-    "//platform/inspect",
   ],
   runtime_deps = [
     ":gradle_resources",
@@ -111,13 +109,14 @@ jvm_library(
 
 jvm_library(
   name = "gradle-tests_test_lib",
+  module_name = "intellij.gradle.tests",
   visibility = ["//visibility:public"],
-  srcs = glob(["testSources/**/*.kt", "testSources/**/*.java"], allow_empty = True),
+  srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:jmock",
     "@lib//:jmock-junit4",
     "@lib//:jmock-legacy",
-    "@lib//:mockito",
+    "//libraries/mockito",
     "@lib//:mockito-kotlin",
     "@lib//:junit4",
     "//plugins/gradle",
@@ -169,7 +168,10 @@ jvm_library(
     "//platform/smRunner:smRunner_test_lib",
     "@lib//:gson",
     "@lib//:guava",
+    "//platform/eel",
+    "//platform/eel-provider",
   ],
+  exports = ["//platform/external-system-api/testFramework"],
   runtime_deps = [
     ":gradle-tests_test_resources",
     "//platform/execution.dashboard",

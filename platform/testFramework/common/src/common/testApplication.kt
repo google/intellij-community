@@ -21,11 +21,13 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.impl.AWTExceptionHandler
 import com.intellij.openapi.application.impl.ApplicationImpl
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
+import com.intellij.openapi.application.impl.TestOnlyThreading
 import com.intellij.openapi.command.impl.DocumentReferenceManagerImpl
 import com.intellij.openapi.command.impl.UndoManagerImpl
 import com.intellij.openapi.command.undo.DocumentReferenceManager
 import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.impl.EditorFactoryImpl
@@ -42,7 +44,6 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.encoding.EncodingManager
 import com.intellij.openapi.vfs.encoding.EncodingManagerImpl
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemBase
-import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.newvfs.RefreshQueue
 import com.intellij.openapi.vfs.newvfs.RefreshQueueImpl
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS
@@ -322,8 +323,8 @@ fun Application.checkEditorsReleased() {
 @TestOnly
 @Internal
 fun Application.clearIdCache() {
-  val managingFS = serviceIfCreated<ManagingFS>() ?: return
-  (managingFS as PersistentFS).clearIdCache()
+  //val managingFS = serviceIfCreated<ManagingFS>() ?: return
+  //(managingFS as PersistentFS).clearIdCache()
 }
 
 @TestOnly
@@ -377,14 +378,18 @@ fun waitForAppLeakingThreads(application: Application, timeout: Long, timeUnit: 
   }
 
   val commitThread = application.serviceIfCreated<DocumentCommitProcessor>() as? DocumentCommitThread
-  commitThread?.waitForAllCommits(timeout, timeUnit)
+  TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
+    commitThread?.waitForAllCommits(timeout, timeUnit)
+  }
 
   val stubIndex = application.serviceIfCreated<StubIndex>() as? StubIndexImpl
   stubIndex?.waitUntilStubIndexedInitialized()
 
-  while (RefreshQueue.getInstance() != null && (RefreshQueueImpl.isRefreshInProgress() || RefreshQueueImpl.isEventProcessingInProgress())) {
+  while (RefreshQueue.getInstance() != null && (RefreshQueueImpl.isRefreshInProgress || RefreshQueueImpl.isEventProcessingInProgress)) {
     if (EDT.isCurrentThreadEdt()) {
-      EDT.dispatchAllInvocationEvents()
+      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
+        EDT.dispatchAllInvocationEvents()
+      }
     }
     else {
       UIUtil.pump()

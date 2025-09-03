@@ -37,6 +37,8 @@ abstract class KotlinJUnitMalformedDeclarationInspectionTestV57 : KotlinJUnitMal
 }
 
 abstract class KotlinJUnitMalformedDeclarationInspectionTestLatest : KotlinJUnitMalformedDeclarationInspectionTestBase(JUNIT5_LATEST) {
+  abstract val pluginVersion: String
+
   /* Malformed extensions */
   fun `test malformed extension no highlighting`() {
     myFixture.testHighlighting(
@@ -529,6 +531,24 @@ abstract class KotlinJUnitMalformedDeclarationInspectionTestLatest : KotlinJUnit
       JvmLanguage.KOTLIN, """
         @org.junit.jupiter.params.ParameterizedClass
         @org.junit.jupiter.params.provider.MethodSource(<error descr="Method source 'a' must be static">"a"</error>)
+        class TestMethodSource {
+          @org.junit.jupiter.params.Parameter
+          lateinit var param: String
+
+          @org.junit.jupiter.api.Test
+          fun test() { }
+          
+          fun a(): Array<String> { return arrayOf("a", "b") }          
+        }        
+        """.trimIndent())
+  }
+
+  fun `test malformed parameterized class method source should not be static`() {
+    myFixture.testHighlighting(
+      JvmLanguage.KOTLIN, """
+        @org.junit.jupiter.params.ParameterizedClass
+        @org.junit.jupiter.params.provider.MethodSource("a")
+        @org.junit.jupiter.api.TestInstance(org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS)
         class TestMethodSource {
           @org.junit.jupiter.params.Parameter
           lateinit var param: String
@@ -1166,6 +1186,7 @@ abstract class KotlinJUnitMalformedDeclarationInspectionTestLatest : KotlinJUnit
     """.trimIndent(), "Add method 'parameters' to 'Test'") // TODO make createMethod preview work
   }
 
+  // TODO remove the "pluginVersion" property after fixing KTIJ-35230
   fun `test malformed parameterized introduce field source quick fix`() {
     myFixture.testQuickFix(
       JvmLanguage.KOTLIN, """
@@ -1173,25 +1194,25 @@ abstract class KotlinJUnitMalformedDeclarationInspectionTestLatest : KotlinJUnit
       import org.junit.jupiter.params.provider.FieldSource
       
       class Test {
-        @FieldSource("para<caret>meters")
-        @ParameterizedTest
-        fun foo(param: String) { }
+          @FieldSource("para<caret>meters")
+          @ParameterizedTest
+          fun foo(param: String) { }
       }
     """.trimIndent(), """
       import org.junit.jupiter.params.ParameterizedTest
+      import org.junit.jupiter.params.provider.Arguments
       import org.junit.jupiter.params.provider.FieldSource
 
       class Test {
-        @FieldSource("parameters")
-        @ParameterizedTest
-        fun foo(param: String) { }
+          @FieldSource("parameters")
+          @ParameterizedTest
+          fun foo(param: String) { }
 
           companion object {
-              @JvmField
-              const val parameters: MutableCollection<Any> = 0L
+              private${if(pluginVersion == "K1") " final" else ""} val parameters: MutableCollection<Arguments> = TODO("initialize me")
           }
       }
-    """.trimIndent(), "Add 'const val' property 'parameters' to 'Test'")
+    """.trimIndent(), "Add 'val' property 'parameters' to 'Test'")
   }
 
   fun `test malformed parameterized create csv source quick fix`() {
@@ -2129,10 +2150,17 @@ abstract class KotlinJUnitMalformedDeclarationInspectionTestLatest : KotlinJUnit
   fun `test malformed suspending test JUnit 5 function`() {
     myFixture.testHighlighting(
       JvmLanguage.KOTLIN, """
-      class JUnit5Test {
-          @org.junit.jupiter.api.Test
-          suspend fun <error descr="Method 'testFoo' annotated with '@Test' should not be a suspending function">testFoo</error>() { }
-      }    
+        import org.junit.jupiter.api.DisplayName
+        import org.junit.jupiter.api.Test
+        
+        class JUnit5Test {
+            @DisplayName("suspend")
+            @Test
+            fun foo() { }
+            
+            @Test
+            suspend fun <error descr="Method 'testFoo' annotated with '@Test' should not be a suspending function">testFoo</error>() { }
+        }    
     """.trimIndent())
   }
 

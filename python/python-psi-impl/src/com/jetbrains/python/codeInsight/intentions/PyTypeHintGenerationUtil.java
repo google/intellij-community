@@ -272,8 +272,10 @@ public final class PyTypeHintGenerationUtil {
     }
   }
 
-  public static void addImportsForTypeAnnotations(@NotNull List<String> types, @NotNull PsiElement anchor) {
-    final Set<PsiNamedElement> symbols = new LinkedHashSet<>();
+  /** Adds imports for type annotations. Sorts imports by name. */
+  public static void addImportsForTypeAnnotations(@NotNull Collection<String> types, @NotNull PsiElement anchor) {
+    final Set<PsiNamedElement> symbols =
+      new TreeSet<>(Comparator.comparing(PsiNamedElement::getName, Comparator.nullsFirst(Comparator.naturalOrder())));
 
     for (String type : types) {
       collectImportTargetsFromTypeExpression(type, anchor, symbols);
@@ -287,7 +289,7 @@ public final class PyTypeHintGenerationUtil {
 
   private static void collectImportTargetsFromTypeExpression(@NotNull String typeExpressionText,
                                                              @NotNull PsiElement anchor,
-                                                             @NotNull Set<PsiNamedElement> symbols) {
+                                                             @NotNull Set<@NotNull PsiNamedElement> symbols) {
     PyExpression typeExpression = PyUtil.createExpressionFromFragment(typeExpressionText, anchor);
     assert typeExpression != null;
     PyQualifiedNameResolveContext qNameResolveContext = PyResolveImportUtil.fromFoothold(anchor);
@@ -312,11 +314,13 @@ public final class PyTypeHintGenerationUtil {
   public static void checkPep484Compatibility(@Nullable PyType type, @NotNull TypeEvalContext context) {
     if (type == null ||
         isNoneType(type) ||
+        // Will be rendered as just Any
+        type instanceof PyUnsafeUnionType || 
         type instanceof PyTypeParameterType) {
       return;
     }
-    else if (type instanceof PyUnionType) {
-      for (PyType memberType : ((PyUnionType)type).getMembers()) {
+    else if (type instanceof PyUnionType unionType) {
+      for (PyType memberType : unionType.getMembers()) {
         checkPep484Compatibility(memberType, context);
       }
     }

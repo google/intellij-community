@@ -1,7 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.core.fileIndex
 
-import com.intellij.openapi.project.Project
+import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.util.messages.Topic
 import org.jetbrains.annotations.ApiStatus
 import java.util.*
@@ -15,12 +15,12 @@ interface WorkspaceFileIndexListener : EventListener {
   }
 
   fun workspaceFileIndexChanged(event: WorkspaceFileIndexChangedEvent)
-
 }
 
 @ApiStatus.Internal
-abstract class WorkspaceFileIndexChangedEvent(project: Project): EventObject(project) {
-
-  abstract fun getRemovedFileSets(): Collection<WorkspaceFileSet>
-  abstract fun getStoredFileSets(): Collection<WorkspaceFileSet>
-}
+class WorkspaceFileIndexChangedEvent(
+  val removedFileSets: Collection<Set<WorkspaceFileSet>>,
+  val registeredFileSets: Collection<Set<WorkspaceFileSet>>,
+  val storageBefore: EntityStorage,
+  val storageAfter: EntityStorage,
+)

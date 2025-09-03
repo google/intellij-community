@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.DataProvider;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
@@ -35,10 +36,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Function;
 
-/**
- * @author Anton Makeev
- * @author Konstantin Bulenkov
- */
 public class JBList<E> extends JList<E> implements ComponentWithEmptyText, ComponentWithExpandableItems<Integer> {
   public static final String IGNORE_LIST_ROW_HEIGHT = "IgnoreListRowHeight";
 
@@ -47,7 +44,7 @@ public class JBList<E> extends JList<E> implements ComponentWithEmptyText, Compo
    * the same item is rendered with exactly the same content
    */
   @ApiStatus.Internal
-  public static final String IMMUTABLE_MODEL_AND_RENDERER = "ImmutableModelAndRenderer";
+  public static final Key<Boolean> IMMUTABLE_MODEL_AND_RENDERER = Key.create("ImmutableModelAndRenderer");
 
   private StatusText myEmptyText;
   private ExpandableItemsHandler<Integer> myExpandableItemsHandler;
@@ -193,16 +190,8 @@ public class JBList<E> extends JList<E> implements ComponentWithEmptyText, Compo
     }
   }
 
-  @SuppressWarnings("LambdaUnfriendlyMethodOverload")
   public void setOffsetFromElementTopForDnD(@NotNull Function<? super Integer, Integer> offsetFromElementTopForDnD) {
     this.offsetFromElementTopForDnD = offsetFromElementTopForDnD;
-  }
-
-  /** @deprecated use {@link #setOffsetFromElementTopForDnD(Function)} instead */
-  @Deprecated(forRemoval = true)
-  @SuppressWarnings({"LambdaUnfriendlyMethodOverload", "UsagesOfObsoleteApi"})
-  public void setOffsetFromElementTopForDnD(@NotNull com.intellij.util.Function<? super Integer, Integer> offsetFromElementTopForDnD) {
-    setOffsetFromElementTopForDnD((Function<? super Integer, Integer>)offsetFromElementTopForDnD);
   }
 
   @Override
@@ -367,13 +356,12 @@ public class JBList<E> extends JList<E> implements ComponentWithEmptyText, Compo
   @Override
   public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
     int increment = super.getScrollableBlockIncrement(visibleRect, orientation, direction);
-    // in the case of scrolling list up using a single-wheel rotation,
+    // in the case of scrolling a list up using a single-wheel rotation,
     // the block increment is used to calculate min scroll as `currScroll - blockIncrement`
     // the resulting y-position of visible rect never exceeds min scroll
     // see `javax.swing.plaf.basic.BasicScrollPaneUI.Handler.mouseWheelMoved` -> vertical handling part -> limitScroll
     return adjustIncrement(visibleRect, orientation, direction, increment);
   }
-
 
   private static int adjustIncrement(Rectangle visibleRect, int orientation, int direction, int increment) {
     if (increment == 0 && orientation == SwingConstants.VERTICAL && direction < 0) {
@@ -479,7 +467,8 @@ public class JBList<E> extends JList<E> implements ComponentWithEmptyText, Compo
     SpeedSearchSupply supply = SpeedSearchSupply.getSupply(this, true);
     if (supply == null) {
       return null;
-    } else {
+    }
+    else {
       return supply.getInputMethodRequests();
     }
   }

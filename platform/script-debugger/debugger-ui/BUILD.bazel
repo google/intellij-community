@@ -1,11 +1,17 @@
 ### auto-generated section `build intellij.platform.scriptDebugger.ui` start
-load("@rules_jvm//:jvm.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+jvm_resources(
+  name = "scriptDebugger-ui_resources",
+  files = glob(["resources/**/*"]),
+  strip_prefix = "resources"
+)
 
 jvm_library(
   name = "scriptDebugger-ui",
   module_name = "intellij.platform.scriptDebugger.ui",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
@@ -27,6 +33,7 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io",
     "//platform/platform-util-netty:ide-util-netty",
     "//platform/util/jdom",
-  ]
+  ],
+  runtime_deps = [":scriptDebugger-ui_resources"]
 )
 ### auto-generated section `build intellij.platform.scriptDebugger.ui` end

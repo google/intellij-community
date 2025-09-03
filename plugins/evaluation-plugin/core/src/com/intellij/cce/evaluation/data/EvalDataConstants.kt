@@ -191,23 +191,23 @@ object Execution {
     )
   )
 
-  val REFERENCE_NAMED_RANGES: TrivialEvalData<List<NamedRange>> = EvalDataDescription(
-    name = "Reference named ranges",
-    description = "Ground truth named ranges",
-    DataPlacement.AdditionalNamedRanges(REFERENCE_NAMED_RANGE_PROPERTY),
+  val REFERENCE_CODE_COMMENT_RANGES: TrivialEvalData<List<CodeCommentRange>> = EvalDataDescription(
+    name = "Reference code comment ranges",
+    description = "Ground truth code comment ranges",
+    DataPlacement.AdditionalCodeCommentRanges(REFERENCE_CODE_COMMENT_RANGE_PROPERTY),
     presentation = EvalDataPresentation(
       PresentationCategory.EXECUTION,
-      DataRenderer.NamedRanges
+      DataRenderer.CodeCommentRanges
     )
   )
 
-  val PREDICTED_NAMED_RANGES: TrivialEvalData<List<NamedRange>> = EvalDataDescription(
-    name = "Predicted named ranges",
-    description = "Predicted named ranges",
-    DataPlacement.AdditionalNamedRanges(PREDICTED_NAMED_RANGE_PROPERTY),
+  val PREDICTED_CODE_COMMENT_RANGES: TrivialEvalData<List<CodeCommentRange>> = EvalDataDescription(
+    name = "Predicted code comment ranges",
+    description = "Predicted code comment ranges",
+    DataPlacement.AdditionalCodeCommentRanges(PREDICTED_CODE_COMMENT_RANGE_PROPERTY),
     presentation = EvalDataPresentation(
       PresentationCategory.EXECUTION,
-      DataRenderer.NamedRanges
+      DataRenderer.CodeCommentRanges
     )
   )
 }
@@ -325,6 +325,36 @@ object Analysis {
     presentation = EvalDataPresentation(
       PresentationCategory.ANALYSIS,
       renderer = DataRenderer.Lines,
+    )
+  )
+
+  val CORRECT_ATTACHMENT: TrivialEvalData<String> = EvalDataDescription(
+    name = "Correct attachment that should be retrieved",
+    description = "Bind with correct attachment",
+    DataPlacement.AdditionalText(AIA_CORRECT_ATTACHMENT),
+    presentation = EvalDataPresentation(
+      PresentationCategory.ANALYSIS,
+      renderer = DataRenderer.Text(wrapping = true, showEmpty = true),
+    )
+  )
+
+  val RETRIEVED_ATTACHMENTS: TrivialEvalData<List<String>> = EvalDataDescription(
+    name = "Retrieved attachments",
+    description = "Bind with the list of retrieved chat attachments",
+    DataPlacement.AdditionalConcatenatedLines(AIA_RETRIEVED_ATTACHMENTS),
+    presentation = EvalDataPresentation(
+      PresentationCategory.ANALYSIS,
+      renderer = DataRenderer.Lines,
+    )
+  )
+
+  val IS_CORRECT_ATTACHMENT_AMONG_RETRIEVED: TrivialEvalData<Boolean> = EvalDataDescription(
+    name = "Is correct attachment among retrieved",
+    description = "Bind with a flag indicating whether correct attachment was retrieved",
+    DataPlacement.AdditionalBoolean(AIA_IS_CORRECT_ATTACHMENT_AMONG_RETRIEVED),
+    presentation = EvalDataPresentation(
+      PresentationCategory.ANALYSIS,
+      renderer = DataRenderer.InlineBoolean,
     )
   )
 

@@ -22,9 +22,11 @@ import com.intellij.psi.createSmartPointer
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.components.resolveToCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
+import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolOrigin
@@ -55,7 +57,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
         }
     }
 
-    context(KaSession)
+    context(session: KaSession)
     @OptIn(KaExperimentalApi::class)
     private fun collectFromParameters(
         callElement: KtCallElement,
@@ -68,6 +70,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
         val excludeListed: Boolean
         val contextMenuPayloads: List<InlayPayload>?
         val callableFqName = functionSymbol.callableId?.asSingleFqName()?.asString()
+            ?: (functionSymbol as? KaConstructorSymbol)?.containingClassId?.asSingleFqName()?.asString()
         if (callableFqName != null) {
             val parameterNames = valueParameters.map { it.name.asString() }
             excludeListed = isExcludeListed(callableFqName, parameterNames)
@@ -84,7 +87,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
         sink.whenOptionEnabled(SHOW_EXCLUDED_PARAMETERS.name) {
             if (excludeListed) {
                 val valueParametersWithNames =
-                    calculateValueParametersWithNames(functionSymbol, callElement, valueParameters) ?: return@whenOptionEnabled
+                    session.calculateValueParametersWithNames(functionSymbol, callElement, valueParameters) ?: return@whenOptionEnabled
 
                 collectFromParameters(functionCall.argumentMapping, valueParametersWithNames, contextMenuPayloads, sink)
             }
@@ -92,7 +95,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
 
         if (excludeListed) return
 
-        val valueParametersWithNames = calculateValueParametersWithNames(functionSymbol, callElement, valueParameters) ?: return
+        val valueParametersWithNames = session.calculateValueParametersWithNames(functionSymbol, callElement, valueParameters) ?: return
 
         val compiledSource = valueParametersWithNames.any { pair ->
             val psi = pair.first.takeIf { it.origin == KaSymbolOrigin.JAVA_LIBRARY }?.psi ?: return@any false
@@ -139,7 +142,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
         return valueParametersWithNames
     }
 
-    context(KaSession)
+    context(_: KaSession)
     private fun collectFromParameters(
         args: Map<KtExpression, KaVariableSignature<KaValueParameterSymbol>>,
         valueParametersWithNames: List<Pair<KaValueParameterSymbol, Name?>>,
@@ -217,7 +220,7 @@ class KtParameterHintsProvider : AbstractKtInlayHintsProvider() {
     }
 }
 
-context(KaSession)
+context(_: KaSession)
 internal fun isExcludeListed(callableFqName: String, parameterNames: List<String>): Boolean {
     return ParameterHintsExcludeListService.getInstance().isExcluded(
         callableFqName,
@@ -230,7 +233,7 @@ class KtParameterHintsExcludeListConfigProvider : ParameterHintsExcludeListConfi
     override fun getDefaultExcludeList(): Set<String> = setOf(
         "*listOf", "*setOf", "*arrayOf", "*ListOf", "*SetOf", "*ArrayOf", "*assert*(*)", "*mapOf", "*MapOf",
         "kotlin.require*(*)", "kotlin.check*(*)", "*contains*(value)", "*containsKey(key)", "kotlin.lazyOf(value)",
-        "*SequenceBuilder.resume(value)", "*SequenceBuilder.yield(value)",
+        "*SequenceBuilder.resume(value)", "*SequenceBuilder.yield(value)", "kotlin.Triple",
 
         /* Gradle DSL especially annoying hints */
         "org.gradle.api.Project.property(propertyName)",

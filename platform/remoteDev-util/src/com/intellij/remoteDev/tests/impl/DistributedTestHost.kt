@@ -11,11 +11,13 @@ import com.intellij.diagnostic.logs.LogCategory
 import com.intellij.diagnostic.logs.LogLevelConfigurationManager
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginModuleId.Companion.asPluginModuleId
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.rd.util.adviseSuspend
@@ -160,7 +162,7 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
 
           // Create test class
           val testPluginId = System.getProperty("distributed.test.module", TEST_PLUGIN_ID)
-          val testPlugin = PluginManagerCore.getPluginSet().findEnabledModule(testPluginId)
+          val testPlugin = PluginManagerCore.getPluginSet().findEnabledModule(PluginId(testPluginId).asPluginModuleId())
                            ?: error("Test plugin '$testPluginId' is not found")
 
           LOG.info("Test class will be loaded from '${testPlugin.pluginId}' plugin")
@@ -320,6 +322,12 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           requestFocus(reportFailures)
         }
 
+        session.isFocused.setSuspend(Dispatchers.IO) { _, _ ->
+          Window.getWindows().filter { it.isShowing }.any {
+            it.isFocused || it.isFocusAncestor()
+          }
+        }
+
         session.makeScreenshot.setSuspend(sessionBgtDispatcher) { _, fileName ->
           makeScreenshot(fileName)
         }
@@ -369,14 +377,14 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
 
   private suspend fun requestFocusWithProjectIfNeeded(project: Project, reportFailures: Boolean): Boolean {
     val projectIdeFrame = WindowManager.getInstance().getFrame(project)
-    if (projectIdeFrame == null) {
-      LOG.info("No frame yet, nothing to focus")
+    if (projectIdeFrame == null || !projectIdeFrame.isVisible) { // it really does happen that only one is true
+      LOG.info("No visible frame yet, nothing to focus")
       return false
     }
     else {
       val frameName = "frame '${projectIdeFrame.name}'"
 
-      return if ((projectIdeFrame.isFocusAncestor() || projectIdeFrame.isFocused)) {
+      return if ((projectIdeFrame.isFocusAncestor() || projectIdeFrame.isFocused)) { // it really does happen that only one is true
         LOG.info("Frame '$frameName' is already focused")
         true
       }
@@ -405,7 +413,7 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           LOG.info(message)
         }
       }) {
-        projectIdeFrame.isFocusAncestor() || projectIdeFrame.isFocused
+        projectIdeFrame.isFocusAncestor() || projectIdeFrame.isFocused // it really does happen that only one is true
       }
     }
   }

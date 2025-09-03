@@ -17,6 +17,7 @@ import com.intellij.platform.searchEverywhere.equalityProviders.SeEqualityChecke
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeProvidersHolder
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
+import com.intellij.platform.searchEverywhere.utils.SeResultsCountBalancer
 import com.jetbrains.rhizomedb.EID
 import fleet.kernel.DurableRef
 import fleet.kernel.onDispose
@@ -46,19 +47,26 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     dataContextId: DataContextId?,
     requestedCountChannel: ReceiveChannel<Int>,
   ): Flow<SeTransferEvent> {
+    val providerHolder = getProvidersHolder(sessionRef, dataContextId) ?: return emptyFlow()
+
     val requestedCountState = MutableStateFlow(0)
     val receivingJob = coroutineScope.launch {
       requestedCountChannel.consumeEach { count ->
         requestedCountState.update { it + count }
       }
     }
-    val resultsBalancer = SeResultsCountBalancer(providerIds)
+
+    val splitProviderIds = providerHolder.splitToEssentialAndNonEssential(providerIds)
+    val resultsBalancer = SeResultsCountBalancer("BE",
+                                                 nonBlockedProviderIds = emptyList(),
+                                                 highPriorityProviderIds = splitProviderIds[SeProviderIdUtils.ESSENTIAL_KEY]!!,
+                                                 lowPriorityProviderIds = splitProviderIds[SeProviderIdUtils.NON_ESSENTIAL_KEY]!!)
 
     SeLog.log(SeLog.ITEM_EMIT) { "Backend will request items from providers: ${providerIds.joinToString(", ")}" }
 
     val itemsFlows = providerIds.mapNotNull { providerId ->
-      getProvidersHolder(sessionRef, dataContextId)
-        ?.get(providerId, isAllTab)
+      providerHolder
+        .get(providerId, isAllTab)
         ?.getItems(params)
         ?.map {
           resultsBalancer.add(it)
@@ -94,10 +102,14 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     dataContextId: DataContextId
   ) : Map<String, Set<SeProviderId>> {
     val providersHolder = getProvidersHolder(sessionRef, dataContextId) ?: return emptyMap()
+    return providersHolder.splitToEssentialAndNonEssential(
+      SeItemsProviderFactory.EP_NAME.extensionList.map { it.id.toProviderId() }
+    )
+  }
 
-    val essential = providersHolder.getEssentialAllTabProviderIds()
-    val nonEssential = SeItemsProviderFactory.EP_NAME.extensionList.map { it.id.toProviderId() }.filter { it !in essential }.toSet()
-
+  private fun SeProvidersHolder.splitToEssentialAndNonEssential(providerIds: List<SeProviderId>): Map<String, Set<SeProviderId>> {
+    val essential = getEssentialAllTabProviderIds().filter { it in providerIds }.toSet()
+    val nonEssential = providerIds.filter { it !in essential }.toSet()
     return mapOf(SeProviderIdUtils.ESSENTIAL_KEY to essential, SeProviderIdUtils.NON_ESSENTIAL_KEY to nonEssential)
   }
 
@@ -214,6 +226,10 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
       providerIds, params, isAllTab, providersHolder, projectId,
     )
     return true
+  }
+
+  suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {
+    return item.fetchItemIfExists()?.presentation()
   }
 
   companion object {

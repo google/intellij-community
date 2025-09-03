@@ -10,7 +10,7 @@ create_kotlinc_options(
     "org.jetbrains.kotlin.analysis.api.KaIdeApi",
     "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
   ],
-  x_context_receivers = True
+  x_context_parameters = True
 )
 
 jvm_resources(
@@ -29,7 +29,7 @@ jvm_library(
   name = "kotlin-gradle-scripting-k2",
   module_name = "kotlin.gradle.scripting.k2",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-gradle-scripting-k2",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -67,6 +67,7 @@ jvm_library(
     "//platform/core-api:core",
     "//plugins/kotlin/base/scripting/scripting.shared",
     "//java/openapi:java",
+    "//platform/platform-impl:ide-impl",
   ],
   runtime_deps = [
     ":kotlin-gradle-scripting-k2_resources",
@@ -77,7 +78,7 @@ jvm_library(
 jvm_library(
   name = "kotlin-gradle-scripting-k2_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["tests/**/*.kt", "tests/**/*.java"], allow_empty = True),
+  srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-gradle-scripting-k2",
   associates = [":kotlin-gradle-scripting-k2"],
   deps = [
@@ -143,6 +144,7 @@ jvm_library(
     "//platform/projectModel-impl",
     "//plugins/kotlin/base/scripting/scripting.shared",
     "//java/openapi:java",
+    "//platform/platform-impl:ide-impl",
   ],
   runtime_deps = [
     ":kotlin-gradle-scripting-k2_resources",

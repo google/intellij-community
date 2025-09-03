@@ -26,11 +26,13 @@ jvm_library(
     "//plugins/devkit/intellij.kotlin.devkit/k1",
     "//plugins/devkit/intellij.kotlin.devkit/k2",
     "//plugins/devkit/intellij.devkit.workspaceModel:workspaceModel",
+    "//plugins/devkit/intellij.devkit.compose:compose",
   ]
 )
 
 jvm_library(
   name = "devkit-plugin-main_test_lib",
+  module_name = "intellij.devkit.plugin.main",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   deps = [
@@ -43,6 +45,7 @@ jvm_library(
     "//plugins/devkit/intellij.kotlin.devkit/k1",
     "//plugins/devkit/intellij.kotlin.devkit/k2",
     "//plugins/devkit/intellij.devkit.workspaceModel:workspaceModel",
+    "//plugins/devkit/intellij.devkit.compose:compose",
   ]
 )
 ### auto-generated section `build intellij.devkit.plugin.main` end
@@ -73,6 +76,7 @@ jvm_library(
 
 jvm_library(
   name = "devkit-plugin-main-noKotlin_test_lib",
+  module_name = "intellij.devkit.plugin.main.noKotlin",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   deps = ["//plugins/devkit/devkit-java-tests:java-tests_test_lib"],

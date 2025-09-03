@@ -114,13 +114,14 @@ class InlayTextMetrics(
   editor: Editor,
   val fontHeight: Int,
   val fontBaseline: Int,
-  private val fontMetrics: FontMetrics,
+  val fontMetrics: FontMetrics,
   val fontType: Int,
-  private val ideScale: Float,
+  val ideScale: Float,
 ) {
   companion object {
-    internal fun create(editor: Editor, size: Float, fontType: Int, context: FontRenderContext) : InlayTextMetrics {
-      val font = if (EditorSettingsExternalizable.getInstance().isUseEditorFontInInlays) {
+    @ApiStatus.Internal
+    fun create(editor: Editor, size: Float, fontType: Int, context: FontRenderContext, isUseEditorFontInInlays: Boolean) : InlayTextMetrics {
+      val font = if (isUseEditorFontInInlays) {
         val editorFont = EditorUtil.getEditorFont()
         editorFont.deriveFont(fontType, size)
       } else {
@@ -133,6 +134,10 @@ class InlayTextMetrics(
       val fontBaseline = ceil(font.createGlyphVector(context, "Alb").visualBounds.height).toInt()
       return InlayTextMetrics(editor, fontHeight, fontBaseline, metrics, fontType, UISettings.getInstance().ideScale)
     }
+
+    internal fun create(editor: Editor, size: Float, fontType: Int, context: FontRenderContext) : InlayTextMetrics {
+      return create(editor, size, fontType, context, EditorSettingsExternalizable.getInstance().isUseEditorFontInInlays)
+    }
   }
 
   val font: Font
@@ -142,6 +147,7 @@ class InlayTextMetrics(
   val ascent: Int = editor.ascent
   val descent: Int = (editor as? EditorImpl)?.descent ?: 0
   val lineHeight: Int = editor.lineHeight
+  val spaceWidth: Int = EditorUtil.getPlainSpaceWidth(editor)
   private val editorComponent = editor.component
 
   @Deprecated("Use InlayTextMetricsStorage.getCurrentStamp() to ensure actual metrics are used")
@@ -162,7 +168,8 @@ class InlayTextMetrics(
   }
 }
 
-private fun getFontRenderContext(editorComponent: JComponent): FontRenderContext {
+@ApiStatus.Internal
+fun getFontRenderContext(editorComponent: JComponent): FontRenderContext {
   val editorContext = FontInfo.getFontRenderContext(editorComponent)
   return FontRenderContext(editorContext.transform,
                            AntialiasingType.getKeyForCurrentScope(false),

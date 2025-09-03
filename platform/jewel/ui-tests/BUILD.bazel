@@ -20,15 +20,10 @@ jvm_resources(
 )
 
 jvm_library(
-  name = "ui-tests",
-  visibility = ["//visibility:public"],
-  srcs = glob([], allow_empty = True)
-)
-
-jvm_library(
   name = "ui-tests_test_lib",
+  module_name = "intellij.platform.jewel.uiTests",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/test/kotlin/**/*.kt", "src/test/kotlin/**/*.java"], allow_empty = True),
+  srcs = glob(["src/test/kotlin/**/*.kt", "src/test/kotlin/**/*.java", "src/test/kotlin/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_ui-tests",
   deps = [
     "@lib//:kotlinx-coroutines-core",
@@ -42,6 +37,9 @@ jvm_library(
     "//libraries/compose-foundation-desktop",
     "//libraries/compose-foundation-desktop-junit",
     "@lib//:kotlin-stdlib",
+    "@lib//:kotlin-test",
+    "@lib//:kotlin-test-assertions-core-jvm",
+    "@lib//:kotlin-test-junit",
   ],
   runtime_deps = [":ui-tests_test_resources"],
   plugins = ["@lib//:compose-plugin"]

@@ -2,16 +2,10 @@
 package com.intellij.platform.pluginManager.shared.rpc
 
 import com.intellij.ide.plugins.api.PluginDto
-import com.intellij.ide.plugins.marketplace.CheckErrorsResult
-import com.intellij.ide.plugins.marketplace.IdeCompatibleUpdate
-import com.intellij.ide.plugins.marketplace.InitSessionResult
-import com.intellij.ide.plugins.marketplace.IntellijPluginMetadata
-import com.intellij.ide.plugins.marketplace.PluginReviewComment
-import com.intellij.ide.plugins.marketplace.PluginSearchResult
-import com.intellij.ide.plugins.marketplace.SetEnabledStateResult
+import com.intellij.ide.plugins.marketplace.*
 import com.intellij.ide.plugins.newui.PluginInstallationState
-import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
 import fleet.rpc.RemoteApi
@@ -22,6 +16,7 @@ import org.jetbrains.annotations.ApiStatus
 
 @Rpc
 @ApiStatus.Internal
+@IntellijInternalApi
 interface PluginManagerApi : RemoteApi<Unit> {
   suspend fun getPlugins(): List<PluginDto>
   suspend fun getPluginById(pluginId: PluginId): PluginDto?
@@ -46,11 +41,10 @@ interface PluginManagerApi : RemoteApi<Unit> {
   suspend fun isPluginRequiresUltimateButItIsDisabled(sessionId: String, pluginId: PluginId): Boolean
   suspend fun hasPluginRequiresUltimateButItsDisabled(ids: List<PluginId>): Boolean
   suspend fun enableRequiredPlugins(sessionId: String, pluginId: PluginId): Set<PluginId>
-  suspend fun getCustomRepoPlugins(): List<PluginDto>
   suspend fun getCustomRepositoryPluginMap(): Map<String, List<PluginDto>>
   suspend fun isDisabledInDiff(sessionId: String, pluginId: PluginId): Boolean
   suspend fun isPluginInstalled(pluginId: PluginId): Boolean
-  suspend fun hasPluginsAvailableForEnableDisable(pluginIds: List<PluginId>): Boolean
+  suspend fun getPluginsRequiresUltimateMap(pluginIds: List<PluginId>): Map<PluginId, Boolean>
   suspend fun filterPluginsRequiresUltimateButItsDisabled(pluginIds: List<PluginId>): List<PluginId>
   suspend fun findPluginNames(pluginIds: List<PluginId>): List<String>
   suspend fun isNeedUpdate(pluginId: PluginId): Boolean
@@ -66,6 +60,9 @@ interface PluginManagerApi : RemoteApi<Unit> {
   suspend fun initSession(sessionId: String): InitSessionResult
   suspend fun isPluginEnabled(pluginId: PluginId): Boolean
   suspend fun findInstalledPlugins(plugins: Set<PluginId>): Map<PluginId, PluginDto>
+  suspend fun loadDescriptorById(pluginId: PluginId): PluginDto?
+  suspend fun getCustomRepoTags(): Set<String>
+  suspend fun updateCustomRepositories(repositoryUrls: List<String>)
 
 
   companion object {

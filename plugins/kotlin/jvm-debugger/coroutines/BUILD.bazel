@@ -8,7 +8,7 @@ create_kotlinc_options(
     "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
   ],
-  x_context_receivers = True
+  x_context_parameters = True
 )
 
 jvm_resources(
@@ -21,7 +21,7 @@ jvm_library(
   name = "coroutines",
   module_name = "kotlin.jvm-debugger.coroutines",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_coroutines",
   deps = [
     "@lib//:kotlin-stdlib",

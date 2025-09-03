@@ -11,7 +11,7 @@ jvm_library(
   name = "psi-impl",
   module_name = "intellij.python.psi.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -49,6 +49,7 @@ jvm_library(
     "//python/python-parser:parser",
     "//python/python-syntax-core:syntax-core",
     "//python/impl.helperLocator:community-helpersLocator",
+    "@lib//:hash4j",
   ],
   exports = ["//python/python-syntax-core:syntax-core"],
   runtime_deps = [":psi-impl_resources"]

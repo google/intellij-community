@@ -6,7 +6,6 @@ import com.intellij.debugger.JavaDebuggerBundle;
 import com.intellij.debugger.SourcePosition;
 import com.intellij.debugger.engine.evaluation.EvaluateException;
 import com.intellij.debugger.engine.evaluation.EvaluateExceptionUtil;
-import com.intellij.ide.util.JavaAnonymousClassesHelper;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -479,17 +478,11 @@ public final class JVMNameUtil {
   }
 
   public static @Nullable String getClassVMName(@Nullable PsiClass containingClass) {
-    // no support for local classes for now. TODO: use JavaLocalClassesHelper
     if (containingClass == null) return null;
-    if (containingClass instanceof PsiAnonymousClass) {
-      String parentName = getClassVMName(PsiTreeUtil.getParentOfType(containingClass, PsiClass.class));
-      if (parentName == null) {
-        return null;
-      }
-      else {
-        return parentName + JavaAnonymousClassesHelper.getName((PsiAnonymousClass)containingClass);
-      }
+    if (PsiUtil.isLocalOrAnonymousClass(containingClass)) {
+      return ClassUtil.getBinaryClassName(containingClass);
     }
+    // need to use getNonAnonymousClassName to have name mappers involved, see DebuggerManagerImpl#getVMClassQualifiedName
     return getNonAnonymousClassName(containingClass);
   }
 }

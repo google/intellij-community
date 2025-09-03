@@ -48,6 +48,7 @@ import com.jetbrains.python.codeInsight.completion.PyModuleNameCompletionContrib
 import com.jetbrains.python.codeInsight.typing.PyBundledStubs;
 import com.jetbrains.python.codeInsight.typing.PyTypeShed;
 import com.jetbrains.python.documentation.PyDocumentationSettings;
+import com.jetbrains.python.documentation.PyTypeRenderer.Feature;
 import com.jetbrains.python.documentation.PythonDocumentationProvider;
 import com.jetbrains.python.documentation.docstrings.DocStringFormat;
 import com.jetbrains.python.namespacePackages.PyNamespacePackagesService;
@@ -583,7 +584,7 @@ public abstract class PyTestCase extends UsefulTestCase {
                                 @NotNull PyTypedElement element,
                                 @NotNull TypeEvalContext context) {
     final PyType actual = context.getType(element);
-    final String actualType = PythonDocumentationProvider.getTypeName(actual, context);
+    final String actualType = PythonDocumentationProvider.getTypeName(actual, context, Feature.UNSAFE_UNION);
     assertEquals(message, expectedType, actualType);
   }
 
@@ -610,6 +611,21 @@ public abstract class PyTestCase extends UsefulTestCase {
         prevIndex = nextIndex;
       }
     }
+  }
+
+  public static void fixme(@NotNull String comment, @NotNull Class<? extends Throwable> c, @NotNull Runnable test) {
+    try {
+      test.run();
+    }
+    catch (Throwable failedError) {
+      if (c.isInstance(failedError)) {
+        // fix-me tests are supposed to fail
+        return;
+      }
+      throw failedError;
+    }
+    // the fix-me test passed -> the bug/feature was fixed!
+    fail("Test (" + comment + ") FIXED!");
   }
 }
 

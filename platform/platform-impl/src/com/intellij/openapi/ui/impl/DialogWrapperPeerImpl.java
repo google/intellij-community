@@ -50,12 +50,15 @@ import com.intellij.ui.mac.touchbar.TouchbarSupport;
 import com.intellij.util.IJSwingUtilities;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.SlowOperations;
+import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.ui.*;
 import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.coroutines.EmptyCoroutineContext;
 import kotlin.jvm.functions.Function0;
+import kotlinx.coroutines.EventLoop;
+import kotlinx.coroutines.ThreadLocalEventLoop;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -478,8 +481,22 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
     CompletableFuture<Void> result = new CompletableFuture<>();
     SplashManagerKt.hideSplash();
-    try (
-      AccessToken ignore = SlowOperations.startSection(SlowOperations.RESET)
+    try ( // numbered in the order of invocation (which is reverse)
+      AccessToken ignore5 = AccessToken.create(() -> {
+        if (changeModalityState) {
+          LaterInvocator.leaveModal(myDialog);
+        }
+      });
+      AccessToken ignore4 = AccessToken.create(() -> {
+        if (changeModalityState) {
+          commandProcessor.leaveModal();
+        }
+      });
+      AccessToken ignore3 = AccessToken.create(() -> {
+        lockCleanup.invoke();
+      });
+      AccessToken ignore2 = SlowOperations.startSection(SlowOperations.RESET);
+      AccessToken ignore1 = resetCoroutinesEventLoop()
     ) {
       lockContextWrapper.accept(() -> {
         if (!isProgressDialog() &&
@@ -495,12 +512,6 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
       });
     }
     finally {
-      lockCleanup.invoke();
-      if (changeModalityState) {
-        commandProcessor.leaveModal();
-        LaterInvocator.leaveModal(myDialog);
-      }
-
       myDialog.getFocusManager().doWhenFocusSettlesDown(() -> result.complete(null));
     }
 
@@ -521,6 +532,20 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
     StackingPopupDispatcher.getInstance().hidePersistentPopups();
     myDisposeActions.add(() -> StackingPopupDispatcher.getInstance().restorePersistentPopups());
+  }
+
+  @RequiresEdt
+  private static AccessToken resetCoroutinesEventLoop() {
+    EventLoop currentEventLoop = ThreadLocalEventLoop.INSTANCE.currentOrNull$kotlinx_coroutines_core();
+    ThreadLocalEventLoop.INSTANCE.resetEventLoop$kotlinx_coroutines_core();
+    return new AccessToken() {
+      @Override
+      public void finish() {
+        if (currentEventLoop != null) {
+          ThreadLocalEventLoop.INSTANCE.resetEventLoop$kotlinx_coroutines_core();
+        }
+      }
+    };
   }
 
   private final class AnCancelAction extends AnAction implements DumbAware {
@@ -985,6 +1010,9 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
       final BufferStrategy strategy = getBufferStrategy();
       if (strategy != null) {
+        if (!EDT.isCurrentThreadEdt()) {
+          LOG.error("Component dispose must be called on EDT", new Throwable());
+        }
         strategy.dispose();
       }
       super.dispose();
@@ -1017,6 +1045,9 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
         // actually, it's a bad idea to globally enable this for dialog graphics since renderers, for example, may not
         // inherit graphics so rendering hints won't be applied and trees or lists may render ugly.
         UISettings.setupAntialiasing(g);
+      }
+      if (!EDT.isCurrentThreadEdt()) {
+        LOG.error("paint must be called on EDT", new Throwable());
       }
 
       super.paint(g);
@@ -1255,4 +1286,5 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
   public void setAutoRequestFocus(boolean b) {
     UIUtil.setAutoRequestFocus((JDialog)myDialog, b);
   }
+  
 }

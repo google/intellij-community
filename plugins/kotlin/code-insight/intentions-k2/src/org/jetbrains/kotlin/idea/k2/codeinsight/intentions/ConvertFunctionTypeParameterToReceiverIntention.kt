@@ -12,6 +12,7 @@ import com.intellij.refactoring.rename.UnresolvableCollisionUsageInfo
 import com.intellij.usageView.UsageInfo
 import com.intellij.util.text.UniqueNameGenerator
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.resolveToCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.analysis.api.types.KaType
@@ -37,7 +38,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getValueParameters
 import org.jetbrains.kotlin.psi.typeRefHelpers.setReceiverTypeReference
 
 class ConvertFunctionTypeParameterToReceiverIntention : SelfTargetingRangeIntention<KtTypeReference>(
-    KtTypeReference::class.java, KotlinBundle.lazyMessage("convert.function.type.parameter.to.receiver")
+    KtTypeReference::class.java, KotlinBundle.messagePointer("convert.function.type.parameter.to.receiver")
 ) {
 
     override fun startInWriteAction(): Boolean = false
@@ -52,7 +53,7 @@ class ConvertFunctionTypeParameterToReceiverIntention : SelfTargetingRangeIntent
             parameterList!!.removeParameter(data.typeParameterIndex)
         }
 
-        setTextGetter(KotlinBundle.lazyMessage("convert.0.to.1", elementBefore.text, elementAfter.text))
+        setTextGetter(KotlinBundle.messagePointer("convert.0.to.1", elementBefore.text, elementAfter.text))
         return element.textRange
     }
 
@@ -132,7 +133,7 @@ private class Converter(
         return baseUsages + usages
     }
 
-    context(KaSession) private fun processExternalUsage(
+    context(_: KaSession) private fun processExternalUsage(
         refElement: PsiElement,
         usages: MutableList<in UsageInfo>,
     ) {
@@ -174,14 +175,14 @@ private class Converter(
         }
     }
 
-    context(KaSession) private fun getArgumentExpressionToProcess(callElement: KtCallElement): KtExpression? {
+    context(_: KaSession) private fun getArgumentExpressionToProcess(callElement: KtCallElement): KtExpression? {
         val argumentMapping = callElement.resolveToCall()?.successfulFunctionCallOrNull()?.argumentMapping ?: return null
         val parameter = data.changeInfo.method.getValueParameters()[data.functionParameterIndex]
         val entry = argumentMapping.entries.find { (_, value) -> value.name.asString() == parameter.name } ?: return null
         return KtPsiUtil.deparenthesize(entry.key)
     }
 
-    context(KaSession) private fun checkThisExpressionsAreExplicatable(
+    context(_: KaSession) private fun checkThisExpressionsAreExplicatable(
         usages: MutableList<in UsageInfo>, expressionToProcess: KtExpression
     ): Boolean {
         for (thisExpr in expressionToProcess.collectDescendantsOfType<KtThisExpression>()) {

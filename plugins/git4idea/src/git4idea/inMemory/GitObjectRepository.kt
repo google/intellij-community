@@ -30,9 +30,7 @@ internal class GitObjectRepository(val repository: GitRepository) {
 
   private val objectCache: MutableMap<Oid, GitObject> = HashMap()
 
-  fun findObject(oid: Oid): GitObject {
-    return findObjectFromCache(oid) ?: loadObjectFromDisk(oid)
-  }
+  val emptyTree by lazy { createTree(emptyMap()) }
 
   fun findObjectFromCache(oid: Oid): GitObject? {
     return objectCache[oid]
@@ -47,19 +45,19 @@ internal class GitObjectRepository(val repository: GitRepository) {
   }
 
   fun findCommit(oid: Oid): GitObject.Commit {
-    val obj = findObject(oid)
+    val obj = findObjectFromCache(oid) ?: loadObjectFromDisk(oid, GitObjectType.COMMIT)
     require(obj is GitObject.Commit) { "Object $oid is not a commit" }
     return obj
   }
 
   fun findTree(oid: Oid): GitObject.Tree {
-    val obj = findObject(oid)
+    val obj = findObjectFromCache(oid) ?: loadObjectFromDisk(oid, GitObjectType.TREE)
     require(obj is GitObject.Tree) { "Object $oid is not a tree" }
     return obj
   }
 
   fun findBlob(oid: Oid): GitObject.Blob {
-    val obj = findObject(oid)
+    val obj = findObjectFromCache(oid) ?: loadObjectFromDisk(oid, GitObjectType.BLOB)
     require(obj is GitObject.Blob) { "Object $oid is not a blob" }
     return obj
   }
@@ -107,14 +105,14 @@ internal class GitObjectRepository(val repository: GitRepository) {
   }
 
   /*
-  All dependencies should be already persisted on disk
+  All dependencies should be persisted on disk
    */
   @RequiresBackgroundThread
   fun commitTree(
     treeOid: Oid,
     parentsOids: List<Oid>,
     message: ByteArray,
-    author: GitObject.Commit.Author,
+    author: GitObject.Commit.Author? = null,
   ): Oid {
     LOG.debug("Starting commitTree operation: treeOid=$treeOid, parents=${parentsOids}")
 
@@ -132,15 +130,21 @@ internal class GitObjectRepository(val repository: GitRepository) {
     val handler = GitLineHandler(repository.project, repository.root, GitCommand.COMMIT_TREE).apply {
       setSilent(true)
       parentsOids.forEach { addParameters("-p", it.hex()) }
-      addCustomEnvironmentVariable("GIT_AUTHOR_NAME", author.name)
-      addCustomEnvironmentVariable("GIT_AUTHOR_EMAIL", author.email)
-      addCustomEnvironmentVariable("GIT_AUTHOR_DATE", author.timestamp)
+      if (author != null) {
+        addCustomEnvironmentVariable("GIT_AUTHOR_NAME", author.name)
+        addCustomEnvironmentVariable("GIT_AUTHOR_EMAIL", author.email)
+        addCustomEnvironmentVariable("GIT_AUTHOR_DATE", author.timestamp)
+      }
       if (isGpgSignEnabledCached(repository)) {
         addParameters("--gpg-sign")
       }
       addParameters("-F")
       addAbsoluteFile(messageFile)
       addParameters(treeOid.hex())
+
+      if (message.isEmpty()) { // in this case git will ignore -F and read message from stdin
+        setInputProcessor(GitHandlerInputProcessorUtil.redirectStream(byteArrayOf().inputStream()))
+      }
     }
 
     val oid = Oid.fromHex(Git.getInstance().runCommand(handler).getOutputOrThrow())
@@ -179,7 +183,11 @@ internal class GitObjectRepository(val repository: GitRepository) {
   fun persistObject(obj: GitObject) {
     if (obj.persisted) return
 
-    obj.dependencies.forEach { persistObject(findObject(it)) }
+    obj.dependencies.forEach { oid ->
+      findObjectFromCache(oid)?.let {
+        persistObject(it)
+      }
+    }
 
     try {
       val handler = GitLineHandler(repository.project, repository.root, GitCommand.HASH_OBJECT).apply {
@@ -189,7 +197,6 @@ internal class GitObjectRepository(val repository: GitRepository) {
       }
 
       val newOid = Oid.fromHex(Git.getInstance().runCommand(handler).getOutputOrThrow())
-
       check(newOid == obj.oid) { "Computed by git OID $newOid does not match expected OID ${obj.oid}" }
 
       obj.persisted = true
@@ -203,17 +210,20 @@ internal class GitObjectRepository(val repository: GitRepository) {
     }
   }
 
+  /**
+   * Object should be persisted on disk
+   */
   @RequiresBackgroundThread
-  private fun loadObjectFromDisk(oid: Oid): GitObject {
-    try {
-      val typeHandler = GitLineHandler(repository.project, repository.root, GitCommand.CAT_FILE).apply {
-        setSilent(true)
-        addParameters("-t", oid.hex())
-      }
+  private fun fetchObjectType(oid: Oid): GitObjectType {
+    val type = Git.getInstance().getObjectTypeEnum(repository, oid.hex())
+    require(type != null) { "Unknown git object type" }
+    return type
+  }
 
-      val typeResult = Git.getInstance().runCommand(typeHandler).getOutputOrThrow()
-      val type = GitObjectType.fromTag(typeResult)
-      require(type != null) { "Unknown git object type: $typeResult" }
+  @RequiresBackgroundThread
+  private fun loadObjectFromDisk(oid: Oid, type: GitObjectType? = null): GitObject {
+    try {
+      val type = type ?: fetchObjectType(oid)
 
       val bodyHandler = GitBinaryHandler(repository.project, repository.root, GitCommand.CAT_FILE).apply {
         setSilent(true)

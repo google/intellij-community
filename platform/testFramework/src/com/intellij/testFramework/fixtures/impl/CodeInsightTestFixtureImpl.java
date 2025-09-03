@@ -75,6 +75,7 @@ import com.intellij.openapi.editor.Inlay;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.ex.MarkupModelEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.DocumentImpl;
@@ -128,6 +129,7 @@ import com.intellij.refactoring.rename.*;
 import com.intellij.refactoring.rename.api.RenameTarget;
 import com.intellij.refactoring.rename.impl.RenameKt;
 import com.intellij.testFramework.*;
+import com.intellij.testFramework.common.EditorCaretTestUtil;
 import com.intellij.testFramework.fixtures.*;
 import com.intellij.testFramework.utils.inlays.CaretAndInlaysInfo;
 import com.intellij.testFramework.utils.inlays.InlayHintsChecker;
@@ -152,7 +154,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.Unmodifiable;
-import org.junit.Assert;
 
 import java.io.File;
 import java.io.IOException;
@@ -316,11 +317,17 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
           Segment focusModeRange = (editor instanceof EditorImpl) ? ((EditorImpl)editor).getFocusModeRange() : null;
           int startOffset = focusModeRange != null ? focusModeRange.getStartOffset() : 0;
           int endOffset = focusModeRange != null ? focusModeRange.getEndOffset() : editor.getDocument().getTextLength();
-          DaemonCodeAnalyzerEx.processHighlights(editor.getDocument(), project, null, startOffset, endOffset,
-                                                 Processors.cancelableCollectProcessor(infos));
+
           if (readEditorMarkupModel) {
+            MarkupModelEx filteredDocumentMarkupModel = ((EditorEx)editor).getFilteredDocumentMarkupModel();
+            DaemonCodeAnalyzerEx.processHighlights(filteredDocumentMarkupModel, project, null, startOffset, endOffset,
+                                                   Processors.cancelableCollectProcessor(infos));
             MarkupModelEx markupModel = (MarkupModelEx)editor.getMarkupModel();
             DaemonCodeAnalyzerEx.processHighlights(markupModel, project, null, startOffset, endOffset,
+                                                   Processors.cancelableCollectProcessor(infos));
+          }
+          else {
+            DaemonCodeAnalyzerEx.processHighlights(editor.getDocument(), project, null, startOffset, endOffset,
                                                    Processors.cancelableCollectProcessor(infos));
           }
         });
@@ -789,11 +796,12 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   public @Nullable String getIntentionPreviewText(@NotNull IntentionAction action) {
     // Run in background thread to catch accidental write-actions during preview generation
     try {
-      return ReadAction.nonBlocking(() -> IntentionPreviewPopupUpdateProcessor.getPreviewText(getProject(), action, getFile(), getEditor()))
-        .submit(AppExecutorUtil.getAppExecutorService()).get();
+      return PlatformTestUtil.waitForFuture(
+        ReadAction.nonBlocking(() -> IntentionPreviewPopupUpdateProcessor.getPreviewText(getProject(), action, getFile(), getEditor()))
+          .submit(AppExecutorUtil.getAppExecutorService()));
     }
-    catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
+    catch (AssertionError e) {
+      throw new RuntimeException(e.getCause());
     }
   }
 
@@ -824,14 +832,9 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   @Override
   public void checkIntentionPreviewHtml(@NotNull IntentionAction action, @NotNull @Language("HTML") String expected) {
     // Run in background thread to catch accidental write-actions during preview generation
-    IntentionPreviewInfo info;
-    try {
-      info = ReadAction.nonBlocking(() -> IntentionPreviewPopupUpdateProcessor.getPreviewInfo(getProject(), action, getFile(), getEditor()))
-        .submit(AppExecutorUtil.getAppExecutorService()).get();
-    }
-    catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
-    }
+    IntentionPreviewInfo info = PlatformTestUtil.waitForFuture(
+      ReadAction.nonBlocking(() -> IntentionPreviewPopupUpdateProcessor.getPreviewInfo(getProject(), action, getFile(), getEditor()))
+        .submit(AppExecutorUtil.getAppExecutorService()));
     assertTrue(action.getText(), info instanceof IntentionPreviewInfo.Html);
     assertEquals(action.getText(), expected, ((IntentionPreviewInfo.Html)info).content().toString());
   }
@@ -2284,7 +2287,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
             boolean executed = ShowIntentionActionsHandler.chooseActionAndInvoke(file, editor, action, action.getText());
             if (!executed) {
               boolean available = action.isAvailable(project, editor, file);
-              Assert.fail("Quick fix '" + action.getText() + "' (" + action.getClass() + ")" +
+              fail("Quick fix '" + action.getText() + "' (" + action.getClass() + ")" +
                           " hasn't executed. isAvailable()=" + available);
             }
           }
@@ -2362,7 +2365,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
     private final String filePath;
     private final String newFileText;
     private final String newDocumentText;
-    private final EditorTestUtil.CaretAndSelectionState caretState;
+    private final EditorCaretTestUtil.CaretAndSelectionState caretState;
 
     private SelectionAndCaretMarkupLoader(@NotNull String fileText, @NotNull String documentText, String filePath) {
       this.filePath = filePath;
@@ -2379,7 +2382,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
 
     private static @NotNull SelectionAndCaretMarkupLoader fromFile(@NotNull String path, String charset) {
       VirtualFile virtualFile = VirtualFileUtil.refreshAndFindVirtualFile(Paths.get(path));
-      assert virtualFile != null;
+      assert virtualFile != null : "File not found: " + path;
       return fromFile(virtualFile);
     }
 

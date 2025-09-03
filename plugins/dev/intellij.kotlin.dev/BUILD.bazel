@@ -11,7 +11,7 @@ jvm_library(
   name = "kotlin-dev",
   module_name = "intellij.kotlin.dev",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "//plugins/dev/intellij.dev.codeInsight:codeInsight",
     "//plugins/dev/intellij.dev.psiViewer:psiViewer",
@@ -22,6 +22,7 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/util:util-ui",
     "//java/java-psi-api:psi",
+    "//plugins/kotlin/highlighting/highlighting-shared:kotlin-highlighting-shared",
     "@lib//:kotlinc-analysis-api-provided",
     "@lib//:kotlinc-kotlin-compiler-common-provided",
   ],

@@ -28,20 +28,6 @@ interface CodeInsightContextManager {
   }
 
   /**
-   * A code insight context is fixed within a single code insight session.
-   *
-   * Code insight session does not support coroutines because the project state can change while a coroutine is suspended.
-   */
-  @RequiresReadLock
-  @RequiresBackgroundThread
-  fun <Result> performCodeInsightSession(context: CodeInsightContext, block: CodeInsightSession.() -> Result): Result
-
-  val currentCodeInsightSession: CodeInsightSession?
-
-  val currentCodeInsightContext: CodeInsightContext
-    get() = currentCodeInsightSession?.context ?: defaultContext()
-
-  /**
    * Returns all registered contexts for [file]
    *
    * @see CodeInsightContextProvider
@@ -59,11 +45,23 @@ interface CodeInsightContextManager {
   fun getCodeInsightContext(fileViewProvider: FileViewProvider): CodeInsightContext
 
   /**
+   * Internal API, use with care
+   *
+   * @return the context associated with [fileViewProvider] or [anyContext] if it's not *yet* associated with any context
+   */
+  @Internal
+  @RequiresReadLock
+  fun getCodeInsightContextRaw(fileViewProvider: FileViewProvider): CodeInsightContext
+
+  /**
+   * DANGEROUS API, AUTHORIZED PERSONNEL ONLY
+   *
    * Tries to assign context of [fileViewProvider] to [context] if it's not yet assigned to something else.
    *
    * @return the context assigned to [fileViewProvider]
    */
   @Internal
+  @Deprecated("DANGEROUS API, AUTHORIZED PERSONNEL ONLY")
   fun getOrSetContext(fileViewProvider: FileViewProvider, context: CodeInsightContext): CodeInsightContext
 
   /**
@@ -71,12 +69,6 @@ interface CodeInsightContextManager {
    * A new emission means all the contexts are invalidated and will be inferred from scratch.
    */
   val changeFlow: Flow<Unit>
-
-  /**
-   * Use [com.intellij.codeInsight.multiverse.isSharedSourceSupportEnabled] instead.
-   */
-  @get: Internal
-  val isSharedSourceSupportEnabled: Boolean
 }
 
 /**

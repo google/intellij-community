@@ -14,7 +14,6 @@ import com.intellij.openapi.vfs.*;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
 import com.intellij.openapi.vfs.newvfs.RefreshQueue;
-import com.intellij.openapi.vfs.newvfs.VfsImplUtil;
 import com.intellij.openapi.vfs.newvfs.impl.VirtualFileSystemEntry;
 import com.intellij.openapi.vfs.newvfs.persistent.BatchingFileSystem;
 import com.intellij.util.ArrayUtil;
@@ -119,7 +118,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   private boolean markFlatDirsDirty(Iterable<String> dirtyPaths) {
     var marked = false;
     for (var dirtyPath : dirtyPaths) {
-      var exactOrParent = VfsImplUtil.findCachedFileByPath(this, dirtyPath);
+      var exactOrParent = findCachedFileByPath(this, dirtyPath);
       if (exactOrParent.first != null) {
         exactOrParent.first.markDirty();
         for (var child : exactOrParent.first.getCachedChildren()) {
@@ -138,7 +137,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   private boolean markRecursiveDirsDirty(Iterable<String> dirtyPaths) {
     var marked = false;
     for (var dirtyPath : dirtyPaths) {
-      var exactOrParent = VfsImplUtil.findCachedFileByPath(this, dirtyPath);
+      var exactOrParent = findCachedFileByPath(this, dirtyPath);
       if (exactOrParent.first != null) {
         exactOrParent.first.markDirtyRecursively();
         marked = true;
@@ -285,8 +284,8 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   );
 
   @Override
-  public FileAttributes.CaseSensitivity fetchCaseSensitivity(@NotNull VirtualFile parent,
-                                                             @NotNull String childName) {
+  public @NotNull FileAttributes.CaseSensitivity fetchCaseSensitivity(@NotNull VirtualFile parent,
+                                                                      @NotNull String childName) {
     return caseSensitivityGetter.accessDiskWithCheckCanceled(Pair.createNonNull(parent, childName));
   }
 
@@ -306,16 +305,6 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
    */
   @ApiStatus.Internal
   @Deprecated(forRemoval = true)
-  public final String @NotNull [] listWithCaching(@NotNull VirtualFile dir) {
-    return listWithCaching(dir, null);
-  }
-
-  /**
-   * @deprecated prefer to use {@link #listWithAttributes(VirtualFile, Set)} instead -- it is stateless, hence its
-   * behavior is more predictable
-   */
-  @ApiStatus.Internal
-  @Deprecated(forRemoval = true)
   public final String @NotNull [] listWithCaching(@NotNull VirtualFile dir,
                                                   @Nullable Set<String> filter) {
     var cache = myFileAttributesCache.get();
@@ -327,7 +316,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     return ArrayUtil.toStringArray(result.keySet());
   }
 
-  /** @deprecated see {@link #listWithCaching(VirtualFile)} docs for reasoning */
+  /** @deprecated see {@link #listWithCaching(VirtualFile, Set)} docs for reasoning */
   @ApiStatus.Internal
   @Deprecated(forRemoval = true)
   public void clearListCache() {
@@ -382,8 +371,9 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
       return Collections.emptyMap();
     }
     try {
-      //We must return 'normal' (case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
-      Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(10, /*caseSensitive: */true);
+      int expectedSize = (filter == null) ? 10 : filter.size();
+      //We must return a 'normal' (=case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
+      Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(expectedSize, /*caseSensitive: */true);
 
       PlatformNioHelper.visitDirectory(Path.of(toIoPath(dir)), filter, (file, ioAttributesHolder) -> {
         try {

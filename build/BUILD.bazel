@@ -42,7 +42,7 @@ jvm_library(
   srcs = ["@rules_jvm//jps-builders-6:build-javac-rt_sources"],
   kotlinc_opts = "@community//:k8",
   deps = [
-    "@lib//:jetbrains-annotations-java5",
+    "@lib//:jetbrains-annotations",
     "@lib//:javax-annotation-api",
     "@lib//:jps-javac-extension",
     "@lib//:protobuf",
@@ -73,7 +73,7 @@ jvm_library(
   name = "build",
   module_name = "intellij.idea.community.build",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "//platform/build-scripts",
     "@lib//:kotlin-stdlib",

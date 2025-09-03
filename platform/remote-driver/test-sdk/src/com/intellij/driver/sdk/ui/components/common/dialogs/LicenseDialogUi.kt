@@ -9,11 +9,13 @@ import com.intellij.driver.sdk.ui.components.elements.DialogUiComponent
 import com.intellij.driver.sdk.ui.components.elements.radioButton
 import com.intellij.driver.sdk.ui.ui
 
-private fun Finder.licenseDialog(action: LicenseDialogUi.() -> Unit) {
-  x(LicenseDialogUi::class.java) { or(byTitle("Manage Licenses"), byTitle("Manage Subscriptions")) }.action()
+fun Finder.licenseDialog() = x(LicenseDialogUi::class.java) {
+  byTitle("Manage Licenses") or byTitle("Manage Subscriptions")
 }
 
-fun Driver.licenseDialog(action: LicenseDialogUi.() -> Unit = {}) = this.ui.licenseDialog(action)
+fun Finder.licenseDialog(action: LicenseDialogUi.() -> Unit) = licenseDialog().action()
+
+fun Driver.licenseDialog(action: LicenseDialogUi.() -> Unit = {}) = ui.licenseDialog().apply(action)
 
 class LicenseDialogUi(data: ComponentData) : UiComponent(data) {
   val licenseServerRadioButton = radioButton { byAccessibleName("License server") }
@@ -81,6 +83,6 @@ fun LicenseDialogUi.removeLicenseConfirmationDialog(action: RemoveLicenseConfirm
 }
 
 class RemoveLicenseConfirmationDialogUi(data: ComponentData): DialogUiComponent(data) {
-  val confirmButton: UiComponent = x { byAccessibleName("Remove License") or byAccessibleName("Deactivate and Restart") }
-  val cancelRemoveButton: UiComponent = x { byAccessibleName("TODO") or byAccessibleName("Keep Subscription") }
+  val confirmButton: UiComponent = x { (byAccessibleName("Remove License") or byAccessibleName("Deactivate and Restart")) and byClass("JButton") }
+  val cancelRemoveButton: UiComponent = x { (byAccessibleName("TODO") or byAccessibleName("Keep Subscription")) and byClass("JButton") }
 }

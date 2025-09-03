@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tests;
 
+import com.intellij.tests.bazel.BazelJUnitOutputListener;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.Filter;
 import org.junit.platform.engine.FilterResult;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,12 +29,19 @@ import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMetho
 
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
 public final class JUnit5BazelRunner {
+  // compatible with https://github.com/bazelbuild/bazel/blob/master/src/java_tools/junitrunner/java/com/google/testing/junit/runner/BazelTestRunner.java
+  private static final int EXIT_CODE_SUCCESS = 0;
+  private static final int EXIT_CODE_TEST_FAILURE_OTHER = 1;
+  private static final int EXIT_CODE_TEST_RUNNER_FAILURE = 2;
+  private static final int EXIT_CODE_TEST_FAILURE_OOM = 137;
+
   private static final String bazelEnvSelfLocation = "SELF_LOCATION";
   private static final String bazelEnvTestTmpDir = "TEST_TMPDIR";
   private static final String bazelEnvRunFilesDir = "RUNFILES_DIR";
   private static final String bazelEnvJavaRunFilesDir = "JAVA_RUNFILES";
   private static final String bazelEnvTestSrcDir = "TEST_SRCDIR";
   private static final String bazelEnvTestBridgeTestOnly = "TESTBRIDGE_TEST_ONLY";
+  private static final String bazelEnvXmlOutputFile = "XML_OUTPUT_FILE";
 
   private static final String jbEnvPrintSortedClasspath = "JB_TEST_PRINT_SORTED_CLASSPATH";
   private static final String jbEnvPrintTestSrcDirContent = "JB_TEST_PRINT_TEST_SRCDIR_CONTENT";
@@ -40,6 +49,7 @@ public final class JUnit5BazelRunner {
   private static final String jbEnvPrintSystemProperties = "JB_TEST_PRINT_SYSTEM_PROPERTIES";
   // true by default. try as much as possible to run tests in sandbox
   private static final String jbEnvSandbox = "JB_TEST_SANDBOX";
+  private static final String jbEnvXmlOutputFile = "JB_XML_OUTPUT_FILE";
 
   private static final ClassLoader ourClassLoader = Thread.currentThread().getContextClassLoader();
   private static final Launcher launcher = LauncherFactory.create();
@@ -150,23 +160,53 @@ public final class JUnit5BazelRunner {
       }
 
       var testExecutionListener = getTestExecutionListener();
-      launcher.execute(testPlan, testExecutionListener);
+      var xmlOutputFile = getXmlOutputFile();
 
-      if (testExecutionListener instanceof ConsoleTestLogger && ((ConsoleTestLogger)testExecutionListener).hasTestsWithThrowableResults()) {
-        System.err.println("Some tests failed");
-        System.exit(1);
+      try (var bazelJUnitOutputListener = new BazelJUnitOutputListener(xmlOutputFile)) {
+        Runtime.getRuntime()
+          .addShutdownHook(
+            new Thread(() -> bazelJUnitOutputListener.closeForInterrupt(), "BazelJUnitOutputListenerShutdownHook")
+          );
+        launcher.registerTestExecutionListeners(bazelJUnitOutputListener, testExecutionListener);
+        launcher.execute(testPlan);
       }
+
+      if (testExecutionListener instanceof ConsoleTestLogger &&
+          ((ConsoleTestLogger)testExecutionListener).hasTestsWithThrowableResults()) {
+        System.err.println("Some tests failed");
+        System.exit(EXIT_CODE_TEST_FAILURE_OTHER);
+      }
+    }
+    catch (OutOfMemoryError e) {
+      //noinspection CallToPrintStackTrace
+      e.printStackTrace();
+      System.exit(EXIT_CODE_TEST_FAILURE_OOM);
     }
     catch (Throwable e) {
       // Internal error, exit with non-zero code
-
       //noinspection CallToPrintStackTrace
       e.printStackTrace();
-      System.exit(155);
+      System.exit(EXIT_CODE_TEST_RUNNER_FAILURE);
     }
     finally {
-      System.exit(0);
+      // System.exit to exist even if some other non-background threads exist
+      System.exit(EXIT_CODE_SUCCESS);
     }
+  }
+
+  private static Path getXmlOutputFile() throws IOException {
+    String xmlOutputFile;
+    // XML_OUTPUT_FILE is set by bazel itself and can't be overridden by `--test_env=XML_OUTPUT_FILE=<some_path>`
+    String jbXmlOutputFile = System.getenv(jbEnvXmlOutputFile);
+    if (jbXmlOutputFile != null && !jbXmlOutputFile.isBlank()) {
+      xmlOutputFile = jbXmlOutputFile;
+    } else {
+      xmlOutputFile = System.getenv(bazelEnvXmlOutputFile);
+    }
+    Path xmlOut = xmlOutputFile != null ? Paths.get(xmlOutputFile) : Files.createTempFile("test", ".xml");
+    Files.createDirectories(xmlOut.getParent());
+
+    return xmlOut;
   }
 
   private static TestExecutionListener getTestExecutionListener() {

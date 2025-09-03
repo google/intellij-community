@@ -14,12 +14,12 @@ jvm_resources(
 )
 
 jvm_provided_library(
-  name = "junit5_provided",
+  name = "libraries_junit5_provided",
   lib = "//libraries/junit5"
 )
 
 jvm_provided_library(
-  name = "junit5-launcher_provided",
+  name = "libraries_junit5-launcher_provided",
   lib = "//libraries/junit5-launcher"
 )
 
@@ -27,7 +27,7 @@ jvm_library(
   name = "junit5",
   module_name = "intellij.platform.testFramework.junit5",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:junit5Jupiter",
     "@lib//:jetbrains-annotations",
@@ -53,8 +53,8 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/util-ex",
     "//platform/util/jdom",
-    ":junit5_provided",
-    ":junit5-launcher_provided",
+    ":libraries_junit5_provided",
+    ":libraries_junit5-launcher_provided",
   ],
   runtime_deps = [":junit5_resources"]
 )
@@ -62,7 +62,7 @@ jvm_library(
 jvm_library(
   name = "junit5_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["test/**/*.kt", "test/**/*.java"], allow_empty = True),
+  srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   associates = [":junit5"],
   deps = [
     "@lib//:junit5Jupiter",

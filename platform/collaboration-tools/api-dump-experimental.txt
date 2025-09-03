@@ -450,15 +450,19 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - a:asLeaf(com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode):java.lang.Object
 - pf:fireModelChanged():V
 - a:getUnresolvedDiscussionsCount(java.lang.Object):I
+- a:isLoading():kotlinx.coroutines.flow.StateFlow
+- a:isLoading(java.lang.Object):Z
 - a:isRead(java.lang.Object):Z
 *f:com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModelFromDetails
 - com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModel
 - <init>(kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel$WithDetails):V
 - asLeaf(com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode):com.intellij.collaboration.util.RefComparisonChange
 - getUnresolvedDiscussionsCount(com.intellij.collaboration.util.RefComparisonChange):I
+- isLoading():kotlinx.coroutines.flow.StateFlow
+- isLoading(com.intellij.collaboration.util.RefComparisonChange):Z
 - isRead(com.intellij.collaboration.util.RefComparisonChange):Z
 *f:com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModelKt
-- sf:setupCodeReviewProgressModel(com.intellij.openapi.vcs.changes.ui.ChangesTree,com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModel):V
+- sf:setupCodeReviewProgressModel(com.intellij.openapi.vcs.changes.ui.ChangesTree,com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel,com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModel):V
 *f:com.intellij.collaboration.ui.codereview.CodeReviewTimelineUIUtil
 - sf:HEADER_VERT_PADDING:I
 - sf:INSTANCE:com.intellij.collaboration.ui.codereview.CodeReviewTimelineUIUtil
@@ -518,13 +522,6 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - sf:INSTANCE:com.intellij.collaboration.ui.codereview.changes.CodeReviewChangeListComponentFactory
 - f:createIn(kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel,com.intellij.collaboration.ui.codereview.CodeReviewProgressTreeModel,java.lang.String):com.intellij.openapi.vcs.changes.ui.AsyncChangesTree
 - f:getSELECTED_CHANGES():com.intellij.openapi.actionSystem.DataKey
-*f:com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory
-- *sf:Companion:com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory$Companion
-- <init>(com.intellij.openapi.project.Project,com.intellij.collaboration.ui.SingleValueModel):V
-- f:create(java.lang.String,Z):com.intellij.openapi.vcs.changes.ui.AsyncChangesTree
-- bs:create$default(com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory,java.lang.String,Z,I,java.lang.Object):com.intellij.openapi.vcs.changes.ui.AsyncChangesTree
-*f:com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory$Companion
-- f:createTreeToolbar(com.intellij.openapi.actionSystem.ActionManager,java.lang.String,javax.swing.JComponent):javax.swing.JComponent
 *f:com.intellij.collaboration.ui.codereview.comment.CodeReviewCommentTextFieldFactory
 - sf:INSTANCE:com.intellij.collaboration.ui.codereview.comment.CodeReviewCommentTextFieldFactory
 - f:createIn(kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.comment.CodeReviewSubmittableTextViewModel,com.intellij.collaboration.ui.codereview.comment.CommentInputActionsComponentFactory$Config,com.intellij.collaboration.ui.codereview.timeline.comment.CommentTextFieldFactory$IconConfig):javax.swing.JComponent
@@ -621,6 +618,17 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - f:createTitleEditor(java.lang.String):com.intellij.ui.components.JBTextArea
 - bs:createTitleEditor$default(com.intellij.collaboration.ui.codereview.create.CodeReviewCreateReviewUIUtil,com.intellij.openapi.project.Project,java.lang.String,I,java.lang.Object):com.intellij.openapi.editor.Editor
 - bs:createTitleEditor$default(com.intellij.collaboration.ui.codereview.create.CodeReviewCreateReviewUIUtil,java.lang.String,I,java.lang.Object):com.intellij.ui.components.JBTextArea
+*f:com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionComponentFactory
+- sf:INSTANCE:com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionComponentFactory
+- f:createDescriptionEditorIn(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionViewModel,java.lang.String):com.intellij.openapi.editor.Editor
+- f:createIn(kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionViewModel,com.intellij.openapi.editor.Editor,com.intellij.openapi.editor.Editor):javax.swing.JPanel
+- f:createTitleEditorIn(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionViewModel,java.lang.String):com.intellij.openapi.editor.Editor
+*:com.intellij.collaboration.ui.codereview.create.CodeReviewTitleDescriptionViewModel
+- a:getDescriptionText():kotlinx.coroutines.flow.StateFlow
+- a:getTitleText():kotlinx.coroutines.flow.StateFlow
+- a:isTemplateLoading():kotlinx.coroutines.flow.StateFlow
+- a:setDescription(java.lang.String):V
+- a:setTitle(java.lang.String):V
 *f:com.intellij.collaboration.ui.codereview.details.CodeReviewDetailsActionsComponentFactory
 - sf:INSTANCE:com.intellij.collaboration.ui.codereview.details.CodeReviewDetailsActionsComponentFactory
 - f:createActionsComponent(kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.Flow,javax.swing.JComponent,javax.swing.JComponent,javax.swing.JComponent,javax.swing.JComponent):javax.swing.JComponent
@@ -823,6 +831,9 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel
 - a:getGrouping():kotlinx.coroutines.flow.StateFlow
 - a:setGrouping(java.util.Collection):V
+*:com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel$WithViewedState
+- com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel$WithDetails
+- a:setViewedState(java.lang.Iterable,Z):V
 *f:com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModelKt
 - sf:isViewedStateForAllChanges(com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangeListViewModel$WithDetails,java.lang.Iterable,Z):Z
 *c:com.intellij.collaboration.ui.codereview.details.model.CodeReviewChangesContainer

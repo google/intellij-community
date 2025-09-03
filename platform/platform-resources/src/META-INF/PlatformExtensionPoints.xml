@@ -149,7 +149,10 @@
     <extensionPoint name="ideStartupWizard" interface="com.intellij.platform.ide.bootstrap.IdeStartupWizard" dynamic="false"/>
     <!--suppress PluginXmlValidity -->
     <extensionPoint name="ApplicationLoadListener" interface="com.intellij.ide.ApplicationLoadListener" dynamic="false"/>
+    <!-- Please do not use this extension point. Consider using `nonLockedIdeEventQueueDispatcher` instead.-->
     <extensionPoint name="ideEventQueueDispatcher" interface="com.intellij.ide.IdeEventQueue$EventDispatcher" dynamic="true"/>
+    <extensionPoint name="nonLockedIdeEventQueueDispatcher" interface="com.intellij.ide.IdeEventQueue$NonLockedEventDispatcher"
+                    dynamic="true"/>
 
     <extensionPoint name="editorTabTitleProvider" interface="com.intellij.openapi.fileEditor.impl.EditorTabTitleProvider" dynamic="true"/>
     <extensionPoint name="editorTabColorProvider" interface="com.intellij.openapi.fileEditor.impl.EditorTabColorProvider" dynamic="true"/>
@@ -165,6 +168,10 @@
 
     <extensionPoint name="editorFloatingToolbarProvider"
                     interface="com.intellij.openapi.editor.toolbar.floating.FloatingToolbarProvider"
+                    dynamic="true"/>
+
+    <extensionPoint name="openInBrowserFloatingToolbarSuppressor"
+                    interface="com.intellij.ide.browsers.actions.OpenInBrowserBaseGroupAction$OpenInBrowserFloatingToolbarSuppressor"
                     dynamic="true"/>
 
     <extensionPoint name="actionPromoter" interface="com.intellij.openapi.actionSystem.ActionPromoter" dynamic="true"/>
@@ -336,6 +343,10 @@
 
     <extensionPoint name="remote.pathMappingProvider" interface="com.intellij.remote.PathMappingProvider" dynamic="true"/>
     <extensionPoint name="remote.targetAwarePathMappingProvider" interface="com.intellij.remote.TargetAwarePathMappingProvider" dynamic="true"/>
+
+    <extensionPoint qualifiedName="com.intellij.remote.customDataContextSerializer"
+                    interface="com.intellij.ide.CustomDataContextSerializer"
+                    dynamic="true"/>
 
     <extensionPoint name="colorAndFontOptionsImportHandler" interface="com.intellij.application.options.colors.ImportHandler" dynamic="true"/>
 
@@ -598,9 +609,6 @@
     <extensionPoint name="usageFilteringRuleCustomizer" interface="com.intellij.usages.rules.UsageFilteringRuleCustomizer" dynamic="true"/>
 
     <extensionPoint name="endUserAgreementUpdater" beanClass="com.intellij.ide.gdpr.EndUserAgreement$PluginAgreementUpdateDescriptor" dynamic="true"/>
-    <extensionPoint name="aiDataCollectionExternalSettings"
-                    interface="com.intellij.ide.gdpr.ui.consents.AiDataCollectionExternalSettings"
-                    dynamic="true"/>
 
     <extensionPoint name="cefDelegate" interface="com.intellij.ui.jcef.CefDelegate" dynamic="false"/>
 
@@ -635,6 +643,7 @@
     <extensionPoint name="findInDirectoryScopeProvider" interface="com.intellij.find.impl.FindInDirectoryScopeProvider" dynamic="true"/>
 
     <extensionPoint name="customTypeRpcSerializer" interface="com.intellij.ide.rpc.CustomTypeRpcSerializer" dynamic="true"/>
+    <extensionPoint name="anActionSerializer" interface="com.intellij.ide.rpc.AnActionSerializer" dynamic="true"/>
 
     <extensionPoint name="frontendDocumentIdRegistry" interface="com.intellij.ide.rpc.FrontendDocumentIdRegistry"
                     dynamic="true"/>

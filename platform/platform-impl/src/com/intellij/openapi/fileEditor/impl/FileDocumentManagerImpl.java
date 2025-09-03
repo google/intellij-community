@@ -390,6 +390,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     LOG.trace("  writing...");
     WriteAction.run(() -> doSaveDocumentInWriteAction(document, file));
     LOG.trace("  done");
+    myMultiCaster.afterDocumentSaved(document);
   }
 
   private boolean maySaveDocument(@NotNull VirtualFile file, @NotNull Document document, boolean isExplicit) {
@@ -674,14 +675,12 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
         @Override
         public void afterVfsChange() {
           for (VFileEvent event : events) {
-            if (event instanceof VFileContentChangeEvent changeEvent && changeEvent.getFile().isValid()) {
-              myFileDocumentManager.contentsChanged(changeEvent);
-            }
-            else if (event instanceof VFileDeleteEvent deleteEvent) {
-              myFileDocumentManager.fileDeleted(deleteEvent.getFile());
-            }
-            else if (event instanceof VFilePropertyChangeEvent propEvent && propEvent.getFile().isValid()) {
-              myFileDocumentManager.propertyChanged(propEvent);
+            switch (event) {
+              case VFileContentChangeEvent changeEvent when changeEvent.getFile().isValid() -> myFileDocumentManager.contentsChanged(changeEvent);
+              case VFileDeleteEvent deleteEvent -> myFileDocumentManager.fileDeleted(deleteEvent.getFile());
+              case VFilePropertyChangeEvent propEvent when propEvent.getFile().isValid() -> myFileDocumentManager.propertyChanged(propEvent);
+              default -> {
+              }
             }
           }
           Reference.reachabilityFence(strongRefsToDocuments);

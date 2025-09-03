@@ -11,14 +11,14 @@ create_kotlinc_options(
     "org.jetbrains.kotlin.analysis.api.KaContextParameterApi",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
   ],
-  x_context_receivers = True
+  x_context_parameters = True
 )
 
 jvm_library(
   name = "kotlin-uast-uast-kotlin-k2",
   module_name = "kotlin.uast.uast-kotlin.k2",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-uast-uast-kotlin-k2",
   deps = [
     "@lib//:kotlin-stdlib",

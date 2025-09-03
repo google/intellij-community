@@ -124,6 +124,7 @@ object CommandLineProcessor {
       if (LightEditUtil.isLightEditEnabled()) {
         val lightEditProject = LightEditUtil.openFile(ioFile, true)
         if (lightEditProject != null) {
+          FUSProjectHotStartUpMeasurer.lightEditProjectFound()
           val future = if (shouldWait) CommandLineWaitingManager.getInstance().addHookForPath(ioFile).asDeferred() else OK_FUTURE
           return CommandLineProcessorResult(project = lightEditProject, future = future)
         }
@@ -352,16 +353,16 @@ object CommandLineProcessor {
       FUSProjectHotStartUpMeasurer.noProjectFound()
     }
     else if (commands.size > 1) {
-      FUSProjectHotStartUpMeasurer.openingMultipleProjects()
+      val numberOfProjects = commands.count { command -> command is OpenProjectResult }
+      val hasLightEditProject = commands.any { command -> (command is OpenProjectResult && command.lightEditMode) ||
+                                                          (command is NoProjectResult && !command.shouldWait && command.lightEditMode) }
+      FUSProjectHotStartUpMeasurer.openingMultipleProjects(false, numberOfProjects, hasLightEditProject)
     }
     else {
       when (val command = commands[0]) {
         is OpenProjectResult -> {
           if (command.lightEditMode) {
             FUSProjectHotStartUpMeasurer.lightEditProjectFound()
-          }
-          else {
-            FUSProjectHotStartUpMeasurer.reportProjectPath(command.file)
           }
         }
         is NoProjectResult -> {
@@ -374,12 +375,14 @@ object CommandLineProcessor {
     for (command in commands) {
         result = when (command) {
           is OpenProjectResult -> {
-            openFileOrProject(file = command.file,
-                              line = command.line,
-                              column = command.column,
-                              tempProject = command.tempProject,
-                              shouldWait = command.shouldWait,
-                              lightEditMode = command.lightEditMode)
+            FUSProjectHotStartUpMeasurer.withProjectContextElement(command.file) {
+              openFileOrProject(file = command.file,
+                                line = command.line,
+                                column = command.column,
+                                tempProject = command.tempProject,
+                                shouldWait = command.shouldWait,
+                                lightEditMode = command.lightEditMode)
+            }
           }
           is NoProjectResult -> {
             if (command.shouldWait) {
@@ -389,7 +392,9 @@ object CommandLineProcessor {
               )
             }
             else if (command.lightEditMode) {
-              LightEditService.getInstance().showEditorWindow()
+              withContext(FUSProjectHotStartUpMeasurer.getContextElementWithEmptyProjectElementToPass()) {
+                LightEditService.getInstance().showEditorWindow()
+              }
               CommandLineProcessorResult(project = LightEditService.getInstance().project, future = OK_FUTURE)
             }
             else {

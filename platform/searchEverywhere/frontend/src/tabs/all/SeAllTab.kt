@@ -68,6 +68,10 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
     return delegate.openInFindToolWindow(sessionRef, params, initEvent, true,allTabFilter.disabledProviderIds)
   }
 
+  override suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {
+    return delegate.getUpdatedPresentation(item)
+  }
+
   override fun dispose() {
     Disposer.dispose(delegate)
   }
@@ -80,7 +84,7 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
 
 private class SeAllFilterEditor(providersIdToName: Map<SeProviderId, @Nls String>) : SeFilterEditorBase<SeEverywhereFilter>(SeEverywhereFilter(false, disabledProviders)) {
   private val actions = listOf(getEverywhereToggleAction(), getFilterTypesAction(providersIdToName))
-  override fun getActions(): List<AnAction> = actions
+  override fun getHeaderActions(): List<AnAction> = actions
 
   private fun getEverywhereToggleAction() = object : CheckBoxSearchEverywhereToggleAction(IdeUICustomization.getInstance().projectMessage("checkbox.include.non.project.items")), AutoToggleAction {
     private var isAutoToggleEnabled: Boolean = true

@@ -4,6 +4,7 @@ package com.intellij.spellchecker.xml;
 import com.intellij.codeInspection.SuppressQuickFix;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
@@ -40,7 +41,7 @@ public class XmlSpellcheckingStrategy extends SuppressibleSpellcheckingStrategy 
     if (element instanceof XmlText) {
       return myXmlTextTokenizer;
     }
-    if (isComment(element)) {
+    if (isXmlComment(element)) {
       return myXmlCommentTokenizer;
     }
     if (element instanceof XmlToken
@@ -95,12 +96,21 @@ public class XmlSpellcheckingStrategy extends SuppressibleSpellcheckingStrategy 
   }
 
   @Override
+  public boolean useTextLevelSpellchecking() {
+    return Registry.is("spellchecker.grazie.enabled");
+  }
+
+  @Override
   protected boolean isLiteral(@NotNull PsiElement element) {
     return element instanceof XmlAttributeValue || element instanceof XmlText;
   }
 
   @Override
   protected boolean isComment(@NotNull PsiElement element) {
+    return isXmlComment(element) || element.getNode().getElementType() == XmlTokenType.XML_COMMENT_CHARACTERS;
+  }
+
+  private static boolean isXmlComment(@NotNull PsiElement element) {
     return element instanceof XmlComment;
   }
 

@@ -2,8 +2,8 @@
 package com.intellij.psi.impl;
 
 import com.intellij.codeInsight.multiverse.CodeInsightContext;
+import com.intellij.codeInsight.multiverse.CodeInsightContextUtil;
 import com.intellij.codeInsight.multiverse.CodeInsightContexts;
-import com.intellij.codeInsight.multiverse.FileViewProviderUtil;
 import com.intellij.codeWithMe.ClientId;
 import com.intellij.concurrency.ThreadContext;
 import com.intellij.core.CoreBundle;
@@ -106,12 +106,13 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
     });
   }
 
+  // dodo IJPL-339: deprecate this method?
   @Override
   public @Nullable PsiFile getPsiFile(@NotNull Document document) {
     return getPsiFile(document, CodeInsightContexts.anyContext());
   }
 
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   @Override
   public @Nullable PsiFile getPsiFile(@NotNull Document document, @NotNull CodeInsightContext context) {
     if (document instanceof DocumentWindow && !((DocumentWindow)document).isValid()) {
@@ -423,7 +424,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   public boolean isEventSystemEnabled(@NotNull Document document) {
     return ReadAction.compute(() -> {
       List<FileViewProvider> viewProviders = getCachedViewProviders(document);
-      return FileViewProviderUtil.isEventSystemEnabled(viewProviders);
+      return CodeInsightContextUtil.isEventSystemEnabled(viewProviders);
     });
   }
 
@@ -435,7 +436,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
                               @NotNull Object reason) {
     assert !myProject.isDisposed() : "Already disposed";
     if (isEventSystemEnabled(document)) {
-      ThreadingAssertions.assertEventDispatchThread();
+      ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
     }
     boolean[] ok = {true};
     if (synchronously) {
@@ -462,7 +463,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
                                               @NotNull @Unmodifiable List<? extends BooleanRunnable> reparseInjectedProcessors,
                                               boolean synchronously) {
     if (isEventSystemEnabled(document)) {
-      ThreadingAssertions.assertEventDispatchThread();
+      ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
     }
     if (myProject.isDisposed()) return false;
     assert !(document instanceof DocumentWindow);
@@ -1127,7 +1128,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
                            @NotNull Object reason,
                            @NotNull ModalityState modality) {
     List<FileViewProvider> viewProviders = getCachedViewProviders(document);
-    if (FileViewProviderUtil.isEventSystemEnabled(viewProviders)) {
+    if (CodeInsightContextUtil.isEventSystemEnabled(viewProviders)) {
       ThreadingAssertions.assertEventDispatchThread();
       // make cached provider non-gcable temporarily (until commit end) to avoid surprising getCachedProvider()==null
       myDocumentCommitProcessor.commitAsynchronously(myProject, this, document, reason, modality);
@@ -1277,6 +1278,7 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
   }
 
   @TestOnly
+  @ApiStatus.Internal
   public void clearUncommittedDocuments() {
     myUncommittedDocuments.clear();
     myUncommittedDocumentTraces.clear();
@@ -1356,4 +1358,17 @@ public abstract class PsiDocumentManagerBase extends PsiDocumentManager implemen
    */
   @ApiStatus.Internal
   public void assertFileIsFromCorrectProject(@NotNull VirtualFile virtualFile) {}
+
+  @TestOnly
+  @ApiStatus.Internal
+  public <T extends Throwable> void executeTestInProductionMode(@NotNull ThrowableRunnable<T> runnable) throws T {
+    boolean old = myUnitTestMode;
+    myUnitTestMode = false;
+    try {
+      runnable.run();
+    }
+    finally {
+      myUnitTestMode = old;
+    }
+  }
 }

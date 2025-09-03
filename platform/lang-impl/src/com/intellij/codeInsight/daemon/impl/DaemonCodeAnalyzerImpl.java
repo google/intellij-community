@@ -37,11 +37,11 @@ import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.ex.MarkupModelEx;
 import com.intellij.openapi.editor.ex.RangeHighlighterEx;
 import com.intellij.openapi.editor.impl.DocumentMarkupModel;
 import com.intellij.openapi.editor.impl.EditorMarkupModelImpl;
-import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.MarkupModel;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.fileEditor.*;
@@ -95,6 +95,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static com.intellij.codeInsight.daemon.impl.FileLevelComponentUtil.doAddFileLevelInfoComponent;
+import static com.intellij.codeInsight.daemon.impl.FileLevelComponentUtil.doRemoveFileLevelInfoComponent;
 
 @State(name = "DaemonCodeAnalyzer", storages = @Storage(StoragePathMacros.PRODUCT_WORKSPACE_FILE))
 @ApiStatus.Internal
@@ -194,15 +197,24 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   }
 
   private synchronized void clearReferences() {
-    myUpdateProgress.values().forEach(ProgressIndicator::cancel);
+    processIndicators(indicator -> {indicator.cancel(); return true;});
     // avoid leak of highlight session via user data
     myUpdateProgress.clear();
     myUpdateRunnableFuture.cancel(true);
     updateRequests.set(0);
   }
 
+  private boolean processIndicators(@NotNull Processor<? super DaemonProgressIndicator> action) {
+    for (DaemonProgressIndicator indicator : new ArrayList<>(myUpdateProgress.values())) {
+      if (!action.process(indicator)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   synchronized void clearProgressIndicator() {
-    myUpdateProgress.values().forEach(HighlightingSessionImpl::clearAllHighlightingSessions);
+    processIndicators(indicator -> {HighlightingSessionImpl.clearAllHighlightingSessions(indicator); return true;});
   }
 
   @TestOnly
@@ -223,10 +235,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     VirtualFile vFile = psiFile.getViewProvider().getVirtualFile();
     List<HighlightInfo> list = new ArrayList<>();
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
-      List<HighlightInfo> data = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-      if (data != null) {
-        list.addAll(data);
-      }
+      list.addAll(getFileLevelHighlights(fileEditor));
     }
     return list;
   }
@@ -256,12 +265,9 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
-      List<HighlightInfo> infos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-      if (infos != null && !infos.isEmpty()) {
-        for (HighlightInfo info : infos) {
-          if (info.getGroup() == group || group == ANY_GROUP) {
-            return true;
-          }
+      for (HighlightInfo info : getFileLevelHighlights(fileEditor)) {
+        if (info.getGroup() == group || group == ANY_GROUP) {
+          return true;
         }
       }
     }
@@ -277,8 +283,8 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   private void cleanFileLevelHighlights(@NotNull FileEditor fileEditor, int group) {
     ThreadingAssertions.assertEventDispatchThread();
-    List<HighlightInfo> infos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-    if (infos == null || infos.isEmpty()) {
+    List<HighlightInfo> infos = getFileLevelHighlights(fileEditor);
+    if (infos.isEmpty()) {
       return;
     }
 
@@ -302,11 +308,11 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
     for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
-      List<HighlightInfo> infos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-      if (infos == null) {
+      List<HighlightInfo> infos = getFileLevelHighlights(fileEditor);
+      if (infos.isEmpty()) {
         continue;
       }
-      infos.removeIf(fileLevelInfo-> {
+      infos.removeIf(fileLevelInfo -> {
         if (!info.attributesEqual(fileLevelInfo)) {
           return false;
         }
@@ -321,11 +327,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   private void disposeFileLevelInfo(@NotNull FileEditor fileEditor, @NotNull HighlightInfo info) {
     ThreadingAssertions.assertEventDispatchThread();
-    JComponent component = info.getFileLevelComponent(fileEditor);
-    if (component != null) {
-      getFileEditorManager().removeTopComponent(fileEditor, component);
-      info.removeFileLeverComponent(fileEditor);
-    }
+    doRemoveFileLevelInfoComponent(info, fileEditor, getFileEditorManager());
     RangeHighlighterEx highlighter = info.getHighlighter();
     if (highlighter != null) {
       highlighter.dispose();
@@ -333,45 +335,36 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   }
 
   @Override
-  public void addFileLevelHighlight(int group, @NotNull HighlightInfo info, @NotNull PsiFile psiFile, @Nullable RangeHighlighter toReuse) {
+  public void addFileLevelHighlight(int group,
+                                    @NotNull HighlightInfo info,
+                                    @NotNull PsiFile psiFile,
+                                    @Nullable RangeHighlighter toReuse,
+                                    @Nullable CodeInsightContext context) {
     ThreadingAssertions.assertEventDispatchThread();
     assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
-    FileEditorManager fileEditorManager = getFileEditorManager();
-    for (FileEditor fileEditor : fileEditorManager.getAllEditorList(vFile)) {
+    for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       if (fileEditor instanceof TextEditor textEditor) {
-        List<Pair<HighlightInfo.IntentionActionDescriptor, TextRange>> actionRanges = new ArrayList<>();
-        info.findRegisteredQuickFix((descriptor, range) -> {
-          actionRanges.add(Pair.create(descriptor, range));
-          return null;
-        });
-        List<HighlightInfo> fileLevelInfos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-        if (fileLevelInfos == null) {
-          fileLevelInfos = ContainerUtil.createConcurrentList(); // must be able to iterate in hasFileLevelHighlights() and concurrently modify in addFileLevelHighlight()
-          fileEditor.putUserData(FILE_LEVEL_HIGHLIGHTS, fileLevelInfos);
-        }
-        if (!ContainerUtil.exists(fileLevelInfos, existing->existing.equalsByActualOffset(info))) {
+        List<HighlightInfo> fileLevelInfos = getOrCreateFileLevelHighlights(fileEditor);
+        if (!ContainerUtil.exists(fileLevelInfos, existing -> existing.equalsByActualOffset(info))) {
           Document document = textEditor.getEditor().getDocument();
           MarkupModel markupModel = DocumentMarkupModel.forDocument(document, myProject, true);
-          RangeHighlighter highlighter = toReuse != null && toReuse.isValid() ? toReuse
-                                         : markupModel.addRangeHighlighter(0, document.getTextLength(), FILE_LEVEL_FAKE_LAYER, null, HighlighterTargetArea.EXACT_RANGE);
-          highlighter.setGreedyToLeft(true);
-          highlighter.setGreedyToRight(true);
-          highlighter.setErrorStripeTooltip(info);
+          // todo do we need to create a new highlighter if toReuse is not-null?
+          RangeHighlighterEx highlighter = HighlightInfoUpdaterImpl.createOrReuseFakeFileLevelHighlighter(group,
+                                                                                                          info,
+                                                                                                          (RangeHighlighterEx)toReuse,
+                                                                                                          markupModel,
+                                                                                                          myProject,
+                                                                                                          context);
           // for the condition `existing.equalsByActualOffset(info)` above work correctly,
           // create a fake whole-file highlighter which will track the document size changes
           // and which will make possible to calculate correct `info.getActualEndOffset()`
           if (toReuse == null) {
             // assign only newly created highlighter here; otherwise the reused highlighter was already set, no need (and can't) to overwrite
-            info.setHighlighter((RangeHighlighterEx)highlighter);
+            info.setHighlighter(highlighter);
           }
-          info.setGroup(group);
           fileLevelInfos.add(info);
-          FileLevelIntentionComponent component = new FileLevelIntentionComponent(info.getDescription(), info.getSeverity(),
-                                                                                  info.getGutterIconRenderer(), actionRanges,
-                                                                                  psiFile, textEditor.getEditor(), info.getToolTip());
-          fileEditorManager.addTopComponent(fileEditor, component);
-          info.addFileLevelComponent(fileEditor, component);
+          addFileLevelInfoComponentToEditor(info, psiFile, textEditor);
           if (LOG.isDebugEnabled()) {
             LOG.debug("addFileLevelHighlight [" + info + "]: fileLevelInfos:" + fileLevelInfos);
           }
@@ -380,61 +373,63 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     }
   }
 
-  // replace one file-level info with the other, possible reusing the fake highlighter
+  /** replace one file-level info with the other, possible reusing the fake highlighter */
   @Override
   public void replaceFileLevelHighlight(@NotNull HighlightInfo oldInfo,
                                         @NotNull HighlightInfo newInfo,
                                         @NotNull PsiFile psiFile,
-                                        @Nullable RangeHighlighter toReuse) {
+                                        @Nullable RangeHighlighter toReuse,
+                                        @Nullable CodeInsightContext context) {
     ThreadingAssertions.assertEventDispatchThread();
     assertFileFromMyProject(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
-    FileEditorManager fileEditorManager = getFileEditorManager();
-    for (FileEditor fileEditor : fileEditorManager.getAllEditorList(vFile)) {
+    for (FileEditor fileEditor : getFileEditorManager().getAllEditorList(vFile)) {
       if (fileEditor instanceof TextEditor textEditor) {
-        List<Pair<HighlightInfo.IntentionActionDescriptor, TextRange>> actionRanges = new ArrayList<>();
-        newInfo.findRegisteredQuickFix((descriptor, range) -> {
-          actionRanges.add(Pair.create(descriptor, range));
-          return null;
-        });
-        List<HighlightInfo> fileLevelInfos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
-        if (fileLevelInfos == null) {
-          fileLevelInfos = ContainerUtil.createConcurrentList(); // must be able to iterate in hasFileLevelHighlights() and concurrently modify in addFileLevelHighlight()
-          fileEditor.putUserData(FILE_LEVEL_HIGHLIGHTS, fileLevelInfos);
-        }
+        List<HighlightInfo> fileLevelInfos = getOrCreateFileLevelHighlights(fileEditor);
         // do not dispose highlighter if it needs to be reused
-        fileLevelInfos.removeIf(fileLevelInfo-> {
-          if (!fileLevelInfo.attributesEqual(fileLevelInfo)) {
+        fileLevelInfos.removeIf(oldFileLevelInfo -> {
+          if (!oldInfo.attributesEqual(oldFileLevelInfo)) {
             return false;
           }
-          ThreadingAssertions.assertEventDispatchThread();
-          JComponent component = fileLevelInfo.getFileLevelComponent(fileEditor);
-          if (component != null) {
-            fileEditorManager.removeTopComponent(fileEditor, component);
-            fileLevelInfo.removeFileLeverComponent(fileEditor);
-          }
-          RangeHighlighterEx highlighter = fileLevelInfo.getHighlighter();
-          if (highlighter != null && highlighter != toReuse) {
-            highlighter.dispose();
+          doRemoveFileLevelInfoComponent(oldFileLevelInfo, fileEditor, getFileEditorManager());
+          RangeHighlighterEx oldHighlighter = oldFileLevelInfo.getHighlighter();
+          if (oldHighlighter != null && oldHighlighter != toReuse) {
+            oldHighlighter.dispose();
           }
           return true;
         });
         Document document = textEditor.getEditor().getDocument();
         MarkupModel markupModel = DocumentMarkupModel.forDocument(document, myProject, true);
         if (toReuse == null) {
-          HighlightInfoUpdaterImpl.createOrReuseFakeFileLevelHighlighter(newInfo.getGroup(), newInfo, null, markupModel);
+          HighlightInfoUpdaterImpl.createOrReuseFakeFileLevelHighlighter(newInfo.getGroup(), newInfo, null, markupModel, myProject, context);
         }
         fileLevelInfos.add(newInfo);
-        FileLevelIntentionComponent component = new FileLevelIntentionComponent(newInfo.getDescription(), newInfo.getSeverity(),
-                                                                                newInfo.getGutterIconRenderer(), actionRanges,
-                                                                                psiFile, textEditor.getEditor(), newInfo.getToolTip());
-        fileEditorManager.addTopComponent(fileEditor, component);
-        newInfo.addFileLevelComponent(fileEditor, component);
+        addFileLevelInfoComponentToEditor(newInfo, psiFile, textEditor);
         if (LOG.isDebugEnabled()) {
           LOG.debug("replaceFileLevelHighlight [" + newInfo + "]: fileLevelInfos:" + fileLevelInfos);
         }
       }
     }
+  }
+
+  private void addFileLevelInfoComponentToEditor(@NotNull HighlightInfo info,
+                                                 @NotNull PsiFile psiFile,
+                                                 @NotNull TextEditor textEditor) {
+    Editor editor = textEditor.getEditor();
+    boolean isHighlighterAvailableInEditor =
+      !(editor instanceof EditorEx) || ((EditorEx)editor).getFilteredDocumentMarkupModel().containsHighlighter(info.getHighlighter());
+
+    FileLevelIntentionComponent component = doAddFileLevelInfoComponent(info, psiFile, textEditor, getFileEditorManager());
+    component.setVisible(isHighlighterAvailableInEditor);
+  }
+
+  private static @NotNull List<HighlightInfo> getOrCreateFileLevelHighlights(@NotNull FileEditor fileEditor) {
+    List<HighlightInfo> fileLevelInfos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
+    if (fileLevelInfos == null) {
+      fileLevelInfos = ContainerUtil.createConcurrentList(); // must be able to iterate in hasFileLevelHighlights() and concurrently modify in addFileLevelHighlight()
+      fileEditor.putUserData(FILE_LEVEL_HIGHLIGHTS, fileLevelInfos);
+    }
+    return fileLevelInfos;
   }
 
   @Override
@@ -559,11 +554,16 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
       if (System.currentTimeMillis() > dStart + 100_000) {
         throw new IllegalStateException("Timeout waiting for smart mode. If you absolutely want to be dumb, please use DaemonCodeAnalyzerImpl.mustWaitForSmartMode(false).");
       }
-      EDT.dispatchAllInvocationEvents();
+      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+        EDT.dispatchAllInvocationEvents();
+        return Unit.INSTANCE;
+      });
     }
     ((GistManagerImpl)GistManager.getInstance()).clearQueueInTests();
-    EDT.dispatchAllInvocationEvents();
-
+    TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+      EDT.dispatchAllInvocationEvents();
+      return Unit.INSTANCE;
+    });
     NonBlockingReadActionImpl.waitForAsyncTaskCompletion(); // wait for async editor loading
 
     clearReferences();
@@ -571,7 +571,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     // previous passes can be canceled but still in flight. wait for them to avoid interference
     myPassExecutorService.cancelAll(false, "DaemonCodeAnalyzerImpl.runPasses");
 
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile); // todo IJPL-339 ???
+    CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
 
     waitForUpdateFileStatusBackgroundQueueInTests(); // update the file status map before prohibiting its modifications
     PsiDocumentManager.getInstance(myProject).commitAllDocuments();
@@ -860,6 +860,12 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     restart("Global restart");
   }
 
+  @NotNull
+  private static List<HighlightInfo> getFileLevelHighlights(@NotNull FileEditor textEditor) {
+    List<HighlightInfo> highlights = textEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
+    return highlights == null ? Collections.emptyList() : highlights;
+  }
+
   @Override
   public void restart(@NotNull Object reason) {
     myFileStatusMap.markAllFilesDirty(reason);
@@ -903,7 +909,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     }
     assertFileFromMyProject(psiFile.getProject(), psiFile);
     Document document = psiFile.getViewProvider().getDocument();
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
+    CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
     return document != null &&
            PsiDocumentManager.getInstance(myProject).isCommitted(document) &&
            document.getModificationStamp() == psiFile.getViewProvider().getModificationStamp() &&
@@ -916,7 +922,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
       return false;
     }
     assertFileFromMyProject(psiFile.getProject(), psiFile);
-    CodeInsightContext context = FileViewProviderUtil.getCodeInsightContext(psiFile);
+    CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
     Document document = psiFile.getViewProvider().getDocument();
     return document != null &&
            document.getModificationStamp() == psiFile.getViewProvider().getModificationStamp() &&
@@ -930,12 +936,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @Override
   public synchronized boolean isRunning() {
-    for (DaemonProgressIndicator indicator : myUpdateProgress.values()) {
-      if (!indicator.isCanceled()) {
-        return true;
-      }
-    }
-    return false;
+    return !processIndicators(indicator -> indicator.isCanceled());
   }
 
   @Override
@@ -1040,10 +1041,10 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     if (myDisposed || myProject.isDisposed() || myProject.getMessageBus().isDisposed()) {
       return;
     }
-    for (Map.Entry<FileEditor, DaemonProgressIndicator> entry : new ArrayList<>(myUpdateProgress.entrySet())) {
-      DaemonProgressIndicator updateProgress = entry.getValue();
-      cancelIndicator(updateProgress, toRestartAlarm, null, reason);
-    }
+    processIndicators(indicator -> {
+      cancelIndicator(indicator, toRestartAlarm, null, reason);
+      return true;
+    });
     myUpdateProgress.clear();
     myPassExecutorService.cancelAll(false, reason);
     daemonCancelEventCount.incrementAndGet();
@@ -1464,6 +1465,13 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
                                                   @NotNull Map<? super Pair<Document, Class<? extends ProgressableTextEditorHighlightingPass>>, ProgressableTextEditorHighlightingPass> mainDocumentPasses) {
     ThreadingAssertions.assertEventDispatchThread();
     BackgroundEditorHighlighter highlighter;
+
+    // since we are running on EDT under write-intent lock, write action can be either absent or pending (if it was invoked on background)
+    // in this case, the progress indicator needs to be canceled.
+    if (ApplicationManagerEx.getApplicationEx().isWriteActionPending()) {
+      stopProcess(false, "Background write action is pending");
+      throw new ProcessCanceledException();
+    }
 
     try (AccessToken ignored = ClientId.withExplicitClientId(ClientFileEditorManager.getClientId(fileEditor))) {
       highlighter = fileEditor.getBackgroundHighlighter();

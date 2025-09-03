@@ -9,10 +9,10 @@ import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import org.jetbrains.plugins.terminal.block.TerminalPromotedDumbAwareAction
 import org.jetbrains.plugins.terminal.block.ui.getClipboardText
 import org.jetbrains.plugins.terminal.block.ui.sanitizeLineSeparators
-import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.editor
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.isReworkedTerminalEditor
+import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.terminalEditor
 
-internal class TerminalPasteSelectionAction : TerminalPromotedDumbAwareAction(), ActionRemoteBehaviorSpecification.Frontend {
+internal class TerminalPasteSelectionAction : TerminalPromotedDumbAwareAction() {
   override fun actionPerformed(e: AnActionEvent) {
     val terminalInput = e.terminalInput ?: error("TerminalInput is missing in terminal editor")
     val text = getClipboardText(useSystemSelectionClipboardIfAvailable = true)
@@ -23,12 +23,12 @@ internal class TerminalPasteSelectionAction : TerminalPromotedDumbAwareAction(),
 
     // Scroll to the cursor if the scrolling model is available in this editor.
     // It can be absent if it is the alternate buffer editor.
-    val scrollingModel = e.editor?.getUserData(TerminalOutputScrollingModel.KEY)
+    val scrollingModel = e.terminalEditor?.getUserData(TerminalOutputScrollingModel.KEY)
     scrollingModel?.scrollToCursor(force = true)
   }
 
   override fun update(e: AnActionEvent) {
-    val editor = e.editor
+    val editor = e.terminalEditor
     e.presentation.isEnabledAndVisible = editor != null &&
                                          editor.isReworkedTerminalEditor &&
                                          TerminalOptionsProvider.instance.pasteOnMiddleMouseButton

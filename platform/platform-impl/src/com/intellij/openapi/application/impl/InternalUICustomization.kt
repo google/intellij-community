@@ -10,18 +10,21 @@ import com.intellij.openapi.ui.Divider
 import com.intellij.openapi.ui.Splittable
 import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.IdeGlassPane
+import com.intellij.openapi.wm.impl.IdeFrameImpl
+import com.intellij.openapi.wm.impl.content.ContentLayout
 import com.intellij.toolWindow.StripesUxCustomizer
 import com.intellij.toolWindow.ToolWindowButtonManager
 import com.intellij.toolWindow.xNext.XNextStripesUxCustomizer
 import com.intellij.ui.JBColor
+import com.intellij.ui.tabs.JBTabPainter
+import com.intellij.ui.tabs.impl.JBTabsImpl
+import com.intellij.ui.tabs.impl.TabLabel
 import com.intellij.ui.tabs.impl.TabPainterAdapter
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.ApiStatus
-import java.awt.Color
-import java.awt.Graphics
-import java.awt.Paint
-import java.awt.Rectangle
+import java.awt.*
 import javax.swing.JComponent
+import javax.swing.JFrame
 import javax.swing.JPanel
 
 @ApiStatus.Experimental
@@ -44,15 +47,20 @@ open class InternalUICustomization {
       return result
     }
   }
+
   open fun progressWidget(project: Project): JComponent? = null
 
   open val aiComponentMarker: AiInternalUiComponentMarker = AiInternalUiComponentMarker()
 
   open val editorTabPainterAdapter: TabPainterAdapter = EditorTabPainterAdapter()
 
+  open val commonTabPainterAdapter: TabPainterAdapter? = null
+
   open val shouldPaintEditorFadeout: Boolean = true
 
   open val toolWindowUIDecorator: ToolWindowUIDecorator = ToolWindowUIDecorator()
+
+  open val toolWindowTabPainter: JBTabPainter = JBTabPainter.TOOL_WINDOW
 
   open val isProjectCustomDecorationActive: Boolean = true
 
@@ -70,10 +78,12 @@ open class InternalUICustomization {
    */
   open fun isSingleStripe(): Boolean = false
 
-  internal val internalCustomizer: StripesUxCustomizer = if(isSingleStripe())
+  internal val internalCustomizer: StripesUxCustomizer = if (isSingleStripe())
     XNextStripesUxCustomizer()
   else
-    StripesUxCustomizer ()
+    StripesUxCustomizer()
+
+  open fun configureMainFrame(frame: IdeFrameImpl) {}
 
   open fun configureButtonLook(look: ActionButtonLook, g: Graphics): Graphics? = null
 
@@ -84,8 +94,6 @@ open class InternalUICustomization {
   open fun installBackgroundUpdater(component: JComponent) {}
 
   open fun installEditorBackground(component: JComponent) {}
-
-  open fun paintBeforeEditorEmptyText(component: JComponent, graphics: Graphics) {}
 
   open fun frameHeaderBackgroundConverter(color: Color?): Color? = color
 
@@ -128,4 +136,18 @@ open class InternalUICustomization {
   open fun getCustomMainBackgroundColor(): Color? = null
 
   fun statusBarRequired(): Boolean = !isSingleStripe()
+
+  open fun getProjectTabContentInsets(): Insets? = null
+
+  open fun paintProjectTabsContainer(component: JComponent, g: Graphics): Boolean = false
+
+  open fun createProjectTab(frame: JFrame) {}
+
+  open fun paintProjectTab(frame: JFrame, label: TabLabel, g: Graphics, tabs: JBTabsImpl, selected: Boolean, index: Int, lastIndex: Int): Boolean = false
+
+  open fun paintTab(g: Graphics, rect: Rectangle, hovered: Boolean, selected: Boolean): Boolean = false
+
+  open fun paintTabBorder(g: Graphics, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean): Boolean = false
+
+  open fun getTabLayoutStart(layout: ContentLayout): Int = 0
 }

@@ -17,7 +17,7 @@ import kotlin.io.path.Path
 /**
  * Exe might sit on eel (new one) or on target (legacy)
  */
-interface Exe {
+sealed interface Exe {
   companion object {
     fun fromString(path: String): Exe {
       try {
@@ -38,17 +38,19 @@ interface Exe {
   }
 }
 
+typealias ExecError = ExecErrorImpl<*>
+
 /**
  * External process error.
  */
-class ExecError(
+class ExecErrorImpl<T : ExecErrorReason>(
   val exe: Exe,
   /**
    * I.e ['-v']
    */
   val args: Array<out String>,
 
-  val errorReason: ExecErrorReason,
+  val errorReason: T,
   /**
    * optional message to be displayed to the user: Why did we run this process. I.e "running pip to install package".
    */

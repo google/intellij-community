@@ -11,7 +11,7 @@ import com.intellij.psi.stubs.StubElement
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.util.indexing.FileContentImpl
 import org.jetbrains.kotlin.analysis.decompiler.stub.file.KotlinClsStubBuilder
-import org.jetbrains.kotlin.idea.base.plugin.artifacts.TestKotlinArtifacts
+import org.jetbrains.kotlin.idea.artifacts.TestKotlinArtifacts
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.stubs.AbstractStubBuilderTest
 import org.jetbrains.kotlin.idea.test.*
@@ -79,7 +79,7 @@ abstract class AbstractClsStubBuilderTest : KotlinLightCodeInsightFixtureTestCas
             sources = listOf(File(sourcePath)),
             target = outDir,
             options = extraOptions,
-            classpath = listOf(TestKotlinArtifacts.kotlinAnnotationsJvm)
+            classpath = listOf(TestKotlinArtifacts.kotlinAnnotationsJvm.toFile())
         ).compile()
 
         val root = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(outDir)!!

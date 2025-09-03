@@ -66,6 +66,7 @@ import com.intellij.openapi.vfs.VirtualFileFilter;
 import com.intellij.openapi.vfs.ex.temp.TempFileSystem;
 import com.intellij.platform.testFramework.core.FileComparisonFailedError;
 import com.intellij.psi.*;
+import com.intellij.psi.impl.DocumentCommitThread;
 import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference;
 import com.intellij.testFramework.common.TestApplicationKt;
 import com.intellij.testFramework.fixtures.IdeaTestExecutionPolicy;
@@ -78,14 +79,13 @@ import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.Decompressor;
+import com.intellij.util.ui.EDT;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import junit.framework.AssertionFailedError;
 import kotlin.Unit;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import kotlinx.coroutines.Job;
+import org.jetbrains.annotations.*;
 import org.jetbrains.concurrency.AsyncPromise;
 import org.jetbrains.concurrency.Promise;
 import org.junit.AssumptionViolatedException;
@@ -254,15 +254,15 @@ public final class PlatformTestUtil {
     }
   }
 
-  public static void assertTreeEqual(@NotNull JTree tree, @NonNls String expected) {
+  public static void assertTreeEqual(@NotNull JTree tree, @NotNull @NonNls String expected) {
     assertTreeEqual(tree, expected, false);
   }
 
-  public static void assertTreeEqual(@NotNull JTree tree, String expected, boolean checkSelected) {
+  public static void assertTreeEqual(@NotNull JTree tree, @NotNull @NonNls String expected, boolean checkSelected) {
     assertTreeEqual(tree, expected, checkSelected, false);
   }
 
-  public static void assertTreeEqual(@NotNull JTree tree, @NotNull String expected, boolean checkSelected, boolean ignoreOrder) {
+  public static void assertTreeEqual(@NotNull JTree tree, @NotNull @NonNls String expected, boolean checkSelected, boolean ignoreOrder) {
     String treeStringPresentation = print(tree, checkSelected);
     if (ignoreOrder) {
       List<String> actualLines = sorted(ContainerUtil.map(splitByLines(treeStringPresentation), String::trim));
@@ -411,14 +411,19 @@ public final class PlatformTestUtil {
   }
 
   public static <T> T waitForFuture(@NotNull Future<T> future, long timeoutMillis) {
+    if (!EDT.isCurrentThreadEdt()) {
+      try {
+        return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+      }
+      catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
     assertDispatchThreadWithoutWriteAccess();
     long start = System.currentTimeMillis();
     while (true) {
       if (!future.isDone()) {
-        TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
-          UIUtil.dispatchAllInvocationEvents();
-          return Unit.INSTANCE;
-        });
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
       }
       try {
         return future.get(10, TimeUnit.MILLISECONDS);
@@ -455,7 +460,7 @@ public final class PlatformTestUtil {
     }, delay);
     pooledAlarm.addRequest(() -> pooledRunnableInvoked.set(true), delay);
 
-    UIUtil.dispatchAllInvocationEvents();
+    dispatchAllInvocationEventsInIdeEventQueue();
 
     long start = System.currentTimeMillis();
     try {
@@ -463,7 +468,7 @@ public final class PlatformTestUtil {
       while (!alarmInvoked2.get()) {
         AtomicBoolean laterInvoked = new AtomicBoolean();
         app.invokeLater(() -> laterInvoked.set(true));
-        UIUtil.dispatchAllInvocationEvents();
+        dispatchAllInvocationEventsInIdeEventQueue();
         assertTrue(laterInvoked.get());
 
         TimeoutUtil.sleep(sleptAlready ? 10 : delay);
@@ -489,7 +494,7 @@ public final class PlatformTestUtil {
     finally {
       Disposer.dispose(tempDisposable);
     }
-    UIUtil.dispatchAllInvocationEvents();
+    dispatchAllInvocationEventsInIdeEventQueue();
   }
 
   /**
@@ -513,6 +518,25 @@ public final class PlatformTestUtil {
       });
       return null;
     });
+  }
+
+  @TestOnly
+  public static void waitForSingleAlarm(@NotNull SingleAlarm alarm, long timeout, @NotNull TimeUnit timeUnit) throws TimeoutException {
+    Job job = alarm.getCurrentJob();
+    if (job == null) {
+      return;
+    }
+
+    long currentTime = System.currentTimeMillis();
+    while (true) {
+      if (!job.isActive()) {
+        return;
+      }
+      if (getMillisSince(currentTime) > timeUnit.toMillis(timeout)) {
+        throw new TimeoutException("Could not wait for " + alarm + "to finish");
+      }
+      dispatchAllEventsInIdeEventQueue();
+    }
   }
 
   /**
@@ -1331,5 +1355,16 @@ public final class PlatformTestUtil {
         "; FJP configured parallelism=" + ForkJoinPool.getCommonPoolParallelism() +
         "; FJP actual common pool parallelism=" + ForkJoinPool.commonPool().getParallelism());
     }
+  }
+
+  @TestOnly
+  public static void waitForAllDocumentsCommitted(long timeout, @NotNull TimeUnit timeUnit) {
+    DocumentCommitThread documentCommitThread = DocumentCommitThread.getInstance();
+    TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
+      documentCommitThread.waitForAllCommits(timeout, timeUnit);
+      return Unit.INSTANCE;
+    });
+    // some callbacks on document commit might require EDT. So we forcibly dispatch pending events to run these callbacks
+    dispatchAllInvocationEventsInIdeEventQueue();
   }
 }

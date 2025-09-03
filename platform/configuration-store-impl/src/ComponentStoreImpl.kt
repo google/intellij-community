@@ -113,7 +113,7 @@ abstract class ComponentStoreImpl : IComponentStore {
 
   @ApiStatus.Internal
   fun incrementModificationCount(componentName: String) {
-    components[componentName]?.let { info ->
+    components.get(componentName)?.let { info ->
       info.updateModificationCount(info.lastModificationCount + 1)
     }
   }
@@ -431,7 +431,9 @@ abstract class ComponentStoreImpl : IComponentStore {
           featureUsageSettingManager.logConfigurationChanged(effectiveComponentName, state)
         }
 
-        setStateToSaveSessionProducer(state, info, effectiveComponentName, sessionProducer)
+        if (state !== HandledByWSM) {
+          setStateToSaveSessionProducer(state, info, effectiveComponentName, sessionProducer)
+        } // else: WSM will call setStateToSaveSessionProducer by itself
       }
     }
   }
@@ -710,7 +712,7 @@ abstract class ComponentStoreImpl : IComponentStore {
       throw AssertionError("This method must be called under remote client id")
     }
 
-    val perClientComponent = (storageManager.componentManager ?: application).getService(componentClass) ?: return
+    val perClientComponent = (storageManager.componentManager ?: application).getServiceForClient(componentClass) ?: return
     if (perClientComponent === info.component) {
       LOG.error(
         "Failed to reload per-client component '${info.stateSpec?.name ?: componentClass.simpleName}': " +

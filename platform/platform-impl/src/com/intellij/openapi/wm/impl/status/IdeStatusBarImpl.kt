@@ -113,6 +113,8 @@ open class IdeStatusBarImpl @ApiStatus.Internal constructor(
 
   private val progressFlow = MutableSharedFlow<ProgressSetChangeEvent>(replay = 1, extraBufferCapacity = Int.MAX_VALUE)
 
+  internal var borderPainter: BorderPainter = DefaultBorderPainter()
+
   companion object {
     internal val HOVERED_WIDGET_ID: DataKey<String> = DataKey.create("HOVERED_WIDGET_ID")
     internal val WIDGET_EFFECT_KEY: Key<WidgetEffect> = Key.create("TextPanel.widgetEffect")
@@ -209,7 +211,16 @@ open class IdeStatusBarImpl @ApiStatus.Internal constructor(
 
     enableEvents(AWTEvent.MOUSE_EVENT_MASK)
     enableEvents(AWTEvent.MOUSE_MOTION_EVENT_MASK)
-    IdeEventQueue.getInstance().addDispatcher({ e -> if (e is MouseEvent) dispatchMouseEvent(e) else false }, coroutineScope)
+    IdeEventQueue.getInstance().addDispatcher(object : IdeEventQueue.NonLockedEventDispatcher {
+      override fun dispatch(e: AWTEvent): Boolean {
+        return if (e is MouseEvent) {
+          dispatchMouseEvent(e)
+        }
+        else {
+          false
+        }
+      }
+    }, coroutineScope)
   }
 
   internal fun initialize() {
@@ -592,6 +603,7 @@ open class IdeStatusBarImpl @ApiStatus.Internal constructor(
   override fun paintChildren(g: Graphics) {
     paintWidgetEffectBackground(g)
     super.paintChildren(g)
+    borderPainter.paintAfterChildren(this, g)
   }
 
   private fun dispatchMouseEvent(e: MouseEvent): Boolean {

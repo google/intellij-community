@@ -11,7 +11,7 @@ jvm_library(
   name = "project-configuration",
   module_name = "kotlin.project-configuration",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -59,6 +59,7 @@ jvm_library(
     "@lib//:maven-resolver-provider",
     "//platform/util",
     "//platform/workspace/storage",
+    "//platform/vcs-impl/shared",
   ],
   runtime_deps = [":project-configuration_resources"]
 )

@@ -72,8 +72,8 @@ final class CustomEntitiesCausingReindexTracker {
       dependencies.stream().filter(description -> description instanceof DependencyDescription.OnParent)
         .map(description -> ((DependencyDescription.OnParent<?, ?>)description).getParentClass());
     Stream<? extends  Class<? extends WorkspaceEntity>> onEntityDeps =
-      dependencies.stream().filter(description -> description instanceof DependencyDescription.OnEntity)
-        .map(description -> ((DependencyDescription.OnEntity<?, ?>)description).getEntityClass());
+      dependencies.stream().filter(description -> description instanceof DependencyDescription.OnArbitraryEntity)
+        .map(description -> ((DependencyDescription.OnArbitraryEntity<?, ?>)description).getEntityClass());
 
     Stream<Class<? extends WorkspaceEntity>> baseAndParentsDependenciesStream = Stream.concat(baseStream, parentDependenciesStream);
     return Stream.concat(baseAndParentsDependenciesStream, onEntityDeps);
@@ -134,8 +134,11 @@ final class CustomEntitiesCausingReindexTracker {
         return isEntityToRescan(contentRoot);
       }
       return false;
-    } else if (Registry.is("ide.workspace.model.sdk.remove.custom.processing") && entity instanceof SdkEntity) {
+    } else if (entity instanceof SdkEntity) {
       return hasDependencyOn((SdkEntity) entity, project);
+    }
+    else if (entity instanceof ProjectSettingsEntity && Registry.is("project.root.manager.over.wsm", false)) {
+      return true; // don't care if there are references from modules or not: project sdk is always indexed
     }
     return isEntityToRescan(entity);
   }

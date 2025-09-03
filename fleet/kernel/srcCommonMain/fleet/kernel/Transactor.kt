@@ -19,6 +19,7 @@ import fleet.reporting.shared.tracing.spannedScope
 import fleet.util.*
 import fleet.util.async.use
 import fleet.util.channels.channels
+import fleet.util.channels.consumeAll
 import fleet.util.channels.consumeEach
 import fleet.util.logging.KLogger
 import fleet.util.logging.KLoggers
@@ -93,9 +94,9 @@ suspend fun waitForDbSourceToCatchUpWithTimestamp(timestamp: Long) {
  * @return the result of [f]
  * */
 suspend fun <T> change(f: ChangeScope.() -> T): T {
-  val currentCoroutineContext = currentCoroutineContext()
-  val kernel = currentCoroutineContext.transactor
-  val interceptor = currentCoroutineContext[ChangeInterceptor] ?: ChangeInterceptor.Identity
+  val context = currentCoroutineContext()
+  val kernel = context.transactor
+  val interceptor = context[ChangeInterceptor] ?: ChangeInterceptor.Identity
   var res: T? = null
   val change = interceptor.change(
     {
@@ -104,12 +105,13 @@ suspend fun <T> change(f: ChangeScope.() -> T): T {
   ) { changeFn ->
     kernel.changeSuspend(changeFn)
   }
-  waitForDbSourceToCatchUpWithTimestamp(change.dbAfter.timestamp)
+  context.dbSource.catchUp(change.dbAfter.timestamp)
+  @Suppress("UNCHECKED_CAST")
   return res as T
 }
 
 
-suspend fun db(): DB =
+fun db(): DB =
   DbContext.threadBound.impl as DB
 
 suspend fun transactor(): Transactor {
@@ -449,58 +451,60 @@ suspend fun <T> withTransactor(
 
     newSingleThreadCoroutineDispatcher("Kernel event loop thread ${kernelId}", DispatcherPriority.HIGH).use { coroutineDispatcher ->
       launch(CoroutineName("Transactor loop $transactor") + coroutineDispatcher, start = CoroutineStart.ATOMIC) {
-        spannedScope("kernel changes") {
-          var ts = 1L
-          consumeEach(priorityDispatchChannel, backgroundDispatchChannel) { changeTask ->
-            runCatching {
-              // cancellation exception thrown from here means that the coroutiune issued the change is cancelled
-              // we should not rethrow it here as it will destroy kernel's event loop
-              // in a sense the cancellation is a rogue one, we should treat it as a simple change failure, and thus keep it INSIDE runCatching
-              changeTask.rendezvous.await()
-              val timedChange = measureTimedValue {
-                val dbBefore = dbState.value
-                span("change", {
-                  set("ts", (dbBefore.timestamp + 1).toString())
-                  cause = changeTask.causeSpan
-                }) {
-                  dbBefore.change(defaultPart) {
-                    meta[DeferredChangeKey] = changeTask.resultDeferred
-                    meta[SpanChangeKey] = currentSpan
-                    middleware.run { performChange(changeTask.f) }
-                    DbTimestamp.single()[DbTimestamp.Timestamp]++
+        consumeAll(priorityDispatchChannel, backgroundDispatchChannel) {
+          spannedScope("kernel changes") {
+            var ts = 1L
+            consumeEach(priorityDispatchChannel, backgroundDispatchChannel) { changeTask ->
+              runCatching {
+                // cancellation exception thrown from here means that the coroutiune issued the change is cancelled
+                // we should not rethrow it here as it will destroy kernel's event loop
+                // in a sense the cancellation is a rogue one, we should treat it as a simple change failure, and thus keep it INSIDE runCatching
+                changeTask.rendezvous.await()
+                val timedChange = measureTimedValue {
+                  val dbBefore = dbState.value
+                  span("change", {
+                    set("ts", (dbBefore.timestamp + 1).toString())
+                    cause = changeTask.causeSpan
+                  }) {
+                    dbBefore.change(defaultPart) {
+                      meta[DeferredChangeKey] = changeTask.resultDeferred
+                      meta[SpanChangeKey] = currentSpan
+                      middleware.run { performChange(changeTask.f) }
+                      DbTimestamp.single()[DbTimestamp.Timestamp]++
+                    }
                   }
                 }
-              }
-              val slowReporter = transactor.meta[SlowChangeReporterKernelKey]
-              checkDuration(coroutineContext = currentCoroutineContext(),
-                            slowReporter = slowReporter,
-                            duration = timedChange.duration,
-                            location = changeTask.causeSpan)
-              val change = timedChange.value
-              Transactor.logger.trace { "[$transactor] broadcasting change $change" }
-              check(sharedFlow.tryEmit(
-                TransactorEvent.SequentialChange(
-                  timestamp = ts++,
-                  change = change))) {
-                "changeFlow should have been created with drop-oldest"
-              }
-              change.meta[OnCompleteKey]?.forEach { onComplete ->
-                runCatching {
-                  asOf(change.dbAfter) {
-                    onComplete(transactor)
-                  }
-                }.onFailure { e ->
-                  Transactor.logger.error(e) { "ChangeScope.onComplete action failed" }
+                val slowReporter = transactor.meta[SlowChangeReporterKernelKey]
+                checkDuration(coroutineContext = currentCoroutineContext(),
+                              slowReporter = slowReporter,
+                              duration = timedChange.duration,
+                              location = changeTask.causeSpan)
+                val change = timedChange.value
+                Transactor.logger.trace { "[$transactor] broadcasting change $change" }
+                check(sharedFlow.tryEmit(
+                  TransactorEvent.SequentialChange(
+                    timestamp = ts++,
+                    change = change))) {
+                  "changeFlow should have been created with drop-oldest"
                 }
-              }
-              change
-            }.onSuccess { change ->
-              changeTask.resultDeferred.complete(change)
-            }.onFailure { ex ->
-              changeTask.resultDeferred.completeExceptionally(ex)
-              if (ex !is CancellationException) {
-                Transactor.logger.error(ex) {
-                  "$transactor change has failed"
+                change.meta[OnCompleteKey]?.forEach { onComplete ->
+                  runCatching {
+                    asOf(change.dbAfter) {
+                      onComplete(transactor)
+                    }
+                  }.onFailure { e ->
+                    Transactor.logger.error(e) { "ChangeScope.onComplete action failed" }
+                  }
+                }
+                change
+              }.onSuccess { change ->
+                changeTask.resultDeferred.complete(change)
+              }.onFailure { ex ->
+                changeTask.resultDeferred.completeExceptionally(ex)
+                if (ex !is CancellationException) {
+                  Transactor.logger.error(ex) {
+                    "$transactor change has failed"
+                  }
                 }
               }
             }
@@ -560,9 +564,6 @@ private fun checkDuration(
     }
   }
 }
-
-@DslMarker
-annotation class KernelDSL
 
 typealias SlowChangeReporter = (CoroutineContext, Long, String) -> Unit
 

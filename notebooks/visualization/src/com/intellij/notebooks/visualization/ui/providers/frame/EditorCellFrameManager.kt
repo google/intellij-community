@@ -22,7 +22,6 @@ class EditorCellFrameManager(private val editorCell: EditorCell) : Disposable { 
   private val view
     get() = editorCell.view
 
-
   private val isSelected
     get() = editorCell.isSelected.get()
   private val isHovered
@@ -87,22 +86,15 @@ class EditorCellFrameManager(private val editorCell: EditorCell) : Disposable { 
     val upperInlayBounds = inlays.firstOrNull {
       it.properties.priority == editor.notebookAppearance.cellInputInlaysPriority && it.properties.isShownAbove
     }?.bounds ?: return null
-
-    val bottomRectHeight = editor.notebookAppearance.cellBorderHeight / 2
-    val delimiterHeight = upperInlayBounds.height - bottomRectHeight
-    val topPosition = upperInlayBounds.y + delimiterHeight
-
     val lowerInlayBounds = inlays.lastOrNull {
       it.properties.priority == editor.notebookAppearance.cellInputInlaysPriority && !it.properties.isShownAbove
     }?.bounds ?: return null
 
-    val lineX = upperInlayBounds.x + upperInlayBounds.width - 0.5
-    val lineStartY = (topPosition).toDouble()
-    val lineEndY = (lowerInlayBounds.y + lowerInlayBounds.height).toDouble()
+    val x = upperInlayBounds.x + upperInlayBounds.width - 0.5
+    val startY = (upperInlayBounds.y + upperInlayBounds.height - editor.notebookAppearance.cellBorderHeight / 2).toDouble() + 0.5
+    val endY = (lowerInlayBounds.y + lowerInlayBounds.height).toDouble() - 1
 
-    val line2DDouble = Line2D.Double(lineX, lineStartY, lineX, lineEndY)
-    cachedRightLine = line2DDouble
-    return line2DDouble
+    return Line2D.Double(x, startY, x, endY).also { cachedRightLine = it }
   }
 
   fun updateCellFrameShow() {

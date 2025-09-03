@@ -28,36 +28,23 @@ import java.util.zip.InflaterInputStream;
 import static org.jetbrains.jps.util.Iterators.*;
 
 public class ConfigurationState {
+  // Update the version value whenever a serialization format changes.
+  // This will help to avoid multiple "failed to load configuration" error messages
+  private static final int VERSION = 1;
+
   private static final ConfigurationState EMPTY = new ConfigurationState(new PathSourceMapper(), NodeSourceSnapshot.EMPTY, NodeSourceSnapshot.EMPTY, Map.of());
-  
-  private static final Set<CLFlags> ourTrackedFlags = EnumSet.of(
-    CLFlags.PLUGIN_ID,
-    CLFlags.PLUGIN_CLASSPATH,
-    CLFlags.PLUGIN_OPTIONS,
-    CLFlags.API_VERSION,
-    CLFlags.LANGUAGE_VERSION,
-    CLFlags.JVM_TARGET,
-    CLFlags.OPT_IN,
-    CLFlags.X_ALLOW_KOTLIN_PACKAGE,
-    CLFlags.X_ALLOW_RESULT_RETURN_TYPE,
-    CLFlags.X_WHEN_GUARDS,
-    CLFlags.X_LAMBDAS,
-    CLFlags.JVM_DEFAULT,
-    CLFlags.X_JVM_DEFAULT, 
-    CLFlags.X_INLINE_CLASSES,
-    CLFlags.X_CONTEXT_RECEIVERS,
-    CLFlags.X_CONTEXT_PARAMETERS,
-    CLFlags.X_CONSISTENT_DATA_CLASS_COPY_VISIBILITY,
-    CLFlags.X_ALLOW_UNSTABLE_DEPENDENCIES,
-    CLFlags.SKIP_METADATA_VERSION_CHECK,
-    CLFlags.X_SKIP_PRERELEASE_CHECK,
-    CLFlags.X_EXPLICIT_API_MODE,
-    CLFlags.X_NO_CALL_ASSERTIONS,
-    CLFlags.X_NO_PARAM_ASSERTIONS,
-    CLFlags.X_SAM_CONVERSIONS,
-    CLFlags.X_STRICT_JAVA_NULLABILITY_ASSERTIONS,
-    CLFlags.X_X_LANGUAGE,
-    CLFlags.FRIENDS
+
+  private static final Set<CLFlags> ourIgnoredFlags = EnumSet.of(
+    CLFlags.NON_INCREMENTAL,
+    CLFlags.JAVA_COUNT,
+    CLFlags.TARGET_LABEL,
+    CLFlags.CP, // processed separately
+    CLFlags.OUT,
+    CLFlags.ABI_OUT,
+    CLFlags.WARN,
+    CLFlags.X_WASM_ATTACH_JS_EXCEPTION,
+    CLFlags.ADD_EXPORT,
+    CLFlags.ADD_READS
   );
   
   private final NodeSourcePathMapper myPathMapper;
@@ -76,9 +63,17 @@ public class ConfigurationState {
     myPathMapper = pathMapper;
     try (var stream = new DataInputStream(new InflaterInputStream(Files.newInputStream(savedState, StandardOpenOption.READ)))) {
       GraphDataInput in = GraphDataInputImpl.wrap(stream);
-      mySourcesSnapshot = new SourceSnapshotImpl(in, PathSource::new);
-      myLibsSnapshot = new SourceSnapshotImpl(in, PathSource::new);
-      myFlagsDigest = in.readLong();
+      int version = in.readInt();
+      if (version == VERSION) {
+        mySourcesSnapshot = new SourceSnapshotImpl(in, PathSource::new);
+        myLibsSnapshot = new SourceSnapshotImpl(in, PathSource::new);
+        myFlagsDigest = in.readLong();
+      }
+      else { // version differs
+        mySourcesSnapshot = NodeSourceSnapshot.EMPTY;
+        myLibsSnapshot = NodeSourceSnapshot.EMPTY;
+        myFlagsDigest = buildFlagsDigest(Map.of());
+      }
     }
   }
 
@@ -86,6 +81,7 @@ public class ConfigurationState {
     Path snapshotPath = DataPaths.getConfigStateStoreFile(context);
     try (var stream = new DataOutputStream(new DeflaterOutputStream(Files.newOutputStream(snapshotPath), new Deflater(Deflater.BEST_SPEED)))) {
       GraphDataOutput out = GraphDataOutputImpl.wrap(stream);
+      out.writeInt(VERSION);
       getSources().write(out);
       getLibraries().write(out);
       out.writeLong(myFlagsDigest);
@@ -139,8 +135,10 @@ public class ConfigurationState {
       return 0;
     }
     
-    List<String> emptyValue = List.of("_empty_");
     Function<List<String>, Iterable<String>> sorted = col -> {
+      if (col == null) {
+        return List.of();
+      }
       if (col.size() <= 1) {
         return col;
       }
@@ -150,7 +148,7 @@ public class ConfigurationState {
     };
 
     return Utils.digest(
-      flat(map(filter(Arrays.asList(CLFlags.values()), ourTrackedFlags::contains), flg -> flat(asIterable(flg.name()), sorted.fun(flags.getOrDefault(flg, emptyValue)))))
+      flat(map(filter(Arrays.asList(CLFlags.values()), flg -> flags.containsKey(flg) && !ourIgnoredFlags.contains(flg)), flg -> flat(asIterable(flg.name()), sorted.fun(flags.get(flg)))))
     );
   }
 

@@ -17,6 +17,8 @@ import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
+import com.intellij.serviceContainer.AlreadyDisposedException;
+import com.intellij.util.LineSeparator;
 import com.intellij.util.LocalTimeCounter;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.*;
@@ -61,13 +63,17 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
 
   @ApiStatus.Internal
   static final class VfsDataFlags {
+    //Flags are contained in the highest byte, because lowest 3 bytes are for (content)ModCount,
+    // see VfsData.Segment.intFieldsArray for details
+
     static final int IS_WRITABLE_FLAG = 0x0100_0000;
     static final int IS_HIDDEN_FLAG = 0x0200_0000;
     static final int IS_OFFLINE = 0x0400_0000;
-    /** {@code true} if the line separator for this file was detected to be equal to {@link com.intellij.util.LineSeparator#getSystemLineSeparator()}. */
+    /** {@code true} if the line separator for this file was detected to be equal to {@link LineSeparator#getSystemLineSeparator()}. */
     static final int SYSTEM_LINE_SEPARATOR_DETECTED = 0x0800_0000; // applicable only to non-directory files
     /** The case-sensitivity of the directory children is known, so the value of {@link #CHILDREN_CASE_SENSITIVE} is actual. */
     static final int CHILDREN_CASE_SENSITIVITY_CACHED = SYSTEM_LINE_SEPARATOR_DETECTED; // applicable only to directories
+    /** Used to mark directories that need refresh */
     private static final int DIRTY_FLAG = 0x1000_0000;
     /** This file is a symlink. */
     static final int IS_SYMLINK_FLAG = 0x2000_0000;
@@ -92,6 +98,20 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
              (sensitivity.isSensitive() ? VfsDataFlags.CHILDREN_CASE_SENSITIVE : 0) |
              (PersistentFS.isSpecialFile(attributes) ? VfsDataFlags.IS_SPECIAL_FLAG : 0);
     }
+
+    static @Flags int toFlags(@NotNull FileAttributes attributes,
+                              boolean isOfflineByDefault) {
+      FileAttributes.CaseSensitivity sensitivity = attributes.areChildrenCaseSensitive();
+      return (attributes.isWritable() ? VfsDataFlags.IS_WRITABLE_FLAG : 0) |
+             (attributes.isHidden() ? VfsDataFlags.IS_HIDDEN_FLAG : 0) |
+             (isOfflineByDefault ? VfsDataFlags.IS_OFFLINE : 0) |
+
+             (sensitivity.isKnown() ? VfsDataFlags.CHILDREN_CASE_SENSITIVITY_CACHED : 0) |
+
+             (attributes.isSymLink() ? VfsDataFlags.IS_SYMLINK_FLAG : 0) |
+             (sensitivity.isSensitive() ? VfsDataFlags.CHILDREN_CASE_SENSITIVE : 0) |
+             (attributes.isSpecial() ? VfsDataFlags.IS_SPECIAL_FLAG : 0);
+    }
   }
 
   static final @Flags int ALL_FLAGS_MASK =
@@ -109,7 +129,6 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
   }
 
 
-
   private final int id;
   private volatile VirtualDirectoryImpl parent;
   /** Actual file data is stored here, see {@link VfsData} doc for details */
@@ -118,6 +137,7 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
   private volatile CachedFileType cachedFileType;
 
   static {
+    //noinspection ConstantValue
     assert ~ALL_FLAGS_MASK == LocalTimeCounter.TIME_MASK : "ALL_FLAGS_MASK and MOD_COUNTER_MASK must combined into full int32";
   }
 
@@ -139,13 +159,18 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
   }
 
   @NotNull VfsData getVfsData() {
-    VfsData data = segment.owningVfsData;
+    VfsData data = segment.owningVfsData();
     PersistentFSImpl owningPersistentFS = data.owningPersistentFS();
     if (!owningPersistentFS.isOwnData(data)) {
-      //PersistentFSImpl re-creates VfsData on (re-)connect
-      throw new AssertionError("'Alien' file object: was created before PersistentFS (re-)connected " +
-                               "(id=" + id + ", parent=" + parent + "), " +
-                               "owningData: " + data + ", pFS: " + owningPersistentFS);
+      if (!owningPersistentFS.isConnected()) {
+        throw new AlreadyDisposedException("VFS is disconnected, all it's files are invalid now");
+      }
+      else {
+        //PersistentFSImpl re-creates VfsData on (re-)connect
+        throw new AssertionError("'Alien' file object: was created before PersistentFS (re-)connected " +
+                                 "(id=" + id + ", parent=" + parent + "), " +
+                                 "owningData: " + data + ", pFS: " + owningPersistentFS);
+      }
     }
     return data;
   }
@@ -166,7 +191,7 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
     while (segment.replacement != null) {
       segment = segment.replacement;
     }
-    VirtualDirectoryImpl changedParent = segment.owningVfsData.getChangedParent(id);
+    VirtualDirectoryImpl changedParent = segment.owningVfsData().getChangedParent(id);
     if (changedParent != null) {
       parent = changedParent;
     }
@@ -380,6 +405,7 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
   }
 
   private static final ThreadLocal<ArrayList<String>> parentsNames = ThreadLocal.withInitial(ArrayList::new);
+
   /**
    * Iterative implementation of {@link #computePath(String, String)}: builds the path into a char[], allocates
    * temporary ArrayList as stack.
@@ -519,12 +545,21 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
   }
 
   @Override
-  public boolean equals(Object o) {
-    return this == o || o instanceof VirtualFileSystemEntry && id == ((VirtualFileSystemEntry)o).id;
+  public final boolean equals(Object o) {
+    if (this == o) return true;
+
+    if (!(o instanceof VirtualFileWithId)) {
+      return false;
+    }
+
+    //untrivial equals implementation: all VirtualFileWithId implementations are considered comparable -- even if they
+    // are completely different implementation classes
+
+    return ((VirtualFileWithId)o).getId() == id;
   }
 
   @Override
-  public int hashCode() {
+  public final int hashCode() {
     return id;
   }
 
@@ -564,12 +599,16 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
       //    is the only method that _doesn't_ throw the AssertionError for alien files, but returns false instead.
       //    In other words: we now consider an 'alien' file as 'invalid' file, instead of a primordial sin.
 
-      VfsData data = segment.owningVfsData;
+      VfsData data = segment.owningVfsData();
       PersistentFSImpl owningPersistentFS = data.owningPersistentFS();
       if (!owningPersistentFS.isOwnData(data)) {
-        Logger.getInstance(VirtualFileSystemEntry.class).warn(
-          "'Alien' file object: was created before PersistentFS (re-)connected (id=" + id + ", parent=" + parent + ")"
-        );
+        Logger log = Logger.getInstance(VirtualFileSystemEntry.class);
+        if (!owningPersistentFS.isConnected()) {
+          log.warn("VFS is disconnected, all it's files are invalid now");
+        }
+        else {
+          log.warn("'Alien' file object: was created before PersistentFS (re-)connected (id=" + id + ", parent=" + parent + ")");
+        }
         return false;
       }
       return data.isFileValid(id);
@@ -578,14 +617,19 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
 
   @Override
   public @NonNls String toString() {
-    VfsData owningVfsData = getSegment().owningVfsData;
+    VfsData owningVfsData = getSegment().owningVfsData();
     //don't use .owningPersistentFS() since it throws assertion if pFS not own current segment anymore,
     // but here we want to return some string always:
-    PersistentFSImpl persistentFs = owningVfsData.owningPersistentFS();
-    if (!persistentFs.isOwnData(owningVfsData)) {
-      //PersistentFSImpl re-creates VfsData on (re-)connect
-      return "'Alien' file object: was created before PersistentFS (re-)connected " +
-             "(id=" + id + ", parent=" + parent + ")";
+    PersistentFSImpl owningPersistentFS = owningVfsData.owningPersistentFS();
+    if (!owningPersistentFS.isOwnData(owningVfsData)) {
+      if (!owningPersistentFS.isConnected()) {
+        return "VFS is disconnected, all it's files are invalid now";
+      }
+      else {
+        //PersistentFSImpl re-creates VfsData on (re-)connect
+        return "'Alien' file object: was created before PersistentFS (re-)connected " +
+               "(id=" + id + ", parent=" + parent + ")";
+      }
     }
 
     if (exists()) {
@@ -801,61 +845,60 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
     return type;
   }
 
-  static final VirtualFileSystemEntry NULL_VIRTUAL_FILE =
-    new VirtualFileSystemEntry() {
-      @Override
-      public String toString() {
-        return "NULL";
-      }
+  static final VirtualFileSystemEntry NULL_VIRTUAL_FILE = new VirtualFileSystemEntry() {
+    @Override
+    public String toString() {
+      return "NULL";
+    }
 
-      @Override
-      public @NotNull NewVirtualFileSystem getFileSystem() {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @NotNull NewVirtualFileSystem getFileSystem() {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @Nullable NewVirtualFile findChild(@NotNull String name) {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @Nullable NewVirtualFile findChild(@NotNull String name) {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @Nullable NewVirtualFile refreshAndFindChild(@NotNull String name) {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @Nullable NewVirtualFile refreshAndFindChild(@NotNull String name) {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @Nullable NewVirtualFile findChildIfCached(@NotNull String name) {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @Nullable NewVirtualFile findChildIfCached(@NotNull String name) {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @NotNull Collection<VirtualFile> getCachedChildren() {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @NotNull Collection<VirtualFile> getCachedChildren() {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @NotNull Iterable<VirtualFile> iterInDbChildren() {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @NotNull Iterable<VirtualFile> iterInDbChildren() {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public boolean isDirectory() {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public boolean isDirectory() {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public VirtualFile[] getChildren() {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public VirtualFile[] getChildren() {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @NotNull OutputStream getOutputStream(Object requestor, long newModificationStamp, long newTimeStamp) {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public @NotNull OutputStream getOutputStream(Object requestor, long newModificationStamp, long newTimeStamp) {
+      throw new UnsupportedOperationException();
+    }
 
-      @Override
-      public @NotNull InputStream getInputStream() {
-        throw new UnsupportedOperationException();
-      }
-    };
+    @Override
+    public @NotNull InputStream getInputStream() {
+      throw new UnsupportedOperationException();
+    }
+  };
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui
 
 import com.intellij.ide.PowerSaveMode
@@ -230,7 +230,7 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
           readAction { evaluate() }
         }
         else {
-          asyncEvaluator?.let { adjustResultWithScale(it(param)) } ?: evaluate()
+          evaluateAsync()
         }
       }
 
@@ -302,7 +302,7 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
 
   private suspend fun setDone(result: Icon) {
     val deferredIconListener = ApplicationManager.getApplication().messageBus.syncPublisher(DeferredIconListener.TOPIC)
-    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    withContext(Dispatchers.UI + ModalityState.any().asContextElement()) {
       isDone = true
       evaluator = null
       asyncEvaluator = null
@@ -318,11 +318,26 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
     return evaluate()
   }
 
-  override fun evaluate(): Icon {
+  override fun evaluate(): Icon = runEvaluator {
+    evaluator?.invoke(param) ?: EMPTY_ICON
+  }
+
+  /**
+   * Computes and returns the computed icon immediately.
+   *
+   * Unlike [evaluate], supports suspending evaluators, falling back to the regular one if no suspending was specified.
+   */
+  @ApiStatus.Internal
+  @VisibleForTesting
+  suspend fun evaluateAsync(): Icon = runEvaluator {
+    asyncEvaluator?.invoke(param) ?: evaluator?.invoke(param) ?: EMPTY_ICON
+  }
+
+  private inline fun runEvaluator(evaluator: () -> Icon): Icon {
     val result = try {
-      evaluator?.invoke(param) ?: EMPTY_ICON
+      evaluator()
     }
-    catch (e: IndexNotReadyException) {
+    catch (_: IndexNotReadyException) {
       EMPTY_ICON
     }
 

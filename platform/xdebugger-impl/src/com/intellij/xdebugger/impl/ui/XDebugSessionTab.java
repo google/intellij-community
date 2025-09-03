@@ -53,6 +53,10 @@ import javax.swing.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import static com.intellij.xdebugger.impl.frame.XDebugSessionProxy.useFeProxy;
 
 /**
  * Note: could be stored in frontend, but it kept in shared due to compatibility issues.
@@ -68,6 +72,7 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
 
   protected @Nullable XDebugSessionProxy mySession;
   private XDebugSessionData mySessionData;
+  private Consumer<DataSink> myAdditionalKeysProvider;
 
   /**
    * @deprecated Use {@link XDebugSessionTab#create(XDebugSessionProxy, Icon, ExecutionEnvironmentProxy, RunContentDescriptor, boolean, boolean)}
@@ -80,7 +85,8 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     XDebugSessionProxy proxy = XDebugSessionProxyKeeperKt.asProxy(session);
     boolean forceNewDebuggerUi = XDebugSessionTabCustomizerKt.forceShowNewDebuggerUi(session.getDebugProcess());
     boolean withFramesCustomization = XDebugSessionTabCustomizerKt.allowFramesViewCustomization(session.getDebugProcess());
-    return create(proxy, icon, environment == null ? null : new BackendExecutionEnvironmentProxy(environment), contentToReuse, forceNewDebuggerUi, withFramesCustomization);
+    @Nullable String defaultFramesViewKey = XDebugSessionTabCustomizerKt.getDefaultFramesViewKey(session.getDebugProcess());
+    return create(proxy, icon, environment == null ? null : new BackendExecutionEnvironmentProxy(environment), contentToReuse, forceNewDebuggerUi, withFramesCustomization, defaultFramesViewKey);
   }
 
   @ApiStatus.Internal
@@ -89,7 +95,8 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
                                                  @Nullable ExecutionEnvironmentProxy environmentProxy,
                                                  @Nullable RunContentDescriptor contentToReuse,
                                                  boolean forceNewDebuggerUi,
-                                                 boolean withFramesCustomization) {
+                                                 boolean withFramesCustomization,
+                                                 @Nullable String defaultFramesViewKey) {
     if (contentToReuse != null && SystemProperties.getBooleanProperty("xdebugger.reuse.session.tab", false)) {
       JComponent component = contentToReuse.getComponent();
       if (component != null) {
@@ -104,12 +111,7 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     XDebugSessionTab tab;
     if (UIExperiment.isNewDebuggerUIEnabled() || forceNewDebuggerUi) {
       if (withFramesCustomization) {
-        if (proxy instanceof XDebugSessionProxy.Monolith monolith) {
-          tab = new XDebugSessionTab3(monolith, icon, environmentProxy);
-        }
-        else {
-          throw new IllegalStateException("Frames view customization is not supported in split mode");
-        }
+        tab = new XDebugSessionTab3(proxy, icon, environmentProxy, defaultFramesViewKey);
       }
       else {
         tab = new XDebugSessionTabNewUI(proxy, icon, environmentProxy);
@@ -139,6 +141,9 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
       sink.set(XWatchesView.DATA_KEY, myWatchesView);
       sink.set(TAB_KEY, this);
       sink.set(XDebugSessionData.DATA_KEY, mySessionData);
+      if (myAdditionalKeysProvider != null) {
+        myAdditionalKeysProvider.accept(sink);
+      }
 
       if (mySession != null) {
         sink.set(XDebugSessionProxy.DEBUG_SESSION_PROXY_KEY, mySession);
@@ -146,6 +151,12 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
         sink.set(LangDataKeys.CONSOLE_VIEW, mySession.getConsoleView());
       }
     });
+  }
+
+  @ApiStatus.Internal
+  public void setAdditionalKeysProvider(Consumer<DataSink> additionalKeysProvider) {
+    LOG.assertTrue(myAdditionalKeysProvider == null, "Additional keys provider is already set");
+    myAdditionalKeysProvider = additionalKeysProvider;
   }
 
   protected void init(XDebugSessionProxy session) {
@@ -214,12 +225,9 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
 
   protected final void createDefaultTabs(XDebugSessionProxy session) {
     myUi.addContent(createFramesContent(session), 0, PlaceInGrid.left, false);
-
-    if (Registry.is("debugger.new.threads.view")) {
+    if (Registry.is("debugger.new.threads.view") || useFeProxy()) {
       Content threadsContent = createThreadsContent(session);
-      if (threadsContent != null) {
-        myUi.addContent(threadsContent, 0, PlaceInGrid.right, true);
-      }
+      myUi.addContent(threadsContent, 0, PlaceInGrid.right, true);
     }
 
     addVariablesAndWatches(session);
@@ -363,19 +371,14 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     return framesContent;
   }
 
-  private @Nullable Content createThreadsContent(XDebugSessionProxy proxy) {
-    if (!(proxy instanceof XDebugSessionProxy.Monolith monolith)) {
-      LOG.error("Threads view is not supported in split mode");
-      return null;
-    }
-    XDebugSessionImpl session = (XDebugSessionImpl)monolith.getSession();
-    XThreadsView stacksView = new XThreadsView(myProject, session);
-    registerView(DebuggerContentInfo.THREADS_CONTENT, stacksView);
-    Content framesContent = myUi.createContent(DebuggerContentInfo.THREADS_CONTENT, stacksView.getPanel(),
+  private @NotNull Content createThreadsContent(XDebugSessionProxy proxy) {
+    XThreadsView threadsView = new XThreadsView(myProject, proxy);
+    registerView(DebuggerContentInfo.THREADS_CONTENT, threadsView);
+    Content threadsContent = myUi.createContent(DebuggerContentInfo.THREADS_CONTENT, threadsView.getPanel(),
                                                XDebuggerBundle.message("debugger.session.tab.threads.title"), null,
-                                               stacksView.getDefaultFocusedComponent());
-    framesContent.setCloseable(false);
-    return framesContent;
+                                               threadsView.getDefaultFocusedComponent());
+    threadsContent.setCloseable(false);
+    return threadsContent;
   }
 
   public void rebuildViews() {

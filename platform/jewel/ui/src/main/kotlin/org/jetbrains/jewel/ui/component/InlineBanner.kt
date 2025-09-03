@@ -86,7 +86,7 @@ import org.jetbrains.jewel.ui.theme.inlineBannerStyle
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineInformationBanner(" +
+            "InlineInformationBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -95,7 +95,8 @@ import org.jetbrains.jewel.ui.theme.inlineBannerStyle
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineInformationBanner",
         ),
 )
 public fun InformationInlineBanner(
@@ -108,6 +109,7 @@ public fun InformationInlineBanner(
     style: InlineBannerStyle = JewelTheme.inlineBannerStyle.information,
     textStyle: TextStyle = JewelTheme.defaultTextStyle,
 ) {
+    @Suppress("DEPRECATION")
     InformationInlineBanner(
         title = title,
         style = style,
@@ -227,7 +229,7 @@ public fun InlineInformationBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineInformationBanner(" +
+            "InlineInformationBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -236,7 +238,8 @@ public fun InlineInformationBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineInformationBanner",
         ),
 )
 public fun InformationInlineBanner(
@@ -364,7 +367,7 @@ public fun InlineInformationBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineSuccessBanner(" +
+            "InlineSuccessBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -373,7 +376,8 @@ public fun InlineInformationBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineSuccessBanner",
         ),
 )
 public fun SuccessInlineBanner(
@@ -386,6 +390,7 @@ public fun SuccessInlineBanner(
     style: InlineBannerStyle = JewelTheme.inlineBannerStyle.success,
     textStyle: TextStyle = JewelTheme.defaultTextStyle,
 ) {
+    @Suppress("DEPRECATION")
     SuccessInlineBanner(
         title = title,
         style = style,
@@ -503,7 +508,7 @@ public fun InlineSuccessBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineSuccessBanner(" +
+            "InlineSuccessBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -512,7 +517,8 @@ public fun InlineSuccessBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineSuccessBanner",
         ),
 )
 public fun SuccessInlineBanner(
@@ -644,7 +650,7 @@ public fun InlineSuccessBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineWarningBanner(" +
+            "InlineWarningBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -653,7 +659,8 @@ public fun InlineSuccessBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineWarningBanner",
         ),
 )
 public fun WarningInlineBanner(
@@ -666,6 +673,7 @@ public fun WarningInlineBanner(
     style: InlineBannerStyle = JewelTheme.inlineBannerStyle.warning,
     textStyle: TextStyle = JewelTheme.defaultTextStyle,
 ) {
+    @Suppress("DEPRECATION")
     WarningInlineBanner(
         title = title,
         style = style,
@@ -785,7 +793,7 @@ public fun InlineWarningBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineWarningBanner(" +
+            "InlineWarningBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -794,7 +802,8 @@ public fun InlineWarningBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineWarningBanner",
         ),
 )
 public fun WarningInlineBanner(
@@ -924,7 +933,7 @@ public fun InlineWarningBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineErrorBanner(" +
+            "InlineErrorBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -933,7 +942,8 @@ public fun InlineWarningBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineErrorBanner",
         ),
 )
 public fun ErrorInlineBanner(
@@ -946,6 +956,7 @@ public fun ErrorInlineBanner(
     style: InlineBannerStyle = JewelTheme.inlineBannerStyle.error,
     textStyle: TextStyle = JewelTheme.defaultTextStyle,
 ) {
+    @Suppress("DEPRECATION")
     ErrorInlineBanner(
         style = style,
         textStyle = textStyle,
@@ -1065,7 +1076,7 @@ public fun InlineErrorBanner(
     "Use the overload with 'linkActions' and 'iconActions' parameters instead",
     replaceWith =
         ReplaceWith(
-            "org.jetbrains.jewel.ui.component.InlineErrorBanner(" +
+            "InlineErrorBanner(" +
                 "text = text, " +
                 "modifier = modifier, " +
                 "title = title, " +
@@ -1074,7 +1085,8 @@ public fun InlineErrorBanner(
                 "iconActions = actionIcons," +
                 "style = style, " +
                 "textStyle = textStyle" +
-                ")"
+                ")",
+            "org.jetbrains.jewel.ui.component.InlineErrorBanner",
         ),
 )
 public fun ErrorInlineBanner(
@@ -1168,10 +1180,10 @@ private fun InlineBannerImpl(
     style: InlineBannerStyle,
     textStyle: TextStyle,
     title: String?,
-    modifier: Modifier,
     icon: @Composable (() -> Unit)?,
     linkActions: (BannerLinkActionScope.() -> Unit)?,
     iconActions: (BannerIconActionScope.() -> Unit)?,
+    modifier: Modifier = Modifier,
     content: @Composable (() -> Unit),
 ) {
     InlineBannerImpl(
@@ -1205,7 +1217,7 @@ private fun InlineBannerImpl(
     icon: @Composable (() -> Unit)?,
     actions: @Composable (FlowRowScope.() -> Unit)?,
     actionIcons: @Composable (RowScope.() -> Unit)?,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     content: @Composable (() -> Unit),
 ) {
     val borderColor = style.colors.border
@@ -1257,13 +1269,13 @@ private fun InlineBannerImpl(
 
 @Composable
 private fun RoundedCornerBox(
-    modifier: Modifier = Modifier,
     contentColor: Color,
     borderColor: Color,
     borderWidth: Dp,
     cornerSize: CornerSize,
     backgroundColor: Color,
     padding: PaddingValues,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(cornerSize)

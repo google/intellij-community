@@ -5,6 +5,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Runnable
 import org.jetbrains.plugins.textmate.Constants
 import org.jetbrains.plugins.textmate.language.TextMateLanguageDescriptor
+import org.jetbrains.plugins.textmate.language.syntax.InjectionNodeDescriptor
 import org.jetbrains.plugins.textmate.language.syntax.SyntaxNodeDescriptor
 import org.jetbrains.plugins.textmate.language.syntax.TextMateCapture
 import org.jetbrains.plugins.textmate.language.syntax.lexer.SyntaxMatchUtils.replaceGroupsWithMatchDataInCaptures
@@ -43,7 +44,7 @@ class TextMateLexerCore(
     myCurrentOffset = startCharOffset
 
     myStates = persistentListOf(notMatched(languageDescriptor.rootSyntaxNode))
-    myCurrentScope = TextMateScope(languageDescriptor.scopeName, null)
+    myCurrentScope = TextMateScope(languageDescriptor.rootScopeName, null)
     myNestedScope = ArrayDeque<Int>().also { it.addLast(1) }
   }
 
@@ -62,6 +63,7 @@ class TextMateLexerCore(
                            lineStartOffset = startLineOffset,
                            linePosition = 0.charOffset(),
                            lineByteOffset = 0.byteOffset(),
+                           injections = languageDescriptor.injections,
                            checkCancelledCallback = checkCancelledCallback)
       addToken(output, endLineOffset)
       output
@@ -74,6 +76,7 @@ class TextMateLexerCore(
                            lineStartOffset = startLineOffset,
                            linePosition = 0.charOffset(),
                            lineByteOffset = 0.byteOffset(),
+                           injections = languageDescriptor.injections,
                            checkCancelledCallback = checkCancelledCallback)
       output
     }
@@ -86,6 +89,7 @@ class TextMateLexerCore(
     lineStartOffset: TextMateCharOffset,
     linePosition: TextMateCharOffset,
     lineByteOffset: TextMateByteOffset,
+    injections: List<InjectionNodeDescriptor>,
     checkCancelledCallback: Runnable?,
   ): PersistentList<TextMateLexerState> {
     var states = states
@@ -138,9 +142,10 @@ class TextMateLexerCore(
                                                      matchBeginString = matchBeginString,
                                                      priority = TextMateWeigh.Priority.NORMAL,
                                                      currentScope = myCurrentScope,
+                                                     injections = injections,
                                                      checkCancelledCallback = checkCancelledCallback)
-        val currentRule = currentState.syntaxRule
-        val currentMatch = currentState.matchData
+      val currentRule = currentState.syntaxRule
+      val currentMatch = currentState.matchData
 
         var endPosition: TextMateCharOffset
         val endMatch = mySyntaxMatcher.matchStringRegex(keyName = Constants.StringKey.END,
@@ -313,6 +318,7 @@ class TextMateLexerCore(
                     lineStartOffset = startLineOffset,
                     linePosition = captureRange.start,
                     lineByteOffset = byteRange.start,
+                    injections = emptyList(),
                     checkCancelledCallback = checkCancelledCallback)
         }
       }

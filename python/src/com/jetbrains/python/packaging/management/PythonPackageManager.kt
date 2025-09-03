@@ -18,18 +18,20 @@ import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.PyPackageManager
-import com.jetbrains.python.packaging.PythonDependenciesExtractor
+import com.jetbrains.python.packaging.PyPackageName
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.common.PythonPackageManagementListener
 import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
 import com.jetbrains.python.packaging.dependencies.PythonDependenciesManager
-import com.jetbrains.python.packaging.normalizePackageName
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
 import com.jetbrains.python.sdk.PythonSdkType
+import com.jetbrains.python.sdk.isReadOnly
+import com.jetbrains.python.sdk.readOnlyErrorMessage
 import kotlinx.coroutines.CoroutineStart
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.CheckReturnValue
+import org.jetbrains.annotations.Nls
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -53,13 +55,10 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
   }
 
 
-  @get:ApiStatus.Internal
-  @set:ApiStatus.Internal
-  protected open var dependencies: List<PythonPackage> = emptyList()
 
   @ApiStatus.Internal
   @Volatile
-  protected open var installedPackages: List<PythonPackage> = emptyList()
+  protected var installedPackages: List<PythonPackage> = emptyList()
 
   @ApiStatus.Internal
   @Volatile
@@ -75,12 +74,18 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
 
   @ApiStatus.Internal
   suspend fun sync(): PyResult<List<PythonPackage>> {
+    if (sdk.isReadOnly) {
+      return PyResult.localizedError(sdk.readOnlyErrorMessage)
+    }
     syncCommand().getOr { return it }
     return reloadPackages()
   }
 
   @ApiStatus.Internal
   suspend fun installPackage(installRequest: PythonPackageInstallRequest, options: List<String> = emptyList()): PyResult<List<PythonPackage>> {
+    if (sdk.isReadOnly) {
+      return PyResult.localizedError(sdk.readOnlyErrorMessage)
+    }
     waitForInit()
     installPackageCommand(installRequest, options).getOr { return it }
 
@@ -88,7 +93,18 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
   }
 
   @ApiStatus.Internal
+  suspend fun installPackageDetached(installRequest: PythonPackageInstallRequest, options: List<String> = emptyList()): PyResult<List<PythonPackage>> {
+    waitForInit()
+    installPackageDetachedCommand(installRequest, options).getOr { return it }
+
+    return reloadPackages()
+  }
+
+  @ApiStatus.Internal
   suspend fun updatePackages(vararg packages: PythonRepositoryPackageSpecification): PyResult<List<PythonPackage>> {
+    if (sdk.isReadOnly) {
+      return PyResult.localizedError(sdk.readOnlyErrorMessage)
+    }
     waitForInit()
     updatePackageCommand(*packages).getOr { return it }
 
@@ -97,14 +113,16 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
 
   @ApiStatus.Internal
   suspend fun uninstallPackage(vararg packages: String): PyResult<List<PythonPackage>> {
+    if (sdk.isReadOnly) {
+      return PyResult.localizedError(sdk.readOnlyErrorMessage)
+    }
     if (packages.isEmpty()) {
       return PyResult.success(installedPackages)
     }
 
     waitForInit()
-    reloadDependencies()
 
-    val normalizedPackagesNames = packages.map { normalizePackageName(it) }
+    val normalizedPackagesNames = packages.map { PyPackageName.normalizePackageName(it) }
     uninstallPackageCommand(*normalizedPackagesNames.toTypedArray()).getOr { return it }
     return reloadPackages()
   }
@@ -115,7 +133,6 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
       return it
     }
 
-    reloadDependencies()
     if (packages != installedPackages) {
       installedPackages = packages
       PyPackageCoroutine.launch(project) {
@@ -173,15 +190,21 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
     }
   }
 
-
   @ApiStatus.Internal
   @CheckReturnValue
   protected abstract suspend fun syncCommand(): PyResult<Unit>
 
+  @ApiStatus.Internal
+  open fun syncErrorMessage(): PackageManagerErrorMessage? = null
 
   @ApiStatus.Internal
   @CheckReturnValue
   protected abstract suspend fun installPackageCommand(installRequest: PythonPackageInstallRequest, options: List<String>): PyResult<Unit>
+
+  @ApiStatus.Internal
+  @CheckReturnValue
+  protected open suspend fun installPackageDetachedCommand(installRequest: PythonPackageInstallRequest, options: List<String>): PyResult<Unit> =
+    installPackageCommand(installRequest, options)
 
   @ApiStatus.Internal
   @CheckReturnValue
@@ -197,17 +220,14 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
   @ApiStatus.Internal
   protected abstract suspend fun loadOutdatedPackagesCommand(): PyResult<List<PythonOutdatedPackage>>
 
+  /**
+   * Extracts project top-level dependencies.
+   * Returns null by default — this manager doesn't support dependency extraction.
+   */
   @ApiStatus.Internal
-  suspend fun reloadDependencies(): List<PythonPackage> {
-    val dependenciesExtractor = PythonDependenciesExtractor.forSdk(project, sdk) ?: return emptyList()
-    dependencies = dependenciesExtractor.extract()
-    return dependencies
-  }
+  open suspend fun extractDependencies(): PyResult<List<PythonPackage>>? = null
 
-  @ApiStatus.Internal
-  fun listDependencies(): List<PythonPackage> = dependencies
-
-  @ApiStatus.Internal
+    @ApiStatus.Internal
   suspend fun waitForInit() {
     initializationJob?.join()
     if (shouldBeInitInstantly()) {
@@ -252,5 +272,11 @@ abstract class PythonPackageManager(val project: Project, val sdk: Sdk) : Dispos
     @Topic.AppLevel
     val PACKAGE_MANAGEMENT_TOPIC: Topic<PythonPackageManagementListener> = Topic(PythonPackageManagementListener::class.java, Topic.BroadcastDirection.TO_DIRECT_CHILDREN)
     val RUNNING_PACKAGING_TASKS: Key<Boolean> = Key.create("PyPackageRequirementsInspection.RunningPackagingTasks")
+
+    @ApiStatus.Internal
+    data class PackageManagerErrorMessage(
+      @param:Nls val descriptionMessage: String,
+      @param:Nls val fixCommandMessage: String
+    )
   }
 }

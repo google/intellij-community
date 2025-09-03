@@ -69,7 +69,6 @@ object CommunityRepositoryModules {
     pluginAuto(listOf("intellij.xpath")) { spec ->
       spec.withModule("intellij.xpath.rt", "rt/xslt-rt.jar")
     },
-    pluginAuto("intellij.platform.langInjection.plugin") {},
     pluginAutoWithCustomDirName("intellij.tasks.core") { spec ->
       spec.directoryName = "tasks"
       spec.withModule("intellij.tasks")
@@ -186,8 +185,8 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.terminal.completion")
       spec.withResource("resources/shell-integrations", "shell-integrations")
     },
-    pluginAuto(listOf("intellij.textmate")) { spec ->
-      spec.withResource("lib/bundles", "lib/bundles")
+    pluginAuto(listOf("intellij.textmate.plugin")) { spec ->
+      spec.withResourceFromModule("intellij.textmate", "lib/bundles", "lib/bundles")
     },
     PythonCommunityPluginModules.pythonCommunityPluginLayout(),
     androidDesignPlugin(),
@@ -215,9 +214,6 @@ object CommunityRepositoryModules {
       spec.withProjectLibrary("package-search-api-client")
       spec.withProjectLibrary("ktor-client-logging")
       spec.withProjectLibrary("kotlinx-document-store-mvstore")
-    },
-    pluginAuto("intellij.platform.jewel.samples.idePlugin") { spec ->
-      spec.withModule("intellij.platform.jewel.samples.showcase")
     }
   )
 
@@ -246,6 +242,7 @@ object CommunityRepositoryModules {
       }
       spec.withModule("intellij.android.designer.customview")
       spec.withModule("intellij.android.designer")
+      spec.withModule("intellij.android.designer.gradle")
       spec.withModule("intellij.android.glance-designer")
       spec.withModule("intellij.android.layoutlib")
       spec.withModule("intellij.android.nav.editor")
@@ -521,7 +518,7 @@ object CommunityRepositoryModules {
         }
         else {
           spec.withGeneratedPlatformResources(supportedOs, supportedArch, supportedLibc) { targetDir, context ->
-            val streamingModule = context.projectModel.project.modules.find { it.name == "intellij.android.streaming" }!!
+            val streamingModule = context.projectModel.project.findModuleByName("intellij.android.streaming")!!
             val ffmpegLibrary = streamingModule.libraryCollection.findLibrary(ffmpegLibraryName)!!
             val javacppLibrary = streamingModule.libraryCollection.findLibrary(javacppLibraryName)!!
             val libDir = targetDir.resolve("lib")

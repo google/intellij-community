@@ -49,8 +49,7 @@ public abstract class DaemonCodeAnalyzerEx extends DaemonCodeAnalyzer {
     return processHighlights(document, project, minSeverity, startOffset, endOffset, CodeInsightContexts.anyContext(), processor);
   }
 
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public static boolean processHighlights(@NotNull Document document,
                                           @NotNull Project project,
                                           @Nullable("null means all") HighlightSeverity minSeverity,
@@ -62,8 +61,7 @@ public abstract class DaemonCodeAnalyzerEx extends DaemonCodeAnalyzer {
     return processHighlights(model, project, minSeverity, startOffset, endOffset, context, processor);
   }
 
-  // todo IJPL-339 mark experimental
-  @ApiStatus.Internal
+  @ApiStatus.Experimental
   public static boolean processHighlights(@NotNull MarkupModelEx model,
                                           @NotNull Project project,
                                           @Nullable("null means all") HighlightSeverity minSeverity,
@@ -133,11 +131,29 @@ public abstract class DaemonCodeAnalyzerEx extends DaemonCodeAnalyzer {
   /**
    * Do not use because manual management of highlights is dangerous and may lead to unexpected flicking/disappearing/stuck highlighters.
    * Instead, generate file-level infos in your inspection/annotator, and they will be removed automatically when outdated
+   *
+   * @param context pass the corresponding context or null if file level highlight is not context-dependent
    */
   @ApiStatus.Internal
-  public abstract void addFileLevelHighlight(int group, @NotNull HighlightInfo info, @NotNull PsiFile psiFile, @Nullable RangeHighlighter toReuse);
+  public abstract void addFileLevelHighlight(int group,
+                                             @NotNull HighlightInfo info,
+                                             @NotNull PsiFile psiFile,
+                                             @Nullable RangeHighlighter toReuse,
+                                             @Nullable CodeInsightContext context);
+
+  /**
+   * Do not use because manual management of highlights is dangerous and may lead to unexpected flicking/disappearing/stuck highlighters.
+   * Instead, generate file-level infos in your inspection/annotator, and they will be removed automatically when outdated
+   *
+   * @param context pass the corresponding context or null if file level highlight is not context-dependent
+   */
   @ApiStatus.Internal
-  public abstract void replaceFileLevelHighlight(@NotNull HighlightInfo oldInfo, @NotNull HighlightInfo newInfo, @NotNull PsiFile psiFile, @Nullable RangeHighlighter toReuse);
+  public abstract void replaceFileLevelHighlight(@NotNull HighlightInfo oldInfo,
+                                                 @NotNull HighlightInfo newInfo,
+                                                 @NotNull PsiFile psiFile,
+                                                 @Nullable RangeHighlighter toReuse,
+                                                 @Nullable CodeInsightContext context);
+
   /**
    * Do not use because manual management of highlights is dangerous and may lead to unexpected flicking/disappearing/stuck highlighters.
    * Instead, generate file-level infos in your inspection/annotator, and they will be removed automatically when outdated
@@ -155,8 +171,8 @@ public abstract class DaemonCodeAnalyzerEx extends DaemonCodeAnalyzer {
     }
 
     Document document = textEditor.getEditor().getDocument();
-    CodeInsightContext context = EditorContextManager.getEditorContext(textEditor.getEditor(), project);
-    return getInstanceEx(project).getFileStatusMap().allDirtyScopesAreNull(document, context);
+    CodeInsightContext context = EditorContextManager.getCachedEditorContext(textEditor.getEditor(), project);
+    return context != null && getInstanceEx(project).getFileStatusMap().allDirtyScopesAreNull(document, context);
   }
 
   @ApiStatus.Internal

@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.terminal.runner;
 
 import com.intellij.execution.CommandLineUtil;
+import com.intellij.execution.process.LocalPtyOptions;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
@@ -10,15 +11,17 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.NioFiles;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.util.text.Strings;
 import com.intellij.platform.eel.EelDescriptor;
-import com.intellij.platform.eel.provider.EelProviderUtil;
+import com.intellij.platform.eel.EelPlatformKt;
 import com.intellij.platform.eel.provider.LocalEelDescriptor;
 import com.intellij.platform.eel.provider.utils.EelPathUtils;
 import com.intellij.terminal.ui.TerminalWidget;
 import com.intellij.util.PathUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.system.OS;
+import com.pty4j.windows.conpty.WinConPtyProcess;
 import kotlin.jvm.functions.Function0;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +35,6 @@ import org.jetbrains.plugins.terminal.util.ShellType;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,8 +44,9 @@ import java.util.Map;
 
 import static com.intellij.platform.eel.provider.EelNioBridgeServiceKt.asEelPath;
 import static com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalContentToRemote;
+import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.BLOCK_TERMINAL_FISH_REGISTRY;
 import static org.jetbrains.plugins.terminal.LocalTerminalDirectRunner.LOGIN_CLI_OPTIONS;
-import static org.jetbrains.plugins.terminal.LocalTerminalDirectRunner.supportsBlocksShellIntegration;
+import static org.jetbrains.plugins.terminal.TerminalStartupKt.findEelDescriptor;
 
 @ApiStatus.Internal
 public final class LocalShellIntegrationInjector {
@@ -75,15 +78,16 @@ public final class LocalShellIntegrationInjector {
 
     String shellName = PathUtil.getFileName(shellExe);
     Path rcFile = findRCFile(shellName);
-    String remoteRcFilePath = rcFile != null ? transferAndGetRemotePath(rcFile, options.getWorkingDirectory()) : null;
+    EelDescriptor eelDescriptor = findEelDescriptor(options.getWorkingDirectory(), shellCommand);
+    String remoteRcFilePath = rcFile != null ? transferAndGetRemotePath(rcFile, eelDescriptor) : null;
     if (remoteRcFilePath != null) {
-      boolean addBlocksIntegration = supportsBlocksShellIntegration(shellName);
+      boolean addBlocksIntegration = supportsBlocksShellIntegration(shellName, eelDescriptor);
       if (ShellNameUtil.isBash(shellName) || (SystemInfo.isMac && shellName.equals(ShellNameUtil.SH_NAME))) {
         addBashRcFileArgument(envs, arguments, resultCommand, remoteRcFilePath);
         // remove --login to enable --rcfile sourcing
         boolean loginShell = arguments.removeAll(LOGIN_CLI_OPTIONS);
         setLoginShellEnv(envs, loginShell);
-        setCommandHistoryFile(options, envs);
+        setCommandHistoryFile(options, envs, eelDescriptor);
         integration = new ShellIntegration(ShellType.BASH, addBlocksIntegration ? new CommandBlockIntegration() : null);
       }
       else if (ShellNameUtil.isZshName(shellName)) {
@@ -210,14 +214,12 @@ public final class LocalShellIntegrationInjector {
    * are transferred together, preserving their relative paths.
    *
    * @param localFileOrDir the path to the local file or directory to be transferred
-   * @param workingDir the working directory pointing to the remote environment
+   * @param eelDescriptor descriptor of the remote environment
    * @return the remote path corresponding to the transferred file or directory if the transfer was successful,
    *         or the original path if no transfer was needed; null if an error occurs.
    */
-  private static @Nullable String transferAndGetRemotePath(@NotNull Path localFileOrDir, @Nullable String workingDir) {
-    EelDescriptor eelDescriptor = findEelDescriptor(workingDir);
+  private static @Nullable String transferAndGetRemotePath(@NotNull Path localFileOrDir, @NotNull EelDescriptor eelDescriptor) {
     if (eelDescriptor == LocalEelDescriptor.INSTANCE) return localFileOrDir.toString();
-    if (eelDescriptor == null) return localFileOrDir.toString();
     Path baseDirectory = findUpShellIntegrationBaseDirectory(localFileOrDir);
     if (baseDirectory == null) return null;
     try {
@@ -233,26 +235,9 @@ public final class LocalShellIntegrationInjector {
       return asEelPath(remoteBaseDirectory.resolve(relativePath)).toString();
     }
     catch (Exception e) {
-      LOG.info("Unable to transfer shell integration (" + baseDirectory + ") to remote (" + eelDescriptor + ")", e);
+      LOG.warn("Unable to transfer shell integration (" + baseDirectory + ") to remote (" + eelDescriptor.getMachine().getName() + ")", e);
       return null;
     }
-  }
-
-  private static @Nullable EelDescriptor findEelDescriptor(@Nullable String workingDir) {
-    if (!TerminalStartupKt.shouldUseEelApi()) return null;
-    if (Strings.isEmptyOrSpaces(workingDir)) {
-      LOG.warn("Empty working directory: " + workingDir);
-      return null;
-    }
-    Path workingDirectoryNioPath;
-    try {
-      workingDirectoryNioPath = Path.of(workingDir);
-    }
-    catch (InvalidPathException e) {
-      LOG.warn("Invalid working directory: " + workingDir, e);
-      return null;
-    }
-    return EelProviderUtil.getEelDescriptor(workingDirectoryNioPath);
   }
 
   /**
@@ -294,7 +279,12 @@ public final class LocalShellIntegrationInjector {
     }
   }
 
-  private static void setCommandHistoryFile(@NotNull ShellStartupOptions startupOptions, @NotNull Map<String, String> envs) {
+  private static void setCommandHistoryFile(
+    @NotNull ShellStartupOptions startupOptions,
+    @NotNull Map<String, String> envs,
+    @NotNull EelDescriptor eelDescriptor
+  ) {
+    if (eelDescriptor != LocalEelDescriptor.INSTANCE) return;
     Function0<Path> commandHistoryFileProvider = startupOptions.getCommandHistoryFileProvider();
     Path commandHistoryFile = commandHistoryFileProvider != null ? commandHistoryFileProvider.invoke() : null;
     if (commandHistoryFile != null) {
@@ -310,4 +300,34 @@ public final class LocalShellIntegrationInjector {
     TerminalWidget widget = options != null ? options.getWidget() : null;
     return widget != null ? ShellTerminalWidget.asShellJediTermWidget(widget) : null;
   }
+
+  /**
+   * @return true if the command block shell integration is available for the specified shell and environment
+   */
+  public static boolean supportsBlocksShellIntegration(@NotNull String shellName, @NotNull EelDescriptor eelDescriptor) {
+    return isCommandBlockShellIntegrationAvailable(shellName, eelDescriptor) &&
+           isSystemCompatibleWithCommandBlocks(eelDescriptor); // the last part of the condition, as it may load the ConPTY library
+  }
+  
+  private static boolean isCommandBlockShellIntegrationAvailable(@NotNull String shellName, @NotNull EelDescriptor eelDescriptor) {
+    return shellName.equals(ShellNameUtil.BASH_NAME) ||
+           eelDescriptor == LocalEelDescriptor.INSTANCE && OS.CURRENT == OS.macOS && shellName.equals(ShellNameUtil.SH_NAME) ||
+           shellName.equals(ShellNameUtil.ZSH_NAME) ||
+           shellName.equals(ShellNameUtil.FISH_NAME) && Registry.is(BLOCK_TERMINAL_FISH_REGISTRY, false) ||
+           ShellNameUtil.isPowerShell(shellName);
+  }
+
+  private static boolean isSystemCompatibleWithCommandBlocks(@NotNull EelDescriptor eelDescriptor) {
+    if (!EelPlatformKt.isWindows(eelDescriptor.getOsFamily())) {
+      return true;
+    }
+    // On Windows, command block support requires recent versions of ConPTY (https://github.com/microsoft/terminal/issues/8698).
+    // Unfortunately, there is no reliable way to check whether the system ConPTY includes this change.
+    // However, the bundled ConPTY does include it (IJPL-190952).
+    // Therefore, let's require local Windows with the bundled ConPTY for the command blocks.
+    return eelDescriptor == LocalEelDescriptor.INSTANCE &&
+           LocalPtyOptions.shouldUseWinConPty() &&
+           WinConPtyProcess.isBundledConPtyLibraryLoaded();
+  }
+
 }

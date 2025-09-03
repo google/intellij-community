@@ -3,13 +3,14 @@ package org.jetbrains.intellij.build.bazel
 
 import java.nio.file.Path
 import kotlin.io.path.invariantSeparatorsPathString
+import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.relativeTo
 
 internal const val PROVIDED_SUFFIX = "-provided"
 
-internal data class LibOwnerDescriptor(
+internal data class LibraryContainer(
   @JvmField val repoLabel: String,
   @JvmField val buildFile: Path,
   @JvmField val moduleFile: Path,
@@ -18,13 +19,15 @@ internal data class LibOwnerDescriptor(
   @JvmField val isCommunity: Boolean,
 )
 
-internal data class Library(
+internal data class LibraryTarget(
+  @JvmField val jpsName: String,
   @JvmField val targetName: String,
-  @JvmField val owner: LibOwnerDescriptor,
+  @JvmField val container: LibraryContainer,
+  @JvmField val isModuleLibrary: Boolean,
 )
 
-internal sealed interface LibOwner {
-  val lib: Library
+internal sealed interface Library {
+  val target: LibraryTarget
 }
 
 @Suppress("unused")
@@ -33,8 +36,8 @@ internal data class MavenLibrary(
   @JvmField val jars: List<MavenFileDescription>,
   @JvmField val sourceJars: List<MavenFileDescription>,
   @JvmField val javadocJars: List<MavenFileDescription>,
-  override val lib: Library,
-) : LibOwner
+  override val target: LibraryTarget,
+) : Library
 
 internal data class MavenFileDescription(
   @JvmField val path: Path,
@@ -42,9 +45,10 @@ internal data class MavenFileDescription(
 )
 
 internal data class LocalLibrary(
-  @JvmField val files: List<Path>,
-  override val lib: Library,
-) : LibOwner
+  val files: List<Path>,
+  val bazelBuildFileDir: Path,
+  override val target: LibraryTarget,
+) : Library
 
 private fun getUrlAndSha256(jar: MavenFileDescription, jarRepositories: List<JarRepository>, m2Repo: Path, urlCache: UrlCache): CacheEntry {
   val jarPath = jar.path.relativeTo(m2Repo).invariantSeparatorsPathString
@@ -73,20 +77,18 @@ private fun getUrlAndSha256(jar: MavenFileDescription, jarRepositories: List<Jar
 internal fun BuildFile.generateMavenLib(
   lib: MavenLibrary,
   labelTracker: MutableSet<String>,
-  providedRequested: Set<LibOwner>,
+  isLibraryProvided: (Library) -> Boolean,
   libVisibility: String?,
 ) {
-  val targetName = lib.lib.targetName
+  val targetName = lib.target.targetName
   @Suppress("SpellCheckingInspection")
   if (targetName == "bifurcan" || targetName == "kotlinx-collections-immutable-jvm") {
     return
   }
 
-  var exportedCompilerPlugins = emptyList<String>()
   if (lib.jars.size == 1) {
     val jar = lib.jars.single()
-    val libName = targetName
-    if (!labelTracker.add(libName)) {
+    if (!labelTracker.add(targetName)) {
       return
     }
 
@@ -99,8 +101,7 @@ internal fun BuildFile.generateMavenLib(
         option("source_jar", "@${fileToHttpRuleFile(sourceJar.path)}")
       }
       if (targetName == "kotlinx-serialization-core") {
-        exportedCompilerPlugins = listOf("@lib//:kotlin-serialization-plugin")
-        option("exported_compiler_plugins", exportedCompilerPlugins)
+        option("exported_compiler_plugins", listOf("@lib//:kotlin-serialization-plugin"))
       }
 
       libVisibility?.let {
@@ -136,26 +137,52 @@ internal fun BuildFile.generateMavenLib(
     }
   }
 
-  if (providedRequested.contains(lib)) {
-    if (exportedCompilerPlugins.isEmpty()) {
-      target("java_library") {
-        option("name", targetName + PROVIDED_SUFFIX)
-        option("exports", arrayOf(":$targetName"))
-        option("neverlink", true)
-        libVisibility?.let {
-          visibility(arrayOf(it))
-        }
+  if (isLibraryProvided(lib)) {
+    generateProvidedMavenLib(lib = lib, libVisibility = libVisibility)
+  }
+}
+
+internal fun BuildFile.generateProvidedMavenLib(
+  lib: MavenLibrary,
+  libVisibility: String?,
+  targetContainer: LibraryContainer? = null,
+) {
+  val targetName = lib.target.targetName
+  @Suppress("SpellCheckingInspection")
+  if (targetName == "bifurcan" || targetName == "kotlinx-collections-immutable-jvm") {
+    return
+  }
+
+  val exportedCompilerPlugins = when (targetName) {
+    "kotlinx-serialization-core" -> listOf("@lib//:kotlin-serialization-plugin")
+    else -> emptyList()
+  }
+
+  val exportsLabel = if (targetContainer == null) {
+    ":$targetName"
+  }
+  else {
+    "${targetContainer.repoLabel}//:$targetName"
+  }
+
+  if (exportedCompilerPlugins.isEmpty()) {
+    target("java_library") {
+      option("name", targetName + PROVIDED_SUFFIX)
+      option("exports", listOf(exportsLabel))
+      option("neverlink", true)
+      libVisibility?.let {
+        visibility(arrayOf(it))
       }
     }
-    else {
-      target("kt_jvm_library") {
-        option("name", targetName + PROVIDED_SUFFIX)
-        option("exports", arrayOf(":$targetName"))
-        option("neverlink", true)
-        option("exported_compiler_plugins", exportedCompilerPlugins)
-        libVisibility?.let {
-          visibility(arrayOf(it))
-        }
+  }
+  else {
+    target("kt_jvm_library") {
+      option("name", targetName + PROVIDED_SUFFIX)
+      option("exports", listOf(exportsLabel))
+      option("neverlink", true)
+      option("exported_compiler_plugins", exportedCompilerPlugins)
+      libVisibility?.let {
+        visibility(arrayOf(it))
       }
     }
   }
@@ -164,7 +191,7 @@ internal fun BuildFile.generateMavenLib(
 @Suppress("DuplicatedCode")
 internal fun generateBazelModuleSectionsForLibs(
   list: List<MavenLibrary>,
-  owner: LibOwnerDescriptor,
+  owner: LibraryContainer,
   jarRepositories: List<JarRepository>,
   m2Repo: Path,
   urlCache: UrlCache,
@@ -206,6 +233,12 @@ internal fun generateBazelModuleSectionsForLibs(
           continue
         }
 
+        if (jar.path.isDirectory()) {
+          // manually attached source directory
+          println("WARN: source directory ${jar.path} is attached to ${lib.target.jpsName}, not generating anything out of it")
+          continue
+        }
+
         val entry = getUrlAndSha256(jar = jar, jarRepositories = jarRepositories, m2Repo = m2Repo, urlCache = urlCache)
         target("http_file") {
           option("name", label)
@@ -222,25 +255,27 @@ private fun fileToHttpRuleRepoName(jar: Path): String = bazelLabelBadCharsPatter
 
 private fun fileToHttpRuleFile(jar: Path): String = fileToHttpRuleRepoName(jar) + "//file"
 
-internal fun generateLocalLibs(libs: Set<LocalLibrary>, providedRequested: Set<LibOwner>, fileToUpdater: MutableMap<Path, BazelFileUpdater>) {
-  for ((dir, libs) in libs.asSequence().sortedBy { it.lib.targetName }.groupBy { it.files.first().parent }) {
+internal fun generateLocalLibs(libs: Collection<LocalLibrary>, isLibraryProvided: (Library) -> Boolean, fileToUpdater: MutableMap<Path, BazelFileUpdater>) {
+  for ((dir, libs) in libs.sortedBy { it.target.targetName }.groupBy { it.bazelBuildFileDir }) {
     val bazelFileUpdater = fileToUpdater.computeIfAbsent(dir.resolve("BUILD.bazel")) { BazelFileUpdater(it) }
     bazelFileUpdater.removeSections("local-libraries")
     buildFile(bazelFileUpdater, "local-libs") {
       load("@rules_java//java:defs.bzl", "java_import")
       for (lib in libs) {
-        val targetName = lib.lib.targetName
+        val targetName = lib.target.targetName
         target("java_import") {
           option("name", targetName)
-          option("jars", lib.files.map { it.fileName.toString() })
-          option("visibility", arrayOf("//visibility:public"))
+          option("jars", lib.files.map {
+            it.relativeTo(dir).invariantSeparatorsPathString
+          })
+          option("visibility", listOf("//visibility:public"))
         }
 
-        if (providedRequested.contains(lib)) {
+        if (isLibraryProvided(lib)) {
           load("@rules_java//java:defs.bzl", "java_library")
           target("java_library") {
             option("name", targetName + PROVIDED_SUFFIX)
-            option("exports", arrayOf(":$targetName"))
+            option("exports", listOf(":$targetName"))
             option("neverlink", true)
             visibility(arrayOf("//visibility:public"))
           }

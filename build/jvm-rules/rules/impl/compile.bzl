@@ -21,10 +21,10 @@ load(
     _KtCompilerPluginInfo = "KtCompilerPluginInfo",
     _KtPluginConfiguration = "KtPluginConfiguration",
 )
-load("@rules_kotlin//kotlin/internal:opts.bzl", "JavacOptions")
 load("//:rules/common-attrs.bzl", "add_dicts")
 load("//:rules/impl/associates.bzl", "get_associates")
 load("//:rules/impl/builder-args.bzl", "init_builder_args")
+load("//:rules/impl/javac-options.bzl", "JavacOptions")
 load("//:rules/impl/kotlinc-options.bzl", "KotlincOptions")
 
 visibility("private")
@@ -79,7 +79,7 @@ def _jvm_deps(ctx, associated_targets, deps, runtime_deps):
 
     # reduced classpath, exclude transitive deps from compilation
     #prune_transitive_deps = toolchains.kt.experimental_prune_transitive_deps and "kt_experimental_prune_transitive_deps_incompatible" not in ctx.attr.tags
-    prune_transitive_deps = False and "kt_experimental_prune_transitive_deps_incompatible" not in ctx.attr.tags
+    prune_transitive_deps = True and "kt_experimental_prune_transitive_deps_incompatible" not in ctx.attr.tags
     transitive = _compute_transitive_jars(dep_infos, prune_transitive_deps)
 
     return struct(
@@ -289,6 +289,8 @@ def _run_jvm_builder(
     javac_opts = ctx.attr.javac_opts[JavacOptions] if ctx.attr.javac_opts else None
     if javac_opts and javac_opts.add_exports:
         args.add_all("--add-export", javac_opts.add_exports)
+    if javac_opts and javac_opts.no_proc:
+        args.add("--no-proc")
 
     isIncremental = (kotlin_inc_threshold != -1 and len(srcs.kt) >= kotlin_inc_threshold) or (java_inc_threshold != -1 and len(srcs.java) >= java_inc_threshold)
     if not isIncremental:

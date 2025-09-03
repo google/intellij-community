@@ -11,15 +11,19 @@ jvm_library(
   name = "java",
   module_name = "intellij.grazie.java",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java"], allow_empty = True),
+  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/grazie/src:core",
     "//java/openapi:java",
+    "//java/java-impl:impl",
     "//java/java-psi-api:psi",
     "//java/java-psi-impl:psi-impl",
+    "//java/java-analysis-impl:analysis-impl",
     "//platform/core-api:core",
     "//platform/util-ex",
+    "//platform/analysis-api:analysis",
+    "//spellchecker",
   ],
   runtime_deps = [":java_resources"]
 )

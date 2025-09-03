@@ -14,11 +14,25 @@ class GroovyAnnotatorPre50Test: LightGroovyTestCase() {
       class B extends A{}
       def foo() {
         A a = new B()
-        if (a instanceof B <error descr="Pattern variable inside 'instanceof' expressions is available in Groovy 5.0 or later">b</error>) {
+        if (a instanceof B <error descr="Pattern variable inside instanceof expressions is available in Groovy 5.0 or later">b</error>) {
         }
       }
     """.trimIndent())
     myFixture.testHighlighting()
-    //myFixture.checkHighlighting()
+  }
+
+  fun testArrayInitializer() {
+    myFixture.configureByText("a.groovy", """
+      class A{}
+      class B extends A{}
+      def foo() {
+        def o = new String[][]{}
+      
+        def a = <error descr="Multi-dimensional array initializer is available in Groovy 5.0 or later">new String[][]{{}}</error>
+        
+        def b = <error descr="Multi-dimensional array initializer is available in Groovy 5.0 or later">new String[][]{{"foo"}}</error>
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
   }
 }

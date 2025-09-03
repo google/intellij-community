@@ -3,7 +3,9 @@ package com.intellij.codeInsight.daemon.impl;
 
 import com.intellij.codeHighlighting.HighlightingPass;
 import com.intellij.codeInsight.daemon.GutterMark;
-import com.intellij.codeInsight.multiverse.*;
+import com.intellij.codeInsight.multiverse.CodeInsightContext;
+import com.intellij.codeInsight.multiverse.CodeInsightContextHighlightingUtil;
+import com.intellij.codeInsight.multiverse.CodeInsightContextUtil;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.diagnostic.Logger;
@@ -168,7 +170,7 @@ public final class UpdateHighlightersUtil {
     }
     if (psiFile != null) {
       DaemonCodeAnalyzerEx.getInstanceEx(project).cleanFileLevelHighlights(group, psiFile);
-      HighlightingSessionImpl.runInsideHighlightingSessionInEDT(psiFile, FileViewProviderUtil.getCodeInsightContext(psiFile), colorsScheme, ProperTextRange.create(startOffset, endOffset), false, session ->
+      HighlightingSessionImpl.runInsideHighlightingSessionInEDT(psiFile, CodeInsightContextUtil.getCodeInsightContext(psiFile), colorsScheme, ProperTextRange.create(startOffset, endOffset), false, session ->
         setHighlightersInRange(document, range, new ArrayList<>(infos), markup, group, session)
       );
     }
@@ -208,7 +210,7 @@ public final class UpdateHighlightersUtil {
           return true;
         }
         if (info.isFileLevelAnnotation()) {
-          codeAnalyzer.addFileLevelHighlight(group, info, psiFile, null);
+          codeAnalyzer.addFileLevelHighlight(group, info, psiFile, null, session.getCodeInsightContext());
           changed[0] = true;
           return true;
         }

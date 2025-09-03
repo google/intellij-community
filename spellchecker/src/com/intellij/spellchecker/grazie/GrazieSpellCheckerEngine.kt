@@ -3,7 +3,6 @@
 
 package com.intellij.spellchecker.grazie
 
-import ai.grazie.annotation.TestOnly
 import ai.grazie.nlp.langs.Language
 import ai.grazie.nlp.langs.LanguageISO
 import ai.grazie.nlp.langs.alphabet.Alphabet
@@ -43,6 +42,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
 
 private const val MAX_WORD_LENGTH = 32
 
@@ -137,14 +137,14 @@ class GrazieSpellCheckerEngine(
 
   override fun isDictionaryLoad(name: String): Boolean = adapter.containsSource(name)
 
-  override fun getDictionaryNames(): Set<String> = adapter.names
+  override fun getDictionaryNames(): Set<String> = adapter.dictionaryNames
 
   override fun loadDictionary(loader: Loader) {
     this.loader.loadWordList(loader, adapter::addList)
   }
 
   override fun addDictionary(dictionary: Dictionary) {
-    adapter.addDictionary(dictionary)
+    if (!isDictionaryLoad(dictionary.name)) adapter.addDictionary(dictionary)
   }
 
   override fun addModifiableDictionary(dictionary: EditableDictionary) {

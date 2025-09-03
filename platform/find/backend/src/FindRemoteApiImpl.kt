@@ -18,7 +18,7 @@ import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.newvfs.VfsPresentationUtil
 import com.intellij.platform.find.FindInFilesResult
@@ -29,8 +29,8 @@ import com.intellij.usages.FindUsagesProcessPresentation
 import com.intellij.usages.UsageInfo2UsageAdapter
 import com.intellij.usages.UsageViewPresentation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -41,68 +41,70 @@ internal class FindRemoteApiImpl : FindRemoteApi {
   override suspend fun findByModel(findModel: FindModel, projectId: ProjectId, filesToScanInitially: List<VirtualFileId>, maxUsagesCount: Int): Flow<FindInFilesResult> {
     val sentItems = AtomicInteger(0)
     return channelFlow {
-        //TODO rewrite find function without using progress indicator and presentation
-        val progressIndicator = EmptyProgressIndicator()
-        val presentation = FindUsagesProcessPresentation(UsageViewPresentation())
+      //TODO rewrite find function without using presentation
+      val presentation = FindUsagesProcessPresentation(UsageViewPresentation())
 
-        val isReplaceState = findModel.isReplaceState
-        val previousResult = ThreadLocal<UsageInfo2UsageAdapter>()
-        val usagesCount = AtomicInteger()
+      val isReplaceState = findModel.isReplaceState
+      val previousResult = ThreadLocal<UsageInfo2UsageAdapter>()
 
-        val project = projectId.findProjectOrNull()
-        if (project == null) {
-          LOG.warn("Project not found for id ${projectId}")
-          return@channelFlow
-        }
-        val filesToScanInitially = filesToScanInitially.mapNotNull { it.virtualFile() }.toSet()
-        // SearchScope is not serializable, so we will get it by id from the client
-        setCustomScopeById(project, findModel)
-        //read action is necessary in case of the loading from a directory
-        val scope = readAction {  FindInProjectUtil.getGlobalSearchScope(project, findModel) }
-        FindInProjectUtil.findUsages(findModel, project, progressIndicator, presentation, filesToScanInitially) { usageInfo ->
-          val usageNum = usagesCount.incrementAndGet()
-          if (usageNum > maxUsagesCount) {
-            return@findUsages false
-          }
+      val project = projectId.findProjectOrNull()
+      if (project == null) {
+        LOG.warn("Project not found for id ${projectId}")
+        return@channelFlow
+      }
+      val filesToScanInitially = filesToScanInitially.mapNotNull { it.virtualFile() }.toSet()
+      // SearchScope is not serializable, so we will get it by id from the client
+      setCustomScopeById(project, findModel)
+      //read action is necessary in case of the loading from a directory
+      val scope = readAction { FindInProjectUtil.getGlobalSearchScope(project, findModel) }
+      coroutineToIndicator {
+        FindInProjectUtil.findUsages(findModel, project, presentation, filesToScanInitially) { usageInfo ->
           val virtualFile = usageInfo.virtualFile
           if (virtualFile == null)
             return@findUsages true
+
+          if (sentItems.get() >= maxUsagesCount) {
+            return@findUsages false
+          }
 
           val adapter = UsageInfo2UsageAdapter(usageInfo)
           val previousItem: UsageInfo2UsageAdapter? = previousResult.get()
           if (!isReplaceState && previousItem != null) adapter.merge(previousItem)
           previousResult.set(adapter)
-          launch {
-            adapter.updateCachedPresentation()
-            val textChunks = adapter.text.map {
-              it.toSerializableTextChunk()
-            }
-            val bgColor = VfsPresentationUtil.getFileBackgroundColor(project, virtualFile)?.rpcId()
-            val presentablePath = readAction { getPresentableFilePath(project, scope, virtualFile) }
+          adapter.updateCachedPresentation()
+          val textChunks = adapter.text.map {
+            it.toSerializableTextChunk()
+          }
+          val bgColor = VfsPresentationUtil.getFileBackgroundColor(project, virtualFile)?.rpcId()
+          val presentablePath = getPresentableFilePath(project, scope, virtualFile)
 
-            val result = FindInFilesResult(
-              presentation = textChunks,
-              line = adapter.line,
-              navigationOffset = adapter.navigationOffset,
-              mergedOffsets = adapter.mergedInfos.map { it.navigationOffset },
-              length = adapter.navigationRange.endOffset - adapter.navigationRange.startOffset,
-              fileId = virtualFile.rpcId(),
-              presentablePath = if (virtualFile.parent == null) FindPopupPanel.getPresentablePath(project, virtualFile)
-                                                                ?: virtualFile.presentableUrl
+          val result = FindInFilesResult(
+            presentation = textChunks,
+            line = adapter.line,
+            navigationOffset = adapter.navigationOffset,
+            mergedOffsets = adapter.mergedInfos.map { it.navigationOffset },
+            length = adapter.navigationRange.endOffset - adapter.navigationRange.startOffset,
+            fileId = virtualFile.rpcId(),
+            presentablePath =
+              if (virtualFile.parent == null) FindPopupPanel.getPresentablePath(project, virtualFile) ?: virtualFile.presentableUrl
               else FindPopupPanel.getPresentablePath(project, virtualFile.parent) + File.separator + virtualFile.name,
-              shortenPresentablePath = presentablePath,
-              backgroundColor = bgColor,
-              tooltipText = adapter.tooltipText,
-              iconId = adapter.icon?.rpcId(),
-            )
+            shortenPresentablePath = presentablePath,
+            backgroundColor = bgColor,
+            tooltipText = adapter.tooltipText,
+            iconId = adapter.icon?.rpcId(),
+            fileLength = virtualFile.length.toInt(),
+            usageInfos = adapter.mergedInfos.toList()
+          )
 
-            send(result)
-            if (usagesCount.get() > maxUsagesCount && sentItems.incrementAndGet() >= maxUsagesCount)
-              close()
-          }.start()
-          usagesCount.get() <= maxUsagesCount
+          val sent = trySend(result)
+          if (sent.isSuccess) {
+            sentItems.incrementAndGet()
+          }
+
+          sentItems.get() <= maxUsagesCount
         }
-    }
+      }
+    }.buffer(capacity = maxUsagesCount)
   }
 
   override suspend fun performFindAllOrReplaceAll(findModel: FindModel, openInNewTab: Boolean, projectId: ProjectId) {
@@ -128,7 +130,7 @@ internal class FindRemoteApiImpl : FindRemoteApi {
     return FindInProjectUtil.getDirectory(findModel) != null
   }
 
-  private fun setCustomScopeById(project: Project, findModel: FindModel) {
+  private suspend fun setCustomScopeById(project: Project, findModel: FindModel) {
     if (findModel.customScope == null && findModel.isCustomScope) {
       val scopeId = findModel.customScopeId ?: return
       ScopesStateService.getInstance(project).getScopeById(scopeId)?.let {

@@ -9,6 +9,8 @@ import com.intellij.find.impl.livePreview.LivePreview
 import com.intellij.find.impl.livePreview.LivePreviewController
 import com.intellij.find.impl.livePreview.LivePreviewPresentation
 import com.intellij.find.impl.livePreview.SearchResults
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.application.ApplicationBundle
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.editor.Editor
@@ -21,6 +23,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.terminal.BlockTerminalColors
+import com.intellij.terminal.actions.TerminalActionUtil
+import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.util.maximumWidth
 import com.intellij.ui.util.preferredWidth
 import com.intellij.util.SmartList
@@ -28,8 +32,10 @@ import com.intellij.util.ui.ComponentWithEmptyText
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.Nls
 import org.jetbrains.plugins.terminal.block.ui.TerminalUi
+import java.awt.Dimension
 import java.awt.Point
 import java.util.regex.PatternSyntaxException
+import javax.swing.JComponent
 import javax.swing.JTextArea
 
 internal class TerminalSearchSession(
@@ -40,6 +46,7 @@ internal class TerminalSearchSession(
 ) : SearchSession, SearchResults.SearchResultsListener, SearchReplaceComponent.Listener {
   private val disposable = Disposer.newDisposable(TerminalSearchSession::class.java.name)
   private val component: SearchReplaceComponent = createSearchComponent()
+  val wrapper: JComponent = DataContextWrapper(component)
   private val searchResults: SearchResults = TerminalSearchResults()
   private val livePreviewController: LivePreviewController = LivePreviewController(searchResults, this, disposable)
 
@@ -92,8 +99,6 @@ internal class TerminalSearchSession(
       .withCloseAction(this::close)
       .build().also {
         (it.searchTextComponent as? JTextArea)?.columns = 14  // default is 12
-        it.preferredWidth = JBUI.scale(TerminalUi.searchComponentWidth)
-        it.maximumWidth = JBUI.scale(TerminalUi.searchComponentWidth)
         it.border = JBUI.Borders.customLine(JBUI.CurrentTheme.Editor.BORDER_COLOR, 0, 1, 1,0)
       }
   }
@@ -267,5 +272,19 @@ internal class TerminalSearchSession(
       }
       else occurrences.lastOrNull()
     }
+  }
+}
+
+private class DataContextWrapper(component: JComponent): Wrapper(component), UiDataProvider {
+  override fun uiDataSnapshot(sink: DataSink) {
+    sink.setNull(TerminalActionUtil.EDITOR_KEY) // disable editor actions when the search is in focus
+  }
+
+  override fun getPreferredSize(): Dimension = super.getPreferredSize().also {
+    it.width = JBUI.scale(TerminalUi.searchComponentWidth)
+  }
+
+  override fun getMaximumSize(): Dimension = super.getMaximumSize().also {
+    it.width = JBUI.scale(TerminalUi.searchComponentWidth)
   }
 }

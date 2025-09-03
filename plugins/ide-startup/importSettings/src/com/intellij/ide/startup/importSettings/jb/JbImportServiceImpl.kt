@@ -41,7 +41,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 import javax.swing.Icon
@@ -59,7 +58,7 @@ internal data class JbProductInfo(
   val pluginDir: Path,
 ) : Product {
   override val origin = SettingsImportOrigin.JetBrainsProduct
-  private val descriptorsMap = ConcurrentHashMap<PluginId, IdeaPluginDescriptorImpl>()
+  private val descriptorsMap = ConcurrentHashMap<PluginId, PluginMainDescriptor>()
   private val descriptorsPrefetchTask = AtomicReference<Deferred<Unit>>()
   private var keymapRef: AtomicReference<String> = AtomicReference()
   val activeKeymap: String?
@@ -115,7 +114,7 @@ internal data class JbProductInfo(
     }
   }
 
-  private fun isCompatible(descriptor: IdeaPluginDescriptorImpl): Boolean {
+  private fun isCompatible(descriptor: PluginMainDescriptor): Boolean {
     if (PluginManagerCore.getPluginSet().isPluginEnabled(descriptor.pluginId)) {
       logger.info("Plugin \"${descriptor.name}\" from \"$name\" is already present in \"${IDEData.getSelf()?.fullName}\"")
       return false
@@ -144,7 +143,7 @@ internal data class JbProductInfo(
     return true
   }
 
-  fun getPluginsDescriptors(): ConcurrentHashMap<PluginId, IdeaPluginDescriptorImpl> {
+  fun getPluginsDescriptors(): ConcurrentHashMap<PluginId, PluginMainDescriptor> {
     if (descriptorsPrefetchTask.get()?.isCompleted != true) {
       logger.warn("Plugins prefetch is still in progress!")
     }
@@ -391,7 +390,7 @@ class JbImportServiceImpl(private val coroutineScope: CoroutineScope) : JbServic
   override fun importSettings(productId: String, data: DataToApply): DialogImportData {
     val productInfo = products[productId] ?: error("Can't find product")
     val filteredCategories = mutableSetOf<SettingsCategory>()
-    var plugins2import: Map<PluginId, IdeaPluginDescriptorImpl>? = null
+    var plugins2import: Map<PluginId, PluginMainDescriptor>? = null
     var unselectedPlugins: List<String>? = null
     for (setting in data.importSettings) {
       if (setting.id == SettingsCategory.PLUGINS.name) {
@@ -460,7 +459,7 @@ class JbImportServiceImpl(private val coroutineScope: CoroutineScope) : JbServic
                 logger.info("Started importing plugins...")
                 restartRequired = true
                 val pluginsStartTime = System.currentTimeMillis()
-                importer.installPlugins(coroutineScope, progressIndicator, plugins2import)
+                importer.installPlugins(progressIndicator, plugins2import)
                 (System.currentTimeMillis() - pluginsStartTime).let {
                   logger.info("Plugins migrated in $it ms.")
                   ImportSettingsEventsCollector.jbPluginsImportTimeSpent(it)

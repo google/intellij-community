@@ -36,6 +36,7 @@ import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.process.ProcessOutputTypes;
 import com.intellij.execution.runners.ExecutionUtil;
 import com.intellij.idea.ActionsBundle;
+import com.intellij.java.debugger.impl.shared.engine.NodeRendererId;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ApplicationNamesInfo;
@@ -81,6 +82,7 @@ import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XExecutionStack;
+import com.intellij.xdebugger.impl.CoroutineUtilsKt;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
 import com.intellij.xdebugger.impl.actions.XDebuggerActions;
@@ -94,10 +96,13 @@ import com.sun.jdi.event.LocatableEvent;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.StepRequest;
+import kotlin.Unit;
 import kotlin.coroutines.EmptyCoroutineContext;
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.CoroutineScopeKt;
 import kotlinx.coroutines.Job;
+import kotlinx.coroutines.flow.Flow;
+import kotlinx.coroutines.flow.MutableSharedFlow;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.*;
 
@@ -146,6 +151,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   private volatile Map<String, Connector.Argument> myArguments;
 
   private final List<NodeRenderer> myRenderers = new ArrayList<>();
+  private final MutableSharedFlow<Unit> myRenderersUpdated = CoroutineUtilsKt.createMutableSharedFlow(1, 1);
 
   // we use null key here
   private final Map<Type, Object> myNodeRenderersMap = Collections.synchronizedMap(new HashMap<>());
@@ -220,6 +226,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     return new DebuggerManagerThreadImpl(disposable, projectScope, this);
   }
 
+  @ApiStatus.Internal
+  public Flow<Unit> getRenderersUpdatedFlow() {
+    return myRenderersUpdated;
+  }
+
   private void reloadRenderers() {
     getManagerThread().schedule(new DebuggerCommandImpl(PrioritizedTask.Priority.HIGH) {
       @Override
@@ -230,6 +241,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
           myRenderers.addAll(NodeRendererSettings.getInstance().getAllRenderers(project));
         }
         finally {
+          myRenderersUpdated.tryEmit(Unit.INSTANCE);
           DebuggerInvocationUtil.invokeLaterAnyModality(project, () -> {
             final DebuggerSession session = mySession;
             if (session != null && session.isAttached()) {
@@ -265,6 +277,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   public @NotNull CompletableFuture<List<NodeRenderer>> getApplicableRenderers(Type type) {
     return DebuggerUtilsImpl.getApplicableRenderers(myRenderers, type);
+  }
+
+  @ApiStatus.Internal
+  public @Nullable NodeRenderer getRendererById(@NotNull NodeRendererId id) {
+    return ContainerUtil.find(myRenderers, r -> id.equals(JavaValueUtilsKt.getId(r)));
   }
 
   public @NotNull CompletableFuture<NodeRenderer> getAutoRendererAsync(@Nullable Type type) {
@@ -1166,7 +1183,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
         mySuspendManager.myExplicitlyResumedThreads.remove(thread);
         continue;
       }
-      if (!suspendAllContext.suspends(thread)) { // the previous loop can theoretically resume it already
+      if (suspendAllContext.suspends(thread)) { // the previous loop can theoretically resume it already
         mySuspendManager.resumeThread(suspendAllContext, thread);
       }
     }
@@ -1301,7 +1318,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
           LOG.debug("Evaluation finished in " + suspendContext);
         }
         myEvaluationContext.setThreadForEvaluation(null);
-        if (DebuggerUtils.isNewThreadSuspendStateTracking() && !mySuspendManager.myExplicitlyResumedThreads.contains(invokeThread)) {
+        if (DebuggerUtils.isNewThreadSuspendStateTracking()) {
           for (SuspendContextImpl anotherContext : mySuspendManager.getEventContexts()) {
             if (anotherContext != suspendContext && !anotherContext.suspends(invokeThread)) {
               boolean shouldSuspendThread = false;
@@ -1315,7 +1332,10 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
                 if (anotherContext.myResumedThreads == null || !anotherContext.myResumedThreads.contains(invokeThread)) {
                   logError("Suspend all context claims not suspending " + invokeThread + " but its resumed threads have no it: " + anotherContext.myResumedThreads);
                 }
-                shouldSuspendThread = true;
+                if (!mySuspendManager.myExplicitlyResumedThreads.contains(invokeThread)) {
+                  // Preserve explicitly resumed thread in the running state
+                  shouldSuspendThread = true;
+                }
               }
               if (shouldSuspendThread) {
                 mySuspendManager.suspendThread(anotherContext, invokeThread);
@@ -2124,16 +2144,42 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     @Override
     protected void resumeAction() {
       SuspendContextImpl context = getSuspendContext();
-      if (context != null &&
-          (context.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD || isResumeOnlyCurrentThread())) {
-        myThreadBlockedMonitor.startWatching(myContextThread);
+      if (context != null) {
+        if (context.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD) {
+          myThreadBlockedMonitor.startWatching(myContextThread);
+        }
       }
 
       if (context != null
           && isResumeOnlyCurrentThread()
           && context.getSuspendPolicy() == EventRequest.SUSPEND_ALL
           && myContextThread != null) {
-        getSuspendManager().resumeThread(context, myContextThread);
+        getVirtualMachineProxy().suspend();
+
+        // The current suspend context should be released, so all related commands should be canceled
+        getSuspendManager().resume(context);
+
+        // When we step in suspend-all mode with the Resume only current thread option,
+        // we need to make a placeholder suspend context to hold other threads.
+        SuspendContextImpl placeholderSuspendContext = mySuspendManager.pushSuspendContext(EventRequest.SUSPEND_ALL, 0);
+        placeholderSuspendContext.setEventSet(context.getEventSet());
+
+        if (context.myResumedThreads != null) {
+          // Resume all threads in the placeholder suspend context that were resumed before the step
+          for (ThreadReferenceProxyImpl threadReferenceProxy : context.myResumedThreads) {
+            getSuspendManager().resumeThread(placeholderSuspendContext, threadReferenceProxy);
+          }
+        }
+
+        // It is important that the placeholder context will be resumed and replaced by some new one.
+        // At that moment, it's resuming will cancel the stepping monitoring.
+        ThreadSteppingMonitor.startTrackThreadStepping(myContextThread, placeholderSuspendContext);
+
+        // We need to mark this thread as explicitly resumed because underhood evaluations should leave it in resumed state at the end
+        mySuspendManager.myExplicitlyResumedThreads.add(myContextThread);
+
+        placeholderSuspendContext.mySteppingThreadForResumeOneSteppingCurrentMode = myContextThread;
+        getSuspendManager().resumeThread(placeholderSuspendContext, myContextThread);
       }
       else {
         super.resumeAction();
@@ -2242,7 +2288,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
     @Override
     public void action() {
-      if (!isAttached() || getVirtualMachineProxy().isPausePressed()) {
+      if (!isAttached()) {
         return;
       }
       logThreads();
@@ -2265,7 +2311,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       var requestor = new FilteredRequestorImpl(process.project) {
         @Override
         public boolean shouldIgnoreThreadFiltering() {
-          // Such low-level requests are not supposed to be filtered out by stepping filters
+          // Such low-level requests are not supposed to be filtered out by thread filter (which is set during stepping, for example)
           return true;
         }
 
@@ -2279,6 +2325,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
           // but the request was hit and processed concurrently with the timeout, thus we can still get the saved suspendContext.
           evaluatableContextFuture.complete(evaluatableContext);
           evaluatableContextObtained.complete(null);
+
+          // Likely pause should pause all explicitly resumed threads also
+          mySuspendManager.myExplicitlyResumedThreads.clear();
           return true;
         }
 
@@ -2324,7 +2373,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     private void setSuspendContextAndCheckConsistency(@NotNull SuspendContextImpl suspendContext) {
       logThreads();
       if (myPredefinedThread != null && !myPredefinedThread.isCollected()) {
-        suspendContext.setThread(myPredefinedThread.getThreadReference());
+        if (suspendContext.getThread() == null) {
+          suspendContext.setThread(myPredefinedThread.getThreadReference());
+        } else {
+          SuspendManagerUtil.switchToThreadInSuspendAllContext(suspendContext, myPredefinedThread);
+        }
       }
 
       myDebuggerManagerThread.schedule(new SuspendContextCommandImpl(suspendContext) {
@@ -2342,6 +2395,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
     private void fallbackPauseWithNonEvaluatableContext() {
       getVirtualMachineProxy().suspend();
+      mySuspendManager.myExplicitlyResumedThreads.clear();
+      mySuspendManager.resumeAllSuspendAllContexts(null);
       SuspendContextImpl suspendContext = mySuspendManager.pushSuspendContext(EventRequest.SUSPEND_ALL, 0);
       setSuspendContextAndCheckConsistency(suspendContext);
       forEachSafe(myDebugProcessListeners, it -> it.paused(suspendContext));

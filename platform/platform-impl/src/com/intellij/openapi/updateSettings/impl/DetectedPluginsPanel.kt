@@ -7,6 +7,9 @@ import com.intellij.ide.plugins.newui.MyPluginModel
 import com.intellij.ide.plugins.newui.PluginDetailsPageComponent
 import com.intellij.ide.plugins.newui.PluginModelFacade
 import com.intellij.ide.plugins.newui.PluginUiModelAdapter
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
@@ -19,14 +22,13 @@ import com.intellij.ui.*
 import com.intellij.ui.components.labels.LinkListener
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.jetbrains.annotations.ApiStatus
 import java.awt.BorderLayout
 import javax.swing.JComponent
 import javax.swing.JTable
 
-@ApiStatus.Internal
-class DetectedPluginsPanel(project: Project?) : OrderPanel<PluginDownloader>(PluginDownloader::class.java) {
+internal class DetectedPluginsPanel(project: Project?) : OrderPanel<PluginDownloader>(PluginDownloader::class.java) {
   private val myDetailsComponent: PluginDetailsPageComponent
   private val myHeader = PluginHeaderPanel()
   private val mySkippedPlugins = HashSet<PluginId>()
@@ -73,7 +75,7 @@ class DetectedPluginsPanel(project: Project?) : OrderPanel<PluginDownloader>(Plu
       }
     })
     entryTable.getSelectionModel().addListSelectionListener {
-      service<CoreUiCoroutineScopeHolder>().coroutineScope.launch {
+      service<CoreUiCoroutineScopeHolder>().coroutineScope.launch(Dispatchers.EDT + ModalityState.stateForComponent(this).asContextElement()) {
         val selectedRow = entryTable.selectedRow
         if (selectedRow != -1) {
           val plugin = getValueAt(selectedRow)!!.descriptor

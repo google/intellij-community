@@ -8,7 +8,7 @@ jvm_resources(
 )
 
 jvm_provided_library(
-  name = "junit4_provided",
+  name = "libraries_junit4_provided",
   lib = "//libraries/junit4"
 )
 
@@ -16,11 +16,11 @@ jvm_library(
   name = "rt",
   module_name = "intellij.java.rt",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   kotlinc_opts = "@community//:k8",
   deps = [
     "@lib//:java-rt-ant-1-7-1-provided",
-    ":junit4_provided",
+    ":libraries_junit4_provided",
   ],
   runtime_deps = [":rt_resources"]
 )

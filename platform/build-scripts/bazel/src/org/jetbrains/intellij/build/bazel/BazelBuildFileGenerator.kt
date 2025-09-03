@@ -4,7 +4,8 @@
 package org.jetbrains.intellij.build.bazel
 
 import com.intellij.openapi.util.NlsSafe
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
+import com.intellij.util.containers.MultiMap
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.java.JavaResourceRootProperties
 import org.jetbrains.jps.model.java.JavaResourceRootType
@@ -19,14 +20,17 @@ import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.jps.model.module.JpsModuleSourceRootType
 import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService
 import org.jetbrains.jps.util.JpsPathUtil
+import org.jetbrains.kotlin.cli.common.arguments.Argument
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.jps.model.JpsKotlinFacetModuleExtension
 import java.nio.file.Path
 import java.util.IdentityHashMap
 import java.util.TreeMap
-import kotlin.io.path.absolutePathString
 import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.relativeTo
+import kotlin.reflect.KProperty1
+import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.javaField
 
 internal class ModuleList(
   @JvmField val community: List<ModuleDescriptor>,
@@ -59,7 +63,7 @@ internal data class CustomModuleDescription(
   }
 }
 
-internal val customModules: Map<String, CustomModuleDescription> = listOf(
+internal val DEFAULT_CUSTOM_MODULES: Map<String, CustomModuleDescription> = listOf(
   CustomModuleDescription(moduleName = "intellij.idea.community.build.zip", bazelPackage = "@community//build", bazelTargetName = "zip",
                           outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build"),
   CustomModuleDescription(moduleName = "intellij.platform.jps.build.dependencyGraph", bazelPackage = "@community//build", bazelTargetName = "dependency-graph",
@@ -70,12 +74,13 @@ internal val customModules: Map<String, CustomModuleDescription> = listOf(
                           additionalProductionTargets = listOf("@rules_jvm//jps-builders-6:build-javac-rt_resources"), additionalProductionJars = listOf("out/bazel-out/jvm-fastbuild/bin/external/rules_jvm+/jps-builders-6/build-javac-rt_resources.jar")),
 ).associateBy { it.moduleName }
 
-@Suppress("ReplaceGetOrSet")
+@Suppress("ReplaceGetOrSet", "SSBasedInspection")
 internal class BazelBuildFileGenerator(
   val ultimateRoot: Path?,
   val communityRoot: Path,
   private val project: JpsProject,
   val urlCache: UrlCache,
+  val customModules: Map<String, CustomModuleDescription>,
 ) {
   @JvmField
   val javaExtensionService: JpsJavaExtensionService = JpsJavaExtensionService.getInstance()
@@ -144,21 +149,34 @@ internal class BazelBuildFileGenerator(
     return moduleContent
   }
 
-  val libs: ObjectOpenHashSet<MavenLibrary> = ObjectOpenHashSet<MavenLibrary>()
-  private val providedRequested = HashSet<LibOwner>()
-  val localLibs: ObjectOpenHashSet<LocalLibrary> = ObjectOpenHashSet<LocalLibrary>()
+  data class LibraryKey(
+    @JvmField
+    val container: LibraryContainer,
+    @JvmField
+    val targetName: String
+  )
+
+  val mavenLibraries: Object2ObjectOpenHashMap<LibraryKey, MavenLibrary> = Object2ObjectOpenHashMap()
+  val localLibraries: Object2ObjectOpenHashMap<LibraryKey, LocalLibrary> = Object2ObjectOpenHashMap()
+
+  private val providedLibraries: ProvidedLibraries = ProvidedLibraries()
+  class ProvidedLibraries() {
+    private val providedLibraries: MultiMap<Library, LibraryContainer> = MultiMap()
+    fun getProvidedContexts(library: Library): Collection<LibraryContainer> = providedLibraries[library]
+    fun markAsProvided(library: Library, container: LibraryContainer) { providedLibraries.putValue(library, container) }
+  }
 
   private val generated = IdentityHashMap<ModuleDescriptor, Boolean>()
 
-  private val communityLibOwner = LibOwnerDescriptor(
+  private val communityLibraries = LibraryContainer(
     repoLabel = "@lib",
     buildFile = communityRoot.resolve("lib/BUILD.bazel"),
     moduleFile = communityRoot.resolve("lib/MODULE.bazel"),
     isCommunity = true
   )
 
-  private val ultimateLibOwner = ultimateRoot?.let { ultimate ->
-    LibOwnerDescriptor(
+  private val ultimateLibraries = ultimateRoot?.let { ultimate ->
+    LibraryContainer(
       repoLabel = "@ultimate_lib",
       buildFile = ultimate.resolve("lib/BUILD.bazel"),
       moduleFile = ultimate.resolve("lib/MODULE.bazel"),
@@ -166,14 +184,14 @@ internal class BazelBuildFileGenerator(
     )
   }
 
-  fun getLibOwner(isCommunity: Boolean): LibOwnerDescriptor = if (isCommunity) {
-    communityLibOwner
+  fun getLibraryContainer(isCommunity: Boolean): LibraryContainer = if (isCommunity) {
+    communityLibraries
   }
   else {
-    require(ultimateLibOwner != null) {
+    require(ultimateLibraries != null) {
       "requesting ultimate lib owner, but ultimate root is not present"
     }
-    ultimateLibOwner
+    ultimateLibraries
   }
 
   fun generateLibs(
@@ -182,28 +200,30 @@ internal class BazelBuildFileGenerator(
   ) {
     val fileToLabelTracker = LinkedHashMap<Path, MutableSet<String>>()
     val fileToUpdater = LinkedHashMap<Path, BazelFileUpdater>()
-    for ((owner, list) in libs.groupByTo(
+    for ((libraryContainer, list) in mavenLibraries
+      .values
+      .groupByTo(
       destination = TreeMap(
         compareBy(
           { it.sectionName },
           { it.buildFile.invariantSeparatorsPathString },
         )
       ),
-      keySelector = { it.lib.owner },
+      keySelector = { it.target.container },
     )) {
-      val bazelFileUpdater = fileToUpdater.computeIfAbsent(owner.buildFile) {
+      val bazelFileUpdater = fileToUpdater.computeIfAbsent(libraryContainer.buildFile) {
         val updater = BazelFileUpdater(it)
         updater.removeSections("maven-libs")
         updater.removeSections("maven libs")
         updater
       }
 
-      val sortedList = list.sortedBy { it.lib.targetName }
+      val sortedList = list.sortedBy { it.target.targetName }
 
-      val groupedByTargetName = sortedList.groupBy { it.lib.targetName }
+      val groupedByTargetName = sortedList.groupBy { it.target.targetName }
 
-      val labelTracker = fileToLabelTracker.computeIfAbsent(owner.moduleFile) { HashSet() }
-      buildFile(out = bazelFileUpdater, sectionName = owner.sectionName) {
+      val labelTracker = fileToLabelTracker.computeIfAbsent(libraryContainer.moduleFile) { HashSet() }
+      buildFile(out = bazelFileUpdater, sectionName = libraryContainer.sectionName) {
         load("@rules_jvm//:jvm.bzl", "jvm_import")
 
         for (entry in groupedByTargetName) {
@@ -211,13 +231,38 @@ internal class BazelBuildFileGenerator(
           if (libs.size > 1) {
             throw IllegalStateException("More than one versions: $entry")
           }
-          generateMavenLib(lib = libs.single(), labelTracker = labelTracker, providedRequested = providedRequested, libVisibility = owner.visibility)
+          generateMavenLib(
+            lib = libs.single(),
+            labelTracker = labelTracker,
+            isLibraryProvided = { providedLibraries.getProvidedContexts(it).contains(libraryContainer) },
+            libVisibility = libraryContainer.visibility,
+          )
+        }
+
+        // provided libraries which are defined in community
+        // but used as provided libraries in the ultimate part
+        if (libraryContainer == ultimateLibraries) {
+          val communityLibrariesWithProvidedUsagesInUltimate = mavenLibraries
+            .values
+            .filter {
+              it.target.container == communityLibraries &&
+              providedLibraries.getProvidedContexts(it).contains(ultimateLibraries)
+            }
+            .sortedBy { it.target.targetName }
+
+          for (lib in communityLibrariesWithProvidedUsagesInUltimate) {
+            generateProvidedMavenLib(
+              lib = lib,
+              libVisibility = libraryContainer.visibility,
+              targetContainer = communityLibraries,
+            )
+          }
         }
       }
 
       generateBazelModuleSectionsForLibs(
         list = sortedList,
-        owner = owner,
+        owner = libraryContainer,
         jarRepositories = jarRepositories,
         m2Repo = m2Repo,
         urlCache = urlCache,
@@ -226,7 +271,15 @@ internal class BazelBuildFileGenerator(
       )
     }
 
-    generateLocalLibs(libs = localLibs, providedRequested = providedRequested, fileToUpdater = fileToUpdater)
+    generateLocalLibs(
+      libs = localLibraries.values,
+      isLibraryProvided = { lib ->
+        providedLibraries
+          .getProvidedContexts(lib)
+          .contains(lib.target.container)
+      },
+      fileToUpdater = fileToUpdater,
+    )
 
     for (updater in fileToUpdater.values) {
       updater.save()
@@ -234,26 +287,27 @@ internal class BazelBuildFileGenerator(
   }
 
   fun addMavenLibrary(lib: MavenLibrary, isProvided: Boolean): MavenLibrary {
-    if (lib.lib.owner == ultimateLibOwner) {
-      libs.firstOrNull { it.lib.owner == communityLibOwner && it.lib.targetName == lib.lib.targetName }?.let {
+    if (lib.target.container == ultimateLibraries) {
+      val communityLibrary = mavenLibraries[LibraryKey(communityLibraries, lib.target.targetName)]
+      if (communityLibrary != null) {
         if (isProvided) {
-          providedRequested.add(it)
+          providedLibraries.markAsProvided(communityLibrary, ultimateLibraries)
         }
-        return it
+        return communityLibrary
       }
     }
 
-    val internedLib = libs.addOrGet(lib)
+    val internedLib = mavenLibraries.computeIfAbsent(LibraryKey(lib.target.container, lib.target.targetName)) { lib }
     if (isProvided) {
-      providedRequested.add(internedLib)
+      providedLibraries.markAsProvided(internedLib, internedLib.target.container)
     }
     return internedLib
   }
 
   fun addLocalLibrary(lib: LocalLibrary, isProvided: Boolean): LocalLibrary {
-    val internedLib = localLibs.addOrGet(lib)
+    val internedLib = localLibraries.computeIfAbsent(LibraryKey(lib.target.container, lib.target.targetName)) { lib }
     if (isProvided) {
-      providedRequested.add(internedLib)
+      providedLibraries.markAsProvided(internedLib, internedLib.target.container)
     }
     return internedLib
   }
@@ -318,7 +372,6 @@ internal class BazelBuildFileGenerator(
         "Unknown module name: ${customModule.moduleName} in `customModules`"
       }
     }
-
     val targetsPerModule = mutableListOf<ModuleTargets>()
     val fileToUpdater = LinkedHashMap<Path, BazelFileUpdater>()
     // bazel build file -> (bzlFile (for import) -> already imported symbols)
@@ -466,13 +519,13 @@ internal class BazelBuildFileGenerator(
     val module = moduleDescriptor.module
     val jvmTarget = getLanguageLevel(module)
     val kotlincOptionsLabel = computeKotlincOptions(buildFile = this, module = moduleDescriptor, jvmTarget = jvmTarget)
-                              ?: (if (jvmTarget == "17") null else "@community//:k$jvmTarget")
-    val javacOptionsLabel = computeJavacOptions(module, jvmTarget)
+                              ?: (if (jvmTarget == "21") null else "@community//:k$jvmTarget")
+    val javacOptionsLabel = computeJavacOptions(moduleDescriptor, jvmTarget)
 
-    val resourceTargets = mutableListOf<String>()
-    val productionCompileTargets = mutableListOf<String>()
-    val productionCompileJars = mutableListOf<String>()
-    val testCompileTargets = mutableListOf<String>()
+    val resourceTargets = mutableListOf<BazelLabel>()
+    val productionCompileTargets = mutableListOf<BazelLabel>()
+    val productionCompileJars = mutableListOf<BazelLabel>()
+    val testCompileTargets = mutableListOf<BazelLabel>()
 
     val sources = moduleDescriptor.sources
     if (moduleDescriptor.resources.isNotEmpty()) {
@@ -495,8 +548,8 @@ internal class BazelBuildFileGenerator(
 
       target("jvm_library") {
         option("name", moduleDescriptor.targetName)
-        productionCompileTargets.add(moduleDescriptor.targetName)
-        productionCompileJars.add(moduleDescriptor.targetName)
+        productionCompileTargets.add(moduleDescriptor.targetAsLabel)
+        productionCompileJars.add(moduleDescriptor.targetAsLabel)
 
         option("module_name", module.name)
         visibility(arrayOf("//visibility:public"))
@@ -508,36 +561,30 @@ internal class BazelBuildFileGenerator(
           option("kotlinc_opts", kotlincOptionsLabel)
         }
 
+        @Suppress("CascadeIf")
         if (module.name == "fleet.util.multiplatform" || module.name == "intellij.platform.syntax.multiplatformSupport") {
-          option("exported_compiler_plugins", arrayOf("@lib//:expects-plugin"))
+          option("exported_compiler_plugins", listOf("@lib//:expects-plugin"))
         }
         //else if (module.name == "fleet.rhizomedb") {
           // https://youtrack.jetbrains.com/issue/IJI-2662/RhizomedbCommandLineProcessor-requires-output-dir-but-we-dont-have-it-for-Bazel-compilation
           //option("exported_compiler_plugins", arrayOf("@lib//:rhizomedb-plugin"))
         //}
         else if (module.name == "fleet.rpc") {
-          option("exported_compiler_plugins", arrayOf("@lib//:rpc-plugin"))
+          option("exported_compiler_plugins", listOf("@lib//:rpc-plugin"))
         }
-        else if (module.name == "fleet.noria.cells" ||
-                 module.name == "fleet.noria.html" ||
-                 module.name == "fleet.noria.ui" ||
-                 module.name == "fleet.noria.ui.examples" ||
-                 module.name == "fleet.noria.windowManagement.api" ||
-                 module.name == "fleet.noria.windowManagement.extensions" ||
-                 module.name == "fleet.noria.windowManagement.impl" ||
-                 module.name == "fleet.noria.windowManagement.implDesktopMacOS") {
-          option("exported_compiler_plugins", arrayOf("@lib//:noria-plugin"))
+        else if (module.name == "fleet.noria.cells") {
+          option("exported_compiler_plugins", listOf("@lib//:noria-plugin"))
         }
 
         var deps = moduleList.deps.get(moduleDescriptor)
         if (deps != null && deps.provided.isNotEmpty()) {
           load("@rules_jvm//:jvm.bzl", "jvm_provided_library")
 
-          val extraDeps = mutableListOf<String>()
-          val labelToName = getUniqueSegmentName(deps.provided)
+          val extraDeps = mutableListOf<BazelLabel>()
+          val labelToName = getUniqueSegmentName(deps.provided.map { it.label })
           for (label in deps.provided) {
-            val name = labelToName.get(label) + "_provided"
-            extraDeps.add(":$name")
+            val name = labelToName.get(label.label) + "_provided"
+            extraDeps.add(BazelLabel(":$name", null))
             target("jvm_provided_library") {
               option("name", name)
               option("lib", label)
@@ -579,8 +626,8 @@ internal class BazelBuildFileGenerator(
       if (addPhonyTarget) {
         addTarget(target)
 
-        productionCompileTargets.add(moduleDescriptor.targetName)
-        productionCompileJars.add(moduleDescriptor.targetName)
+        productionCompileTargets.add(moduleDescriptor.targetAsLabel)
+        productionCompileJars.add(moduleDescriptor.targetAsLabel)
       }
     }
 
@@ -589,13 +636,16 @@ internal class BazelBuildFileGenerator(
     // Decide whether to render a test target at all
     if (moduleHasTestSources || isTestClasspathModule(moduleDescriptor)) {
       val testLibTargetName = "${moduleDescriptor.targetName}$TEST_LIB_NAME_SUFFIX"
-      testCompileTargets.add(testLibTargetName)
+      testCompileTargets.add(BazelLabel(testLibTargetName, moduleDescriptor))
 
       val testDeps = moduleList.testDeps.get(moduleDescriptor)
 
       load("@rules_jvm//:jvm.bzl", "jvm_library")
       target("jvm_library") {
         option("name", testLibTargetName)
+        if (testDeps == null || testDeps.associates.isEmpty()) { // => in this case no 'associates' attribute will be generated
+          option("module_name", module.name)
+        }
 
         visibility(arrayOf("//visibility:public"))
 
@@ -635,15 +685,15 @@ internal class BazelBuildFileGenerator(
       else -> "out/bazel-out/jvm-fastbuild/bin/$bazelModuleRelativePath"
     }
 
-    fun addPackagePrefix(target: String): String =
-      if (target.startsWith("//") || target.startsWith("@")) target else "$packagePrefix:$target"
+    fun addPackagePrefix(target: BazelLabel): String =
+      if (target.label.startsWith("//") || target.label.startsWith("@")) target.label else "$packagePrefix:${target.label}"
 
-    fun getJarLocation(jarName: String) = when {
+    fun getJarLocation(jarName: BazelLabel) = when {
       // full target name instead of just jar for intellij.dotenv.*
       // like @community//plugins/env-files-support:dotenv-go_resources
-      jarName.startsWith("@community//") ->
-        "out/bazel-out/jvm-fastbuild/bin/external/community+/${jarName.substringAfter("@community//").replace(':', '/')}.jar"
-      else -> "$jarOutputDirectory/$jarName.jar"
+      jarName.label.startsWith("@community//") ->
+        "out/bazel-out/jvm-fastbuild/bin/external/community+/${jarName.label.substringAfter("@community//").replace(':', '/')}.jar"
+      else -> "$jarOutputDirectory/${jarName.label}.jar"
     }
 
     return ModuleTargets(
@@ -664,7 +714,7 @@ internal class BazelBuildFileGenerator(
   }
 
   private data class GenerateResourcesResult(
-    val resourceTargets: List<String>,
+    val resourceTargets: List<BazelLabel>,
   )
 
   private fun BuildFile.generateResources(
@@ -689,12 +739,12 @@ internal class BazelBuildFileGenerator(
     }
 
     if (!module.isCommunity && module.targetName.startsWith("dotenv-") && resources[0].baseDirectory.contains("community")) {
+      val productionLabel = "@community//plugins/env-files-support/${module.targetName.removePrefix("dotenv-")}:${module.targetName.removePrefix("dotenv-")}"
       val fixedTargetsList = if (forTests) {
-        // skip for now
-        emptyList()
+        listOf(BazelLabel("$productionLabel$TEST_RESOURCES_TARGET_SUFFIX", module))
       }
       else {
-        listOf("@community//plugins/env-files-support:${module.targetName}_resources")
+        listOf(BazelLabel("$productionLabel$PRODUCTION_RESOURCES_TARGET_SUFFIX", module))
       }
       return GenerateResourcesResult(resourceTargets = fixedTargetsList)
     }
@@ -720,28 +770,30 @@ internal class BazelBuildFileGenerator(
         }
       }
 
-      name
+      BazelLabel(name, module)
     }
 
     return GenerateResourcesResult(resourceTargets = resourceTargets)
   }
 
-  private fun BuildFile.computeJavacOptions(module: JpsModule, jvmTarget: String): String? {
-    val extraJavacOptions = projectJavacSettings.currentCompilerOptions.ADDITIONAL_OPTIONS_OVERRIDE.get(module.name) ?: return null
+  private fun BuildFile.computeJavacOptions(module: ModuleDescriptor, jvmTarget: String): String? {
+    val extraJavacOptions = projectJavacSettings.currentCompilerOptions.ADDITIONAL_OPTIONS_OVERRIDE.get(module.module.name) ?: ""
     val exports = addExportsRegex.findAll(extraJavacOptions).map { it.groupValues[1] + "=ALL-UNNAMED" }.toList()
-    if (exports.isEmpty()) {
+    val noProc = !projectJavacSettings.getAnnotationProcessingProfile(module.module).isEnabled
+    if (exports.isEmpty() && noProc) {
       return null
     }
 
-    load("@rules_kotlin//kotlin:jvm.bzl", "kt_javac_options")
+    load("@rules_jvm//:jvm.bzl", "kt_javac_options")
     val customJavacOptionsName = "custom-javac-options"
     target("kt_javac_options") {
       option("name", customJavacOptionsName)
       // release is not compatible with --add-exports (*** java)
-      require(jvmTarget == "17")
+      require(jvmTarget == "21")
       option("x_ep_disable_all_checks", true)
       option("warn", "off")
       option("add_exports", exports)
+      option("no_proc", noProc)
     }
     return ":$customJavacOptionsName"
   }
@@ -749,12 +801,43 @@ internal class BazelBuildFileGenerator(
   private fun getLanguageLevel(module: JpsModule): String {
     val languageLevel = javaExtensionService.getLanguageLevel(module)
     return when {
-      languageLevel == LanguageLevel.JDK_1_7 || languageLevel == LanguageLevel.JDK_1_8 -> "8"
-      languageLevel == LanguageLevel.JDK_1_9 || languageLevel == LanguageLevel.JDK_11 -> "11"
+      languageLevel == LanguageLevel.JDK_1_7 -> "7"
+      languageLevel == LanguageLevel.JDK_1_8 -> "8"
+      languageLevel == LanguageLevel.JDK_11 -> "11"
       languageLevel == LanguageLevel.JDK_17 -> "17"
+      languageLevel == LanguageLevel.JDK_21 -> "21"
       languageLevel != null -> error("Unsupported language level: $languageLevel")
-      else -> "17"
+      else -> "21"
     }
+  }
+
+  private fun jpsModuleNameToBazelBuildName(module: JpsModule, baseBuildDir: Path, communityRoot: Path, ultimateRoot: Path?): @NlsSafe String {
+    val moduleName = module.name
+    val customModule = customModules.get(moduleName)
+    if (customModule != null) {
+      return customModule.bazelTargetName
+    }
+
+    val baseDirFilename = if (baseBuildDir == communityRoot || baseBuildDir == ultimateRoot) null else baseBuildDir.fileName.toString()
+    if (baseDirFilename != null && baseDirFilename != "resources" &&
+        (moduleName.endsWith(".$baseDirFilename") || (camelToSnakeCase(moduleName, '-')).endsWith(".$baseDirFilename"))) {
+      return baseDirFilename
+    }
+
+    val result = moduleName
+      .removePrefix("intellij.platform.")
+      .removePrefix("intellij.idea.community.")
+      .removePrefix("intellij.")
+
+    val parentDirDirName = when {
+      baseBuildDir == ultimateRoot -> null
+      baseBuildDir.parent == ultimateRoot -> "idea"
+      else -> baseBuildDir.parent.fileName.toString()
+    }
+
+    return result
+      .let { if (parentDirDirName != null) it.removePrefix("$parentDirDirName.") else it }
+      .replace('.', '-')
   }
 }
 
@@ -798,9 +881,7 @@ private fun computeSources(module: JpsModule, contentRoots: List<Path>, bazelBui
       }
 
       if (type == JavaSourceRootType.SOURCE || type == JavaSourceRootType.TEST_SOURCE) {
-        val rootProperties = root.properties
-        if ((rootProperties !is JavaSourceRootProperties || !rootProperties.isForGeneratedSources) && moduleWithForm.contains (module.name)) {
-          // rootDir.walk().any { it.extension == "form" }
+        if (!(root.properties as JavaSourceRootProperties).isForGeneratedSources) {
           sequenceOf(SourceDirDescriptor(glob = listOf("$prefix**/*.kt", "$prefix**/*.java", "$prefix**/*.form"), excludes = excludes))
         }
         else {
@@ -844,42 +925,12 @@ private fun isReferencedAsTestDep(
   return false
 }
 
-// todo: use context.getBazelDependencyLabel
 private fun isUsed(
   deps: ModuleDeps,
   referencedModule: ModuleDescriptor,
 ): Boolean {
-  return deps.deps.any { it.substringAfterLast(':').substringAfterLast('/').contains(referencedModule.targetName) } ||
-         deps.runtimeDeps.any { it.substringAfterLast(':').substringAfterLast('/').contains(referencedModule.targetName) }
-}
-
-private fun jpsModuleNameToBazelBuildName(module: JpsModule, baseBuildDir: Path, communityRoot: Path, ultimateRoot: Path?): @NlsSafe String {
-  val moduleName = module.name
-  val customModule = customModules.get(moduleName)
-  if (customModule != null) {
-    return customModule.bazelTargetName
-  }
-
-  val baseDirFilename = if (baseBuildDir == communityRoot || baseBuildDir == ultimateRoot) null else baseBuildDir.fileName.toString()
-  if (baseDirFilename != null && baseDirFilename != "resources" &&
-      (moduleName.endsWith(".$baseDirFilename") || (camelToSnakeCase(moduleName, '-')).endsWith(".$baseDirFilename"))) {
-    return baseDirFilename
-  }
-
-  val result = moduleName
-    .removePrefix("intellij.platform.")
-    .removePrefix("intellij.idea.community.")
-    .removePrefix("intellij.")
-
-  val parentDirDirName = when {
-    baseBuildDir == ultimateRoot -> null
-    baseBuildDir.parent == ultimateRoot -> "idea"
-    else -> baseBuildDir.parent.fileName.toString()
-  }
-
-  return result
-    .let { if (parentDirDirName != null) it.removePrefix("$parentDirDirName.") else it }
-    .replace('.', '-')
+  return deps.depsModuleSet.contains(referencedModule) ||
+         deps.runtimeDepsModuleSet.contains(referencedModule)
 }
 
 private fun checkAndGetRelativePath(parentDir: Path, childDir: Path): Path {
@@ -912,86 +963,131 @@ private fun computeKotlincOptions(buildFile: BuildFile, module: ModuleDescriptor
   val kotlinFacetModuleExtension = module.module.container.getChild(JpsKotlinFacetModuleExtension.KIND) ?: return null
   val mergedCompilerArguments = kotlinFacetModuleExtension.settings.mergedCompilerArguments as? K2JVMCompilerArguments ?: return null
   val options = HashMap<String, Any>()
-  // see create_kotlinc_options
-  var effectiveOptIn = mergedCompilerArguments.optIn?.asList() ?: emptyList()
-  if (effectiveOptIn.size == 1 && effectiveOptIn[0] == "com.intellij.openapi.util.IntellijInternalApi") {
-    effectiveOptIn = emptyList()
+
+  val handledArguments = mutableSetOf<String>()
+  fun <T> handleArgument(property: KProperty1<out K2JVMCompilerArguments, T>, body: (T) -> Unit) {
+    body(property.getter.call(mergedCompilerArguments))
+    check(handledArguments.add(property.name))
+  }
+
+  //api_version
+  handleArgument(K2JVMCompilerArguments::apiVersion) { apiVersion ->
+    if (apiVersion != null && apiVersion != "2.2") {
+      options.put("api_version", apiVersion)
+    }
+  }
+  //language_version
+  handleArgument(K2JVMCompilerArguments::languageVersion) { languageVersion ->
+    if (languageVersion != null && languageVersion != "2.2") {
+      options.put("language_version", languageVersion)
+    }
   }
   //optin
-  if (effectiveOptIn.isNotEmpty()) {
-    options.put("opt_in", effectiveOptIn)
+  handleArgument(K2JVMCompilerArguments::optIn) {
+    // see create_kotlinc_options
+    var effectiveOptIn = it?.asList() ?: emptyList()
+    if (effectiveOptIn.size == 1 && effectiveOptIn[0] == "com.intellij.openapi.util.IntellijInternalApi") {
+      effectiveOptIn = emptyList()
+    }
+    if (effectiveOptIn.isNotEmpty()) {
+      options.put("opt_in", effectiveOptIn)
+    }
   }
   //plugin_options
-  val pluginOptions = mergedCompilerArguments.pluginOptions
-  if (pluginOptions?.isNotEmpty() == true) {
-    options.put("plugin_options", pluginOptions.map {
-      it.replace("${module.bazelBuildFileDir.absolutePathString()}/", "")
-    })
+  handleArgument(K2JVMCompilerArguments::pluginOptions) { pluginOptions ->
+    if (pluginOptions?.isNotEmpty() == true) {
+      options.put("plugin_options", pluginOptions.map {
+        it.replace("${module.bazelBuildFileDir.invariantSeparatorsPathString}/", "${'$'}BASE_DIR$/${module.relativePathFromProjectRoot.invariantSeparatorsPathString}/")
+      })
+    }
   }
   //x_allow_kotlin_package
-  if (mergedCompilerArguments.allowKotlinPackage) {
-    options.put("x_allow_kotlin_package", true)
+  handleArgument(K2JVMCompilerArguments::allowKotlinPackage) {
+    if (it) {
+      options.put("x_allow_kotlin_package", true)
+    }
   }
   //x_allow_result_return_type
   if (mergedCompilerArguments.errors?.unknownExtraFlags?.contains("-Xallow-result-return-type") == true) {
     options.put("x_allow_result_return_type", true)
   }
   //x_allow_unstable_dependencies
-  if (mergedCompilerArguments.allowUnstableDependencies) {
-    options.put("x_allow_unstable_dependencies", true)
+  handleArgument(K2JVMCompilerArguments::allowUnstableDependencies) {
+    if (it) {
+      options.put("x_allow_unstable_dependencies", true)
+    }
   }
   //x_consistent_data_class_copy_visibility
-  if (mergedCompilerArguments.consistentDataClassCopyVisibility) {
-    options.put("x_consistent_data_class_copy_visibility", true)
+  handleArgument(K2JVMCompilerArguments::consistentDataClassCopyVisibility) {
+    if (it) {
+      options.put("x_consistent_data_class_copy_visibility", true)
+    }
   }
   //x_context_parameters
-  if (mergedCompilerArguments.contextParameters) {
-    options.put("x_context_parameters", true)
+  handleArgument(K2JVMCompilerArguments::contextParameters) {
+    if (it) {
+      options.put("x_context_parameters", true)
+    }
   }
   //x_context_receivers
-  if (mergedCompilerArguments.contextReceivers) {
-    options.put("x_context_receivers", true)
+  handleArgument(K2JVMCompilerArguments::contextReceivers) {
+    if (it) {
+      options.put("x_context_receivers", true)
+    }
   }
   //x_explicit_api_mode
-  if (mergedCompilerArguments.explicitApi != "disable") {
-    options.put("x_explicit_api_mode", mergedCompilerArguments.explicitApi)
+  handleArgument(K2JVMCompilerArguments::explicitApi) {
+    if (it != "disable") {
+      options.put("x_explicit_api_mode", it)
+    }
   }
   //x_inline_classes
-  if (mergedCompilerArguments.inlineClasses) {
-    options.put("x_inline_classes", true)
+  handleArgument(K2JVMCompilerArguments::inlineClasses) {
+    if (it) {
+      options.put("x_inline_classes", true)
+    }
   }
   //x_jvm_default
-  val xJvmDefault = mergedCompilerArguments.jvmDefault
-  if (xJvmDefault != null) {
-    if (xJvmDefault != "all") {
-      options.put("x_jvm_default", xJvmDefault)
-    }
-  } else {
-    if (mergedCompilerArguments.jvmDefaultStable == null) {
-      options.put("x_jvm_default", "all-compatibility")
+  handleArgument(K2JVMCompilerArguments::jvmDefault) { xJvmDefault ->
+    if (xJvmDefault != null) {
+      if (xJvmDefault != "all") {
+        options.put("x_jvm_default", xJvmDefault)
+      }
+    } else {
+      if (mergedCompilerArguments.jvmDefaultStable == null) {
+        options.put("x_jvm_default", "all-compatibility")
+      }
     }
   }
   //x_lambdas
-  val lambdas = mergedCompilerArguments.lambdas
-  if (lambdas != null && lambdas != "indy") {
-    options.put("x_lambdas", lambdas)
+  handleArgument(K2JVMCompilerArguments::lambdas) { lambdas ->
+    if (lambdas != null && lambdas != "indy") {
+      options.put("x_lambdas", lambdas)
+    }
   }
   //x_no_call_assertions
-  if (mergedCompilerArguments.noCallAssertions) {
-    options.put("x_no_call_assertions", true)
+  handleArgument(K2JVMCompilerArguments::noCallAssertions) {
+    if (it) {
+      options.put("x_no_call_assertions", true)
+    }
   }
   //x_no_param_assertions
-  if (mergedCompilerArguments.noParamAssertions) {
-    options.put("x_no_param_assertions", true)
+  handleArgument(K2JVMCompilerArguments::noParamAssertions) {
+    if (it) {
+      options.put("x_no_param_assertions", true)
+    }
   }
   //x_sam_conversions
-  val samConversions = mergedCompilerArguments.samConversions
-  if (samConversions != null) {
-    options.put("x_sam_conversions", samConversions)
+  handleArgument(K2JVMCompilerArguments::samConversions) { samConversions ->
+    if (samConversions != null && samConversions != "indy") {
+      options.put("x_sam_conversions", samConversions)
+    }
   }
   //x_skip_prerelease_check
-  if (mergedCompilerArguments.skipPrereleaseCheck) {
-    options.put("x_skip_prerelease_check", true)
+  handleArgument(K2JVMCompilerArguments::skipPrereleaseCheck) {
+    if (it) {
+      options.put("x_skip_prerelease_check", true)
+    }
   }
   //x_strict_java_nullability_assertions
   if (mergedCompilerArguments.errors?.unknownExtraFlags?.contains("-Xstrict-java-nullability-assertions") == true) {
@@ -1002,14 +1098,24 @@ private fun computeKotlincOptions(buildFile: BuildFile, module: ModuleDescriptor
     options.put("x_wasm_attach_js_exception", true)
   }
   //x_when_guards
-  if (mergedCompilerArguments.whenGuards) {
-    options.put("x_when_guards", true)
+  handleArgument(K2JVMCompilerArguments::whenGuards) {
+    if (it) {
+      options.put("x_when_guards", true)
+    }
   }
   //x_x_language
   val xXLanguageInlineClass = mergedCompilerArguments.internalArguments.any { it.stringRepresentation == "-XXLanguage:+InlineClasses"}
   if (xXLanguageInlineClass) {
     options.put("x_x_language", "+InlineClasses")
   }
+
+  checkNoUnhandledKotlincOptions(
+    module.module,
+    mergedCompilerArguments,
+    handledArguments = handledArguments + setOf("jvmTarget", "pluginClasspaths"),
+    handledInternalArguments = setOf("-XXLanguage:+InlineClasses", "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks"),
+    handledUnknownExtraFlags = setOf("-Xallow-result-return-type", "-Xstrict-java-nullability-assertions", "-Xwasm-attach-js-exception", "-Xwasm-kclass-fqn"),
+  )
 
   if (options.isEmpty()) {
     return null
@@ -1020,7 +1126,7 @@ private fun computeKotlincOptions(buildFile: BuildFile, module: ModuleDescriptor
   val kotlincOptionsName = "custom_" + module.targetName
   buildFile.target("create_kotlinc_options") {
     option("name", kotlincOptionsName)
-    if (jvmTarget != "17") {
+    if (jvmTarget != "21") {
       option("jvm_target", jvmTarget)
     }
     for ((name, value) in options.entries.sortedBy { it.key }) {
@@ -1030,12 +1136,50 @@ private fun computeKotlincOptions(buildFile: BuildFile, module: ModuleDescriptor
   return ":$kotlincOptionsName"
 }
 
+private fun checkNoUnhandledKotlincOptions(module: JpsModule, mergedCompilerArguments: K2JVMCompilerArguments, handledArguments: Set<String>, handledInternalArguments: Set<String>, handledUnknownExtraFlags: Set<String>) {
+  // check arguments:
+  mergedCompilerArguments::class.memberProperties
+    .filter { it.javaField!!.getAnnotation(Argument::class.java) != null }
+    .filterNot { it.name in handledArguments }
+    .forEach {
+      val defaultValue = it.getter.call(K2JVMCompilerArguments())
+      if (it.getter.call(mergedCompilerArguments) != defaultValue) {
+        error("module '${module.name}' has compiler argument which is not supported: ${it.name}")
+      }
+    }
+
+  // check internal arguments:
+  mergedCompilerArguments.internalArguments.filterNot { it.stringRepresentation in handledInternalArguments }.forEach {
+    error("module '${module.name}' has compiler internal argument which is not supported: ${it.stringRepresentation}")
+  }
+
+  // check errors:
+  mergedCompilerArguments.errors?.unknownArgs.orEmpty().forEach {
+    error("module '${module.name}' has unknown compiler argument: $it")
+  }
+  mergedCompilerArguments.errors?.unknownExtraFlags.orEmpty().filterNot { it in handledUnknownExtraFlags }.forEach {
+    error("module '${module.name}' has unknown compiler extra flag: $it")
+  }
+  mergedCompilerArguments.errors?.argumentWithoutValue?.let {
+    error("module '${module.name}' has compiler argument without value: $it")
+  }
+  mergedCompilerArguments.errors?.booleanArgumentWithValue?.let {
+    error("module '${module.name}' has compiler boolean argument with value: $it")
+  }
+  mergedCompilerArguments.errors?.argfileErrors.orEmpty().forEach {
+    error("module '${module.name}' has compiler argfile error: $it")
+  }
+  mergedCompilerArguments.errors?.internalArgumentsParsingProblems.orEmpty().forEach {
+    error("module '${module.name}' has compiler internal arguments parsing problem: $it")
+  }
+}
+
 private val addExportsRegex = Regex("""--add-exports\s+([^=]+)=\S+""")
 
 private fun renderDeps(
   deps: ModuleDeps?,
   target: Target,
-  resourceDependencies: List<String>,
+  resourceDependencies: List<BazelLabel>,
   forTests: Boolean,
 ) {
   if (deps != null) {
@@ -1054,21 +1198,26 @@ private fun renderDeps(
     val runtimeDeps = resourceDependencies
                         .filter {
                           check(
-                            PRODUCTION_RESOURCES_TARGET_REGEX.matches(it) ||
-                            TEST_RESOURCES_TARGET_REGEX.matches(it)
+                            PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
+                            TEST_RESOURCES_TARGET_REGEX.matches(it.label)
                           ) {
                             "Unexpected resource dependency target name: $it"
                           }
                           check(
-                            !PRODUCTION_RESOURCES_TARGET_REGEX.matches(it) ||
-                            !TEST_RESOURCES_TARGET_REGEX.matches(it)
+                            !PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
+                            !TEST_RESOURCES_TARGET_REGEX.matches(it.label)
                           ) {
                             "Resource dependency target name matches both prod and test regex: $it"
                           }
-                          return@filter PRODUCTION_RESOURCES_TARGET_REGEX.matches(it) ||
-                          (forTests && TEST_RESOURCES_TARGET_REGEX.matches(it))
-                        }.map { if (it.startsWith('@') || it.startsWith("//")) it else ":$it" } +
-                      (deps?.runtimeDeps ?: emptyList())
+                          return@filter PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
+                          (forTests && TEST_RESOURCES_TARGET_REGEX.matches(it.label))
+                        }.map {
+                          if (it.label.startsWith('@') || it.label.startsWith("//")) {
+                            it
+                          } else {
+                            it.copy(label = ":${it.label}")
+                          }
+                        } + (deps?.runtimeDeps ?: emptyList())
     if (runtimeDeps.isNotEmpty()) {
       target.option("runtime_deps", runtimeDeps)
     }
@@ -1079,55 +1228,12 @@ private fun renderDeps(
 }
 
 private fun getUniqueSegmentName(labels: List<String>): Map<String, String> {
-  // first try with just last segments
-  val lastSegments = labels.associateWith { path ->
-    path.splitToSequence('/').last().substringAfter(':').replace('.', '-')
-  }
-
-  // find which names have collisions
-  val nameCount = lastSegments.values.groupingBy { it }.eachCount()
-  if (nameCount.none { it.value > 1 }) {
-    return lastSegments
-  }
-
-  // for paths with colliding names, try using more segments
-  val result = LinkedHashMap<String, String>()
-  var segmentDepth = 2
-
-  while (true) {
-    result.clear()
-    for (label in labels) {
-      val segments = label.splitToSequence('/')
-        .map { it.substringAfter(':').replace('.', '-') }
-        .filter { it.isNotEmpty() }
-        .toList()
-      if (segments.isEmpty()) {
-        continue
-      }
-
-      val lastSegment = segments.last()
-
-      // if this last segment has collisions, use more segments
-      if ((nameCount[lastSegment] ?: 0) > 1) {
-        val relevantSegments = segments.takeLast(minOf(segmentDepth, segments.size))
-        result.put(label, relevantSegments.joinToString("-"))
-      }
-      else {
-        // no collision - use just the last segment
-        result.put(label, lastSegment.replace('.', '-'))
-      }
-    }
-
-    // check if we resolved all collisions
-    val newNameCount = result.values.groupingBy { it }.eachCount()
-    if (newNameCount.none { it.value > 1 }) {
-      return result
-    }
-
-    segmentDepth++
-    // safety check to prevent infinite loop
-    if (segmentDepth > 5) {
-      throw IllegalStateException("Unable to resolve unique names after trying 5 segment levels")
-    }
+  return labels.associateWith { path ->
+    path.splitToSequence('/').map {
+      it.substringAfter(':')
+        .replace('.', '-')
+        .replace("/", "")
+        .replace("@", "")
+    }.filter { it.isNotEmpty() }.joinToString("_")
   }
 }

@@ -6,17 +6,22 @@ import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.ide.highlighter.XmlFileType
 import com.intellij.model.Pointer
-import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.XmlElementVisitor
 import com.intellij.psi.createSmartPointer
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.parentOfType
 import com.intellij.psi.xml.XmlFile
+import com.intellij.psi.xml.XmlTag
+import com.intellij.xml.util.XmlUtil
 import org.jetbrains.idea.devkit.DevKitBundle
-import org.jetbrains.idea.devkit.dom.IdeaPlugin
 import org.jetbrains.idea.devkit.dom.index.PluginIdDependenciesIndex
 import org.jetbrains.idea.devkit.util.DescriptorUtil
 import org.jetbrains.jps.model.java.JavaModuleSourceRootTypes
@@ -26,7 +31,7 @@ internal class ModuleNotRegisteredAsPluginContentInspection : LocalInspectionToo
   override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
     return object : XmlElementVisitor() {
       override fun visitXmlFile(file: XmlFile) {
-        if (isPluginModuleFile(file) && isModuleReferencedAsContentModule(file)) {
+        if (DescriptorUtil.isPluginModuleFile(file) && isNotReferencedAsContentModule(file) && isNotXIncluded(file)) {
           val moduleName = getModuleName(file)
           holder.registerProblem(
             file,
@@ -42,15 +47,17 @@ internal class ModuleNotRegisteredAsPluginContentInspection : LocalInspectionToo
     return xmlFile.virtualFile.nameWithoutExtension
   }
 
-  private fun isPluginModuleFile(xmlFile: XmlFile): Boolean {
-    if (xmlFile.rootTag?.name != IdeaPlugin.TAG_NAME) return false
-    val parentDirName = xmlFile.parent?.name ?: return false
-    return parentDirName != "META-INF"
+  private fun isNotReferencedAsContentModule(xmlFile: XmlFile): Boolean {
+    val moduleVirtualFile = xmlFile.virtualFile ?: return false
+    val projectScope = GlobalSearchScope.projectScope(xmlFile.project)
+    return PluginIdDependenciesIndex.findFilesIncludingContentModule(moduleVirtualFile, projectScope).isEmpty()
   }
 
-  private fun isModuleReferencedAsContentModule(xmlFile: XmlFile): Boolean {
-    val moduleVirtualFile = xmlFile.virtualFile ?: return false
-    return PluginIdDependenciesIndex.findContentDependsTo(xmlFile.project, moduleVirtualFile).none()
+  private fun isNotXIncluded(file: XmlFile): Boolean {
+    return !ReferencesSearch.search(file).anyMatch {
+      val xmlTag = it.element.parentOfType<XmlTag>() ?: return@anyMatch false
+      xmlTag.namespace == XmlUtil.XINCLUDE_URI && xmlTag.localName == "include"
+    }
   }
 
   private fun fixIfPluginXmlFound(file: XmlFile, moduleName: String): Array<out LocalQuickFix> {
@@ -92,17 +99,29 @@ internal class ModuleNotRegisteredAsPluginContentInspection : LocalInspectionToo
 
     override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
       val pluginXmlFile = pluginXmlFilePointer.dereference() ?: return
+      includeModuleInPluginXml(pluginXmlFile)
+    }
+
+    private fun includeModuleInPluginXml(pluginXmlFile: XmlFile) {
       val ideaPlugin = DescriptorUtil.getIdeaPlugin(pluginXmlFile) ?: return
-      ideaPlugin.content.addModuleEntry().name.stringValue = addedModuleName
+      ideaPlugin.getFirstOrAddContentDescriptor().addModuleEntry().name.stringValue = addedModuleName
     }
 
     override fun getFamilyName(): String {
       return DevKitBundle.message("inspection.module.not.registered.as.plugin.content.fix.add", pluginId)
     }
 
-    // no preview needed
     override fun generatePreview(project: Project, previewDescriptor: ProblemDescriptor): IntentionPreviewInfo {
-      return IntentionPreviewInfo.EMPTY
+      val originalPluginXmlFile = pluginXmlFilePointer.dereference() ?: return IntentionPreviewInfo.EMPTY
+      val pluginXmlFileCopy = originalPluginXmlFile.copy() as XmlFile
+      includeModuleInPluginXml(pluginXmlFileCopy)
+      return IntentionPreviewInfo.CustomDiff(
+        XmlFileType.INSTANCE,
+        originalPluginXmlFile.name,
+        originalPluginXmlFile.text,
+        pluginXmlFileCopy.text,
+        true
+      )
     }
   }
 }

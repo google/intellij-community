@@ -17,7 +17,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.progress.*
 import com.intellij.openapi.progress.util.ProgressDialogUI
-import com.intellij.openapi.progress.util.ProgressIndicatorWithDelayedPresentation.DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS
 import com.intellij.openapi.progress.util.ProgressWindow
 import com.intellij.openapi.progress.util.createDialogWrapper
 import com.intellij.openapi.project.Project
@@ -40,6 +39,7 @@ import com.intellij.platform.util.coroutines.flow.throttle
 import com.intellij.platform.util.progress.ProgressPipe
 import com.intellij.platform.util.progress.ProgressState
 import com.intellij.platform.util.progress.createProgressPipe
+import com.intellij.ui.progress.ProgressUIUtil
 import com.intellij.util.AwaitCancellationAndInvoke
 import com.intellij.util.application
 import com.intellij.util.awaitCancellationAndInvoke
@@ -364,6 +364,11 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
             "Modal progresses are allowed only under write-intent lock because they need to prevent background write actions." +
             "Consider moving this modal progress out of `readAction`")
     }
+    if (application.isWriteAccessAllowed) {
+      logger<PlatformTaskSupport>().error("This thread holds write lock while trying to invoke a modal progress." +
+                                          "Write actions should be fast so they do not stall the progress in the IDE." +
+                                          "Consider moving your modal computation outside write action and apply the result of the computation in a different EDT event.")
+    }
     return prepareThreadContext { ctx ->
       val descriptor = ModalIndicatorDescriptor(owner, title, cancellation)
       val scope = CoroutineScope(ctx + ClientId.coroutineContext())
@@ -412,10 +417,12 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
         // Unblock `getNextEvent()` in case it's blocked.
         SwingUtilities.invokeLater(EmptyRunnable.INSTANCE)
       }
-      IdeEventQueue.getInstance().pumpEventsForHierarchy(
-        exitCondition = modalJob::isCompleted,
-        modalComponent = deferredDialog::modalComponent,
-      )
+      resetThreadLocalEventLoop {
+        IdeEventQueue.getInstance().pumpEventsForHierarchy(
+          exitCondition = modalJob::isCompleted,
+          modalComponent = deferredDialog::modalComponent,
+        )
+      }
       try {
         @OptIn(ExperimentalCoroutinesApi::class)
         taskJob.getCompleted().getOrThrow()
@@ -423,6 +430,24 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
       finally {
         cleanup.finish()
       }
+    }
+  }
+}
+
+/**
+ * We are installing a nested _modal_ event loop, so the EDT coroutines launched in immediate dispatcher must go to the modal loop,
+ * and not to the unconfined loop as they do now.
+ */
+@Suppress("INVISIBLE_REFERENCE")
+private inline fun <T> resetThreadLocalEventLoop(action: () -> T): T {
+  val existingEventLoop = ThreadLocalEventLoop.currentOrNull()
+  ThreadLocalEventLoop.resetEventLoop()
+  try {
+    return action()
+  }
+  finally {
+    if (existingEventLoop != null) {
+      ThreadLocalEventLoop.setEventLoop(existingEventLoop)
     }
   }
 }
@@ -461,7 +486,7 @@ internal fun CoroutineScope.showIndicator(
   stateFlow: Flow<ProgressState>,
 ): Job {
   return launch(Dispatchers.Default) {
-    delay(DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS.toLong())
+    delay(ProgressUIUtil.DEFAULT_PROGRESS_DELAY_MILLIS)
     withContext(progressManagerTracer.span("Progress: ${progressModel.title}")) {
       withContext(Dispatchers.EDT) {
         val taskInfo = taskInfo(progressModel.title, progressModel.cancellation)
@@ -560,7 +585,7 @@ private fun CoroutineScope.showModalIndicator(
       if (isHeadlessEnv()) {
         return@supervisorScope
       }
-      delay(DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS.toLong())
+      delay(ProgressUIUtil.DEFAULT_PROGRESS_DELAY_MILLIS)
       doShowModalIndicator(taskJob, descriptor, stateFlow, deferredDialog)
     }
   }

@@ -925,7 +925,9 @@
         <action id="ReportProblem" class="com.intellij.ide.actions.ReportProblemAction"/>
         <action id="SendFeedback" class="com.intellij.ide.actions.SendFeedbackAction"/>
         <separator/>
-        <action id="OpenLog" internal="true" class="com.intellij.internal.OpenLogAction"/>
+        <action id="OpenLog" internal="true" class="com.intellij.internal.OpenLogAction">
+          <synonym key="action.OpenLog.Show.text"/>
+        </action>
         <action id="ShowLog" class="com.intellij.ide.actions.ShowLogAction">
           <synonym key="action.ShowLog.Finder.text"/>
           <synonym key="action.ShowLog.Explorer.text"/>
@@ -1316,6 +1318,7 @@
 
     <group id="Internal" internal="true" popup="true" compact="true">
       <group id="Internal.Errors" popup="true">
+        <action class="com.intellij.internal.ExceptionShowCaseAction" internal="true" description="Show exception" text="Show Exception"/>
         <action id="DropAnError" internal="true" class="com.intellij.diagnostic.DropAnErrorAction"
                 text="Drop an Error" description="Hold down SHIFT for a sequence of exceptions"/>
         <action id="DropAnErrorWithAttachments" internal="true" class="com.intellij.diagnostic.DropAnErrorWithAttachmentsAction"
@@ -1741,7 +1744,6 @@
     </group>
 
     <action class="com.intellij.diagnostic.ResetWindowsDefenderNotification" id="ResetWindowsDefenderNotification"/>
-    <action class="com.intellij.diagnostic.FixWSLFirewallAction" id="FixWSLFirewall"/>
 
     <group id="UpdateEntryPointGroup"/>
     <group id="SettingsEntryPointGroup" class="com.intellij.ide.actions.SettingsEntryPointGroup">
@@ -1819,6 +1821,7 @@
       <action id="DumpVfsInfoForExcludedFiles" internal="true" class="com.intellij.internal.DumpVfsInfoForExcludedFilesAction"/>
       <action id="DumpVfsInfoForFsRoot" internal="true" class="com.intellij.internal.DumpVfsInfoForFsRootAction"/>
       <action id="DumpWatchedRoots" internal="true" class="com.intellij.openapi.roots.impl.DumpWatchedRootsAction"/>
+      <action id="CountVfsFileChildrenAction" internal="true" class="com.intellij.internal.CountVfsFileChildrenAction"/>
       <separator/>
       <action internal="true" id="PruneEmptyDirectories" class="com.intellij.ide.actions.PruneEmptyDirectoriesAction"/>
       <action internal="true" id="FixLineSeparators" class="com.intellij.ide.actions.FixLineSeparatorsAction"/>
@@ -1859,9 +1862,14 @@
       <add-to-group group-id="RevealGroup" anchor="last"/>
       <override-text place="RevealInPopup"/>
     </group>
+    <group id="OpenInBrowserEditorContextBarGroup" />
     <group id="OpenInBrowserEditorContextBarGroupAction"
            class="com.intellij.ide.browsers.actions.OpenInBrowserBaseGroupAction$OpenInBrowserEditorContextBarGroupAction">
-      <add-to-group group-id="EditorContextBarMenu" anchor="last"/>
+      <add-to-group group-id="OpenInBrowserEditorContextBarGroup" anchor="last"/>
     </group>
   </actions>
+  <applicationListeners>
+    <listener class="com.intellij.ide.projectView.impl.ProjectViewVfsInfoListener"
+              topic="com.intellij.openapi.util.registry.RegistryValueListener"/>
+  </applicationListeners>
 </idea-plugin>

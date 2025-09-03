@@ -26,7 +26,7 @@ internal class GitInMemoryRewordAction : GitSingleCommitEditingAction() {
   )
 
   override fun update(e: AnActionEvent, commitEditingData: SingleCommitEditingData) {
-    if (!Registry.`is`("git.in.memory.reword.commit.enabled")) {
+    if (!Registry.`is`("git.in.memory.commit.editing.operations.enabled")) {
       e.presentation.isEnabledAndVisible = false
       return
     }
@@ -67,7 +67,7 @@ internal class GitInMemoryRewordAction : GitSingleCommitEditingAction() {
     GitDisposable.getInstance(project).coroutineScope.launch {
       withBackgroundProgress(project, GitBundle.message("rebase.log.reword.action.progress.indicator.title")) {
         val objectRepo = GitObjectRepository(repository)
-        val operationResult = GitInMemoryRewordOperation(repository, objectRepo, commit, newMessage).execute()
+        val operationResult = GitInMemoryRewordOperation(objectRepo, commit, newMessage).execute()
         if (operationResult is GitCommitEditingOperationResult.Complete) {
           operationResult.notifySuccess(
             GitBundle.message("rebase.log.reword.action.notification.successful.title"),

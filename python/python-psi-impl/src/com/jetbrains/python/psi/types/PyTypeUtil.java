@@ -24,12 +24,11 @@ import com.jetbrains.python.psi.PyClass;
 import com.jetbrains.python.psi.PyPsiFacade;
 import com.jetbrains.python.psi.impl.PyBuiltinCache;
 import one.util.streamex.StreamEx;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.*;
 
 import java.util.*;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -75,8 +74,8 @@ public final class PyTypeUtil {
     if (type instanceof UserDataHolder) {
       return ((UserDataHolder)type).getUserData(key);
     }
-    if (type instanceof PyUnionType) {
-      for (final PyType memberType : ((PyUnionType)type).getMembers()) {
+    if (type instanceof PyUnionType unionType) {
+      for (final PyType memberType : unionType.getMembers()) {
         if (memberType == null) {
           continue;
         }
@@ -115,8 +114,11 @@ public final class PyTypeUtil {
    * It allows to process types received as the result of multiresolve uniformly with the others.
    */
   public static @NotNull StreamEx<PyType> toStream(@Nullable PyType type) {
-    if (type instanceof PyUnionType) {
-      return StreamEx.of(((PyUnionType)type).getMembers());
+    if (type instanceof PyUnionType unionType) {
+      return StreamEx.of(unionType.getMembers());
+    }
+    if (type instanceof PyUnsafeUnionType weakUnionType) {
+      return StreamEx.of(weakUnionType.getMembers());
     }
     return StreamEx.of(type);
   }
@@ -133,6 +135,18 @@ public final class PyTypeUtil {
    * @see #toUnion()
    */
   public static @NotNull Collector<Ref<PyType>, ?, Ref<PyType>> toUnionFromRef() {
+    return toUnionFromRef(PyUnionType::union);
+  }
+
+  public static @NotNull Collector<Ref<PyType>, ?, Ref<PyType>> toUnsafeUnionFromRef() {
+    return toUnionFromRef(PyUnsafeUnionType::unsafeUnion);
+  }
+
+  public static @NotNull Collector<Ref<PyType>, ?, Ref<PyType>> toUnionFromRef(@Nullable PyType streamSource) {
+    return toUnionFromRef(streamSource instanceof PyUnsafeUnionType ? PyUnsafeUnionType::unsafeUnion : PyUnionType::union);
+  }
+  
+  private static @NotNull Collector<Ref<PyType>, ?, Ref<PyType>> toUnionFromRef(@NotNull BinaryOperator<PyType> unionReduction) {
     return Collectors.reducing(null, (accType, hintType) -> {
       if (hintType == null) {
         return accType;
@@ -141,7 +155,7 @@ public final class PyTypeUtil {
         return hintType;
       }
       else {
-        return Ref.create(PyUnionType.union(accType.get(), hintType.get()));
+        return Ref.create(unionReduction.apply(accType.get(), hintType.get()));
       }
     });
   }
@@ -160,6 +174,18 @@ public final class PyTypeUtil {
    */
   public static @NotNull Collector<@Nullable PyType, ?, @Nullable PyType> toUnion() {
     return Collectors.collectingAndThen(Collectors.toList(), PyUnionType::union);
+  }
+
+  public static @NotNull Collector<@Nullable PyType, ?, @Nullable PyType> toUnsafeUnion() {
+    return Collectors.collectingAndThen(Collectors.toList(), PyUnsafeUnionType::unsafeUnion);
+  }
+
+  public static @NotNull Collector<@Nullable PyType, ?, @Nullable PyType> toUnion(@Nullable PyType streamSource) {
+    return toUnion(streamSource instanceof PyUnsafeUnionType ? PyUnsafeUnionType::unsafeUnion : PyUnionType::union);
+  }
+
+  private static @NotNull Collector<@Nullable PyType, ?, @Nullable PyType> toUnion(@NotNull Function<List<@Nullable PyType>, @Nullable PyType> unionFactory) {
+    return Collectors.collectingAndThen(Collectors.toList(), unionFactory);
   }
 
   public static boolean isDict(@Nullable PyType type) {
@@ -185,5 +211,40 @@ public final class PyTypeUtil {
   
   public static boolean inheritsAny(@NotNull PyType type, @NotNull TypeEvalContext context) {
     return type instanceof PyClassLikeType classLikeType && classLikeType.getAncestorTypes(context).contains(null);
+  }
+
+  /**
+   * Collects a set of types that participate in the textual type hint representation of {@code type}.
+   * The returned set preserves a stable DFS order and is unmodifiable.
+   */
+  public static @NotNull @UnmodifiableView Set<PyType> collectTypeComponentsFromType(@Nullable PyType type,
+                                                                                     @NotNull TypeEvalContext context) {
+    Set<PyType> result = new LinkedHashSet<>();
+
+    PyRecursiveTypeVisitor.traverse(type, context, new PyRecursiveTypeVisitor.PyTypeTraverser() {
+      @Override
+      public @NotNull PyRecursiveTypeVisitor.Traversal visitPyType(@NotNull PyType pyType) {
+        result.add(pyType);
+        return super.visitPyType(pyType);
+      }
+
+      @Override
+      public PyRecursiveTypeVisitor.@NotNull Traversal visitPyLiteralType(@NotNull PyLiteralType literalType) {
+        PyClassLikeType literalClassType = literalType.getPyClass().getType(context);
+        if (literalClassType != null) {
+          // Adds eg. signal.Handler when the given type was Literal[Handlers.SIG_DFL]
+          result.add(literalClassType);
+        }
+        return super.visitPyLiteralType(literalType);
+      }
+
+      @Override
+      public PyRecursiveTypeVisitor.@NotNull Traversal visitUnknownType() {
+        result.add(null); // add Any type
+        return super.visitUnknownType();
+      }
+    });
+
+    return Collections.unmodifiableSet(result);
   }
 }

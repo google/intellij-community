@@ -1,9 +1,9 @@
 {
-  "name": "Many Islands Dark",
+  "name": "Islands Dark",
   "dark": true,
   "author": "JetBrains",
   "parentTheme": "ExperimentalDark",
-  "editorScheme": "Island Dark",
+  "editorScheme": "Islands Dark",
   "colors": {
     "Gray3": "#393B40",
     "Gray2.5": "#323438",
@@ -60,7 +60,8 @@
     "Islands": 1,
     "Island": {
       "arc": 20,
-      "border1.insets": "6,6,6,6"
+      "border1.insets": "6,6,6,6",
+      "inactiveAlpha": 0.44
     },
 
     "MainWindow.background": "BackgroundLight",
@@ -68,8 +69,15 @@
 
     "Borders.color": "BorderDark",
     "Borders.ContrastBorderColor": "BorderDark",
-    "MainWindow.Tab.background": "#131314",
     "MainWindow.FullScreeControl.Background": "#575A5C",
+
+    "MainWindow.Tab": {
+      "background": "#131314",
+      "selectedBackground": "ToolWindowBackground",
+      "hoverBackground": "#FFFFFF12",
+      "separatorColor": "#FFFFFF16",
+      "foreground": "#6F737A"
+    },
 
     "MainToolbar": {
       "background": "BackgroundLight",

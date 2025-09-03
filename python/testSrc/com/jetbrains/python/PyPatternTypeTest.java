@@ -84,6 +84,37 @@ match m:
         """);
   }
 
+  // PY-83197
+  public void testMatchValuePatternExcludeOnlyLiteral() {
+    doTestByText("""
+from typing import assert_type, Literal
+
+class X:
+    v: Literal[1] | str
+
+class Y:
+    a: int | float
+    b: Literal[1]
+
+x: X = X()
+y = Y()
+
+match x.v:
+    case y.a:
+        assert_type(x.v, Literal[1])
+    case _:
+        assert_type(x.v, Literal[1] | str)
+
+assert_type(x.v, Literal[1] | str)
+
+match x.v:
+    case y.b:
+        assert_type(x.v, Literal[1])
+    case _:
+        assert_type(x.v, str)
+                   """);
+  }
+
   public void testMatchSequencePatternCaptures() {
     doTestByText("""
 from typing import assert_type
@@ -168,6 +199,64 @@ match m:
         """);
   }
 
+  public void testMatchSequencePatternNarrowSubjectItems() {
+    doTestByText("""
+from typing import assert_type, Literal
+m: int
+n: str
+o: bool
+
+match m, n, o:
+    case [3, "foo", True]:
+        assert_type(m, Literal[3])
+        assert_type(n, Literal['foo'])
+        assert_type(o, Literal[True])
+    case [a, b, c]:
+        assert_type(m, int)
+        assert_type(n, str)
+        assert_type(o, bool)
+        """);
+  }
+
+  public void testMatchSequencePatternNarrowSubjectItemsRecursive() {
+    doTestByText("""
+from typing import assert_type, Literal
+m: int
+n: int
+o: int
+p: int
+q: int
+r: int
+
+match m, (n, o), (p, (q, r)):
+    case [0, [1, 2], [3, [4, 5]]]:
+        assert_type(m, Literal[0])
+        assert_type(n, Literal[1])
+        assert_type(o, Literal[2])
+        assert_type(p, Literal[3])
+        assert_type(q, Literal[4])
+        assert_type(r, Literal[5])
+        """);
+  }
+
+  public void testMatchSequencePatternSequencesLengthMismatchNoNarrowing() {
+    doTestByText("""
+m: int
+n: str
+o: bool
+
+match m, n, o:
+    case [3, "foo"]:
+        assert_type(m, int)
+        assert_type(n, str)
+        assert_type(o, bool)
+    case [3, "foo", True, True]:
+        assert_type(m, int)
+        assert_type(n, str)
+        assert_type(o, bool)
+        """);
+  }
+
   public void testMatchNestedSequencePatternNarrowsInner() {
     doTestByText("""
 from typing import assert_type
@@ -203,7 +292,7 @@ m2: Sequence[int]
 m3: array.array[int]
 m4: collections.deque[int]
 m5: list[int]
-m6: memoryview
+m6: memoryview[int]
 m7: range
 m8: tuple[int]
 
@@ -507,6 +596,23 @@ def f(x):
     match x:
         case C(foo=x, bar=y):
             assert_type(x, str)
+                   """);
+  }
+
+  // PY-82963
+  public void testMatchClassPatternShadowingCaptureMultipleSubjects() {
+    doTestByText("""
+from typing import assert_type
+
+class C:
+    foo: str
+    bar: int
+
+def f(a, b):
+    match a, b:
+        case C(foo=a), C():
+            assert_type(a, str)
+            assert_type(b, C)
                    """);
   }
   

@@ -162,8 +162,7 @@ The project is split in modules:
    * `ide-laf-bridge-styling` contains the IntelliJ Platform bridge theming for the Markdown renderer
    * `int-ui-standalone-styling` contains the standalone Int UI theming for the Markdown renderer
 7. `samples` contains the example apps, which showcase the available components:
-   * `standalone` is a regular CfD app, using the standalone theme definitions and custom window decoration
-   * `ide-plugin` is an IntelliJ plugin that showcases the use of the Swing Bridge
+   * `standalone` is a regular CfD app, using the standalone theme definitions and custom window decoration. See DevKit plugin for demo inside IntelliJ IDEA plugin.
    * `showcase` contains the shared component showcase code, used by both the IDE plugin and the standalone sample
 
 ## Branching strategy and IJ Platforms
@@ -456,3 +455,5 @@ Here is a small selection of projects that use Compose for Desktop and Jewel:
 You can find help on the [`#jewel`](https://app.slack.com/client/T09229ZC6/C05T8U2C31T) channel on the Kotlin Slack.
 If you don't already have access to the Kotlin Slack, you can request it
 [here](https://surveys.jetbrains.com/s3/kotlin-slack-sign-up).
+
+You can find a series of guides on the Jewel processes in the [`docs`](docs) folder.

@@ -11,12 +11,13 @@ jvm_library(
   name = "json",
   module_name = "intellij.grazie.json",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java"], allow_empty = True),
+  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/grazie/src:core",
     "//platform/core-api:core",
     "//json/backend",
+    "//platform/util",
     "//platform/util-ex",
   ],
   runtime_deps = [":json_resources"]

@@ -262,6 +262,17 @@ open class EditorsSplitters internal constructor(
     }
   }
 
+  internal var borderPainter: BorderPainter = DefaultBorderPainter()
+
+  override fun paintChildren(g: Graphics) {
+    super.paintChildren(g)
+    borderPainter.paintAfterChildren(this, g)
+  }
+
+  override fun isPaintingOrigin(): Boolean {
+    return borderPainter.isPaintingOrigin(this)
+  }
+
   fun writeExternal(element: Element) {
     writeExternal(element = element, delayedStates = emptyMap())
   }
@@ -477,7 +488,7 @@ open class EditorsSplitters internal constructor(
     val frame = getFrame() ?: return
     val file = currentCompositeFlow.value?.file
     if (file == null) {
-      withContext(Dispatchers.EDT) {
+      withContext(Dispatchers.UiWithModelAccess) {
         frame.setFileTitle(null, null)
       }
     }
@@ -489,7 +500,7 @@ open class EditorsSplitters internal constructor(
       catch (ignored: InvalidPathException) {
         null
       }
-      withContext(Dispatchers.EDT) {
+      withContext(Dispatchers.UiWithModelAccess) {
         frame.setFileTitle(title, ioFile)
       }
     }
@@ -797,9 +808,9 @@ open class EditorsSplitters internal constructor(
 
   @JvmOverloads
   @RequiresEdt
-  fun openInRightSplit(file: VirtualFile, requestFocus: Boolean = true): EditorWindow? = openInRightSplit(file, requestFocus, null)
+  fun openInRightSplit(file: VirtualFile, requestFocus: Boolean = true, forceFocus: Boolean = false): EditorWindow? = openInRightSplit(file, requestFocus, forceFocus, null)
 
-  internal fun openInRightSplit(file: VirtualFile, requestFocus: Boolean = true, explicitlySetCompositeProvider: (() -> EditorComposite?)?): EditorWindow? {
+  internal fun openInRightSplit(file: VirtualFile, requestFocus: Boolean = true, forceFocus: Boolean = false, explicitlySetCompositeProvider: (() -> EditorComposite?)?): EditorWindow? {
     val window = currentWindow ?: return null
     val parent = window.component.parent
     if (parent is Splitter) {
@@ -810,13 +821,13 @@ open class EditorsSplitters internal constructor(
           manager.openFile(
             file = file,
             window = rightSplitWindow,
-            options = FileEditorOpenOptions(requestFocus = requestFocus, waitForCompositeOpen = false, explicitlyOpenCompositeProvider = explicitlySetCompositeProvider),
+            options = FileEditorOpenOptions(requestFocus = requestFocus, waitForCompositeOpen = false, forceFocus = forceFocus, explicitlyOpenCompositeProvider = explicitlySetCompositeProvider),
           )
           return rightSplitWindow
         }
       }
     }
-    return window.split(orientation = JSplitPane.HORIZONTAL_SPLIT, forceSplit = true, virtualFile = file, focusNew = requestFocus, explicitlySetCompositeProvider = explicitlySetCompositeProvider)
+    return window.split(orientation = JSplitPane.HORIZONTAL_SPLIT, forceSplit = true, virtualFile = file, focusNew = requestFocus, forceFocus = forceFocus, explicitlySetCompositeProvider = explicitlySetCompositeProvider)
   }
 }
 
@@ -1008,7 +1019,7 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
 
     val windowCoroutineScope = splitters.coroutineScope.childScope("EditorWindow")
 
-    val windowDeferred = windowCoroutineScope.async(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    val windowDeferred = windowCoroutineScope.async(Dispatchers.UI + ModalityState.any().asContextElement()) {
       splitters.insideChange++
       val editorWindow = EditorWindow(owner = splitters, coroutineScope = windowCoroutineScope)
       editorWindow.component.isFocusable = false
@@ -1036,7 +1047,7 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
       }
     }.mapNotNull { it.getCompleted() }
 
-    span("file opening in EDT", Dispatchers.EDT) {
+    span("file opening in EDT", Dispatchers.UiWithModelAccess) {
       var window: EditorWindow? = null
       val windowAddedDeferred = CompletableDeferred<Unit>()
       try {

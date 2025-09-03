@@ -83,6 +83,8 @@ jvm_library(
     "//xml/impl",
     "//spellchecker",
     "//spellchecker:spellchecker_test_lib",
+    "//plugins/grazie/src:core",
+    "//plugins/grazie",
     "//java/java-impl:impl",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -102,6 +104,10 @@ jvm_library(
     "//xml/xml-psi-api:psi",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
+  ],
+  exports = [
+    "//plugins/properties:properties-backend",
+    "//java/java-impl:impl",
   ],
   runtime_deps = [":java-i18n_resources"]
 )

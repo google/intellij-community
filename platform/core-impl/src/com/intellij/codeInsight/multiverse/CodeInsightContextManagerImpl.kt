@@ -1,10 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.multiverse
 
-import com.intellij.concurrency.currentThreadContext
-import com.intellij.concurrency.installThreadContext
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
@@ -17,6 +14,7 @@ import com.intellij.psi.impl.PsiManagerEx
 import com.intellij.psi.impl.file.impl.FileManagerEx
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.util.AtomicMapCache
+import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.containers.CollectionFactory
@@ -25,10 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.atomic.AtomicBoolean
 
 @ApiStatus.Internal
 class CodeInsightContextManagerImpl(
@@ -84,21 +80,11 @@ class CodeInsightContextManagerImpl(
     }
   }
 
-  override fun <Result> performCodeInsightSession(context: CodeInsightContext, block: CodeInsightSession.() -> Result): Result {
-    val session = CodeInsightSessionImpl(context)
-    return installThreadContext(currentThreadContext() + CodeInsightSessionElement(session)) {
-      block(session)
-    }
-  }
-
-  override val currentCodeInsightSession: CodeInsightSession?
-    get() = com.intellij.codeInsight.multiverse.currentCodeInsightSession
-
   @RequiresReadLock
   @RequiresBackgroundThread
   override fun getCodeInsightContexts(file: VirtualFile): List<CodeInsightContext> {
-    //ThreadingAssertions.softAssertBackgroundThread()
-    //ThreadingAssertions.softAssertReadAccess()
+    ThreadingAssertions.softAssertBackgroundThread()
+    ThreadingAssertions.softAssertReadAccess()
 
     if (!isSharedSourceSupportEnabled(project)) return listOf(defaultContext())
 
@@ -123,8 +109,8 @@ class CodeInsightContextManagerImpl(
   override fun getPreferredContext(file: VirtualFile): CodeInsightContext {
     if (!isSharedSourceSupportEnabled(project)) return defaultContext()
 
-    //ThreadingAssertions.softAssertBackgroundThread()
-    //ThreadingAssertions.softAssertReadAccess()
+    ThreadingAssertions.softAssertBackgroundThread()
+    ThreadingAssertions.softAssertReadAccess()
 
     log.trace { "requested preferred context of file ${file.path}" }
 
@@ -138,6 +124,9 @@ class CodeInsightContextManagerImpl(
 
     log.trace { "requested context of FileViewProvider ${fileViewProvider.virtualFile.path}" }
 
+    ThreadingAssertions.softAssertBackgroundThread()
+    ThreadingAssertions.softAssertReadAccess()
+
     val context = getCodeInsightContextRaw(fileViewProvider)
 
     if (context == anyContext()) {
@@ -147,6 +136,7 @@ class CodeInsightContextManagerImpl(
     return context
   }
 
+  @Deprecated("DANGEROUS API, AUTHORIZED PERSONNEL ONLY")
   override fun getOrSetContext(fileViewProvider: FileViewProvider, context: CodeInsightContext): CodeInsightContext {
     log.trace { "requested getOrSet context of FileViewProvider ${fileViewProvider.virtualFile.path}" }
 
@@ -224,7 +214,7 @@ class CodeInsightContextManagerImpl(
   /**
    * does not infer the substitution for `anyContext`
    */
-  fun getCodeInsightContextRaw(fileViewProvider: FileViewProvider): CodeInsightContext =
+  override fun getCodeInsightContextRaw(fileViewProvider: FileViewProvider): CodeInsightContext =
     fileViewProvider.getUserData(codeInsightContextKey) ?: defaultContext()
 
   fun setCodeInsightContext(fileViewProvider: FileViewProvider, context: CodeInsightContext) {
@@ -233,46 +223,13 @@ class CodeInsightContextManagerImpl(
     val effectiveContext = context.takeUnless { it == defaultContext() }
     fileViewProvider.putUserData(codeInsightContextKey, effectiveContext)
   }
-
-  override val isSharedSourceSupportEnabled: Boolean
-    get() {
-      project.getUserData(multiverse_enabler_key)?.let { return it }
-
-      synchronized(this) {
-        project.getUserData(multiverse_enabler_key)?.let { return it }
-        val result = computeSharedSourceEnabled()
-        project.putUserData(multiverse_enabler_key, result)
-        log.info("multiverse is ${if (result) "enabled" else "disabled"}")
-        return result
-      }
-    }
-
-  private fun computeSharedSourceEnabled(): Boolean {
-    @Suppress("TestOnlyProblems")
-    if (ApplicationManager.getApplication().isUnitTestMode && MultiverseTestEnabler.getValueAndErase()) {
-      return true
-    }
-
-    val result = MULTIVERSE_ENABLER_EP_NAME.extensionList.any { enabler ->
-      runSafely { enabler.enableMultiverse(project) } == true
-    }
-    return result
-  }
 }
-
-private class CodeInsightSessionImpl(
-  override val context: CodeInsightContext
-) : CodeInsightSession
 
 private val EP_NAME = ExtensionPointName.create<CodeInsightContextProvider>("com.intellij.multiverse.codeInsightContextProvider")
 
 private val codeInsightContextKey = Key.create<CodeInsightContext>("codeInsightContextKey")
 
 private val log = logger<CodeInsightContextManagerImpl>()
-
-private val multiverse_enabler_key = Key.create<Boolean>("shared.source.support.enabled")
-
-private val MULTIVERSE_ENABLER_EP_NAME : ExtensionPointName<MultiverseEnabler> = ExtensionPointName.create("com.intellij.multiverseEnabler")
 
 /**
  * appends an item to the sequence if the sequence is empty
@@ -286,33 +243,4 @@ private fun <T> Sequence<T>.appendIfEmpty(item: T) = sequence {
   if (isEmpty) {
     yield(item)
   }
-}
-
-@TestOnly
-@ApiStatus.Internal
-object MultiverseTestEnabler {
-  private val value = AtomicBoolean()
-
-  fun enableSharedSourcesForTheNextProject() {
-    val prev = value.getAndSet(true)
-    if (prev) {
-      throw IllegalStateException("multiverse is already enabled")
-    }
-  }
-
-  internal fun getValueAndErase(): Boolean {
-    val prev = value.getAndSet(false)
-    return prev
-  }
-}
-
-internal sealed interface SetContextResult {
-  /** the context was successfully installed */
-  object Success : SetContextResult
-
-  /** the context was not installed because of a concurrent context update */
-  class ConcurrentlyUpdated(val newContext: CodeInsightContext) : SetContextResult
-
-  /** the context was not installed because the file view provider is missing in the file manager storage */
-  object ProviderIsMissing : SetContextResult
 }

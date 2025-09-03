@@ -650,6 +650,23 @@ class JavaJUnitMalformedDeclarationInspectionTest {
         """.trimIndent())
     }
 
+    fun `test malformed parameterized class method source should not be static highlighting`() {
+      myFixture.testHighlighting(JvmLanguage.JAVA, """
+        @org.junit.jupiter.params.ParameterizedClass
+        @org.junit.jupiter.params.provider.MethodSource("a")
+        @org.junit.jupiter.api.TestInstance(org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS)
+        class TestMethodSource {
+          @org.junit.jupiter.params.Parameter
+          String param;
+
+          @org.junit.jupiter.api.Test
+          void test() { }
+          
+          String[] a() { return new String[] {"a", "b"}; }
+        }
+        """.trimIndent())
+    }
+
     fun `test malformed parameterized class method source should have no parameters highlighting`() {
       myFixture.testHighlighting(JvmLanguage.JAVA, """
         @org.junit.jupiter.params.ParameterizedClass
@@ -1384,22 +1401,23 @@ class JavaJUnitMalformedDeclarationInspectionTest {
       import org.junit.jupiter.params.provider.FieldSource;
       
       class Test {
-        @FieldSource("li<caret>st")
-        @ParameterizedTest
-        void foo(String param) { }
+          @FieldSource("li<caret>st")
+          @ParameterizedTest
+          void foo(String param) { }
       }
     """.trimIndent(), """
       import org.junit.jupiter.params.ParameterizedTest;
+      import org.junit.jupiter.params.provider.Arguments;
       import org.junit.jupiter.params.provider.FieldSource;
 
       import java.util.Collection;
 
       class Test {
-          public static final Collection<Object> list = 0L;
+          private static final Collection<Arguments> list = ;
 
           @FieldSource("list")
-        @ParameterizedTest
-        void foo(String param) { }
+          @ParameterizedTest
+          void foo(String param) { }
       }
     """.trimIndent(), "Create constant field 'list' in 'Test'", testPreview = true)
     }

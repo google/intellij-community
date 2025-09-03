@@ -97,30 +97,27 @@ sealed interface DependencyDescription<E : WorkspaceEntity> {
   ) : DependencyDescription<E>
 
   /**
-   * Indicates that the contributor must be called for the entities [R] when any entity of type [E] is added, removed or replaced.
+   * Indicates that the contributor must be called for the entities [E] when any entity of type [A] is added, removed or replaced.
+   * This is a more generic option, but [OnParent] and [OnChild] should be used whenever possible, as they are more efficient.
    */
-  data class OnEntity<R : WorkspaceEntity, E : WorkspaceEntity>(
+  data class OnArbitraryEntity<E : WorkspaceEntity, A : WorkspaceEntity>(
     /** Type of entity */
-    val entityClass: Class<E>,
-    /** Type of entity [R] which has a dependency on entity [E] */
-    val resultClass: Class<R>,
-    /** Computes entities*/
-    val resultGetter: (E) -> Sequence<R>
-  ) : DependencyDescription<R>
+    val entityClass: Class<A>,
+    /** Computes dependant entities*/
+    val dependantEntitiesGetter: (A) -> Sequence<E>
+  ) : DependencyDescription<E>
 
   /**
-   * Indicates that the contributor must be called for the entities [R] when any entity of type [E] adds the first
-   * or remove the last reference to [R].
+   * Indicates that the contributor must be called for the entities [E] when any entity of type [R] adds the first
+   * or remove the last reference to [E].
    */
   @ApiStatus.Experimental
-  data class OnReference<R: WorkspaceEntityWithSymbolicId, E: WorkspaceEntityWithSymbolicId>(
-    /** Type that could contain references to [R] */
-    val referenceHolderClass: Class<E>,
-    /** Type for which a contributor should be called */
-    val resultClass: Class<R>,
+  data class OnReference<E: WorkspaceEntityWithSymbolicId, R: WorkspaceEntity>(
+    /** Type that could contain references to [E] */
+    val referenceHolderClass: Class<R>,
     /** Computes references */
-    val referencedEntitiesGetter: (E) -> Sequence<SymbolicEntityId<R>>
-  ): DependencyDescription<R>
+    val referencedEntitiesGetter: (R) -> Sequence<SymbolicEntityId<E>>
+  ): DependencyDescription<E>
 }
 
 /**

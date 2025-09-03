@@ -6,10 +6,13 @@ import com.intellij.codeInsight.multiverse.CodeInsightContext
 import com.intellij.codeInsight.multiverse.CodeInsightContextManagerImpl
 import com.intellij.codeInsight.multiverse.anyContext
 import com.intellij.openapi.diagnostic.trace
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
 import com.intellij.psi.AbstractFileViewProvider
 import com.intellij.psi.FileViewProvider
 import com.intellij.util.containers.ContainerUtil
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.contracts.ExperimentalContracts
@@ -57,7 +60,7 @@ internal sealed interface FileProviderMap {
   /**
    * Support [anyContext] special case. See doc of [FileProviderMap].
    *
-   * This method is called when the map contains a single entry, it has [anyContext] as a key, and we want to reassing this entry to [context]..
+   * This method is called when the map contains a single entry, it has [anyContext] as a key, and we want to reassigning this entry to [context]..
    * The method tries to assign the context to the existing provider.
    *
    * @return the actual context assigned to [viewProvider]. Either [context] or a context that had been assigned to [viewProvider] concurrently.
@@ -130,6 +133,7 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
     // There was a designated default context, but its provider was collected.
     // Let's try to find another one.
 
+    var cancellationCounter = 0
     while (this.map.size() > 0) {
       // evicting collected items and assigning the new default context
       update {
@@ -141,6 +145,11 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
       }
       // Damn it. Another view provider was collected too! Let's try one more time.
       log.trace { "anyContext was GCed for [$this]. Trying again" }
+      cancellationCounter++
+      if (cancellationCounter % 1000 == 0) {
+        log.error("Can't find anyContext by ${cancellationCounter} attempts. $this")
+        ProgressManager.checkCanceled()
+      }
     }
 
     log.trace { "anyContext was GCed for [$this]. no provider found" }
@@ -269,11 +278,13 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
    */
   @OptIn(ExperimentalContracts::class)
   private inline fun update(
-    block: (currentMap: ContextMap<FileViewProvider>) -> ContextMap<FileViewProvider>?
+    block: (currentMap: ContextMap<FileViewProvider>) -> ContextMap<FileViewProvider>?,
   ) {
     contract {
       callsInPlace(block, kotlin.contracts.InvocationKind.AT_LEAST_ONCE)
     }
+
+    var cancellationCounter = 0
     while (true) {
       val currentMap = map
       val newMap = block(currentMap) ?: continue
@@ -282,6 +293,11 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
       }
       if (compareAndSet(currentMap, newMap)) {
         return
+      }
+
+      cancellationCounter++
+      if (cancellationCounter % 1000 == 0) {
+        ProgressManager.checkCanceled()
       }
     }
   }
@@ -293,6 +309,8 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
   private fun storeStrongLinkInProvider(provider: FileViewProvider) {
     provider.putUserData(strongLinkToFileProviderMap, this)
   }
+
+  override fun toString(): String = "FileProviderMapImpl(map=$map)"
 }
 
 private fun mapOf(
@@ -312,7 +330,9 @@ private fun installContext(viewProvider: FileViewProvider, context: CodeInsightC
  * It stays the same during the whole life of a given [ContextMap]. Though it can be collected by GC.
  * To reassign the default context, [processQueue] should be called which will return a new instance of [ContextMap] with a new default context.
  */
-private interface ContextMap<V : Any> {
+@ApiStatus.Internal
+@VisibleForTesting
+interface ContextMap<V : Any> {
   operator fun get(key: CodeInsightContext): V?
   fun add(key: CodeInsightContext, value: V): ContextMap<V>
   fun remove(key: CodeInsightContext): ContextMap<V>
@@ -323,9 +343,11 @@ private interface ContextMap<V : Any> {
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun <V : Any> emptyContextMap(): ContextMap<V> = EmptyMap as ContextMap<V>
+@ApiStatus.Internal
+@VisibleForTesting
+fun <V : Any> emptyContextMap(): ContextMap<V> = EmptyMap as ContextMap<V>
 
-private object EmptyMap: ContextMap<Any> {
+private object EmptyMap : ContextMap<Any> {
   override fun get(key: CodeInsightContext): Any? = null
   override fun add(key: CodeInsightContext, value: Any): ContextMap<Any> = OneItemMap(key, value)
   override fun remove(key: CodeInsightContext): ContextMap<Any> = this
@@ -333,13 +355,14 @@ private object EmptyMap: ContextMap<Any> {
   override fun size(): Int = 0
   override fun defaultValue(): Any? = null
   override fun processQueue(): EmptyMap = this
+  override fun toString(): String = "EmptyMap"
 }
 
 private class OneItemMap<V : Any> private constructor(
   val key: CodeInsightContext,
-  val value: WeakReference<V>
-): ContextMap<V> {
-  constructor(key: CodeInsightContext, value: V): this(key, WeakReference(value))
+  val value: WeakReference<V>,
+) : ContextMap<V> {
+  constructor(key: CodeInsightContext, value: V) : this(key, WeakReference(value))
 
   override fun get(key: CodeInsightContext): V? {
     return if (this.key == key) value.get()
@@ -394,7 +417,7 @@ private class OneItemMap<V : Any> private constructor(
 private class ManyItemMap<V : Any>(
   private val map: Map<CodeInsightContext, V>,
   private val defaultContext: CodeInsightContext,
-): ContextMap<V> {
+) : ContextMap<V> {
 
   override fun get(key: CodeInsightContext): V? = map[key]
 
@@ -402,21 +425,19 @@ private class ManyItemMap<V : Any>(
     var newMap: MutableMap<CodeInsightContext, V>? = null
 
     for (k in map.keys) {
-      val v = map[k]
-      if (v != null) {
-        if (newMap == null) {
-          newMap = ContainerUtil.createWeakValueMap<CodeInsightContext, V>()
-        }
-        newMap[k] = v
+      val v = map[k] ?: continue
+
+      if (newMap == null) {
+        // constructing map only if at least 2 elements are found
+        newMap = newMap(key, value)
       }
+      newMap[k] = v
     }
 
     if (newMap == null) {
       // we have only one (k, v) pair
       return OneItemMap(key, value)
     }
-
-    newMap[key] = value
 
     val newDefaultContext = if (newMap[defaultContext] == null) {
       key // todo IJPL-339 does changing the default context require some more care???
@@ -438,48 +459,58 @@ private class ManyItemMap<V : Any>(
   private fun produceNewMapWithoutKey(key: CodeInsightContext?): ContextMap<V> {
     var newMap: MutableMap<CodeInsightContext, V>? = null
 
-    var existingKey: CodeInsightContext? = null
-    var existingValue: V? = null
+    var firstKey: CodeInsightContext? = null
+    var firstValue: V? = null
 
     for (k in map.keys) {
       if (k == key) continue
-      val value = map[k]
-      if (value != null) {
-        if (existingKey == null) {
-          existingKey = k
-          existingValue = value
+
+      val value = map[k] ?: continue
+
+      if (firstKey == null) {
+        firstKey = k
+        firstValue = value
+      }
+      else {
+        if (newMap == null) {
+          // creating new map only if at least 2 elements are found
+          newMap = newMap(firstKey, firstValue!!)
         }
-        else {
-          if (newMap == null) {
-            newMap = ContainerUtil.createWeakValueMap<CodeInsightContext, V>()
-          }
-          newMap[existingKey] = existingValue!!
-          newMap[k] = value
-        }
+        newMap[k] = value
       }
     }
 
-    if (existingKey == null) {
+    if (firstKey == null) {
       // we don't have even one survived value, GC collected all of them
       return emptyContextMap()
     }
 
     if (newMap == null) {
       // we have only one (k, v) pair
-      return OneItemMap(existingKey, existingValue!!)
+      return OneItemMap(firstKey, firstValue!!)
     }
 
-    val newDefaultContext = when (key) {
-      defaultContext -> newMap.keys.first() // todo IJPL-339 does changing the default context require some more care???
-      else -> defaultContext
+    val newDefaultContext = if (key == defaultContext || newMap[defaultContext] == null) {
+      // todo IJPL-339 does changing the default context require some more care???
+      firstKey
+    }
+    else {
+      defaultContext
     }
     return ManyItemMap(newMap, newDefaultContext)
+  }
+
+  private fun newMap(firstKey: CodeInsightContext, firstValue: V): MutableMap<CodeInsightContext, V> {
+    val map = ContainerUtil.createWeakValueMap<CodeInsightContext, V>()
+    map[firstKey] = firstValue
+    return map
   }
 
   override fun entries(): Collection<Map.Entry<CodeInsightContext, V>> {
     return map.keys.mapNotNull { key ->
       val value = map[key] ?: return@mapNotNull null
-      EntryImpl(key, value) }
+      EntryImpl(key, value)
+    }
   }
 
   override fun size(): Int = map.size
@@ -497,15 +528,14 @@ private class ManyItemMap<V : Any>(
     }
   }
 
-  override fun toString(): String {
-    return "ManyItemMap(map=$map)"
-  }
+  override fun toString(): String =
+    "ManyItemMap(map=" + map.entries.joinToString(separator = ", ", prefix = "{", postfix = "}") { (k, v) -> "$k=$v" } + ", defaultContext=$defaultContext)"
 }
 
 private class EntryImpl<V : Any>(
   override val key: CodeInsightContext,
   override val value: V,
-): Map.Entry<CodeInsightContext, V>
+) : Map.Entry<CodeInsightContext, V>
 
 private val log = com.intellij.openapi.diagnostic.logger<FileProviderMap>()
 

@@ -5,11 +5,13 @@ package com.intellij.util.indexing.roots
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.virtualFile
 import com.intellij.platform.workspace.jps.entities.LibraryEntity
@@ -142,10 +144,6 @@ internal fun selectRootVirtualFiles(value: Collection<VirtualFile>): List<Virtua
   return selectRootItems(value) { file -> file.path }
 }
 
-internal fun selectRootVirtualFileUrls(urls: Collection<VirtualFileUrl>): List<VirtualFileUrl> {
-  return selectRootItems(urls) { url -> JpsPathUtil.urlToPath(url.url) }
-}
-
 private fun <T> selectRootItems(items: Collection<T>, toPath: Function<T, String>): List<T> {
   if (items.size < 2) {
     if (items is List<T>) return items
@@ -260,11 +258,15 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
     }
 
     for ((libraryEntity, roots) in rootData.libraryRoots.entries) {
-      descriptions.add(LibraryRootsDescription(libraryEntity, roots))
+      if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
+        descriptions.add(LibraryRootsDescription(libraryEntity, roots))
+      }
     }
 
     for ((libraryEntity, roots) in rootData.libraryUrlRoots.entries) {
-      descriptions.add(LibraryUrlRootsDescription(libraryEntity, roots))
+      if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
+        descriptions.add(LibraryUrlRootsDescription(libraryEntity, roots))
+      }
     }
 
     for ((entityReference, roots) in rootData.externalRoots.entries) {
@@ -333,6 +335,7 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
   fun <E : WorkspaceEntity> registerEntitiesFromContributor(contributor: WorkspaceFileIndexContributor<E>,
                                                             entityStorage: EntityStorage) {
     entityStorage.entities(contributor.entityClass).forEach { entity ->
+      Cancellation.checkCancelled()
       registerAddedEntity(entity, contributor, entityStorage)
     }
   }

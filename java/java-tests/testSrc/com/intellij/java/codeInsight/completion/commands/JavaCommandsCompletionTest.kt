@@ -6,15 +6,18 @@ import com.intellij.codeInsight.completion.command.CommandCompletionDocumentatio
 import com.intellij.codeInsight.completion.command.CommandCompletionLookupElement
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.HintManagerImpl
+import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection
 import com.intellij.ide.highlighter.JavaFileType
+import com.intellij.java.codeInsight.completion.commands.JavaCommandsCompletionTest.TestHintManager
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
 import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.backend.documentation.AsyncDocumentation
@@ -70,6 +73,39 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
         } 
       }
     """.trimIndent())
+  }
+
+  fun testFormatPreview() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+        void foo() {
+          int y = 10;
+          int x =                           y.<caret>;
+        } 
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    val item = elements.first { element -> element.lookupString.contains("format", ignoreCase = true) }
+      .`as`(CommandCompletionLookupElement::class.java)
+    if (item == null) {
+      fail()
+      return
+    }
+    val preview = item.command.getPreview()
+    if (preview !is IntentionPreviewInfo.CustomDiff) {
+      fail()
+      return
+    }
+    val expected = """
+      class A { 
+        void foo() {
+          int y = 10;
+            int x = y;
+        } 
+      }
+    """.trimIndent()
+    assertEquals(preview.modifiedText(), expected)
   }
 
   fun testFormatWholeMethod() {
@@ -137,6 +173,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }
     """.trimIndent())
   }
+
   fun testFormatOutside() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -198,6 +235,17 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
           }
       }
     """.trimIndent())
+  }
+
+  fun testGenerateConstructorWithoutSpecialChars() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+        .generate con<caret>
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    assertNotNull(elements.firstOrNull { element -> element.lookupString.contains("Generate 'Constructor'", ignoreCase = true) })
   }
 
   fun testGenerateConstructorInline() {
@@ -316,6 +364,56 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
 
   }
 
+  fun testInlineMethod() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          public String getY() {
+              String y = getX();
+              return y;
+          }
+          
+          public String getX.<caret>(){return "1";}
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    selectItem(elements.first { element -> element.lookupString.contains("Inline", ignoreCase = true) })
+    myFixture.checkResult("""
+        class A {
+            public String getY() {
+                String y = "1";
+                return y;
+            }
+        
+        }""".trimIndent())
+  }
+
+  fun testInlineMethodEnd() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          public String getY() {
+              String y = getX();
+              return y;
+          }
+          
+          public String getX(){
+            return "1";
+          }.<caret>
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    selectItem(elements.first { element -> element.lookupString.contains("Inline", ignoreCase = true) })
+    myFixture.checkResult("""
+        class A {
+            public String getY() {
+                String y = "1";
+                return y;
+            }
+        
+        }""".trimIndent())
+  }
+
   fun testInlineFieldWithNoInitializerNoCommand() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -395,13 +493,26 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
           }
       }.<caret>""".trimIndent())
     val elements = myFixture.completeBasic()
-    selectItem(elements.first { element -> element.lookupString.contains("Comment with line comment", ignoreCase = true) })
-    myFixture.checkResult("""
+    val item = elements.first { element -> element.lookupString.contains("Comment with line comment", ignoreCase = true) }
+    selectItem(item)
+    val expectedText = """
       //class A {
       //    public String getY() {
       //        return "y";
       //    }
-      //}""".trimIndent())
+      //}""".trimIndent()
+    myFixture.checkResult(expectedText)
+    val lookupElement = item.`as`(CommandCompletionLookupElement::class.java)
+    if (lookupElement == null) {
+      fail()
+      return
+    }
+    val preview = lookupElement.command.getPreview()
+    if (preview !is IntentionPreviewInfo.CustomDiff) {
+      fail()
+      return
+    }
+    assertEquals(preview.modifiedText(), expectedText)
   }
 
   fun testCommentElementByBlock() {
@@ -463,6 +574,19 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       ?.`as`(CommandCompletionLookupElement::class.java)
     assertNotNull(lookupElement)
     assertEquals(TextRange(19, 22), (lookupElement as CommandCompletionLookupElement).highlighting?.range)
+  }
+
+  fun testRenameRecord() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+        record Records1(int a, int b) .<caret>{
+        }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    val lookupElement = elements
+      .firstOrNull { element -> element.lookupString.contains("rename", ignoreCase = true) }
+      ?.`as`(CommandCompletionLookupElement::class.java)
+    assertNotNull(lookupElement)
+    assertEquals(TextRange(7, 15), (lookupElement as CommandCompletionLookupElement).highlighting?.range)
   }
 
   fun testRenameMethod2() {
@@ -649,37 +773,35 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
 
   fun testRedCode() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
-    runBlocking {
-      val psiFile = myFixture.configureByText(JavaFileType.INSTANCE, """
-      class A { 
-        void foo() {
-          int y = 10L<caret>;
-        } 
-      }
-      """.trimIndent())
-      myFixture.doHighlighting()
-      myFixture.type(".")
-      val elements = myFixture.completeBasic()
-      val item = elements.first { element -> element.lookupString.contains("Convert literal to", ignoreCase = true) }
-      val documentationProvider = CommandCompletionDocumentationProvider()
-      val documentationTarget = documentationProvider.documentationTarget(psiFile, item, editor.caretModel.offset)
-      val documentation = documentationTarget?.computeDocumentation() as? AsyncDocumentation
-      assertNotNull(documentation)
-      val resultDocumentation = documentation?.supplier?.invoke() as? DocumentationData
-      assertNotNull(resultDocumentation)
-      val expected = "<div style=\"min-width: 150px; max-width: 250px; padding: 0; margin: 0;\"> \n" +
-                     "<div style=\"width: 95%; background-color:#ffffff; line-height: 1.3200000524520874\"><div style=\"background-color:#ffffff;color:#000000\"><pre style=\"font-family:'JetBrains Mono',monospace;\"><span style=\"font-size: 90%; color:#999999;\">  2  </span><span style=\"color:#000080;font-weight:bold;\">int&#32;</span>y&#32;=&#32;<span style=\"color:#0000ff;background-color:#cad9fa;\">10</span>;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;</pre></div><br/>\n" +
-                     "</div></div>"
-      assertEquals(expected, resultDocumentation?.html ?: "")
-      selectItem(item)
-      myFixture.checkResult("""
-      class A { 
-        void foo() {
-          int y = 10;
-        } 
-      }
-    """.trimIndent())
+    val psiFile = myFixture.configureByText(JavaFileType.INSTANCE, """
+    class A { 
+      void foo() {
+        int y = 10L<caret>;
+      } 
     }
+    """.trimIndent())
+    myFixture.doHighlighting()
+    myFixture.type(".")
+    val elements = myFixture.completeBasic()
+    val item = elements.first { element -> element.lookupString.contains("Convert literal to", ignoreCase = true) }
+    val documentationProvider = CommandCompletionDocumentationProvider()
+    val documentationTarget = documentationProvider.documentationTarget(psiFile, item, editor.caretModel.offset)
+    val documentation = documentationTarget?.computeDocumentation() as? AsyncDocumentation
+    assertNotNull(documentation)
+    val resultDocumentation = runBlockingMaybeCancellable { documentation?.supplier?.invoke() } as? DocumentationData
+    assertNotNull(resultDocumentation)
+    val expected = """<ideaFloatingCodePreview background-color="#ffffff" font-size="13">
+      <div style="#ffffff; line-height:1.3200000524520874;"><div style="background-color:#ffffff;color:#000000"><pre style="font-family:'JetBrains Mono',monospace;"><span style="font-size: 90%; color:#999999;">  3  </span><span style="color:#000080;font-weight:bold;">int&#32;</span>y&#32;=&#32;<span style="color:#0000ff;background-color:#cad9fa;">10</span>;</pre></div>
+      </div></ideaFloatingCodePreview>"""
+    assertEquals(expected, resultDocumentation?.html ?: "")
+    selectItem(item)
+    myFixture.checkResult("""
+    class A { 
+      void foo() {
+        int y = 10;
+      } 
+    }
+  """.trimIndent())
   }
 
   fun testRedCodeImport() {

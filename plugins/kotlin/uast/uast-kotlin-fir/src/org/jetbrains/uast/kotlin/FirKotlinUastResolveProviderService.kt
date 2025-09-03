@@ -48,7 +48,7 @@ interface FirKotlinUastResolveProviderService : BaseKotlinUastResolveProviderSer
 
     fun isSupportedFile(file: KtFile): Boolean = true
 
-    context(KaSession)
+    context(_: KaSession)
     private fun KaAnnotation.toFakeDeserializedSymbol(
         parent: KtDeclaration,
         symbol: KaDeclarationSymbol
@@ -743,6 +743,8 @@ interface FirKotlinUastResolveProviderService : BaseKotlinUastResolveProviderSer
     }
 
     override fun getType(ktDeclaration: KtDeclaration, source: UElement): PsiType? {
+        if (ktDeclaration !is KtDeclarationWithReturnType) return null
+
         analyzeForUast(ktDeclaration) {
             val ktType = ktDeclaration.returnType
             return toPsiType(
@@ -762,6 +764,8 @@ interface FirKotlinUastResolveProviderService : BaseKotlinUastResolveProviderSer
         containingLightDeclaration: PsiModifierListOwner?,
         isForFake: Boolean,
     ): PsiType? {
+        if (ktDeclaration !is KtDeclarationWithReturnType) return null
+
         analyzeForUast(ktDeclaration) {
             val ktType = ktDeclaration.returnType
             return toPsiType(

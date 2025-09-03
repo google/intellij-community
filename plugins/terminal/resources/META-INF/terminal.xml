@@ -57,11 +57,11 @@
     <registryKey key="terminal.classic.refresh.vfs.on.shell.command.finished" defaultValue="true"
                  description="Refresh VFS when shell commands are finished in the Classic Terminal.
                   May not work 100% reliably as it uses heuristics to determine when command is finished."/>
-    <registryKey key="terminal.use.EelApi" defaultValue="true"
+    <registryKey key="terminal.use.EelApi" defaultValue="false"
                  description="Use EelApi to launch a shell process. Launching a local shell works the same as before.
                   For WSL environments, the shell process in WSL will be launched via IJEnt instead of using wsl.exe."/>
-    <registryKey key="terminal.new.ui.completion.popup" defaultValue="false"
-                 description="Disabled completion popUp for reworked terminal for development time"/>
+    <registryKey key="terminal.new.ui.completion.popup" defaultValue="true"
+                 description="Whether popup-based command completion feature is enabled in the Reworked Terminal"/>
     <registryKey key="terminal.type.ahead" defaultValue="true"
                  description="Whether terminal should predict how shell handles typing to minimize the typing latency. Monolith-only at the moment"/>
     <registryKey key="terminal.generic.hyperlinks" defaultValue="false"
@@ -96,10 +96,6 @@
                             implementationClass="org.jetbrains.plugins.terminal.block.completion.TerminalCommandSpecCompletionContributorGen1"
                             order="first, before terminalPowerShell, after ml_context"/>
     <completion.contributor language="any"
-                            id="terminalCommandSpecGen2"
-                            implementationClass="org.jetbrains.plugins.terminal.block.reworked.completion.TerminalCommandSpecCompletionContributorGen2"
-                            order="first, before terminalPowerShell, after ml_context"/>
-    <completion.contributor language="any"
                             id="terminalPowerShell"
                             implementationClass="org.jetbrains.plugins.terminal.block.completion.powershell.PowerShellCompletionContributor"
                             order="first, before shShebang, before liveTemplates, after ml_context"/>
@@ -123,6 +119,10 @@
     <advancedSetting id="new.terminal.output.capacity.kb" default="1024" groupKey="group.advanced.settings.terminal"/>
 
     <postStartupActivity implementation="org.jetbrains.plugins.terminal.block.GenOneTerminalOptionHidingActivity"/>
+    
+    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.TerminalSessionIdDataContextSerializer" />
+    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.IsAlternateBufferDataContextSerializer" />
+    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.hyperlinks.HyperlinkIdDataContextSerializer" />
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
@@ -181,5 +181,6 @@
       <action id="TerminalNewPredefinedSession" class="org.jetbrains.plugins.terminal.action.TerminalNewPredefinedSessionAction"
               icon="AllIcons.Toolbar.Expand"/>
     </group>
+    <group id="Terminal.HyperlinkContextMenu" class="org.jetbrains.plugins.terminal.hyperlinks.HyperlinkContextMenuActionGroup" />
   </actions>
 </idea-plugin>

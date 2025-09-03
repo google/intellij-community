@@ -31,6 +31,7 @@ kotlin {
     "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
     "-Xlambdas=class",
     "-Xconsistent-data-class-copy-visibility",
+    "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks",
   )
   jvm {}
   wasmJs {
@@ -67,8 +68,8 @@ kotlin {
     }
     implementation(jps.io.opentelemetry.opentelemetry.sdk966255575.get())
     implementation(jps.io.opentelemetry.semconv.opentelemetry.semconv489456914.get())
-    implementation(project(":reporting-api"))
-    implementation(project(":multiplatform-shims"))
+    implementation(project(":fleet.reporting.api"))
+    implementation(project(":fleet.multiplatform.shims"))
   }
   // KOTLIN__MARKER_END
 }

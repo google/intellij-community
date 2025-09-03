@@ -92,6 +92,9 @@ fun NewProjectWizardStep.projectWizardJdkComboBox(
     sdkFilter,
     jdkPredicate,
   )
+    .onApply {
+      context.projectJdk = intentProperty?.get()?.prepareJdk()
+    }
 }
 
 /**

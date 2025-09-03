@@ -9,6 +9,7 @@ import com.intellij.lang.xml.XMLLanguage
 
 class XMLSupportTest : GrazieTestBase() {
   override val additionalEnabledRules: Set<String> = setOf("LanguageTool.EN.EN_QUOTES")
+  override val enableGrazieChecker: Boolean = true
 
   fun `test grammar check in xsd file`() {
     runHighlightTestForFile("ide/language/xml/Example.xsd")
@@ -48,6 +49,6 @@ class XMLSupportTest : GrazieTestBase() {
   }
 
   fun `test grazie spellchecking in html file`() {
-    runHighlightTestForFileUsingGrazieSpellchecker("ide/language/xml/Spellcheck.html")
+    runHighlightTestForFile("ide/language/xml/Spellcheck.html")
   }
 }

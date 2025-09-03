@@ -26,8 +26,9 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingCancellable
-import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.pluginManager.shared.rpc.PluginInstallerApi
 import com.intellij.platform.pluginManager.shared.rpc.PluginManagerApi
 import com.intellij.platform.project.projectId
@@ -41,6 +42,7 @@ import org.jetbrains.annotations.ApiStatus
 import javax.swing.JComponent
 
 @ApiStatus.Internal
+@IntellijInternalApi
 class BackendUiPluginManagerController() : UiPluginManagerController {
   override fun isEnabled(): Boolean {
     return !TraverseUIMode.getInstance().isActive()
@@ -52,50 +54,52 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return PluginManagerApi.getInstance().getPlugins().withSource()
   }
 
-  override fun getVisiblePlugins(showImplementationDetails: Boolean): List<PluginUiModel> {
-    return awaitForResult { PluginManagerApi.getInstance().getVisiblePlugins(showImplementationDetails).withSource() }
+  override suspend fun getVisiblePlugins(showImplementationDetails: Boolean): List<PluginUiModel> {
+    return PluginManagerApi.getInstance().getVisiblePlugins(showImplementationDetails).withSource()
   }
 
   override suspend fun initSession(sessionId: String): InitSessionResult {
     return PluginManagerApi.getInstance().initSession(sessionId)
   }
 
-  override fun getInstalledPlugins(): List<PluginUiModel> {
-    return awaitForResult { PluginManagerApi.getInstance().getInstalledPlugins().withSource() }
+  override suspend fun getInstalledPlugins(): List<PluginUiModel> {
+    return PluginManagerApi.getInstance().getInstalledPlugins().withSource()
   }
 
-  override fun getUpdates(): List<PluginUiModel> {
-    return awaitForResult { PluginManagerApi.getInstance().getUpdates().withSource() }
+  override suspend fun getUpdates(): List<PluginUiModel> {
+    return PluginManagerApi.getInstance().getUpdates().withSource()
   }
 
-  override fun getPlugin(id: PluginId): PluginUiModel? {
-    return awaitForResult { PluginManagerApi.getInstance().getPluginById(id)?.withSource() }
+  override suspend fun getPlugin(id: PluginId): PluginUiModel? {
+    return PluginManagerApi.getInstance().getPluginById(id)?.withSource()
   }
 
   override suspend fun findPlugin(pluginId: PluginId): PluginUiModel? {
     return PluginManagerApi.getInstance().findPlugin(pluginId)?.withSource()
   }
 
-  override fun getLastCompatiblePluginUpdateModel(pluginId: PluginId, buildNumber: String?, indicator: ProgressIndicator?): PluginUiModel? {
-    return awaitForResult { PluginManagerApi.getInstance().getLastCompatiblePluginUpdateModel(pluginId, buildNumber)?.withSource() }
+  override suspend fun getLastCompatiblePluginUpdateModel(pluginId: PluginId, buildNumber: String?, indicator: ProgressIndicator?): PluginUiModel? {
+    return  PluginManagerApi.getInstance().getLastCompatiblePluginUpdateModel(pluginId, buildNumber)?.withSource()
   }
 
-  override fun getLastCompatiblePluginUpdate(allIds: Set<PluginId>, throwExceptions: Boolean, buildNumber: String?): List<IdeCompatibleUpdate> {
-    return awaitForResult { PluginManagerApi.getInstance().getLastCompatiblePluginUpdate(allIds, throwExceptions, buildNumber) }
+  override suspend fun getLastCompatiblePluginUpdate(allIds: Set<PluginId>, throwExceptions: Boolean, buildNumber: String?): List<IdeCompatibleUpdate> {
+    return PluginManagerApi.getInstance().getLastCompatiblePluginUpdate(allIds, throwExceptions, buildNumber)
   }
 
-  override fun allowLoadUnloadSynchronously(id: PluginId): Boolean {
-    return awaitForResult { PluginInstallerApi.getInstance().allowLoadUnloadSynchronously(id) }
+  override suspend fun performUninstall(sessionId: String, pluginId: PluginId): Boolean {
+    return PluginInstallerApi.getInstance().performUninstall(sessionId, pluginId)
   }
 
-  override fun performUninstall(sessionId: String, pluginId: PluginId): Boolean {
-    return runBlockingCancellable { PluginInstallerApi.getInstance().performUninstall(sessionId, pluginId) }
+  override suspend fun installOrUpdatePlugin(sessionId: String, parentComponent: JComponent?, descriptor: PluginUiModel, updateDescriptor: PluginUiModel?, installSource: FUSEventSource?, modalityState: ModalityState?, pluginEnabler: PluginEnabler?): InstallPluginResult {
+    return PluginInstallerApi.getInstance().installOrUpdatePlugin(sessionId, PluginDto.fromModel(descriptor), updateDescriptor?.let { PluginDto.fromModel(it) }, installSource)
   }
 
-  override fun performInstallOperation(installPluginRequest: InstallPluginRequest, parentComponent: JComponent?, modalityState: ModalityState?, progressIndicator: ProgressIndicator?, pluginEnabler: PluginEnabler, installCallback: (InstallPluginResult) -> Unit) {
-    service<BackendRpcCoroutineContext>().coroutineScope.launch {
-      installCallback(PluginInstallerApi.getInstance().performInstallOperation(installPluginRequest))
-    }
+  override suspend fun continueInstallation(sessionId: String, pluginId: PluginId, enableRequiredPlugins: Boolean, allowInstallWithoutRestart: Boolean, pluginEnabler: PluginEnabler?, modalityState: ModalityState?, parentComponent: JComponent?): InstallPluginResult {
+    return PluginInstallerApi.getInstance().continueInstallation(sessionId, pluginId, enableRequiredPlugins, allowInstallWithoutRestart)
+  }
+
+  override suspend fun getCustomRepoTags(): Set<String> {
+    return PluginManagerApi.getInstance().getCustomRepoTags()
   }
 
   override suspend fun isModified(sessionId: String): Boolean {
@@ -114,24 +118,36 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return PluginManagerApi.getInstance().isDisabledInDiff(sessionId, pluginId)
   }
 
+  override suspend fun getPluginsRequiresUltimateMap(pluginIds: List<PluginId>): Map<PluginId, Boolean> {
+    return PluginManagerApi.getInstance().getPluginsRequiresUltimateMap(pluginIds)
+  }
+
+  override suspend fun isRestartRequired(sessionId: String): Boolean {
+    return PluginInstallerApi.getInstance().isRestartRequired(sessionId)
+  }
+
   override suspend fun findInstalledPlugins(plugins: Set<PluginId>): Map<PluginId, PluginUiModel> {
     return PluginManagerApi.getInstance().findInstalledPlugins(plugins)
+  }
+
+  override suspend fun loadDescriptorById(pluginId: PluginId): PluginUiModel? {
+    return PluginManagerApi.getInstance().loadDescriptorById(pluginId)
   }
 
   override suspend fun isPluginEnabled(pluginId: PluginId): Boolean {
     return PluginManagerApi.getInstance().isPluginEnabled(pluginId)
   }
 
-  override fun isPluginInstalled(pluginId: PluginId): Boolean {
-    return awaitForResult { PluginManagerApi.getInstance().isPluginInstalled(pluginId) }
+  override suspend fun isPluginInstalled(pluginId: PluginId): Boolean {
+    return PluginManagerApi.getInstance().isPluginInstalled(pluginId)
   }
 
-  override fun getPluginInstallationState(pluginId: PluginId): PluginInstallationState {
-    return awaitForResult { PluginManagerApi.getInstance().getPluginInstallationState(pluginId) }
+  override suspend fun getPluginInstallationState(pluginId: PluginId): PluginInstallationState {
+    return PluginManagerApi.getInstance().getPluginInstallationState(pluginId)
   }
 
-  override fun getPluginInstallationStates(): Map<PluginId, PluginInstallationState> {
-    return awaitForResult { PluginManagerApi.getInstance().getPluginInstallationStates() }
+  override suspend fun getPluginInstallationStates(): Map<PluginId, PluginInstallationState> {
+    return PluginManagerApi.getInstance().getPluginInstallationStates()
   }
 
   override suspend fun checkPluginCanBeDownloaded(pluginUiModel: PluginUiModel, progressIndicator: ProgressIndicator?): Boolean {
@@ -140,10 +156,6 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
 
   override suspend fun loadErrors(sessionId: String): Map<PluginId, CheckErrorsResult> {
     return PluginManagerApi.getInstance().loadErrors(sessionId)
-  }
-
-  override fun hasPluginsAvailableForEnableDisable(pluginIds: List<PluginId>): Boolean {
-    return awaitForResult { PluginManagerApi.getInstance().hasPluginsAvailableForEnableDisable(pluginIds) }
   }
 
   override fun connectToUpdateServiceWithCounter(sessionId: String, callback: (Int?) -> Unit): PluginUpdatesService {
@@ -159,8 +171,8 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return awaitForResult { PluginManagerApi.getInstance().filterPluginsRequiresUltimateButItsDisabled(pluginIds) }
   }
 
-  override fun findPluginNames(pluginIds: List<PluginId>): List<String> {
-    return awaitForResult { PluginManagerApi.getInstance().findPluginNames(pluginIds) }
+  override suspend fun findPluginNames(pluginIds: List<PluginId>): List<String> {
+    return PluginManagerApi.getInstance().findPluginNames(pluginIds)
   }
 
   override fun setEnableStateForDependencies(sessionId: String, descriptorIds: Set<PluginId>, enable: Boolean): SetEnabledStateResult {
@@ -171,12 +183,8 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return PluginInstallerApi.getInstance().getErrors(sessionId, pluginId)
   }
 
-  override fun enableRequiredPlugins(sessionId: String, pluginId: PluginId): Set<PluginId> {
-    return awaitForResult { PluginManagerApi.getInstance().enableRequiredPlugins(sessionId, pluginId) }
-  }
-
-  override fun getCustomRepoPlugins(): List<PluginUiModel> {
-    return awaitForResult { PluginManagerApi.getInstance().getCustomRepoPlugins().withSource() }
+  override suspend fun enableRequiredPlugins(sessionId: String, pluginId: PluginId): Set<PluginId> {
+    return PluginManagerApi.getInstance().enableRequiredPlugins(sessionId, pluginId)
   }
 
   override suspend fun getCustomRepositoryPluginMap(): Map<String, List<PluginUiModel>> {
@@ -191,8 +199,8 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return PluginManagerApi.getInstance().isBundledUpdate(pluginIds)
   }
 
-  override fun prepareToUninstall(pluginsToUninstall: List<PluginId>): PrepareToUninstallResult {
-    return awaitForResult { PluginInstallerApi.getInstance().prepareToUninstall(pluginsToUninstall) }
+  override suspend fun prepareToUninstall(pluginsToUninstall: List<PluginId>): PrepareToUninstallResult {
+    return PluginInstallerApi.getInstance().prepareToUninstall(pluginsToUninstall)
   }
 
   override suspend fun resetSession(sessionId: String, removeSession: Boolean, parentComponent: JComponent?): Map<PluginId, Boolean> {
@@ -203,40 +211,28 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     awaitForResult { PluginManagerApi.getInstance().setEnabledState(sessionId, pluginIds, enable) }
   }
 
-  override fun getApplyError(sessionId: String): String? {
-    return awaitForResult { PluginInstallerApi.getInstance().getApplySessionError(sessionId) }
-  }
-
-  override fun applySession(sessionId: String, parent: JComponent?, project: Project?): ApplyPluginsStateResult {
-    return awaitForResult { PluginInstallerApi.getInstance().applyPluginSession(sessionId, project?.projectId()) }
+  override suspend fun applySession(sessionId: String, parent: JComponent?, project: Project?): ApplyPluginsStateResult {
+    return PluginInstallerApi.getInstance().applyPluginSession(sessionId, project?.projectId())
   }
 
   override suspend fun updatePluginDependencies(sessionId: String): Set<PluginId> {
     return PluginInstallerApi.getInstance().updatePluginDependencies(sessionId)
   }
 
-  override fun allowLoadUnloadWithoutRestart(pluginId: PluginId): Boolean {
-    return awaitForResult { PluginInstallerApi.getInstance().allowLoadUnloadWithoutRestart(pluginId.idString) }
+  override suspend fun executePluginsSearch(query: String, count: Int, includeIncompatible: Boolean): PluginSearchResult {
+    return  PluginManagerApi.getInstance().executeMarketplaceQuery(query, count, includeIncompatible)
   }
 
-  override fun isPluginDisabled(pluginId: PluginId): Boolean {
-    return awaitForResult { PluginManagerApi.getInstance().isPluginDisabled(pluginId) }
+  override suspend fun loadPluginDetails(model: PluginUiModel): PluginUiModel? {
+    return PluginManagerApi.getInstance().loadMetadata(PluginDto.fromModel(model))
   }
 
-  override fun executePluginsSearch(query: String, count: Int, includeIncompatible: Boolean): PluginSearchResult {
-    return awaitForResult { PluginManagerApi.getInstance().executeMarketplaceQuery(query, count, includeIncompatible) }
+  override suspend fun loadPluginReviews(pluginId: PluginId, page: Int): List<PluginReviewComment>? {
+    return PluginManagerApi.getInstance().loadPluginReviews(pluginId, page)
   }
 
-  override fun loadPluginDetails(model: PluginUiModel): PluginUiModel? {
-    return awaitForResult { PluginManagerApi.getInstance().loadMetadata(PluginDto.fromModel(model)) }
-  }
-
-  override fun loadPluginReviews(pluginId: PluginId, page: Int): List<PluginReviewComment>? {
-    return awaitForResult { PluginManagerApi.getInstance().loadPluginReviews(pluginId, page) }
-  }
-
-  override fun loadPluginMetadata(externalPluginId: String): IntellijPluginMetadata? {
-    return awaitForResult { PluginManagerApi.getInstance().loadPluginMetadata(externalPluginId) }
+  override suspend fun loadPluginMetadata(externalPluginId: String): IntellijPluginMetadata? {
+    return PluginManagerApi.getInstance().loadPluginMetadata(externalPluginId)
   }
 
   override fun getAllPluginsTags(): Set<String> {
@@ -247,22 +243,14 @@ class BackendUiPluginManagerController() : UiPluginManagerController {
     return awaitForResult { PluginManagerApi.getInstance().getAllVendors() }
   }
 
-  override fun updateDescriptorsForInstalledPlugins() {
+  override suspend fun updateDescriptorsForInstalledPlugins() {
     service<BackendRpcCoroutineContext>().coroutineScope.launch {
       PluginManagerApi.getInstance().updateDescriptorsForInstalledPlugins()
     }
   }
 
-  override fun uninstallDynamicPlugin(parentComponent: JComponent?, sessionId: String, pluginId: PluginId, isUpdate: Boolean): Boolean {
-    return awaitForResult { PluginInstallerApi.getInstance().uninstallDynamicPlugin(sessionId, pluginId, isUpdate) }
-  }
-
-  override fun deletePluginFiles(pluginId: PluginId) {
-    awaitForResult { PluginInstallerApi.getInstance().deletePluginFiles(pluginId) }
-  }
-
-  override fun isNeedUpdate(pluginId: PluginId): Boolean {
-    return awaitForResult { PluginManagerApi.getInstance().isNeedUpdate(pluginId) }
+  override suspend fun isNeedUpdate(pluginId: PluginId): Boolean {
+    return PluginManagerApi.getInstance().isNeedUpdate(pluginId)
   }
 
   override suspend fun closeSession(sessionId: String) {

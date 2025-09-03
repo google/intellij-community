@@ -8,14 +8,17 @@ import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.grazie.GrazieBundle
 import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.text.CheckerRunner
-import com.intellij.grazie.text.TextChecker
 import com.intellij.grazie.text.TextContent
 import com.intellij.grazie.text.TextExtractor
+import com.intellij.grazie.text.TextExtractor.findAllTextContents
 import com.intellij.lang.Language
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.util.TextRange
 import com.intellij.profile.codeInspection.InspectionProfileManager
-import com.intellij.psi.*
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiElementVisitor
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.spellchecker.ui.SpellCheckingEditorCustomization
 import java.util.*
@@ -30,7 +33,6 @@ class GrazieInspection : LocalInspectionTool(), DumbAware {
       return PsiElementVisitor.EMPTY_VISITOR
     }
 
-    val checkers = TextChecker.allCheckers()
     val checkedDomains = checkedDomains()
     val areChecksDisabled = getDisabledChecker(file)
 
@@ -43,9 +45,9 @@ class GrazieInspection : LocalInspectionTool(), DumbAware {
 
         for (extracted in sortByPriority(texts, session.priorityRange)) {
           val runner = CheckerRunner(extracted)
-          runner.run(checkers) { problem ->
-            runner.toProblemDescriptors(problem, isOnTheFly).forEach(holder::registerProblem)
-          }
+          runner.run()
+            .filterNot { it.isStyleLike }
+            .forEach { runner.toProblemDescriptors(it, isOnTheFly).forEach(holder::registerProblem) }
         }
       }
     }
@@ -67,19 +69,6 @@ class GrazieInspection : LocalInspectionTool(), DumbAware {
       catch (e: ClassNotFoundException) {
         false
       }
-    }
-
-    @JvmStatic
-    fun findAllTextContents(vp: FileViewProvider, domains: Set<TextContent.TextDomain>): Set<TextContent> {
-      val allContents: MutableSet<TextContent> = HashSet()
-      for (root in vp.allFiles) {
-        for (element in SyntaxTraverser.psiTraverser(root)) {
-          if (element.firstChild == null) {
-            allContents.addAll(TextExtractor.findTextsAt(element, domains))
-          }
-        }
-      }
-      return allContents
     }
 
     @JvmStatic
@@ -152,8 +141,8 @@ class GrazieInspection : LocalInspectionTool(), DumbAware {
                "fileLanguage = ${psiFile.language}, " +
                "viewProviderLanguages = ${psiFile.viewProvider.allFiles.map { it.language }.toSet()}, " +
                "parentLanguages = ${contents.map { it.commonParent }.map { it.language }.toSet()},"
-               "isPhysical = ${psiFile.isPhysical}, " +
-               "contentLengths = ${contents.map { it.length }}]"
+        "isPhysical = ${psiFile.isPhysical}, " +
+        "contentLengths = ${contents.map { it.length }}]"
       }
     }
   }

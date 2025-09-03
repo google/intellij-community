@@ -53,7 +53,7 @@ internal class TerminalTypeAhead(
   fun isDisabled() = PlatformUtils.isJetBrainsClient() || isDisabledInRegistry() || !isTypingCommand()
 
   private fun isDisabledInRegistry(): Boolean = !Registry.`is`("terminal.type.ahead", false)
-  
+
   private fun isTypingCommand(): Boolean = blocksModel.blocks.lastOrNull()?.let { lastBlock ->
     // The command start offset is where the prompt ends. If it's not there yet, it means the user can't type a command yet.
     // The output start offset is -1 until the command starts executing. Once that happens, it means the user can't type anymore.
@@ -66,9 +66,12 @@ private fun TerminalOutputModel.insertAtCursor(string: String) {
   if (!remainingLinePart.isBlank()) return // at this moment we only support type-ahead at the end of a visible line
   withTypeAhead {
     val replaceLength = string.length.coerceAtMost(remainingLinePart.length)
-    replaceContent(relativeOffset(cursorOffsetState.value), replaceLength, string, emptyList())
-    // Do not reuse cursorOffset because replaceContent might change it.
-    updateCursorPosition(relativeOffset(cursorOffsetState.value + string.length))
+    val replaceOffset = relativeOffset(cursorOffsetState.value)
+    replaceContent(replaceOffset, replaceLength, string, emptyList())
+    // Do not reuse cursorOffsetState.value because replaceContent might change it.
+    // Instead, compute the new offset using the absolute offsets.
+    val newCursorOffset = absoluteOffset(replaceOffset.toAbsolute() + string.length).coerceAtMost(relativeOffset(document.textLength))
+    updateCursorPosition(newCursorOffset)
   }
 }
 

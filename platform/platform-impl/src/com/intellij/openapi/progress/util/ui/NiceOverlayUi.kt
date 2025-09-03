@@ -89,7 +89,7 @@ class NiceOverlayUi(
   private val popupOffsetX: Int = rootPane.width / 2 - popupWidth / 2
   private val popupOffsetY: Int = run {
     val frame = SwingUtilities.getAncestorOfClass(IdeFrame::class.java, rootPane) as? IdeFrame
-    frame?.statusBar?.component?.location?.y ?: (rootPane.height / 2 - popupHeight / 2)
+    frame?.statusBar?.component?.location?.y ?: (rootPane.height - 20 - popupHeight)
   }
 
   // regions of the buttons relative to the containing component
@@ -111,6 +111,8 @@ class NiceOverlayUi(
    */
   private val popupWithShadowLocation: Rectangle = Rectangle(popupOffsetX - shadowSize, popupOffsetY - shadowSize, popupWidth + shadowSize * 2, popupHeight + shadowSize * 2)
 
+  private val initialCursor = rootPane.cursor
+
   /**
    * The "model" of the popup
    */
@@ -126,6 +128,8 @@ class NiceOverlayUi(
       // screenshot is not accessed in this case
       null
     }
+
+    trySetCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR))
 
     drawShadow()
 
@@ -242,6 +246,7 @@ class NiceOverlayUi(
    */
   fun close() {
     rootPane.repaint(popupWithShadowLocation)
+    trySetCursor(initialCursor)
   }
 
   private fun restoreScreenshot() {
@@ -294,7 +299,11 @@ class NiceOverlayUi(
       accumulatingOffsetX += lengthOfText1 + gapBetweenText1AndText2
 
       if (threadDumpButtonHovered) {
+        trySetCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR))
         graphics.paintButtonBackground(accumulatingOffsetX, lengthOfText2 + gapBetweenText2AndText3 + lengthOfText3)
+      }
+      else {
+        trySetCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR))
       }
 
       graphics.drawMainText(accumulatingOffsetX, dumpThreadsButtonText)
@@ -318,6 +327,15 @@ class NiceOverlayUi(
     }
 
     return backBuffer
+  }
+
+  private fun trySetCursor(cursor: Cursor) {
+    val point = MouseInfo.getPointerInfo()?.location ?: return
+    val window = SwingUtilities.getWindowAncestor(rootPane) ?: return
+    if (!window.isShowing || !window.bounds.contains(point)) return
+    SwingUtilities.convertPointFromScreen(point, window) // handles insets/decorations
+    val deepest = SwingUtilities.getDeepestComponentAt(window, point.x, point.y) ?: window
+    UIUtil.setCursor(deepest, cursor)
   }
 
   private fun getTextLength(text: @Nls String): Int {

@@ -75,8 +75,11 @@ com.intellij.openapi.editor.ex.LineIterator
 - a:start(I):V
 com.intellij.openapi.editor.ex.MarkupIterator
 - com.intellij.util.containers.PeekableIterator
+- java.lang.AutoCloseable
 - sf:EMPTY:com.intellij.openapi.editor.ex.MarkupIterator
+- close():V
 - a:dispose():V
+- s:emptyIterator():com.intellij.openapi.editor.ex.MarkupIterator
 - s:mergeIterators(com.intellij.openapi.editor.ex.MarkupIterator,com.intellij.openapi.editor.ex.MarkupIterator,java.util.Comparator):com.intellij.openapi.editor.ex.MarkupIterator
 com.intellij.openapi.editor.ex.RangeMarkerEx
 - com.intellij.openapi.editor.RangeMarker
@@ -117,6 +120,7 @@ com.intellij.openapi.vfs.impl.http.RemoteFileInfo
 - a:startDownloading():V
 com.intellij.openapi.wm.ex.ProgressIndicatorEx
 - com.intellij.openapi.progress.ProgressIndicator
+- sf:EMPTY_ARRAY:com.intellij.openapi.wm.ex.ProgressIndicatorEx[]
 - a:addStateDelegate(com.intellij.openapi.wm.ex.ProgressIndicatorEx):V
 - a:finish(com.intellij.openapi.progress.TaskInfo):V
 - a:initStateFrom(com.intellij.openapi.progress.ProgressIndicator):V

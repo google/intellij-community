@@ -29,6 +29,9 @@ import com.intellij.psi.util.parentOfType
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.components.buildClassType
+import org.jetbrains.kotlin.analysis.api.components.expressionType
+import org.jetbrains.kotlin.analysis.api.components.resolveToSymbol
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
@@ -48,6 +51,7 @@ import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.idea.base.psi.classIdIfNonLocal
 import org.jetbrains.kotlin.idea.base.psi.getOrCreateCompanionObject
+import org.jetbrains.kotlin.idea.base.psi.presentableClassId
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.utils.resolveExpression
 import org.jetbrains.kotlin.idea.quickfix.createFromUsage.CreateFromUsageUtil
@@ -92,7 +96,7 @@ object K2CreatePropertyFromUsageBuilder {
         }
     }
 
-    context(KaSession)
+    context(_: KaSession)
     private fun buildRequests(ref: KtNameReferenceExpression): List<Pair<JvmClass, CreateFieldRequest>> {
         val requests = mutableListOf<Pair<JvmClass, CreateFieldRequest>>()
         val qualifiedElement = ref.getQualifiedElement()
@@ -140,7 +144,7 @@ object K2CreatePropertyFromUsageBuilder {
                 }
                 val jvmModifiers = createModifiers(ref, containingKtFile, isExtension = true, static = true, false)
                 val classId =
-                    (defaultContainerPsi as? KtClassOrObject)?.takeUnless { it is KtEnumEntry }?.classIdIfNonLocal ?: (defaultContainerPsi as? PsiClass)?.classIdIfNonLocal
+                    (defaultContainerPsi as? KtClassOrObject)?.takeUnless { it is KtEnumEntry }?.presentableClassId ?: (defaultContainerPsi as? PsiClass)?.classIdIfNonLocal
                 if (classId != null) {
                     val targetClassType = buildClassType(if (static) ClassId.fromString(classId.asFqNameString() + ".Companion") else classId)
                     requests.add(wrapperForKtFile to CreatePropertyFromKotlinUsageRequest(ref, jvmModifiers, targetClassType, isExtension = true))
@@ -243,14 +247,21 @@ object K2CreatePropertyFromUsageBuilder {
                     } else "fix.create.from.usage.property"
                     KotlinBundle.message(key, request.fieldName)
                 }
-            } else
-            KotlinBundle.message(
-                "quickFix.add.property.text",
-                kotlinModifiers?.joinToString(separator = " ", postfix = " ") ?: "",
-                varVal,
-                request.fieldName,
-                classOrFileName.toString()
-            )
+            } else {
+                val modifier = if (lateinit || kotlinModifiers?.contains(KtTokens.LATEINIT_KEYWORD) == true) {
+                    "lateinit "
+                } else if (request.isConstant) {
+                    "const "
+                } else ""
+
+                KotlinBundle.message(
+                    "quickFix.add.property.text",
+                    modifier,
+                    varVal,
+                    request.fieldName,
+                    classOrFileName.toString()
+                )
+            }
         }
 
         private var declarationText: String = computeDeclarationText()

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import com.intellij.openapi.util.JDOMUtil
@@ -237,7 +237,7 @@ private fun withAppInfoOverride(originalPatchedAppInfo: String,
 private fun shortenCompanyName(name: String) = name.removeSuffix(" s.r.o.").removeSuffix(" Inc.")
 
 fun findApplicationInfoInSources(project: JpsProject, productProperties: ProductProperties): Path {
-  val module = checkNotNull(project.modules.find { it.name == productProperties.applicationInfoModule }) {
+  val module = checkNotNull(project.findModuleByName(productProperties.applicationInfoModule)) {
     "Cannot find required '${productProperties.applicationInfoModule}' module"
   }
   val appInfoRelativePath = "idea/${productProperties.platformPrefix ?: ""}ApplicationInfo.xml"

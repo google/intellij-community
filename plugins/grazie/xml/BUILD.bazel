@@ -11,7 +11,7 @@ jvm_library(
   name = "xml",
   module_name = "intellij.grazie.xml",
   visibility = ["//visibility:public"],
-  srcs = glob(["main/kotlin/**/*.kt", "main/kotlin/**/*.java"], allow_empty = True),
+  srcs = glob(["main/kotlin/**/*.kt", "main/kotlin/**/*.java", "main/kotlin/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/grazie/src:core",
@@ -21,8 +21,11 @@ jvm_library(
     "//platform/util",
     "//platform/util-ex",
     "//platform/code-style-api:codeStyle",
+    "//platform/analysis-api:analysis",
     "//xml/xml-parser:parser",
     "//xml/impl",
+    "//spellchecker",
+    "//spellchecker/xml",
   ],
   runtime_deps = [":xml_resources"]
 )

@@ -428,17 +428,70 @@ public fun BlockQuote.Companion.dark(
 @ExperimentalJewelApi
 public fun List.Companion.light(
     baseTextStyle: TextStyle = defaultTextStyle,
-    ordered: Ordered = Ordered.light(numberStyle = baseTextStyle),
-    unordered: Unordered = Unordered.light(bulletStyle = baseTextStyle.copy(fontWeight = FontWeight.Black)),
+    ordered: Ordered =
+        Ordered.light(
+            numberStyle = baseTextStyle,
+            numberFormatStyles =
+                Ordered.NumberFormatStyles(
+                    firstLevel = NumberFormatStyle.Decimal,
+                    secondLevel = NumberFormatStyle.Roman,
+                    thirdLevel = NumberFormatStyle.Alphabetical,
+                ),
+        ),
+    unordered: Unordered =
+        Unordered.light(
+            bulletStyle = baseTextStyle.copy(fontWeight = FontWeight.Black),
+            bulletCharStyles = Unordered.BulletCharStyles(firstLevel = '•', secondLevel = '◦', thirdLevel = '▪'),
+        ),
 ): List = List(ordered, unordered)
 
 @ApiStatus.Experimental
 @ExperimentalJewelApi
 public fun List.Companion.dark(
     baseTextStyle: TextStyle = defaultTextStyle,
-    ordered: Ordered = Ordered.dark(numberStyle = baseTextStyle),
-    unordered: Unordered = Unordered.dark(bulletStyle = baseTextStyle.copy(fontWeight = FontWeight.Black)),
+    ordered: Ordered =
+        Ordered.dark(
+            numberStyle = baseTextStyle,
+            numberFormatStyles =
+                Ordered.NumberFormatStyles(
+                    firstLevel = NumberFormatStyle.Decimal,
+                    secondLevel = NumberFormatStyle.Roman,
+                    thirdLevel = NumberFormatStyle.Alphabetical,
+                ),
+        ),
+    unordered: Unordered =
+        Unordered.dark(
+            bulletStyle = baseTextStyle.copy(fontWeight = FontWeight.Black),
+            bulletCharStyles = Unordered.BulletCharStyles(firstLevel = '•', secondLevel = '◦', thirdLevel = '▪'),
+        ),
 ): List = List(ordered, unordered)
+
+@ApiStatus.Experimental
+@ExperimentalJewelApi
+@Deprecated("Please, use the overload with numberFormatStyles.")
+public fun Ordered.Companion.light(
+    numberStyle: TextStyle = defaultTextStyle,
+    numberContentGap: Dp = 4.dp,
+    numberMinWidth: Dp = 16.dp,
+    numberTextAlign: TextAlign = TextAlign.End,
+    itemVerticalSpacing: Dp = 16.dp,
+    itemVerticalSpacingTight: Dp = 4.dp,
+    padding: PaddingValues = PaddingValues(start = 6.dp),
+): Ordered =
+    Ordered(
+        numberStyle,
+        numberContentGap,
+        numberMinWidth,
+        numberTextAlign,
+        itemVerticalSpacing,
+        itemVerticalSpacingTight,
+        padding,
+        Ordered.NumberFormatStyles(
+            firstLevel = NumberFormatStyle.Decimal,
+            secondLevel = NumberFormatStyle.Roman,
+            thirdLevel = NumberFormatStyle.Alphabetical,
+        ),
+    )
 
 @ApiStatus.Experimental
 @ExperimentalJewelApi
@@ -466,6 +519,33 @@ public fun Ordered.Companion.light(
         itemVerticalSpacingTight,
         padding,
         numberFormatStyles,
+    )
+
+@ApiStatus.Experimental
+@ExperimentalJewelApi
+@Deprecated("Please, use the overload with numberFormatStyles.")
+public fun Ordered.Companion.dark(
+    numberStyle: TextStyle = defaultTextStyle,
+    numberContentGap: Dp = 4.dp,
+    numberMinWidth: Dp = 16.dp,
+    numberTextAlign: TextAlign = TextAlign.End,
+    itemVerticalSpacing: Dp = 16.dp,
+    itemVerticalSpacingTight: Dp = 4.dp,
+    padding: PaddingValues = PaddingValues(start = 6.dp),
+): Ordered =
+    Ordered(
+        numberStyle,
+        numberContentGap,
+        numberMinWidth,
+        numberTextAlign,
+        itemVerticalSpacing,
+        itemVerticalSpacingTight,
+        padding,
+        Ordered.NumberFormatStyles(
+            firstLevel = NumberFormatStyle.Decimal,
+            secondLevel = NumberFormatStyle.Roman,
+            thirdLevel = NumberFormatStyle.Alphabetical,
+        ),
     )
 
 @ApiStatus.Experimental
@@ -498,6 +578,29 @@ public fun Ordered.Companion.dark(
 
 @ApiStatus.Experimental
 @ExperimentalJewelApi
+@Deprecated("Please, use the version with bulletCharStyles.")
+public fun Unordered.Companion.light(
+    bullet: Char? = '•',
+    bulletStyle: TextStyle = defaultTextStyle.copy(fontWeight = FontWeight.Black),
+    bulletContentGap: Dp = 4.dp,
+    itemVerticalSpacing: Dp = 16.dp,
+    itemVerticalSpacingTight: Dp = 4.dp,
+    padding: PaddingValues = PaddingValues(start = 6.dp),
+    markerMinWidth: Dp = 16.dp,
+): Unordered =
+    Unordered(
+        bullet,
+        bulletStyle,
+        bulletContentGap,
+        itemVerticalSpacing,
+        itemVerticalSpacingTight,
+        padding,
+        markerMinWidth,
+        Unordered.BulletCharStyles(firstLevel = '•', secondLevel = '◦', thirdLevel = '▪'),
+    )
+
+@ApiStatus.Experimental
+@ExperimentalJewelApi
 public fun Unordered.Companion.light(
     bullet: Char? = '•',
     bulletStyle: TextStyle = defaultTextStyle.copy(fontWeight = FontWeight.Black),
@@ -518,6 +621,29 @@ public fun Unordered.Companion.light(
         padding,
         markerMinWidth,
         bulletCharStyles,
+    )
+
+@ApiStatus.Experimental
+@ExperimentalJewelApi
+@Deprecated("Please, use the version with bulletCharStyles.")
+public fun Unordered.Companion.dark(
+    bullet: Char? = '•',
+    bulletStyle: TextStyle = defaultTextStyle.copy(fontWeight = FontWeight.Black),
+    bulletContentGap: Dp = 4.dp,
+    itemVerticalSpacing: Dp = 16.dp,
+    itemVerticalSpacingTight: Dp = 4.dp,
+    padding: PaddingValues = PaddingValues(start = 6.dp),
+    markerMinWidth: Dp = 16.dp,
+): Unordered =
+    Unordered(
+        bullet,
+        bulletStyle,
+        bulletContentGap,
+        itemVerticalSpacing,
+        itemVerticalSpacingTight,
+        padding,
+        markerMinWidth,
+        Unordered.BulletCharStyles(firstLevel = '•', secondLevel = '◦', thirdLevel = '▪'),
     )
 
 @ApiStatus.Experimental

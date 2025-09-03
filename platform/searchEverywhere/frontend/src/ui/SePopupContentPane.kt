@@ -140,9 +140,6 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
       .row(resizable = true).cell(resultsScrollPane, horizontalAlign = HorizontalAlign.FILL, verticalAlign = VerticalAlign.FILL, resizableColumn = true)
       .row().cell(extendedInfoContainer, horizontalAlign = HorizontalAlign.FILL, resizableColumn = true)
 
-    // hide resultsScrollPane and extendedInfoContainer
-    updateViewMode()
-
     textField.text = vm.searchPattern.value
     textField.selectAll()
     textField.document.addDocumentListener(object : DocumentAdapter() {
@@ -150,6 +147,13 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
         vm.setSearchText(textField.text)
       }
     })
+
+    if (textField.text.isNotEmpty()) {
+      isCompactViewMode = false
+    }
+
+    // hide resultsScrollPane and extendedInfoContainer if isCompactViewMode = true
+    updateViewMode()
 
     addHistoryExtensionToTextField()
 
@@ -189,10 +193,17 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
               searchStatePublisher.searchStoppedProducingResults(searchId, resultListModel.size, true)
 
               if (!resultListModel.isValid || resultListModel.isEmpty) {
-                if (!textField.text.isEmpty() &&
-                    (vm.currentTab.getSearchEverywhereToggleAction() as? AutoToggleAction)?.autoToggle(true) ?: false) {
-                  headerPane.updateActionsAsync()
-                  return@withContext
+                if (!textField.text.isEmpty()) {
+                  val currentTab = vm.currentTab
+                  if (currentTab.tabId == searchContext.tabId) {
+
+                    if ((currentTab.getSearchEverywhereToggleAction() as? AutoToggleAction)?.autoToggle(true) ?: false) {
+                      currentTab.lastNotFoundString = textField.text
+                      headerPane.updateActionsAsync()
+                      return@withContext
+                    }
+
+                  }
                 }
               }
 
@@ -233,7 +244,12 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
         val filterEditor = it.filterEditor.getValue()
         filterEditor?.let { filterEditor ->
           withContext(Dispatchers.EDT) {
-            headerPane.setFilterActions(filterEditor.getActions())
+            headerPane.setFilterActions(filterEditor.getHeaderActions())
+            hintHelper.removeRightExtensions()
+            val rightActions = filterEditor.getSearchFieldActions()
+            if (rightActions.isNotEmpty()) {
+              hintHelper.setRightExtensions(rightActions)
+            }
           }
         }
       }
@@ -293,9 +309,9 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
 
     WindowMoveListener(this).installTo(headerPane)
 
-    DumbAwareAction.create { vm.getHistoryItem(true)?.let { textField.text = it; textField.selectAll() } }
+    DumbAwareAction.create { vm.getHistoryItem(true).let { textField.text = it; textField.selectAll() } }
       .registerCustomShortcutSet(SearchTextField.SHOW_HISTORY_SHORTCUT, this)
-    DumbAwareAction.create { vm.getHistoryItem(false)?.let { textField.text = it; textField.selectAll() } }
+    DumbAwareAction.create { vm.getHistoryItem(false).let { textField.text = it; textField.selectAll() } }
       .registerCustomShortcutSet(SearchTextField.ALT_SHOW_HISTORY_SHORTCUT, this)
   }
 
@@ -377,7 +393,7 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
   @Internal
   fun selectFirstItem() {
     vm.coroutineScope.launch(Dispatchers.EDT) {
-     elementsSelected(intArrayOf(0), 0)
+      elementsSelected(intArrayOf(0), 0)
     }
   }
 
@@ -403,6 +419,30 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
     }
     else {
       resultList.repaint()
+      refreshPresentations()
+    }
+  }
+
+  private suspend fun refreshPresentations() {
+    val visibleRange = resultList.firstVisibleIndex..resultList.lastVisibleIndex
+    val visibleRows = visibleRange.mapNotNull { resultListModel.get(it) as? SeResultListItemRow }
+
+    coroutineScope {
+      visibleRows.forEach { itemRow ->
+        val item = itemRow.item
+
+        launch {
+          val newPresentation = vm.currentTab.getUpdatedPresentation(item)
+          if (newPresentation != null) {
+            val newItemRow = SeResultListItemRow(item.withPresentation(newPresentation))
+
+            withContext(Dispatchers.EDT) {
+              val index = resultListModel.indexOf(itemRow).takeIf { it != -1 } ?: return@withContext
+              resultListModel.set(index, newItemRow)
+            }
+          }
+        }
+      }
     }
   }
 
@@ -415,9 +455,22 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
 
     ScrollingUtil.installMoveDownAction(resultList, textField)
 
+    resultList.selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
     resultList.addListSelectionListener { _: ListSelectionEvent ->
-      val index = resultList.selectedIndex
-      if (index != -1) {
+      val selectedIndices = resultList.selectedIndices
+      if (selectedIndices.size > 1) {
+        val multiSelection = selectedIndices.all { i ->
+          val element = resultListModel.get(i)
+          element is SeResultListItemRow && element.item.presentation.isMultiSelectionSupported
+        }
+        if (!multiSelection) {
+          val leadSelectionIndex = resultList.leadSelectionIndex
+          resultList.setSelectedIndex(leadSelectionIndex)
+        }
+      }
+
+      val firstSelectedIndex = resultList.selectedIndex
+      if (firstSelectedIndex != -1) {
         extendedInfoComponent?.updateElement(resultList.selectedValue, this@SePopupContentPane)
       }
     }
@@ -678,7 +731,6 @@ class SePopupContentPane(private val project: Project?, private val vm: SePopupV
 
   private fun updateViewMode(compact: Boolean) {
     extendedInfoContainer.isVisible = !compact && isExtendedInfoEnabled()
-    resultsScrollPane.isVisible = !compact
 
     if (compact == isCompactViewMode) return
     isCompactViewMode = compact

@@ -3298,6 +3298,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("companionObjectConstructor.kt")
+        public void testCompanionObjectConstructor() throws Exception {
+            runTest("testData/quickfix/changeObjectToClass/companionObjectConstructor.kt");
+        }
+
         @TestMetadata("primaryConstructor.kt")
         public void testPrimaryConstructor() throws Exception {
             runTest("testData/quickfix/changeObjectToClass/primaryConstructor.kt");
@@ -5764,6 +5769,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/member/innerClass.kt");
                     }
 
+                    @TestMetadata("propertyLikeCall.kt")
+                    public void testPropertyLikeCall() throws Exception {
+                        runTest("testData/quickfix/createFromUsage/createFunction/call/member/propertyLikeCall.kt");
+                    }
+
                     @TestMetadata("propertyOnUserType.kt")
                     public void testPropertyOnUserType() throws Exception {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/member/propertyOnUserType.kt");
@@ -7234,6 +7244,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 @TestMetadata("unknownTypeInReturn.kt")
                 public void testUnknownTypeInReturn() throws Exception {
                     runTest("testData/quickfix/createFromUsage/createVariable/parameter/unknownTypeInReturn.kt");
+                }
+
+                @TestMetadata("withMissedArgument.kt")
+                public void testWithMissedArgument() throws Exception {
+                    runTest("testData/quickfix/createFromUsage/createVariable/parameter/withMissedArgument.kt");
                 }
 
                 @TestMetadata("withPackageName.kt")
@@ -9717,14 +9732,34 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("if.kt")
+        public void testIf() throws Exception {
+            runTest("testData/quickfix/explicitlyIgnoreReturnValue/if.kt");
+        }
+
         @TestMetadata("ignoredWithAnnotation.kt")
         public void testIgnoredWithAnnotation() throws Exception {
             runTest("testData/quickfix/explicitlyIgnoreReturnValue/ignoredWithAnnotation.kt");
         }
 
+        @TestMetadata("parentheses.kt")
+        public void testParentheses() throws Exception {
+            runTest("testData/quickfix/explicitlyIgnoreReturnValue/parentheses.kt");
+        }
+
+        @TestMetadata("parenthesesInIfBranch.kt")
+        public void testParenthesesInIfBranch() throws Exception {
+            runTest("testData/quickfix/explicitlyIgnoreReturnValue/parenthesesInIfBranch.kt");
+        }
+
         @TestMetadata("simple.kt")
         public void testSimple() throws Exception {
             runTest("testData/quickfix/explicitlyIgnoreReturnValue/simple.kt");
+        }
+
+        @TestMetadata("when.kt")
+        public void testWhen() throws Exception {
+            runTest("testData/quickfix/explicitlyIgnoreReturnValue/when.kt");
         }
     }
 
@@ -12373,6 +12408,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/nullables/removeRedundantNullable.kt");
             }
 
+            @TestMetadata("removeRedundantNullable1.kt")
+            public void testRemoveRedundantNullable1() throws Exception {
+                runTest("testData/quickfix/nullables/removeRedundantNullable1.kt");
+            }
+
             @TestMetadata("removeSupertypeNullable1.kt")
             public void testRemoveSupertypeNullable1() throws Exception {
                 runTest("testData/quickfix/nullables/removeSupertypeNullable1.kt");
@@ -13685,6 +13725,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/override/implemenAsConstructorParameter.kt");
             }
 
+            @TestMetadata("implemenAsConstructorParameterDisabledWithContextParameters.kt")
+            public void testImplemenAsConstructorParameterDisabledWithContextParameters() throws Exception {
+                runTest("testData/quickfix/override/implemenAsConstructorParameterDisabledWithContextParameters.kt");
+            }
+
+            @TestMetadata("implemenAsConstructorParameterDisabledWithReceiver.kt")
+            public void testImplemenAsConstructorParameterDisabledWithReceiver() throws Exception {
+                runTest("testData/quickfix/override/implemenAsConstructorParameterDisabledWithReceiver.kt");
+            }
+
             @TestMetadata("implemenAsConstructorParameterFunction.kt")
             public void testImplemenAsConstructorParameterFunction() throws Exception {
                 runTest("testData/quickfix/override/implemenAsConstructorParameterFunction.kt");
@@ -13794,6 +13844,35 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             public void testVirtualMethodHiddenWithPublicModifier() throws Exception {
                 runTest("testData/quickfix/override/virtualMethodHiddenWithPublicModifier.kt");
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/quickfix/overridingIgnorableWithMustUse")
+    public static class OverridingIgnorableWithMustUse extends AbstractK1QuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K1;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("alreadyAnnotated.kt")
+        public void testAlreadyAnnotated() throws Exception {
+            runTest("testData/quickfix/overridingIgnorableWithMustUse/alreadyAnnotated.kt");
+        }
+
+        @TestMetadata("class.kt")
+        public void testClass() throws Exception {
+            runTest("testData/quickfix/overridingIgnorableWithMustUse/class.kt");
+        }
+
+        @TestMetadata("file.kt")
+        public void testFile() throws Exception {
+            runTest("testData/quickfix/overridingIgnorableWithMustUse/file.kt");
         }
     }
 

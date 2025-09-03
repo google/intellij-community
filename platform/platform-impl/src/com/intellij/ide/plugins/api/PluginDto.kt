@@ -2,18 +2,20 @@
 package com.intellij.ide.plugins.api
 
 import com.intellij.ide.plugins.IdeaPluginDescriptor
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginNodeVendorDetails
 import com.intellij.ide.plugins.newui.PluginDependencyModel
 import com.intellij.ide.plugins.newui.PluginSource
 import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
+import com.intellij.openapi.util.IntellijInternalApi
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 
-
 @Serializable
 @ApiStatus.Internal
+@IntellijInternalApi
 class PluginDto(
   override var name: String? = null,
   override var pluginId: PluginId,
@@ -79,6 +81,8 @@ class PluginDto(
   override var isBundledUpdate: Boolean = false
   override var untilBuild: String? = null
 
+  override var isDisableAllowed: Boolean = true
+
   override fun getDescriptor(): IdeaPluginDescriptor {
     return PluginDtoDescriptorWrapper(this)
   }
@@ -102,7 +106,7 @@ class PluginDto(
 
   companion object {
     @JvmStatic
-    fun fromModel(model: PluginUiModel): PluginDto {
+    fun fromModel(model: PluginUiModel, ignoreDescriptionForNotLoadedPluigns: Boolean = false): PluginDto {
       if (model is PluginDto) {
         return model
       }
@@ -156,13 +160,16 @@ class PluginDto(
         repositoryName = model.repositoryName
         channel = model.channel
         installSource = model.installSource
-        description = model.description
+        if (!ignoreDescriptionForNotLoadedPluigns || PluginManagerCore.isLoaded(model.pluginId)) {
+          description = model.description
+        }
         category = model.category
         sinceBuild = model.sinceBuild
         untilBuild = model.untilBuild
         releaseDate = model.releaseDate
         isBundledUpdate = model.isBundledUpdate
         isImplementationDetail = model.isImplementationDetail
+        isDisableAllowed = model.isDisableAllowed
       }
     }
   }

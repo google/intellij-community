@@ -1,4 +1,4 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.codeInsight;
 
@@ -30,21 +30,22 @@ public abstract class AutoPopupController {
    * removes from autopopup bottom panel with buttons and hints
    */
   public static final Key<Boolean> SHOW_BOTTOM_PANEL_IN_LOOKUP_UI = Key.create("Show Bottom Panel In Auto-Popup");
+
   /**
    * Setting this user data key to the editor with a completion provider
-   * allows showing auto popup for slashes
+   * allows showing the auto popup for slashes
    */
   public static final Key<Boolean> ALLOW_AUTO_POPUP_FOR_SLASHES_IN_PATHS = Key.create("Allow Auto-Popup For Slashes In Paths");
 
   /**
-   * If editor has Boolean.TRUE by this key completion popup would be shown without advertising text at the bottom.
+   * If editor has {@code Boolean.TRUE} by this key completion popup would be shown without advertising text at the bottom.
    */
   public static final Key<Boolean> NO_ADS = Key.create("Show Completion Auto-Popup without Ads");
 
   /**
-   * If editor has Boolean.TRUE by this key completion popup would be shown every time when editor gets focus.
-   * For example this key can be used for TextFieldWithAutoCompletion.
-   * (TextFieldWithAutoCompletion looks like standard JTextField and completion shortcut is not obvious to be active)
+   * If editor has {@code Boolean.TRUE} by this key completion popup would be shown every time when editor gets focus.
+   * For example, this key can be used for TextFieldWithAutoCompletion.
+   * (TextFieldWithAutoCompletion looks like standard JTextField and the completion shortcut is not obvious to be active)
    */
   public static final Key<Boolean> AUTO_POPUP_ON_FOCUS_GAINED = Key.create("Show Completion Auto-Popup On Focus Gained");
 
@@ -56,7 +57,9 @@ public abstract class AutoPopupController {
 
   public abstract void autoPopupMemberLookup(@NotNull Editor editor, @Nullable Condition<? super PsiFile> condition);
 
-  public abstract void autoPopupMemberLookup(@NotNull Editor editor, @NotNull CompletionType completionType, @Nullable Condition<? super PsiFile> condition);
+  public abstract void autoPopupMemberLookup(@NotNull Editor editor,
+                                             @NotNull CompletionType completionType,
+                                             @Nullable Condition<? super PsiFile> condition);
 
   public abstract void scheduleAutoPopup(@NotNull Editor editor,
                                          @NotNull CompletionType completionType,

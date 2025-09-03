@@ -495,8 +495,11 @@ public final class ConfigImportHelper {
   }
 
   private static boolean shouldAskForConfig() {
+    if (!canAskForConfig()) {
+      return false;
+    }
     String showImportDialog = System.getProperty(SHOW_IMPORT_CONFIG_DIALOG_PROPERTY);
-    if ("default-production".equals(showImportDialog) || "never".equals(showImportDialog)) {
+    if ("default-production".equals(showImportDialog)) {
       return false;
     }
     return PluginManagerCore.isRunningFromSources() ||
@@ -504,11 +507,13 @@ public final class ConfigImportHelper {
            "true".equals(showImportDialog);
   }
 
-  private static @Nullable Pair<Path, Path> showDialogAndGetOldConfigPath(List<Path> guessedOldConfigDirs) {
+  private static boolean canAskForConfig() {
     String showImportDialog = System.getProperty(SHOW_IMPORT_CONFIG_DIALOG_PROPERTY);
-    if ("never".equals(showImportDialog)) {
-      return null;
-    }
+    return !"never".equals(showImportDialog) && !AppMode.isRemoteDevHost();
+  }
+
+  private static @Nullable Pair<Path, Path> showDialogAndGetOldConfigPath(List<Path> guessedOldConfigDirs) {
+    if (!canAskForConfig()) return null;
 
     //noinspection TestOnlyProblems
     LookAndFeelThemeAdapterKt.setEarlyUiLaF();
@@ -1282,7 +1287,7 @@ public final class ConfigImportHelper {
       }
 
       try {
-        IdeaPluginDescriptorImpl descriptor = PluginDescriptorLoader.loadAndInitDescriptorFromArtifact(Paths.get(source), null);
+        IdeaPluginDescriptorImpl descriptor = PluginDescriptorLoader.loadDescriptorFromArtifact(Paths.get(source), null);
         if (descriptor != null) {
           result.add(descriptor.getPluginId());
         }

@@ -344,8 +344,42 @@ public class PyExtractMethodTest extends LightMarkedTestCase {
     doFail("foo", "Cannot perform refactoring when execution flow is interrupted");
   }
 
+  // PY-83001
+  public void testExtractCompleteBody() {
+    doTest("body");
+  }
+
+  // PY-83066
+  public void testExtractAddsImport1() {
+    doTest("body");
+  }
+
+  // PY-83066
+  public void testExtractAddsImport2() {
+    doTest("body");
+  }
+
+  // PY-83066
+  public void testExtractAddsImport3() {
+    doTest("body");
+  }
+
+  // PY-83066
+  public void testExtractAddsImport4() {
+    doTest("body");
+  }
+
+  // PY-83066
+  public void testExtractAddsImport5() {
+    doTest("body");
+  }
+
   // PY-35287
   public void testTypedStatements() {
     doTest("greeting");
+  }
+
+  public void testPreserveWhitespaceBetweenStatements() {
+    doTest("extracted");
   }
 }

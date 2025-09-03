@@ -9,10 +9,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import org.jdom.Element
+import org.jetbrains.jps.model.serialization.JpsMavenSettings
 import org.jetbrains.jps.model.serialization.JpsSerializationManager
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import kotlin.collections.asSequence
+import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.invariantSeparatorsPathString
@@ -28,11 +31,28 @@ internal class JpsModuleToBazel {
 
     @JvmStatic
     fun main(args: Array<String>) {
-      val workspaceDir: Path? = System.getenv(BAZEL_BUILD_WORKSPACE_DIRECTORY_ENV)?.let { Path.of(it).normalize() }
-      val runWithoutUltimateRoot = (System.getenv(RUN_WITHOUT_ULTIMATE_ROOT_ENV) ?: "false").toBooleanStrict()
+      var workspaceDir = System.getenv(BAZEL_BUILD_WORKSPACE_DIRECTORY_ENV)
+                         ?: System.getProperty("user.dir")
+      var runWithoutUltimateRoot = System.getenv(RUN_WITHOUT_ULTIMATE_ROOT_ENV) ?: "false"
+      var defaultCustomModules = "true"
+      var m2Repo = JpsMavenSettings.getMavenRepositoryPath()
 
-      val communityRoot = searchCommunityRoot(workspaceDir ?: Path.of(System.getProperty("user.dir")))
-      val ultimateRoot: Path? = if (!runWithoutUltimateRoot && communityRoot.parent.resolve(".ultimate.root.marker").exists()) {
+      for (arg in args) {
+        when {
+          arg.startsWith("--run_without_ultimate_root=") ->
+            runWithoutUltimateRoot = arg.substringAfter("=")
+          arg.startsWith("--workspace_directory=") ->
+            workspaceDir = arg.substringAfter("=")
+          arg.startsWith("--default-custom-modules=") ->
+            defaultCustomModules = arg.substringAfter("=")
+          arg.startsWith("--m2-repo=") ->
+            m2Repo = arg.substringAfter("=")
+          else -> error("Unknown argument: $arg")
+        }
+      }
+
+      val communityRoot = searchCommunityRoot(Path.of(workspaceDir))
+      val ultimateRoot: Path? = if (!runWithoutUltimateRoot.toBooleanStrict() && communityRoot.parent.resolve(".ultimate.root.marker").exists()) {
         communityRoot.parent
       } else {
         null
@@ -40,11 +60,11 @@ internal class JpsModuleToBazel {
 
       println("Community root: $communityRoot")
       println("Ultimate root: $ultimateRoot")
+      println("M2 repo root: $m2Repo")
 
       val projectDir = ultimateRoot ?: communityRoot
 
-      val m2Repo = Path.of(System.getProperty("user.home"), ".m2/repository")
-      val project = JpsSerializationManager.getInstance().loadProject(projectDir.toString(), mapOf("MAVEN_REPOSITORY" to m2Repo.toString()), true)
+      val project = JpsSerializationManager.getInstance().loadProject(projectDir.toString(), mapOf("MAVEN_REPOSITORY" to m2Repo), true)
       val jarRepositories = loadJarRepositories(projectDir)
 
       val modulesBazel = listOfNotNull(
@@ -59,6 +79,7 @@ internal class JpsModuleToBazel {
         communityRoot = communityRoot,
         project = project,
         urlCache = urlCache,
+        customModules = if (defaultCustomModules.toBooleanStrict()) DEFAULT_CUSTOM_MODULES else emptyMap(),
       )
       val moduleList = generator.computeModuleList()
       // first, generate community to collect libs, that used by community (to separate community and ultimate libs)
@@ -67,7 +88,7 @@ internal class JpsModuleToBazel {
       generator.save(communityResult.moduleBuildFiles)
       generator.save(ultimateResult.moduleBuildFiles)
 
-      generator.generateLibs(jarRepositories = jarRepositories, m2Repo = m2Repo)
+      generator.generateLibs(jarRepositories = jarRepositories, m2Repo = Path.of(m2Repo))
 
       // Check that after all workings of generator, all checksums from urls with checksums
       // are saved to MODULE.bazel correctly
@@ -93,7 +114,7 @@ internal class JpsModuleToBazel {
 
       if (ultimateRoot != null) {
         val targetsFile = ultimateRoot.resolve("build/bazel-targets.json")
-        saveTargets(targetsFile, communityResult.moduleTargets + ultimateResult.moduleTargets, moduleList)
+        saveTargets(targetsFile, communityResult.moduleTargets + ultimateResult.moduleTargets, moduleList, generator.mavenLibraries.values + generator.localLibraries.values)
       }
     }
 
@@ -103,6 +124,14 @@ internal class JpsModuleToBazel {
       jarRepositories: List<JarRepository>,
     ) {
       val usedEntries = urlCache.getUsedEntries()
+
+      if (usedEntries.isEmpty()) {
+        check(modulesBazel.none { it.exists() }) {
+          "No used entries -> not module bazel files generated: $modulesBazel should not exist"
+        }
+        return
+      }
+
       val mapOnDisk = readModules(modulesBazel, jarRepositories, warningsAsErrors = true)
 
       if (mapOnDisk != usedEntries) {
@@ -134,7 +163,7 @@ internal class JpsModuleToBazel {
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun saveTargets(file: Path, targets: List<BazelBuildFileGenerator.ModuleTargets>, moduleList: ModuleList) {
+    fun saveTargets(file: Path, targets: List<BazelBuildFileGenerator.ModuleTargets>, moduleList: ModuleList, libs: Collection<Library>) {
       @Serializable
       data class TargetsFileModuleDescription(
         val productionTargets: List<String>,
@@ -147,12 +176,15 @@ internal class JpsModuleToBazel {
       @Serializable
       data class TargetsFile(
         val modules: Map<String, TargetsFileModuleDescription>,
+        val projectLibraries: Map<String, String>
       )
 
       val skippedModules = moduleList.skippedModules
 
       val tempFile = Files.createTempFile(file.parent, file.fileName.toString(), ".tmp")
       try {
+        val emptyModule = TargetsFileModuleDescription(emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+
         Files.writeString(
           tempFile, jsonSerializer.encodeToString<TargetsFile>(
           serializer = jsonSerializer.serializersModule.serializer(),
@@ -163,9 +195,13 @@ internal class JpsModuleToBazel {
                 productionJars = moduleTarget.productionJars,
                 testTargets = moduleTarget.testTargets,
                 testJars = moduleTarget.testJars,
-                exports = moduleList.deps[moduleTarget.moduleDescriptor]?.exports ?: emptyList(),
+                exports = moduleList.deps[moduleTarget.moduleDescriptor]?.exports?.map { it.label } ?: emptyList(),
               )
-            } + skippedModules.associateWith { moduleName -> TargetsFileModuleDescription(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()) }
+            } + skippedModules.associateWith { emptyModule },
+            projectLibraries = libs.asSequence().mapNotNull {
+              if (it.target.isModuleLibrary) return@mapNotNull null
+              return@mapNotNull it.target.jpsName to "${it.target.container.repoLabel}//:${it.target.targetName}"
+            }.sortedBy { it.first }.toMap()
           )))
         tempFile.moveTo(file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
       } finally {
@@ -176,10 +212,10 @@ internal class JpsModuleToBazel {
     fun searchCommunityRoot(start: Path): Path {
       var current = start
       while (true) {
-        if (Files.exists(current.resolve("intellij.idea.community.main.iml"))) {
+        if (Files.exists(current.resolve(".community.root.marker"))) {
           return current
         }
-        if (Files.exists(current.resolve("community/intellij.idea.community.main.iml"))) {
+        if (Files.exists(current.resolve("community/.community.root.marker"))) {
           return current.resolve("community")
         }
 
@@ -209,6 +245,7 @@ private fun deleteOldFiles(projectDir: Path, generatedFiles: Set<Path>) {
     }
   }
 
+  fileListFile.parent.createDirectories()
   Files.writeString(fileListFile, generatedFiles.joinToString("\n") { projectDir.relativize(it).invariantSeparatorsPathString })
 }
 

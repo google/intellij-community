@@ -11,6 +11,7 @@ plugins {
   id("fleet-build-jps-module-plugin")
   alias(libs.plugins.dokka)
   // GRADLE_PLUGINS__MARKER_START
+  alias(jps.plugins.rhizomedb)
   // GRADLE_PLUGINS__MARKER_END
 }
 
@@ -32,6 +33,8 @@ kotlin {
     "-Xconsistent-data-class-copy-visibility",
     "-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi",
     "-Xcontext-parameters",
+    "-Xwasm-kclass-fqn",
+    "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks",
   )
   jvm {}
   wasmJs {
@@ -67,8 +70,8 @@ kotlin {
     implementation(jps.org.jetbrains.kotlinx.kotlinx.serialization.json.jvm231489733.get().let { "${it.group}:kotlinx-serialization-json:${it.version}" }) {
       isTransitive = false
     }
-    implementation(project(":util-core"))
-    implementation(project(":multiplatform-shims"))
+    implementation(project(":fleet.util.core"))
+    implementation(project(":fleet.multiplatform.shims"))
   }
   // KOTLIN__MARKER_END
 }

@@ -4,6 +4,7 @@ import com.intellij.codeInspection.SuppressionUtil;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.grazie.grammar.strategy.GrammarCheckingStrategy;
 import com.intellij.grazie.ide.language.LanguageGrammarChecking;
+import com.intellij.lang.ASTNode;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
 import com.intellij.lang.LanguageExtensionPoint;
@@ -13,8 +14,10 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPoint;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.SyntaxTraverser;
 import com.intellij.psi.util.CachedValue;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
@@ -25,6 +28,8 @@ import org.jetbrains.annotations.*;
 
 import java.util.*;
 import java.util.regex.Pattern;
+
+import static com.intellij.util.containers.ContainerUtil.createConcurrentWeakKeyWeakValueMap;
 
 /**
  * An extension specifying how to extract natural language text from PSI for specific programming languages.
@@ -37,17 +42,35 @@ public abstract class TextExtractor {
   private static final Key<CachedValue<Cache>> COMMON_PARENT_CACHE = Key.create("TextExtractor common parent cache");
   private static final Key<CachedValue<Cache>> QUERY_CACHE = Key.create("TextExtractor query cache");
   private static final Key<Boolean> IGNORED = Key.create("TextExtractor ignored");
+  private static final Key<CachedValue<Map<TextContent, TextContent>>> CONTENT_INTERNER = Key.create("TextExtractor interner");
   private static final Pattern SUPPRESSION = Pattern.compile(SuppressionUtil.COMMON_SUPPRESS_REGEXP);
 
   /**
    * Extract text from the given PSI element, if possible.
    * The returned text is most often fully embedded in {@code element},
-   * but it may also include other PSI elements (e.g. adjacent comments).
+   * but it may also include other PSI elements (e.g., adjacent comments).
    * In the latter case, this extension should return an equal {@link TextContent} for every one of those adjacent elements.
+   * <p>
+   * Typical usage:
+   *
+   * <pre><code class="java">TextContentBuilder.FromPsi.build(element, textDomain)</code></pre>
+   *
+   * Implementation guidance:
+   * <p>
+   * To maximize performance, guard against unnecessary (and sometimes quite expensive) operations by checking that
+   * the requested textDomain is contained in allowedDomains before extracting.
+   *
+   * <pre><code class="java">
+   * if (shouldExtractTextContent(root) && allowedDomains.contains(textDomain)) {
+   *   // some other potentially performance-intensive operations
+   *   return TextContentBuilder.FromPsi.build(root, textDomain)
+   * }
+   * </code></pre>
+   *
+   * See concrete implementations (e.g., in ChatInputTextExtractor, JsonTextExtractor, GoTextExtractor, etc.) for
+   * examples.
+
    * @param allowedDomains the set of the text domains that are expected by the caller.
-   *                       The extension may check this set before doing unnecessary expensive PSI traversal
-   *                       to improve the performance,
-   *                       but it's not necessary.
    * @see TextContentBuilder
    * @see #buildTextContents
    */
@@ -83,6 +106,19 @@ public abstract class TextExtractor {
 
   /**
    * @return text contents intersecting the given PSI element with the domains from the allowed set.
+   * <p>
+   * Same as {@link #findTextsAt}, but the extensions are queried only for the given {@code psi}. The results are cached and reused.
+   */
+  public static @NotNull List<TextContent> findTextsExactlyAt(@NotNull PsiElement psi, @NotNull Set<TextContent.TextDomain> allowedDomains) {
+    PsiFile file = psi.getContainingFile();
+    return ContainerUtil.filter(
+      obtainContents(allowedDomains, file, psi),
+      c -> c.getUserData(IGNORED) == null && allowedDomains.contains(c.getDomain())
+    );
+  }
+
+  /**
+   * @return text contents intersecting the given PSI element with the domains from the allowed set.
    * The extensions are queried for the given {@code psi} and its parents, the results are cached and reused.
    */
   public static @Unmodifiable @NotNull List<TextContent> findTextsAt(@NotNull PsiElement psi, @NotNull Set<TextContent.TextDomain> allowedDomains) {
@@ -103,12 +139,10 @@ public abstract class TextExtractor {
       }
     }
 
-    Language fileLanguage = (file != null ? file : psi.getContainingFile()).getLanguage();
-
     for (PsiElement each = psi; each != null; each = each.getParent()) {
       RecursionGuard.StackStamp stamp = RecursionManager.markStack();
 
-      List<TextContent> contents = obtainContents(allowedDomains, fileLanguage, each);
+      List<TextContent> contents = obtainContents(allowedDomains, file != null ? file : psi.getContainingFile(), each);
       if (stamp.mayCacheNow() && !contents.isEmpty()) {
         StreamEx.of(contents)
           .groupingBy(TextContent::getCommonParent)
@@ -126,16 +160,24 @@ public abstract class TextExtractor {
 
   private static Cache obtainCache(PsiElement psi, Key<CachedValue<Cache>> key) {
     var provider = TextContentModificationTrackerProvider.EP_NAME.forLanguage(psi.getLanguage());
-    var tracker = provider == null ? PsiModificationTracker.MODIFICATION_COUNT : provider.getModificationTracker(psi);
+    var providedTracker = provider != null ? provider.getModificationTracker(psi) : null;
+    var tracker = providedTracker != null ? providedTracker : PsiModificationTracker.MODIFICATION_COUNT;
     
-    CachedValue<Cache> cache = CachedValuesManager.getManager(psi.getProject()).createCachedValue(
-      () -> CachedValueProvider.Result.create(new Cache(), tracker));
+    CachedValue<Cache> cache = CachedValuesManager.getManager(psi.getProject())
+      .createCachedValue(() -> CachedValueProvider.Result.create(new Cache(), tracker));
     cache = ((UserDataHolderEx)psi).putUserDataIfAbsent(key, cache);
     return cache.getValue();
   }
 
+  private static Map<TextContent, TextContent> obtainInterner(PsiFile file) {
+    CachedValue<Map<TextContent, TextContent>> cache = CachedValuesManager.getManager(file.getProject())
+      .createCachedValue(() -> CachedValueProvider.Result.create(createConcurrentWeakKeyWeakValueMap(), file));
+    cache = ((UserDataHolderEx)file).putUserDataIfAbsent(CONTENT_INTERNER, cache);
+    return cache.getValue();
+  }
+
   private static List<TextContent> obtainContents(Set<TextContent.TextDomain> allowedDomains,
-                                                  Language fileLanguage,
+                                                  PsiFile file,
                                                   PsiElement psi) {
     CachedValue<Cache> cv = psi.getUserData(QUERY_CACHE);
     if (cv != null) {
@@ -147,9 +189,15 @@ public abstract class TextExtractor {
 
     Language psiLanguage = psi.getLanguage();
     List<TextContent> contents = doExtract(psi, allowedDomains, psiLanguage);
+    Language fileLanguage = file.getLanguage();
     if (contents.isEmpty() && fileLanguage != psiLanguage) {
       contents = doExtract(psi, allowedDomains, fileLanguage);
     }
+    if (contents.isEmpty()) return Collections.emptyList();
+
+    // deduplicate equal contents created by different threads to avoid O(token_count) 'equals' checks later on
+    var interner = obtainInterner(file);
+    contents = ContainerUtil.map(contents, content -> interner.computeIfAbsent(content, __ -> content));
 
     for (TextContent content : contents) {
       if (shouldIgnore(content)) {
@@ -157,15 +205,36 @@ public abstract class TextExtractor {
       }
     }
 
-    if (!contents.isEmpty() && stamp.mayCacheNow()) {
+    if (stamp.mayCacheNow()) {
       obtainCache(psi, QUERY_CACHE).register(allowedDomains, contents);
+      cacheOnSiblings(allowedDomains, psi, contents);
     }
     return contents;
   }
 
+  private static void cacheOnSiblings(Set<TextContent.TextDomain> allowedDomains,
+                                      PsiElement psi,
+                                      List<TextContent> contents) {
+    contents.forEach(content -> {
+      int startOffset = content.textOffsetToFile(0);
+      int endOffset = content.textOffsetToFile(content.length());
+      TextRange psiRangeInFile = psi.getTextRange();
+      if (psiRangeInFile.getStartOffset() > startOffset || psiRangeInFile.getEndOffset() < endOffset) {
+        for (ASTNode child : psi.getParent().getNode().getChildren(null)) {
+          PsiElement sibling = child.getPsi();
+          contents.stream()
+            .filter(it -> it.intersectsRange(sibling.getTextRange()))
+            .forEach(it -> {
+              obtainCache(sibling, QUERY_CACHE).register(allowedDomains, List.of(content));
+            });
+        }
+      }
+    });
+  }
+
   private static class Cache {
-    final EnumSet<TextContent.TextDomain> checkedDomains = EnumSet.noneOf(TextContent.TextDomain.class);
-    final LinkedHashSet<TextContent> foundContents = new LinkedHashSet<>();
+    private final EnumSet<TextContent.TextDomain> checkedDomains = EnumSet.noneOf(TextContent.TextDomain.class);
+    private final Set<TextContent> foundContents = new LinkedHashSet<>();
 
     synchronized void register(Set<TextContent.TextDomain> allowedDomains, List<TextContent> contents) {
       checkedDomains.addAll(allowedDomains);
@@ -214,6 +283,21 @@ public abstract class TextExtractor {
     return ContainerUtil.filter(findTextsAt(psi, allowedDomains), c -> psiRange.contains(c.textOffsetToFile(0)));
   }
 
+
+  /**
+   * Extract all text contents from a file view provider that match the specified domains.
+   * Traverses through all PSI elements in all root files of the view provider and collects matching text contents.
+   */
+  public static Set<TextContent> findAllTextContents(FileViewProvider vp, Set<TextContent.TextDomain> domains) {
+    Set<TextContent> allContents = new HashSet<>();
+    for (PsiFile root : vp.getAllFiles()) {
+      for (PsiElement element : SyntaxTraverser.psiTraverser(root)) {
+        allContents.addAll(findTextsExactlyAt(element, domains));
+      }
+    }
+    return allContents;
+  }
+
   private static boolean hasIntersectingInjection(TextContent content, PsiFile file) {
     return InjectedLanguageManager.getInstance(file.getProject()).findInjectedElementAt(file, content.textOffsetToFile(0)) != null;
   }
@@ -255,7 +339,8 @@ public abstract class TextExtractor {
    */
   public static Set<Language> getSupportedLanguages() {
     Set<Language> result = new HashSet<>();
-    ExtensionPoint<LanguageExtensionPoint<TextExtractor>> ep = ApplicationManager.getApplication().getExtensionArea().getExtensionPoint(EP.getName());
+    ExtensionPoint<LanguageExtensionPoint<TextExtractor>> ep =
+      ApplicationManager.getApplication().getExtensionArea().getExtensionPoint(EP.getName());
     for (var point : ep.getExtensionList()) {
       ContainerUtil.addIfNotNull(result, Language.findLanguageByID(point.language));
     }
@@ -264,5 +349,10 @@ public abstract class TextExtractor {
       ContainerUtil.addIfNotNull(result, Language.findLanguageByID(point.language));
     }
     return result;
+  }
+  
+  @TestOnly
+  public @NotNull List<TextContent> buildTextContentsTestAccessor(@NotNull PsiElement element, @NotNull Set<TextContent.TextDomain> allowedDomains) {
+    return buildTextContents(element, allowedDomains); 
   }
 }

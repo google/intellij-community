@@ -1,3 +1,6 @@
+import org.jetbrains.jewel.buildlogic.metalava.GenerateMetalavaApiTask
+import org.jetbrains.jewel.buildlogic.theme.IntelliJThemeGeneratorTask
+
 plugins {
     jewel
     `jewel-check-public-api`
@@ -6,7 +9,10 @@ plugins {
     `intellij-theme-generator`
 }
 
-dependencies { api(projects.ui) }
+dependencies {
+    api(projects.ui)
+    implementation(libs.jbr.api)
+}
 
 intelliJThemeGenerator {
     register("intUiLight") {
@@ -17,4 +23,9 @@ intelliJThemeGenerator {
         themeClassName = "org.jetbrains.jewel.intui.core.theme.IntUiDarkTheme"
         themeFilePath = "../../platform/platform-resources/src/themes/expUI/expUI_dark.theme.json"
     }
+}
+
+tasks {
+    val themeGeneratorTasks = withType<IntelliJThemeGeneratorTask>()
+    withType<GenerateMetalavaApiTask> { dependsOn(themeGeneratorTasks) }
 }

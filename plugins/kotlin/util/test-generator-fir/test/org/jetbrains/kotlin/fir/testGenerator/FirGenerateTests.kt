@@ -2,6 +2,7 @@
 
 package org.jetbrains.kotlin.fir.testGenerator
 
+import com.intellij.testFramework.TestIndexingModeSupporter.IndexingMode
 import org.jetbrains.fir.uast.test.*
 import org.jetbrains.kotlin.fir.testGenerator.codeinsight.generateK2CodeInsightTests
 import org.jetbrains.kotlin.fir.testGenerator.gradle.generateK2GradleTests
@@ -42,6 +43,7 @@ import org.jetbrains.kotlin.idea.fir.parameterInfo.AbstractFirMultilineParameter
 import org.jetbrains.kotlin.idea.fir.parameterInfo.AbstractFirParameterInfoTest
 import org.jetbrains.kotlin.idea.fir.projectView.AbstractK2ProjectViewTest
 import org.jetbrains.kotlin.idea.fir.resolve.*
+import org.jetbrains.kotlin.idea.fir.run.AbstractKotlinTestNavigationTest
 import org.jetbrains.kotlin.idea.fir.search.AbstractHLImplementationSearcherTest
 import org.jetbrains.kotlin.idea.fir.search.AbstractKotlinBuiltInsResolveScopeEnlargerTest
 import org.jetbrains.kotlin.idea.fir.search.AbstractScopeEnlargerTest
@@ -144,6 +146,10 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K2) {
     }
 
     testGroup("fir/tests", testDataPath = "../../idea/tests/testData", category = CODE_INSIGHT) {
+        testClass<AbstractKotlinTestNavigationTest>(indexingMode = listOf(IndexingMode.DUMB_FULL_INDEX, IndexingMode.SMART)) {
+            model("navigation/navigateToTestFromView", pattern = Patterns.forRegex("^([^.]+)\\.(kt|java)$"))
+        }
+
         testClass<AbstractK2AddImportActionTest> {
             model("idea/actions/kotlinAddImportAction", pattern = KT_WITHOUT_DOTS)
         }
@@ -268,7 +274,7 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K2) {
             model("navigation/moveToNextMethod", pattern = TEST, testMethodName = "doTest")
         }
 
-        testClass<AbstractFirGotoTest> {
+        testClass<AbstractFirGotoTest>(indexingMode = listOf(IndexingMode.DUMB_FULL_INDEX, IndexingMode.SMART)) {
             model("navigation/gotoClass", testMethodName = "doClassTest")
             model("navigation/gotoSymbol", testMethodName = "doSymbolTest")
         }

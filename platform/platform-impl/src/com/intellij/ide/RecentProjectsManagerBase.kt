@@ -16,13 +16,14 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.application.appSystemDir
+import com.intellij.openapi.application.PathManager.getSystemDir
 import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.components.*
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.runAndLogException
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
@@ -73,6 +74,8 @@ import java.util.concurrent.atomic.LongAdder
 import javax.swing.Icon
 import javax.swing.JFrame
 import kotlin.collections.Map.Entry
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.invariantSeparatorsPathString
@@ -404,7 +407,15 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       }
     }
 
-    FUSProjectHotStartUpMeasurer.reportProjectPath(projectFile)
+    return FUSProjectHotStartUpMeasurer.withProjectContextElement(projectFile) {
+      openProjectWithEffectiveOptions(projectFile, effectiveOptions)
+    }
+  }
+
+  private suspend fun openProjectWithEffectiveOptions(
+    projectFile: Path,
+    effectiveOptions: OpenProjectTask,
+  ): Project? {
     if (ProjectUtil.isValidProjectPath(projectFile)) {
       val projectManager = ProjectManagerEx.getInstanceEx()
       projectManager.openProjects.firstOrNull { isSameProject(projectFile = projectFile, project = it) }?.let { project ->
@@ -427,7 +438,10 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   override fun setActivationTimestamp(project: Project, timestamp: Long) {
+    LOG.trace { "setActivationTimestamp: project=$project, timestamp=$timestamp" }
+
     if (disableUpdatingRecentInfo.get()) {
+      LOG.trace { "setActivationTimestamp: updating recent info is disabled" }
       return
     }
 
@@ -456,7 +470,10 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   internal fun projectOpened(project: Project, openTimestamp: Long) {
+    LOG.trace { "projectOpened: project=$project, openTimestamp=$openTimestamp" }
+
     if (disableUpdatingRecentInfo.get() || LightEdit.owns(project)) {
+      LOG.trace { "projectOpened: updating recent info is disabled" }
       return
     }
 
@@ -566,6 +583,8 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   override suspend fun reopenLastProjectsOnStart(): Boolean {
+    LOG.trace { "reopenLastProjectsOnStart" }
+
     // Do not reopen, because previously opened projects will open in new instances
     // TODO alternative behaviour?
     if (ProjectManagerEx.IS_PER_PROJECT_INSTANCE_ENABLED) {
@@ -618,6 +637,8 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     index: Int,
     someProjectWasOpened: Boolean,
   ): Boolean {
+    LOG.trace { "openOneByOne: openPaths=$openPaths index=$index someProjectWasOpened=$someProjectWasOpened" }
+
     val (key, value) = openPaths.get(index)
     EelInitialization.runEelInitialization(key)
     val project = openProject(projectFile = Path.of(key), options = OpenProjectTask {
@@ -628,6 +649,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     })
     val nextIndex = index + 1
     if (nextIndex == openPaths.size) {
+      project?.let { fireLastProjectsReopenedEvent(it) }
       return someProjectWasOpened || project != null
     }
     else {
@@ -639,10 +661,15 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
 
   // toOpen - no non-existent project paths and every info has a frame
   private suspend fun openMultiple(toOpen: List<Pair<Path, RecentProjectMetaInfo>>): Boolean {
+    LOG.trace { "openMultiple: toOpen=$toOpen" }
+
     val activeInfo = (toOpen.maxByOrNull { it.second.activationTimestamp } ?: return false).second
-    val taskList = ArrayList<Pair<Path, OpenProjectTask>>(toOpen.size)
+
+    data class Setup(val path: Path, val elementToPass: CoroutineContext?, val task: OpenProjectTask)
+
+    val taskList = ArrayList<Setup>(toOpen.size)
     span("project frame initialization", Dispatchers.EDT) {
-      var activeTask: Pair<Path, OpenProjectTask>? = null
+      var activeTask: Setup? = null
       for ((path, info) in toOpen) {
         val isActive = info == activeInfo
         val ideFrame = createIdeFrame(info.frame ?: FrameInfo())
@@ -651,18 +678,25 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
         }
 
         CustomWindowHeaderUtil.customizeRawFrame(ideFrame)
-        ideFrame.isVisible = true
-        val task = Pair(path, OpenProjectTask {
-          forceOpenInNewFrame = true
-          showWelcomeScreen = false
-          projectWorkspaceId = info.projectWorkspaceId
-          implOptions = OpenProjectImplOptions(recentProjectMetaInfo = info, frame = ideFrame)
-        })
-        if (isActive) {
-          activeTask = task
-        }
-        else {
-          taskList.add(task)
+        FUSProjectHotStartUpMeasurer.withProjectContextElement(path) {
+          ideFrame.isVisible = true
+
+          val startUpContextElementToPass = FUSProjectHotStartUpMeasurer.getStartUpContextElementToPass()
+          val task = Setup(path,
+                           startUpContextElementToPass,
+                           OpenProjectTask {
+                             forceOpenInNewFrame = true
+                             showWelcomeScreen = false
+                             projectWorkspaceId = info.projectWorkspaceId
+                             implOptions = OpenProjectImplOptions(recentProjectMetaInfo = info, frame = ideFrame)
+                           })
+
+          if (isActive) {
+            activeTask = task
+          }
+          else {
+            taskList.add(task)
+          }
         }
       }
 
@@ -670,22 +704,31 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       // but once the windows are created, we start project loading from the latest active project (and put its window at front)
       taskList.add(activeTask!!)
       taskList.reverse()
-      activeTask.second.frame?.toFront()
+      activeTask.task.frame?.toFront()
     }
 
     val projectManager = ProjectManagerEx.getInstanceEx()
     try {
+      var activeProject: Project? = null
+
       val iterator = taskList.iterator()
       while (iterator.hasNext()) {
-        val (path, options) = iterator.next()
-        projectManager.openProjectAsync(path, options)
+        val (path, coroutineContext, options) = iterator.next()
+        val project = withContext(coroutineContext ?: EmptyCoroutineContext) {
+          projectManager.openProjectAsync(path, options)
+        }
+        if (activeProject == null) {
+          activeProject = project
+        }
         iterator.remove()
       }
+
+      activeProject?.let { fireLastProjectsReopenedEvent(it) }
     }
     finally {
       // cleanup unused pre-allocated frames if the operation failed or was canceled
       for (task in taskList) {
-        task.second.frame?.dispose()
+        task.task.frame?.dispose()
       }
     }
     return true
@@ -949,6 +992,12 @@ private fun fireChangeEvent() {
   }
 }
 
+private suspend fun fireLastProjectsReopenedEvent(activeProject: Project) {
+  withContext(Dispatchers.EDT) {
+    application.messageBus.syncPublisher(RecentProjectsManager.LAST_PROJECTS_TOPIC).lastProjectsReopened(activeProject)
+  }
+}
+
 private fun isUseProjectFrameAsSplash() = Registry.`is`("ide.project.frame.as.splash")
 
 private fun readProjectName(path: String): String {
@@ -979,7 +1028,7 @@ private fun readProjectName(path: String): String {
   return JpsPathUtil.readProjectName(storePath) ?: PathUtilRt.getFileName(path)
 }
 
-private fun getLastProjectFrameInfoFile() = appSystemDir.resolve("lastProjectFrameInfo")
+private fun getLastProjectFrameInfoFile() = getSystemDir().resolve("lastProjectFrameInfo")
 
 private fun convertToSystemIndependentPaths(list: MutableList<String>) {
   list.replaceAll {

@@ -58,6 +58,8 @@ import kotlinx.coroutines.flow.*
 import org.jdom.Element
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.util.concurrent.TimeUnit
@@ -188,8 +190,11 @@ open class EditorComposite internal constructor(
   protected open suspend fun beforeFileOpen(scope: CoroutineScope, model: EditorCompositeModel) {}
   @Internal
   protected open suspend fun afterFileOpen(scope: CoroutineScope, model: EditorCompositeModel) {}
+  @Internal
+  protected open suspend fun onHandleModel(model: EditorCompositeModel) {}
 
   private suspend fun handleModel(model: EditorCompositeModel) {
+    onHandleModel(model)
     val fileEditorWithProviders = model.fileEditorAndProviderList
     fileEditorWithProviders.assignEditorProperties()
 
@@ -593,6 +598,18 @@ open class EditorComposite internal constructor(
       }
       val index = calcComponentInsertionIndex(component, container)
       container.add(wrapper, index)
+
+      // editor components can be hidden if they correspond to an inactive context
+      // when we hide the component, we need to hide its border as well which can be achieved by hiding wrapper
+      component.addComponentListener(object : ComponentAdapter() {
+        override fun componentShown(e: ComponentEvent?) {
+          wrapper.isVisible = true
+        }
+
+        override fun componentHidden(e: ComponentEvent?) {
+          wrapper.isVisible = false
+        }
+      })
       if (top) {
         dispatcher.multicaster.topComponentAdded(editor, index, component, container)
       }
@@ -1055,11 +1072,12 @@ internal fun focusEditorOnComposite(
   composite: EditorComposite,
   splitters: EditorsSplitters,
   toFront: Boolean = true,
+  forceFocus: Boolean = false,
 ): Boolean {
   val currentWindow = splitters.currentWindow
   val currentSelectedComposite = currentWindow?.selectedComposite
   // while the editor was loading, the user switched to another editor - don't steal focus
-  if (currentSelectedComposite === composite) {
+  if (currentSelectedComposite === composite || forceFocus) {
     val preferredFocusedComponent = composite.preferredFocusedComponent
     if (preferredFocusedComponent == null) {
       LOG.warn("Cannot focus editor (splitters=$splitters, composite=$composite, reason=preferredFocusedComponent is null)")

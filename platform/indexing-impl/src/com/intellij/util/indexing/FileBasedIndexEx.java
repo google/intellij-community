@@ -16,7 +16,10 @@ import com.intellij.openapi.project.ProjectLocator;
 import com.intellij.openapi.roots.ContentIterator;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.registry.Registry;
-import com.intellij.openapi.vfs.*;
+import com.intellij.openapi.vfs.CompactVirtualFileSet;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.psi.SingleRootFileViewProvider;
 import com.intellij.psi.search.EverythingGlobalScope;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -548,13 +551,6 @@ public abstract class FileBasedIndexEx extends FileBasedIndex {
     }
   }
 
-  @Override
-  public boolean iterateNonIndexableFiles(@NotNull Project project,
-                                          @Nullable VirtualFileFilter acceptFilter,
-                                          @NotNull ContentIterator processor) {
-    return NonIndexableFilesUtils.iterateNonIndexableFilesImpl(project, acceptFilter, processor);
-  }
-
   /**
    * Returns providers of files to be indexed.
    * <p>
@@ -566,12 +562,7 @@ public abstract class FileBasedIndexEx extends FileBasedIndex {
     if (project instanceof LightEditCompatible) {
       return Collections.emptyList();
     }
-    if (Registry.is("use.workspace.file.index.to.generate.iterators")) {
-      return IndexingIteratorsProvider.getInstance(project).getIndexingIterators();
-    }
-    else {
-      return IndexableFilesIndex.getInstance(project).getIndexingIterators();
-    }
+    return IndexingIteratorsProvider.getInstance(project).getIndexingIterators();
   }
 
   private @Nullable <K, V> IntSet collectFileIdsContainingAllKeys(@NotNull ID<K, V> indexId,

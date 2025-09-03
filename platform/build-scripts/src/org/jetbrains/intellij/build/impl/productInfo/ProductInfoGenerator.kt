@@ -1,4 +1,5 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:JvmName("ProductInfoGenerator")
 package org.jetbrains.intellij.build.impl.productInfo
 
 import com.intellij.platform.buildData.productInfo.CustomCommandLaunchData
@@ -85,7 +86,7 @@ private fun generateGitRevisionProperty(context: BuildContext): CustomProperty? 
   val gitRoot = findGitRoot(context)
   if (gitRoot == null) {
     if (!context.options.isInDevelopmentMode && !context.options.isTestBuild) {
-      context.messages.error("Cannot find Git repository root for '${context.paths.projectHome}'")
+      context.messages.logErrorAndThrow("Cannot find Git repository root for '${context.paths.projectHome}'")
     }
     return null
   }
@@ -94,7 +95,7 @@ private fun generateGitRevisionProperty(context: BuildContext): CustomProperty? 
     return CustomProperty(CustomPropertyNames.GIT_REVISION, revision)
   }
   catch (e: Exception) {
-    context.messages.error("Cannot determine Git revision to store in product-info.json: ${e.message}", e)
+    context.messages.logErrorAndThrow("Cannot determine Git revision to store in product-info.json: ${e.message}", e)
     return null
   }
 }

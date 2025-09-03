@@ -37,6 +37,7 @@ import com.jetbrains.python.sdk.pipenv.PIPENV_ICON
 import com.jetbrains.python.sdk.poetry.POETRY_ICON
 import com.jetbrains.python.sdk.uv.UV_ICON
 import com.jetbrains.python.statistics.InterpreterTarget
+import com.jetbrains.python.statistics.PythonInterpreterInstallationIdsHolder.Companion.PYTHON_INSTALLATION_INTERRUPTED
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.ApiStatus
 import javax.swing.Icon
@@ -57,14 +58,22 @@ abstract class PythonAddEnvironment(open val model: PythonAddInterpreterModel) {
    *
    * Error is shown to user. Do not catch all exceptions, only return exceptions valuable to user
    */
-  abstract suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): PyResult<Sdk>
+  protected abstract suspend fun getOrCreateSdk(moduleOrProject: ModuleOrProject): PyResult<Sdk>
+
+  protected suspend fun setupSdk(moduleOrProject: ModuleOrProject): PyResult<Sdk> {
+    val sdk = getOrCreateSdk(moduleOrProject).getOr { return it }
+
+    moduleOrProject.moduleIfExists?.excludeInnerVirtualEnv(sdk)
+
+    return Result.success(sdk)
+  }
 
   @ApiStatus.Internal
   suspend fun getOrCreateSdkWithModal(moduleOrProject: ModuleOrProject): PyResult<Sdk> {
     return withModalProgress(ModalTaskOwner.guess(),
                              message("python.sdk.progress.setting.up.environment"),
                              TaskCancellation.cancellable()) {
-      getOrCreateSdk(moduleOrProject)
+      setupSdk(moduleOrProject)
     }
   }
 
@@ -73,7 +82,7 @@ abstract class PythonAddEnvironment(open val model: PythonAddInterpreterModel) {
     return withBackgroundProgress(moduleOrProject.project,
                                   message("python.sdk.progress.setting.up.environment"),
                                   TaskCancellation.cancellable()) {
-      getOrCreateSdk(moduleOrProject)
+      setupSdk(moduleOrProject)
     }
   }
 
@@ -149,6 +158,7 @@ internal fun installBaseSdk(sdk: Sdk, existingSdks: List<Sdk>): Sdk? {
     val notification = NotificationGroupManager.getInstance()
       .getNotificationGroup("Python interpreter installation")
       .createNotification(message("python.sdk.installation.balloon.error.message"), NotificationType.ERROR)
+      .setDisplayId(PYTHON_INSTALLATION_INTERRUPTED)
     notification.collapseDirection
 
     notification.addAction(NotificationAction.createSimple(message("python.sdk.installation.balloon.error.action")) {

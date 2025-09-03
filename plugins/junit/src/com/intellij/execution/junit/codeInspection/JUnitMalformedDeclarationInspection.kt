@@ -24,7 +24,6 @@ import com.intellij.lang.Language
 import com.intellij.lang.jvm.JvmMethod
 import com.intellij.lang.jvm.JvmModifier
 import com.intellij.lang.jvm.JvmModifiersOwner
-import com.intellij.lang.jvm.JvmValue
 import com.intellij.lang.jvm.actions.*
 import com.intellij.lang.jvm.types.JvmPrimitiveTypeKind
 import com.intellij.lang.jvm.types.JvmType
@@ -45,7 +44,6 @@ import com.intellij.psi.util.TypeConversionUtil
 import com.intellij.psi.util.parentOfType
 import com.intellij.uast.UastHintedVisitorAdapter
 import com.intellij.util.asSafely
-import com.siyeh.ig.fixes.SerialVersionUIDBuilder
 import com.siyeh.ig.junit.JUnitCommonClassNames.*
 import com.siyeh.ig.psiutils.TestUtils
 import com.siyeh.ig.psiutils.TypeUtils
@@ -390,8 +388,10 @@ private class JUnitMalformedSignatureVisitor(
     val javaClass = aClass.javaPsi
     if (aClass.isInterface || aClass.javaPsi.hasModifier(JvmModifier.ABSTRACT)) return
     val hasNestedAnnotation = javaClass.hasAnnotation(ORG_JUNIT_JUPITER_API_NESTED)
-    if (!hasNestedAnnotation && !aClass.methods.any { it.javaPsi.hasAnnotation(ORG_JUNIT_JUPITER_API_TEST) ||
-                                                      it.javaPsi.hasAnnotation(ORG_JUNIT_JUPITER_PARAMS_PARAMETERIZED_TEST)}) return
+    if (!hasNestedAnnotation && !aClass.methods.any {
+        it.javaPsi.hasAnnotation(ORG_JUNIT_JUPITER_API_TEST) ||
+        it.javaPsi.hasAnnotation(ORG_JUNIT_JUPITER_PARAMS_PARAMETERIZED_TEST)
+      }) return
     if (!hasNestedAnnotation && aClass.isStatic) return
     if (hasNestedAnnotation && !aClass.isStatic && aClass.visibility != UastVisibility.PRIVATE) return
     val message = JUnitBundle.message("jvm.inspections.junit.malformed.missing.nested.annotation.descriptor")
@@ -421,8 +421,14 @@ private class JUnitMalformedSignatureVisitor(
     param.javaPsi?.asSafely<PsiParameter>()?.let { AnnotationUtil.isAnnotated(it, ignorableAnnotations, 0) } == true
   }
 
+  private fun UMethod.hasSuspendModifier(): Boolean {
+    if (lang != Language.findLanguageByID("kotlin")) return false
+    if (!javaPsi.modifierList.text.contains("suspend")) return false
+    return uastParameters.firstOrNull()?.type?.canonicalText == COROUTINES_CONTINUATION_TYPE
+  }
+
   private fun checkSuspendFunction(method: UMethod): Boolean {
-    return if (method.lang == Language.findLanguageByID("kotlin") && method.javaPsi.modifierList.text.contains("suspend")) {
+    return if (method.hasSuspendModifier()) {
       val message = JUnitBundle.message("jvm.inspections.junit.malformed.suspend.function.descriptor")
       holder.registerUProblem(method, message)
       true
@@ -630,10 +636,11 @@ private class JUnitMalformedSignatureVisitor(
   }
 
   private fun PsiSourceResolveResult.getSourceForClass(owner: PsiClass): PsiElement? {
-    if(element is PsiMethod) {
+    if (element is PsiMethod) {
       if (owners.isEmpty()) return element // direct link
       return owner.findMethodBySignature(element as PsiMethod, true)
-    } else if (element is PsiField) {
+    }
+    else if (element is PsiField) {
       if (owners.isEmpty()) return element // direct link
       return owner.findFieldByName((element as PsiField).name, true)
     }
@@ -641,7 +648,7 @@ private class JUnitMalformedSignatureVisitor(
   }
 
   private fun checkFieldSource(declaration: UDeclaration, methodSource: PsiAnnotation) {
-    if(declaration !is UMethod) return
+    if (declaration !is UMethod) return
     val psiMethod = declaration.javaPsi
     val containingClass = psiMethod.containingClass ?: return
     val annotationMemberValue = methodSource.flattenedAttributeValues(PsiAnnotation.DEFAULT_REFERENCED_METHOD_NAME)
@@ -706,7 +713,7 @@ private class JUnitMalformedSignatureVisitor(
   }
 
   private fun checkAbsentFieldSourceProvider(
-    containingClass: PsiClass, anchor: PsiElement, sourceProviderName: String, method: UMethod
+    containingClass: PsiClass, anchor: PsiElement, sourceProviderName: String, method: UMethod,
   ) {
     val message = JUnitBundle.message(
       "jvm.inspections.junit.malformed.param.field.source.unresolved.descriptor",
@@ -714,19 +721,18 @@ private class JUnitMalformedSignatureVisitor(
     )
     val className = StringUtil.getPackageName(sourceProviderName, '#')
     return if (isOnTheFly && className.isEmpty()) {
-      val modifiers = mutableListOf(JvmModifier.PUBLIC)
+      val modifiers = mutableListOf(JvmModifier.PRIVATE, JvmModifier.FINAL)
       if (!TestUtils.testInstancePerClass(containingClass)) modifiers.add(JvmModifier.STATIC)
-      val typeFromText = JavaPsiFacade.getElementFactory(containingClass.project).createTypeFromText(
-        FIELD_SOURCE_TYPE, containingClass
-      )
+      val elementFactory = JavaPsiFacade.getElementFactory(containingClass.project)
+      val sourceFieldType = elementFactory.createTypeFromText(FIELD_SOURCE_TYPE, containingClass)
       val request = fieldRequest(
         fieldName = sourceProviderName,
         annotations = emptyList(),
         modifiers = modifiers,
-        fieldType = expectedTypes(typeFromText),
+        fieldType = expectedTypes(sourceFieldType),
         targetSubstitutor = PsiJvmSubstitutor(containingClass.project, PsiSubstitutor.EMPTY),
-        initializer = JvmValue.createLongValue(SerialVersionUIDBuilder.computeDefaultSUID(containingClass)),
-        isConstant = true
+        initializer = null,
+        isConstant = false
       )
       val actions = createAddFieldActions(containingClass, request)
       val quickFixes = IntentionWrapper.wrapToQuickFixes(actions, containingClass.containingFile).toTypedArray()
@@ -797,7 +803,7 @@ private class JUnitMalformedSignatureVisitor(
     ) {
       val actions = mutableListOf<IntentionAction>()
       val sameClass = sourceProvider.containingClass == containingClass
-      if(sameClass) {
+      if (sameClass) {
         val annotation = JavaPsiFacade.getElementFactory(containingClass.project).createAnnotationFromText(
           TEST_INSTANCE_PER_CLASS, containingClass
         )
@@ -1076,7 +1082,7 @@ private class JUnitMalformedSignatureVisitor(
     }
   }
 
-  class AnnotatedSignatureProblem(
+  inner class AnnotatedSignatureProblem(
     private val annotations: List<String>,
     private val shouldBeStatic: Boolean? = null,
     private val ignoreOnRunWith: Boolean = false,
@@ -1185,7 +1191,7 @@ private class JUnitMalformedSignatureVisitor(
       val problems = modifierProblems(
         visibility, element.visibility, elementIsStatic, javaPsi.containingClass?.let { cls -> TestUtils.testInstancePerClass(cls) } == true
       )
-      if (element.lang == Language.findLanguageByID("kotlin") && element.javaPsi.modifierList.text.contains("suspend")) {
+      if (element.hasSuspendModifier()) {
         val message = JUnitBundle.message(
           "jvm.inspections.junit.malformed.annotated.suspend.function.descriptor", annotation
         )
@@ -1438,7 +1444,8 @@ private class JUnitMalformedSignatureVisitor(
 
     const val TEST_INSTANCE_PER_CLASS = "@org.junit.jupiter.api.TestInstance(TestInstance.Lifecycle.PER_CLASS)"
     const val METHOD_SOURCE_RETURN_TYPE = "java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments>"
-    const val FIELD_SOURCE_TYPE = "java.util.Collection<java.lang.Object>"
+    const val FIELD_SOURCE_TYPE = "java.util.Collection<org.junit.jupiter.params.provider.Arguments>"
+    const val COROUTINES_CONTINUATION_TYPE = "kotlin.coroutines.Continuation<? super kotlin.Unit>"
 
     val checkableRunners = listOf(
       "org.junit.runners.AllTests",

@@ -9,9 +9,9 @@ jvm_library(
 
 jvm_library(
   name = "frontback-tests_test_lib",
+  module_name = "intellij.java.frontback.tests",
   visibility = ["//visibility:public"],
-  srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
-  associates = ["//java/java-frontback-impl:frontback-impl"],
+  srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:easymock",
     "@lib//:mockito",
@@ -30,12 +30,25 @@ jvm_library(
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
     "//platform/backend/workspace",
+    "//java/java-frontback-impl:frontback-impl",
     "//platform/platform-tests:tests_test_lib",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//java/testFramework/shared",
     "//platform/syntax/syntax-psi:psi",
     "//java/java-syntax:syntax",
+    "//platform/syntax/syntax-tree:tree",
+  ],
+  exports = [
+    "@lib//:easymock",
+    "@lib//:mockito",
+    "@lib//:assert_j",
+    "@lib//:kotlin-test",
+    "//platform/testFramework",
+    "//platform/testFramework:testFramework_test_lib",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/platform-tests:tests_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.frontback.tests` end

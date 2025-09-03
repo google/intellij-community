@@ -1,6 +1,7 @@
 // Copyright 2000-2017 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python.codeInsight.typing;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.intellij.openapi.util.*;
@@ -48,8 +49,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.dynatrace.hash4j.hashing.Hashing.xxh3_128;
 import static com.intellij.openapi.util.RecursionManager.doPreventingRecursion;
 import static com.jetbrains.python.psi.PyKnownDecorator.TYPING_FINAL;
 import static com.jetbrains.python.psi.PyKnownDecorator.TYPING_FINAL_EXT;
@@ -783,9 +786,16 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   }
 
   private static @Nullable Ref<PyType> getType(@NotNull PyExpression expression, @NotNull Context context) {
+    PyType type = context.getKnownType(expression);
+    if (type != null) {
+      return Ref.create(type);
+    }
     for (Pair<PyQualifiedNameOwner, PsiElement> pair : tryResolvingWithAliases(expression, context.getTypeContext())) {
       final Ref<PyType> typeRef = getTypeForResolvedElement(expression, pair.getFirst(), pair.getSecond(), context);
       if (typeRef != null) {
+        if (typeRef.get() != null) {
+          context.assumeType(expression, typeRef.get());
+        }
         return typeRef;
       }
     }
@@ -828,11 +838,11 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
                                                                  @NotNull PsiElement resolved,
                                                                  @NotNull Context context) {
     if (alias != null) {
-      if (context.getTypeAliasStack().contains(alias)) {
+      if (context.containsTypeAlias(alias)) {
         // Recursive types are not yet supported
         return null;
       }
-      context.getTypeAliasStack().add(alias);
+      context.addTypeAlias(alias);
     }
     try {
       final Ref<PyType> typeHintFromProvider = PyTypeHintProvider.Companion.parseTypeHint(
@@ -965,7 +975,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     }
     finally {
       if (alias != null) {
-        context.getTypeAliasStack().remove(alias);
+        context.removeTypeAlias(alias);
       }
     }
   }
@@ -1041,7 +1051,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   }
 
   private static @Nullable PyType anchorTypeParameter(@NotNull PyExpression typeHint, @Nullable PyType type, @NotNull Context context) {
-    PyQualifiedNameOwner typeParamDefinitionFromStack = context.getTypeAliasStack().isEmpty() ? null : context.getTypeAliasStack().peek();
+    PyQualifiedNameOwner typeParamDefinitionFromStack = context.isTypeAliasStackEmpty() ? null : context.peekTypeAlias();
     assert typeParamDefinitionFromStack == null || typeParamDefinitionFromStack instanceof PyTargetExpression;
     PyTargetExpression targetExpr = (PyTargetExpression)typeParamDefinitionFromStack;
     if (type instanceof PyTypeVarTypeImpl typeVar) {
@@ -1090,10 +1100,10 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       return Ref.create(typeVar.toClass());
     }
     // Represent Type[Union[str, int]] internally as Union[Type[str], Type[int]]
-    final PyUnionType unionType = as(type, PyUnionType.class);
-    if (unionType != null &&
-        unionType.getMembers().stream().allMatch(t -> t instanceof PyClassType && !((PyClassType)t).isDefinition())) {
-      return Ref.create(PyUnionType.union(ContainerUtil.map(unionType.getMembers(), t -> ((PyClassType)t).toClass())));
+    if (type instanceof PyUnionType unionType &&
+        ContainerUtil.all(unionType.getMembers(), t -> t instanceof PyClassType clsType && !clsType.isDefinition())) {
+      //noinspection DataFlowIssue
+      return Ref.create(unionType.map(clsType -> ((PyClassType)clsType).toClass()));
     }
     return Ref.create();
   }
@@ -1112,9 +1122,12 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
           // we want to parameterize it with its type parameters defaults already here.
           // We need this check for the type argument list because getParameterizedType() relies on getClassType() for
           // getting the type corresponding to the subscription expression operand.
+          PsiElement stubRetainedContext = getStubRetainedTypeHintContext(typeHint);
           if (classLikeType instanceof PyClassType classType &&
-              isGeneric(classLikeType, typeContext) &&
-              !(typeHint.getParent() instanceof PySubscriptionExpression se && typeHint.equals(se.getOperand()))) {
+              !(stubRetainedContext instanceof PyClass ||
+                PsiTreeUtil.getStubOrPsiParentOfType(stubRetainedContext, ScopeOwner.class) instanceof PyClass) &&
+              !(typeHint.getParent() instanceof PySubscriptionExpression se && typeHint.equals(se.getOperand())) &&
+              isGeneric(classType, context.myContext)) {
             PyCollectionType parameterized = parameterizeClassDefaultAware(classType.getPyClass(), List.of(), context);
             if (parameterized != null) {
               return Ref.create(parameterized.toInstance());
@@ -1661,7 +1674,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   private static @Nullable PyQualifiedNameOwner getTypeParameterScope(@NotNull String name,
                                                                       @NotNull PyExpression typeHint,
                                                                       @NotNull Context context) {
-    if (!context.myComputeTypeParameterScope) return null;
+    if (!context.isComputeTypeParameterScopeEnabled()) return null;
 
     PsiElement typeHintContext = getStubRetainedTypeHintContext(typeHint);
     List<PyQualifiedNameOwner> typeParamOwnerCandidates =
@@ -1682,13 +1695,12 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       }
     }
     if (closestOwner != null) {
-      boolean prevComputeTypeParameterScope = context.myComputeTypeParameterScope;
-      context.myComputeTypeParameterScope = false;
+      boolean prevComputeTypeParameterScope = context.setComputeTypeParameterScopeEnabled(false);
       try {
         return findSameTypeParameterInDefinition(closestOwner, name, context) != null ? closestOwner : null;
       }
       finally {
-        context.myComputeTypeParameterScope = prevComputeTypeParameterScope;
+        context.setComputeTypeParameterScopeEnabled(prevComputeTypeParameterScope);
       }
     }
 
@@ -1718,10 +1730,10 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     // While evaluating type hints of enclosing functions' parameters, resolving to the same TypeVar
     // definition shouldn't trigger the protection against recursive aliases, so we manually remove
     // it from the top for the time being.
-    if (context.getTypeAliasStack().isEmpty()) {
+    if (context.isTypeAliasStackEmpty()) {
       return null;
     }
-    PyQualifiedNameOwner typeVarDeclaration = context.getTypeAliasStack().pop();
+    PyQualifiedNameOwner typeVarDeclaration = context.popTypeAlias();
     assert typeVarDeclaration instanceof PyTargetExpression;
     try {
       final Iterable<PyTypeParameterType> typeParameters;
@@ -1737,7 +1749,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       return ContainerUtil.find(typeParameters, type -> name.equals(type.getName()));
     }
     finally {
-      context.getTypeAliasStack().push(typeVarDeclaration);
+      context.pushTypeAlias(typeVarDeclaration);
     }
   }
 
@@ -2071,12 +2083,13 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       if (!function.isGenerator()) {
         return wrapInCoroutineType(returnType, function);
       }
-      var desc = GeneratorTypeDescriptor.create(returnType);
+      var desc = GeneratorTypeDescriptor.fromGenerator(returnType);
       if (desc != null) {
-        return desc.withAsync(true).toPyType(function);
+        final PyClass classType = PyPsiFacade.getInstance(function.getProject()).createClassByQName(ASYNC_GENERATOR, function);
+        final List<PyType> generics = Arrays.asList(desc.yieldType, desc.sendType);
+        return classType != null ? new PyCollectionTypeImpl(classType, false, generics) : null;
       }
     }
-
     return returnType;
   }
 
@@ -2106,72 +2119,80 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   }
 
   public record GeneratorTypeDescriptor(
-    String className,
-    PyType yieldType, // if YieldType is not specified, it is AnyType
-    PyType sendType,  // if SendType is not specified, it is PyNoneType
-    PyType returnType // if ReturnType is not specified, it is PyNoneType
+    @Nullable PyType yieldType,
+    @Nullable PyType sendType,
+    @Nullable PyType returnType,
+    boolean isAsync
   ) {
-
-    private static final List<String> SYNC_TYPES = List.of(GENERATOR, "typing.Iterable", "typing.Iterator");
-    private static final List<String> ASYNC_TYPES = List.of(ASYNC_GENERATOR, "typing.AsyncIterable", "typing.AsyncIterator");
-
-    public static @Nullable GeneratorTypeDescriptor create(@Nullable PyType type) {
-      final PyClassType classType = as(type, PyClassType.class);
-      final PyCollectionType genericType = as(type, PyCollectionType.class);
-      if (classType == null) return null;
+    /**
+     * Extracts type parameters from typing.Generator and typing.AsyncGenerator
+     */
+    public static @Nullable GeneratorTypeDescriptor fromGenerator(@Nullable PyType type) {
+      if (!(type instanceof PyClassType classType)) return null;
 
       final String qName = classType.getClassQName();
       if (qName == null) return null;
-      if (!SYNC_TYPES.contains(qName) && !ASYNC_TYPES.contains(qName)) return null;
+
+      boolean isAsync = ASYNC_GENERATOR.equals(qName);
+      if (!isAsync && !GENERATOR.equals(qName)) return null;
+
+      final PyType noneType = PyBuiltinCache.getInstance(classType.getPyClass()).getNoneType();
 
       PyType yieldType = null;
-      final var noneType = PyBuiltinCache.getInstance(classType.getPyClass()).getNoneType();
       PyType sendType = noneType;
-      PyType returnType = noneType;
-
-      if (genericType != null) {
+      PyType returnType = isAsync ? null : noneType;
+      if (type instanceof PyCollectionType genericType) {
         yieldType = ContainerUtil.getOrElse(genericType.getElementTypes(), 0, yieldType);
-        if (GENERATOR.equals(qName) || ASYNC_GENERATOR.equals(qName)) {
-          sendType = ContainerUtil.getOrElse(genericType.getElementTypes(), 1, sendType);
+        sendType = ContainerUtil.getOrElse(genericType.getElementTypes(), 1, sendType);
+        returnType = ContainerUtil.getOrElse(genericType.getElementTypes(), 2, returnType);
+      }
+      return new GeneratorTypeDescriptor(yieldType, sendType, returnType, isAsync);
+    }
+
+    /**
+     * Unlike {@link #fromGenerator}, this method can also extract yield type from Protocol types like typing.Iterable
+     */
+    public static @Nullable GeneratorTypeDescriptor fromGeneratorOrProtocol(@Nullable PyType type, @NotNull TypeEvalContext context) {
+      if (!(type instanceof PyClassType classType)) return null;
+
+      GeneratorTypeDescriptor desc = fromGenerator(type);
+      if (desc != null) {
+        return desc;
+      }
+
+      if (PyProtocolsKt.isProtocol(classType, context)) {
+        PyType yieldType;
+
+        PyType syncUpcast = PyTypeUtil.convertToType(classType, "typing.Iterable", classType.getPyClass(), context);
+        if (syncUpcast instanceof PyCollectionType collectionType) {
+          yieldType = collectionType.getIteratedItemType();
+          return new GeneratorTypeDescriptor(yieldType, null, null, false);
         }
-        if (GENERATOR.equals(qName)) {
-          returnType = ContainerUtil.getOrElse(genericType.getElementTypes(), 2, returnType);
+        PyType asyncUpcast = PyTypeUtil.convertToType(classType, "typing.AsyncIterable", classType.getPyClass(), context);
+        if (asyncUpcast instanceof PyCollectionType asyncCollectionType) {
+          yieldType = asyncCollectionType.getIteratedItemType();
+          return new GeneratorTypeDescriptor(yieldType, null, null, true);
+        }
+
+        // Here we try to understand a yield type by return type of __next__ method of protocol specified in annotation.
+        // We cannot use convertToType with typing.Iterator here, as it inherits from typing.Iterable
+        // and requires both __iter__ and __next__, while it should be possible to decide the yield type only by __next__.
+        // TODO: unify logic with PyTargetExpressionImpl.getIterationType (PY-82453)
+        PyFunction next = classType.getPyClass().findMethodByName(PyNames.DUNDER_NEXT, true, context);
+        if (next != null) {
+          yieldType = context.getReturnType(next);
+          yieldType = PyTypeChecker.substitute(yieldType, PyTypeChecker.unifyReceiver(classType, context), context);
+          return new GeneratorTypeDescriptor(yieldType, null, null, false);
+        }
+
+        PyFunction anext = classType.getPyClass().findMethodByName(PyNames.ANEXT, true, context);
+        if (anext != null) {
+          yieldType = Ref.deref(unwrapCoroutineReturnType(context.getReturnType(anext)));
+          yieldType = PyTypeChecker.substitute(yieldType, PyTypeChecker.unifyReceiver(classType, context), context);
+          return new GeneratorTypeDescriptor(yieldType, null, null, true);
         }
       }
-      return new GeneratorTypeDescriptor(qName, yieldType, sendType, returnType);
-    }
-
-    public boolean isAsync() {
-      return ASYNC_TYPES.contains(className);
-    }
-
-    public GeneratorTypeDescriptor withAsync(boolean async) {
-      if (async) {
-        var idx = SYNC_TYPES.indexOf(className);
-        if (idx == -1) return this;
-        return new GeneratorTypeDescriptor(ASYNC_TYPES.get(idx), yieldType, sendType, returnType);
-      }
-      else {
-        var idx = ASYNC_TYPES.indexOf(className);
-        if (idx == -1) return this;
-        return new GeneratorTypeDescriptor(SYNC_TYPES.get(idx), yieldType, sendType, returnType);
-      }
-    }
-
-    public @Nullable PyType toPyType(@NotNull PsiElement anchor) {
-      final PyClass classType = PyPsiFacade.getInstance(anchor.getProject()).createClassByQName(className, anchor);
-      final List<PyType> generics;
-      if (GENERATOR.equals(className)) {
-        generics = Arrays.asList(yieldType, sendType, returnType);
-      }
-      else if (ASYNC_GENERATOR.equals(className)) {
-        generics = Arrays.asList(yieldType, sendType);
-      }
-      else {
-        generics = Collections.singletonList(yieldType);
-      }
-
-      return classType != null ? new PyCollectionTypeImpl(classType, false, generics) : null;
+      return null;
     }
   }
 
@@ -2301,6 +2322,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
 
     private Context(@NotNull TypeEvalContext context) {
       myContext = context;
+      recomputeStrongHashValue();
     }
 
     public @NotNull TypeEvalContext getTypeContext() {
@@ -2309,6 +2331,72 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
 
     public @NotNull Stack<PyQualifiedNameOwner> getTypeAliasStack() {
       return myTypeAliasStack;
+    }
+
+    // Explicit API for manipulating type alias stack
+    public boolean containsTypeAlias(@NotNull PyQualifiedNameOwner alias) {
+      return myTypeAliasStack.contains(alias);
+    }
+
+    public void addTypeAlias(@NotNull PyQualifiedNameOwner alias) {
+      myTypeAliasStack.add(alias);
+      recomputeStrongHashValue();
+    }
+
+    public void removeTypeAlias(@NotNull PyQualifiedNameOwner alias) {
+      myTypeAliasStack.remove(alias);
+      recomputeStrongHashValue();
+    }
+
+    public boolean isTypeAliasStackEmpty() {
+      return myTypeAliasStack.isEmpty();
+    }
+
+    public @Nullable PyQualifiedNameOwner peekTypeAlias() {
+      return myTypeAliasStack.isEmpty() ? null : myTypeAliasStack.peek();
+    }
+
+    public void pushTypeAlias(@NotNull PyQualifiedNameOwner alias) {
+      myTypeAliasStack.push(alias);
+      recomputeStrongHashValue();
+    }
+
+    public @Nullable PyQualifiedNameOwner popTypeAlias() {
+      PyQualifiedNameOwner res = myTypeAliasStack.isEmpty() ? null : myTypeAliasStack.pop();
+      recomputeStrongHashValue();
+      return res;
+    }
+
+    public boolean isComputeTypeParameterScopeEnabled() {
+      return myComputeTypeParameterScope;
+    }
+
+    public boolean setComputeTypeParameterScopeEnabled(boolean value) {
+      boolean prev = myComputeTypeParameterScope;
+      myComputeTypeParameterScope = value;
+      recomputeStrongHashValue();
+      return prev;
+    }
+
+    public @Nullable PyType getKnownType(@NotNull PyExpression expression) {
+      //noinspection SuspiciousMethodCalls
+      return myContext.getContextTypeCache().get(new Pair<>(expression, getContextStrongHashValue()));
+    }
+
+    public void assumeType(@NotNull PyExpression expression, @NotNull PyType type) {
+      myContext.getContextTypeCache().put(new Pair<>(expression, getContextStrongHashValue()), type);
+    }
+
+    private @NotNull HashValue128 myContextStrongHashValue;
+
+    private void recomputeStrongHashValue() {
+      myContextStrongHashValue = xxh3_128().hashCharsTo128Bits(Stream.concat(Stream.of(myComputeTypeParameterScope ? "1" : "0"),
+                                                    myTypeAliasStack.stream().map(it -> it.getQualifiedName()))
+                                                   .collect(Collectors.joining("#")));
+    }
+
+    private @NotNull HashValue128 getContextStrongHashValue() {
+      return myContextStrongHashValue;
     }
 
     @Override

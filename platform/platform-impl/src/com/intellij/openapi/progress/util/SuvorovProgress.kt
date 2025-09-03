@@ -4,14 +4,15 @@ package com.intellij.openapi.progress.util
 import com.intellij.CommonBundle
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.PerformanceWatcher
+import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.actions.RevealFileAction
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.impl.InternalThreading
+import com.intellij.openapi.application.useDebouncedDrawingInSuvorovProgress
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.progress.impl.fus.FreezeUiUsageCollector
 import com.intellij.openapi.progress.util.ui.NiceOverlayUi
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
@@ -20,6 +21,9 @@ import com.intellij.ui.KeyStrokeAdapter
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.application
 import com.intellij.util.ui.AsyncProcessIcon
+import com.intellij.util.ui.GraphicsUtil
+import com.jetbrains.rd.util.error
+import com.jetbrains.rd.util.getLogger
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.future.asCompletableFuture
@@ -27,9 +31,9 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.AWTEvent
 import java.awt.KeyboardFocusManager
-import java.awt.event.InvocationEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
+import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -87,7 +91,7 @@ object SuvorovProgress {
       return
     }
 
-    FreezeUiUsageCollector.reportUiFreezePopupVisible()
+    LifecycleUsageTriggerCollector.onFreezePopupShown()
 
     // in tests, there is no UI scale, but we still want to run SuvorovProgress
     val isScaleInitialized = (application.isUnitTestMode || JBUIScale.isInitialized())
@@ -109,7 +113,8 @@ object SuvorovProgress {
       }
       "NiceOverlay" -> {
         val currentFocusedPane = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusedWindow?.let(SwingUtilities::getRootPane)
-        if (currentFocusedPane == null) {
+        // IJPL-203107 in remote development, there is no graphics for a component
+        if (currentFocusedPane == null || GraphicsUtil.safelyGetGraphics(currentFocusedPane) == null) {
           // can happen also in tests
           processInvocationEventsWithoutDialog(awaitedValue, Int.MAX_VALUE)
         }
@@ -147,20 +152,37 @@ object SuvorovProgress {
         }
         if (dumpThreads) {
           ApplicationManager.getApplication().executeOnPooledThread(Runnable {
-            val dumpDir = PerformanceWatcher.getInstance().dumpThreads("freeze-popup", true, false)
-            if (dumpDir != null) {
-              RevealFileAction.openFile(dumpDir)
+            val dumpFile = PerformanceWatcher.getInstance().dumpThreads("freeze-popup", true, false)
+            if (dumpFile != null) {
+              if (Files.exists(dumpFile)) {
+                RevealFileAction.openFile(dumpFile)
+              }
+              else {
+                getLogger<SuvorovProgress>().error { "Failed to dump threads to $dumpFile" }
+              }
             }
           })
         }
       }, disposable)
 
     repostAllEvents()
+    var oldTimestamp = System.currentTimeMillis()
     try {
       while (!awaitedValue.isCompleted) {
-        niceOverlay.redrawMainComponent()
-        stealer.dispatchEvents(0)
-        Thread.sleep(10)
+        if (useDebouncedDrawingInSuvorovProgress) {
+          val newTimestamp = System.currentTimeMillis()
+          if (newTimestamp - oldTimestamp >= 10) {
+            // we do not want to redraw the UI too frequently
+            oldTimestamp = newTimestamp
+            niceOverlay.redrawMainComponent()
+          }
+          stealer.dispatchEvents(10)
+        }
+        else {
+          niceOverlay.redrawMainComponent()
+          stealer.dispatchEvents(0)
+          Thread.sleep(10)
+        }
       }
     }
     finally {

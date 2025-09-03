@@ -393,15 +393,18 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
         }
       })
 
-      IdeEventQueue.getInstance().addDispatcher({ event ->
-                                                  if (event is KeyEvent) {
-                                                    process { manager ->
-                                                      manager.dispatchKeyEvent(event)
-                                                    }
-                                                  }
+      IdeEventQueue.getInstance().addDispatcher(
+        object : IdeEventQueue.NonLockedEventDispatcher {
+          override fun dispatch(e: AWTEvent): Boolean {
+            if (e is KeyEvent) {
+              process { manager ->
+                manager.dispatchKeyEvent(e)
+              }
+            }
 
-                                                  false
-                                                }, coroutineScope)
+            return false
+          }
+        }, coroutineScope)
     }
   }
 
@@ -1600,7 +1603,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   override fun invokeLater(runnable: Runnable) {
     if (!toolWindowSetInitializer.addToPendingTasksIfNotInitialized(runnable)) {
-      coroutineScope.launch(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
+      coroutineScope.launch(Dispatchers.UiWithModelAccess + ModalityState.nonModal().asContextElement()) {
         runnable.run()
       }
     }

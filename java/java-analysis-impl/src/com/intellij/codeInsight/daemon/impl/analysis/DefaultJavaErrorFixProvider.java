@@ -249,6 +249,9 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
       }
       return null;
     });
+    fix(SWITCH_EXPRESSION_NO_RESULT, error -> {
+      return myFactory.createLiftThrowOutOfSwitchExpression(error.psi());
+    });
     fix(SYNTAX_ERROR, error -> error.psi().getParent() instanceof PsiSwitchLabeledRuleStatement rule &&
                                error.psi().getErrorDescription().equals(JavaPsiBundle.message("expected.switch.rule"))
                                ? myFactory.createWrapSwitchRuleStatementsIntoBlockFix(rule)
@@ -334,6 +337,13 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
     fix(METHOD_GENERIC_CLASH, error ->
       error.context().method() instanceof SyntheticElement ?
       null : myFactory.createSameErasureButDifferentMethodsFix(error.context().method(), error.context().superMethod()));
+    fixes(METHOD_DUPLICATE, (error, sink) -> {
+      error.context().methods().stream()
+        .filter(m -> !m.equals(error.psi()))
+        .filter(m -> !(m instanceof SyntheticElement)) // filters out synthetic methods, such as Enum#values()
+        .findFirst()
+        .ifPresent(m -> sink.accept(myFactory.createNavigateToDuplicateElementFix(m)));
+    });
   }
 
   private void createExceptionFixes() {

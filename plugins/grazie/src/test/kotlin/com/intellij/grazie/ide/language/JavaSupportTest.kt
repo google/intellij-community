@@ -10,7 +10,8 @@ import com.intellij.tools.ide.metrics.benchmark.Benchmark
 
 
 class JavaSupportTest : GrazieTestBase() {
-  override val additionalEnabledRules: Set<String> = setOf("LanguageTool.EN.UPPERCASE_SENTENCE_START")
+  override val additionalEnabledRules: Set<String> = setOf("LanguageTool.EN.UPPERCASE_SENTENCE_START", "LanguageTool.EN.FILE_EXTENSIONS_CASE")
+  override val enableGrazieChecker: Boolean = true
 
   override fun getProjectDescriptor(): LightProjectDescriptor {
     return LightJavaCodeInsightFixtureTestCase.JAVA_LATEST
@@ -72,7 +73,7 @@ class JavaSupportTest : GrazieTestBase() {
   fun `test grazie spellchecking in java`() {
     val words = setOf("SSIZE_MAX", "MacTyppoo", "CANopen", "DBtune", "RESTTful", "typpoTypoo")
     ProjectDictionaryLayer(project).dictionary.addToDictionary(words)
-    runHighlightTestForFileUsingGrazieSpellchecker("ide/language/java/CamelCase.java")
+    runHighlightTestForFile("ide/language/java/CamelCase.java")
   }
 
   fun `test multiline compounds`() {
@@ -112,7 +113,33 @@ class JavaSupportTest : GrazieTestBase() {
         }
       """.trimIndent(),
       "Online-Shop"
-      )
+    )
+  }
+
+  fun `test meaningful suggestions in RenameTo action`() {
+    myFixture.configureByText("a.java", """
+      class A {
+        void foo() {
+          int <TYPO descr="Typo: In word 'tagret'">tag<caret>ret</TYPO>Dir = 1;
+        }
+      }
+    """)
+    myFixture.checkHighlighting()
+    val intention = myFixture.findSingleIntention("Typo: Rename to…")
+    myFixture.launchAction(intention)
+    myFixture.checkResult("""
+      class A {
+        void foo() {
+          int targetDir = 1;
+        }
+      }
+    """)
+  }
+
+  fun `test no highlighting after fixing an error within the same range`() {
+    runHighlightTestForFile("ide/language/java/PDF.java")
+    myFixture.launchAction(myFixture.findSingleIntention("PDF"))
+    myFixture.checkHighlighting()
   }
 
   private fun doTest(beforeText: String, afterText: String, hint: String) {

@@ -13,7 +13,6 @@ import com.intellij.util.application
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.request.header
-import io.ktor.utils.io.streams.asInput
 import io.modelcontextprotocol.kotlin.sdk.Implementation
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.SseClientTransport
@@ -24,6 +23,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.asSink
+import kotlinx.io.asSource
 import kotlinx.io.buffered
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -80,7 +80,7 @@ class TransportTest {
   @com.intellij.mcpserver.annotations.McpTool()
   @McpDescription("Test description")
   suspend fun test_tool() {
-    projectFromTool.complete(currentCoroutineContext().getProjectOrNull(lookForAnyProject = false))
+    projectFromTool.complete(currentCoroutineContext().projectOrNull)
   }
 
   private fun transportTest(transportHolder: TransportHolder, action: suspend (Client) -> Unit) = runBlocking {
@@ -114,7 +114,7 @@ class StdioTransportHolder(project: Project) : TransportHolder() {
   }
 
   override val transport: AbstractTransport by lazy {
-    StdioClientTransport(process.inputStream.asInput(), process.outputStream.asSink().buffered())
+    StdioClientTransport(process.inputStream.asSource().buffered(), process.outputStream.asSink().buffered())
   }
 
   override fun close() {

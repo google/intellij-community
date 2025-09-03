@@ -17,6 +17,16 @@ import java.util.Map;
 public class Py3TypeTest extends PyTestCase {
   public static final String TEST_DIRECTORY = "/types/";
 
+  public void testYieldInsideLambda() {
+    // Checks that foo is not a generator
+    doTest("int", """
+             def foo():
+                 y = lambda x: (yield x)
+                 return 42
+             expr = foo()
+             """);
+  }
+  
   // PY-21069
   public void testDunderGetattr() {
     doTest("MyClass", """
@@ -410,7 +420,7 @@ public class Py3TypeTest extends PyTestCase {
   }
 
   public void testOpenBinary() {
-    doTest("BufferedReader",
+    doTest("BufferedReader[_BufferedReaderStream]",
            "expr = open('foo', 'rb')\n");
   }
 
@@ -431,7 +441,7 @@ public class Py3TypeTest extends PyTestCase {
   }
 
   public void testIoOpenBinary() {
-    doTest("BufferedReader",
+    doTest("BufferedReader[_BufferedReaderStream]",
            """
              import io
              expr = io.open('foo', 'rb')
@@ -463,7 +473,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-20770
   public void testAsyncGeneratorDunderAnext() {
-    doTest("Awaitable[int]",
+    doTest("Coroutine[Any, Any, int]",
            """
              async def asyncgen():
                  yield 42
@@ -725,6 +735,18 @@ public class Py3TypeTest extends PyTestCase {
            """
              def f(a: int):
                  if a in (1, 2, ""):
+                     expr = a
+             """);
+    doTest("Literal[1, 2]",
+           """
+             def f(a: int):
+                 if a in {1, 2, ""}:
+                     expr = a
+             """);
+    doTest("Literal[1, 2]",
+           """
+             def f(a: int):
+                 if a in [1, 2, ""]:
                      expr = a
              """);
     doTest("Literal[-10, \"a\"]",
@@ -3941,6 +3963,15 @@ public class Py3TypeTest extends PyTestCase {
               expr = T
 
           T = -1
+      """);
+  }
+
+  // PY-74257
+  public void testNotProperlyImportedQualifiedNameInTypeHint() {
+    doMultiFileTest("Any", """
+      from lib import f
+      
+      expr = f()
       """);
   }
 

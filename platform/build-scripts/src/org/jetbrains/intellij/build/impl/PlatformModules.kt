@@ -31,8 +31,16 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.SortedSet
 
+/**
+ * List of modules which are included in lib/app.jar in all IntelliJ-based IDEs and loaded by the core classloader.
+ * 
+ * **Please don't add new modules here!**
+ * 
+ * If you need to add a module to all IDEs, register it as a content module in essential-modules.xml, see [this article](https://youtrack.jetbrains.com/articles/IJPL-A-956) for 
+ * details. You can use 'loading="embedded"' to make it still loaded by the core classloader if needed.
+ */
 @Suppress("RemoveRedundantQualifierName")
-private val PLATFORM_API_MODULES = java.util.List.of(
+private val PLATFORM_CORE_MODULES = java.util.List.of(
   "intellij.platform.analysis",
   "intellij.platform.builtInServer",
   "intellij.platform.diff",
@@ -41,30 +49,22 @@ private val PLATFORM_API_MODULES = java.util.List.of(
   "intellij.platform.externalSystem.dependencyUpdater",
   "intellij.platform.codeStyle",
   "intellij.platform.lang.core",
+  "intellij.platform.debugger",
   "intellij.platform.ml",
   "intellij.platform.remote.core",
   "intellij.platform.remoteServers.agent.rt",
   "intellij.platform.usageView",
   "intellij.platform.execution",
   "intellij.platform.kernel",
-)
-
-/**
- * List of modules which are included in lib/app.jar in all IntelliJ based IDEs.
- */
-@Suppress("RemoveRedundantQualifierName")
-private val PLATFORM_IMPLEMENTATION_MODULES = java.util.List.of(
+  
   "intellij.platform.analysis.impl",
   "intellij.platform.diff.impl",
   "intellij.platform.editor.ex",
   "intellij.platform.externalProcessAuthHelper",
-  "intellij.platform.inspect",
   "intellij.platform.lvcs",
   "intellij.platform.macro",
-  "intellij.platform.scriptDebugger.protocolReaderRuntime",
   "intellij.platform.remoteServers.impl",
-  "intellij.platform.scriptDebugger.backend",
-  "intellij.platform.scriptDebugger.ui",
+  "intellij.platform.debugger.impl",
   "intellij.platform.smRunner",
   "intellij.platform.structureView.impl",
   "intellij.platform.testRunner",
@@ -76,8 +76,6 @@ private val PLATFORM_IMPLEMENTATION_MODULES = java.util.List.of(
 
   "intellij.platform.runtime.product",
   "intellij.platform.bootstrap",
-
-  "intellij.platform.vcs.log",
 
   "intellij.platform.markdown.utils",
   "intellij.platform.util.commonsLangV2Shim",
@@ -97,7 +95,6 @@ private val PLATFORM_IMPLEMENTATION_MODULES = java.util.List.of(
   "intellij.platform.ide.favoritesTreeView",
   "intellij.platform.bookmarks",
   "intellij.platform.todo",
-  "intellij.libraries.cglib",
 )
 
 @Suppress("RemoveRedundantQualifierName")
@@ -106,8 +103,7 @@ internal val PLATFORM_CUSTOM_PACK_MODE: Map<String, LibraryPackMode> = java.util
 )
 
 internal fun collectPlatformModules(to: MutableCollection<String>) {
-  to.addAll(PLATFORM_API_MODULES)
-  to.addAll(PLATFORM_IMPLEMENTATION_MODULES)
+  to.addAll(PLATFORM_CORE_MODULES)
 }
 
 private fun addModule(relativeJarPath: String, moduleNames: Sequence<String>, productLayout: ProductModulesLayout, layout: PlatformLayout) {
@@ -133,9 +129,6 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
   // used only in modules that packed into Java
   layout.withoutProjectLibrary("jps-javac-extension")
   layout.withoutProjectLibrary("Eclipse")
-
-  // this library is used in some modules compatible with Java 7, it's replaced by its superset 'jetbrains-annotations' in the distribution
-  layout.withoutProjectLibrary("jetbrains-annotations-java5")
 
   for (customizer in productLayout.platformLayoutSpec) {
     customizer(layout, context)
@@ -270,8 +263,7 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
       )
     )
   }
-  explicit.addAll(toModuleItemSequence(list = PLATFORM_API_MODULES, productLayout = productLayout, reason = "PLATFORM_API_MODULES", context = context))
-  explicit.addAll(toModuleItemSequence(list = PLATFORM_IMPLEMENTATION_MODULES, productLayout = productLayout, reason = "PLATFORM_IMPLEMENTATION_MODULES", context = context))
+  explicit.addAll(toModuleItemSequence(list = PLATFORM_CORE_MODULES, productLayout = productLayout, reason = "PLATFORM_CORE_MODULES", context = context))
   explicit.addAll(toModuleItemSequence(list = productLayout.productApiModules, productLayout = productLayout, reason = "productApiModules", context = context))
 
   val explicitModuleNames = explicit.map { it.moduleName }.toList()
@@ -529,11 +521,11 @@ private suspend fun processAndGetProductPluginContentModules(
 private val excludedPaths = java.util.Set.of(
   "/META-INF/ultimate.xml",
   "/META-INF/ultimate-services.xml",
-  "/META-INF/RdServer.xml",
-  "/META-INF/unattendedHost.xml",
   "/META-INF/cwmBackendConnection.xml",
   "/META-INF/cwmConnectionFrontend.xml",
   "/META-INF/clientUltimate.xml",
+  "/META-INF/backendUltimate.xml",
+  "/META-INF/controllerBackendUltimate.xml"
 )
 
 private val COMMUNITY_IMPL_EXTENSIONS = setOf(
@@ -663,16 +655,6 @@ private suspend fun collectAndEmbedProductModules(root: Element, xIncludePathRes
 // we can consider ways to improve `pluginAuto` and eliminate the need for an explicit declaration here.
 @Suppress("RemoveRedundantQualifierName")
 private val PRODUCT_MODULE_IMPL_COMPOSITION = java.util.Map.of(
-  "intellij.platform.vcs.log.impl", listOf(
-    "intellij.platform.vcs.log.graph.impl",
-  ),
-  "intellij.platform.collaborationTools", listOf(
-    "intellij.platform.collaborationTools.auth.base",
-    "intellij.platform.collaborationTools.auth",
-  ),
-  "intellij.platform.vcs.dvcs.impl", listOf(
-    "intellij.platform.vcs.dvcs"
-  ),
   "intellij.rider", listOf(
     "intellij.platform.debugger.modulesView"
   ),

@@ -15,6 +15,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  module_name = "intellij.platform.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
   deps = [
@@ -169,6 +170,8 @@ jvm_library(
     "//xml/xml-psi-api:psi",
     "//platform/runtime/product",
     "//platform/locking.impl",
+    "//platform/testFramework/junit5/highlighting",
+    "//platform/vcs-impl/shared",
   ],
   runtime_deps = [
     ":tests_test_resources",

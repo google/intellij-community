@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectStorePathManager
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.project.impl.checkTrustedState
+import com.intellij.openapi.project.impl.getOrInitializeModule
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.startup.StartupManager
@@ -27,6 +28,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.projectImport.ProjectAttachProcessor
 import com.intellij.projectImport.ProjectOpenProcessor
@@ -179,6 +181,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
       var options = originalOptions
       if (LightEditService.getInstance() != null && LightEditService.getInstance().isForceOpenInLightEditMode) {
         LightEditService.getInstance().openFile(file, false)?.let {
+          FUSProjectHotStartUpMeasurer.lightEditProjectFound()
           return it
         }
       }
@@ -197,6 +200,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
           if (LightEditService.getInstance().isLightEditEnabled && !LightEditService.getInstance().isPreferProjectMode) {
             val lightEditProject = LightEditService.getInstance().openFile(file, true)
             if (lightEditProject != null) {
+              FUSProjectHotStartUpMeasurer.lightEditProjectFound()
               return lightEditProject
             }
           }
@@ -236,6 +240,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
       var options = originalOptions
       if (LightEditService.getInstance() != null && LightEditService.getInstance().isForceOpenInLightEditMode) {
         LightEditService.getInstance().openFile(file, false)?.let {
+          FUSProjectHotStartUpMeasurer.lightEditProjectFound()
           return it
         }
       }
@@ -254,6 +259,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
           if (LightEditService.getInstance().isLightEditEnabled && !LightEditService.getInstance().isPreferProjectMode) {
             val lightEditProject = LightEditService.getInstance().openFile(file, true)
             if (lightEditProject != null) {
+              FUSProjectHotStartUpMeasurer.lightEditProjectFound()
               return lightEditProject
             }
           }
@@ -280,7 +286,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
       return project
     }
 
-    suspend fun runDirectoryProjectConfigurators(baseDir: Path, project: Project, newProject: Boolean): Module? {
+    suspend fun runDirectoryProjectConfigurators(baseDir: Path, project: Project, newProject: Boolean, createModule: Boolean): Module? {
       project.putUserData(PROJECT_CONFIGURED_BY_PLATFORM_PROCESSOR, true)
 
       val moduleRef = Ref<Module>()
@@ -292,6 +298,9 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
         }
       }
 
+      if (createModule){
+        moduleRef.getOrInitializeModule(project, virtualFile)
+      }
       for (configurator in EP_NAME.lazySequence()) {
         try {
           if (configurator is DirectoryProjectConfigurator.AsyncDirectoryProjectConfigurator) {

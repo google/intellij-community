@@ -28,6 +28,15 @@ def _map_jvm_target_to_flag(version):
         return None
     return ["-jvm-target=%s" % version]
 
+def _map_api_version_to_flag(version):
+    if not version:
+        return None
+    return ["-api-version=%s" % version]
+
+def _map_language_version_to_flag(version):
+    if not version:
+        return None
+    return ["-language-version=%s" % version]
 
 def _map_opt_in_class_to_flag(values):
     return ["-opt-in=%s" % v for v in values]
@@ -57,11 +66,31 @@ _KOPTS = {
         args = dict(
             default = "",
             doc = "The target version of the generated JVM bytecode",
-            values = ["6", "8", "9", "10", "11", "12", "13", "15", "16", "17"],
+            values = ["6", "7", "8", "9", "10", "11", "12", "13", "15", "16", "17", "21"],
         ),
         type = attr.string,
         value_to_flag = None,
         map_value_to_flag = _map_jvm_target_to_flag,
+    ),
+    "api_version": struct(
+        args = dict(
+            default = "",
+            doc = "Allow using declarations only from the specified version of Kotlin bundled libraries",
+            values = ["2.0", "2.1", "2.2"],
+        ),
+        type = attr.string,
+        value_to_flag = None,
+        map_value_to_flag = _map_api_version_to_flag,
+    ),
+    "language_version": struct(
+        args = dict(
+            default = "",
+            doc = "Provide source compatibility with the specified version of Kotlin",
+            values = ["2.0", "2.1", "2.2"],
+        ),
+        type = attr.string,
+        value_to_flag = None,
+        map_value_to_flag = _map_language_version_to_flag,
     ),
     "opt_in": struct(
         args = dict(
@@ -327,7 +356,7 @@ kt_kotlinc_options = rule(
 )
 
 
-def _to_flags(opts, attr_provider):
+def to_flags(opts, attr_provider):
     """Translate options to flags
 
     Args:
@@ -342,6 +371,8 @@ def _to_flags(opts, attr_provider):
     flags = []
     for n, o in opts.items():
         value = getattr(attr_provider, n, None)
+        if value == None:
+            continue
         if o.value_to_flag and o.value_to_flag.get(derive.info, None):
             info = o.value_to_flag[derive.info]
             flag = info.derive(info.ctx, value)
@@ -363,7 +394,7 @@ def kotlinc_options_to_flags(kotlinc_options):
     Returns:
         list of flags to add to the command line.
     """
-    return _to_flags(_KOPTS, kotlinc_options)
+    return to_flags(_KOPTS, kotlinc_options)
 
 
 def kotlinc_options_to_args(kotlinc_options, args):

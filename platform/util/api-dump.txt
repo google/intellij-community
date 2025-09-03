@@ -7,6 +7,8 @@ com.intellij.execution.process.ProcessListener
 - processTerminated(com.intellij.execution.process.ProcessEvent):V
 - processWillTerminate(com.intellij.execution.process.ProcessEvent,Z):V
 - startNotified(com.intellij.execution.process.ProcessEvent):V
+c:com.intellij.execution.process.ProcessOutputType
+- s:fromKey(com.intellij.openapi.util.Key):com.intellij.execution.process.ProcessOutputType
 com.intellij.execution.process.ProcessOutputTypes
 - sf:STDERR:com.intellij.openapi.util.Key
 - sf:STDOUT:com.intellij.openapi.util.Key
@@ -21,6 +23,37 @@ com.intellij.openapi.Disposable$Parent
 - a:beforeTreeDispose():V
 a:com.intellij.openapi.application.AccessToken
 - s:compound(java.util.List):com.intellij.openapi.application.AccessToken
+- s:create(java.lang.Runnable):com.intellij.openapi.application.AccessToken
+f:com.intellij.openapi.application.PathManager
+- s:findBinFile(java.lang.String):java.nio.file.Path
+- s:findBinFileWithException(java.lang.String):java.nio.file.Path
+- s:getBinDir():java.nio.file.Path
+- s:getBinPath():java.lang.String
+- s:getCommonDataPath():java.nio.file.Path
+- s:getConfigDir():java.nio.file.Path
+- s:getConfigPath():java.lang.String
+- s:getHomeDir():java.nio.file.Path
+- s:getHomeDir(Z):java.nio.file.Path
+- s:getHomePath():java.lang.String
+- s:getHomePath(Z):java.lang.String
+- s:getLibDir():java.nio.file.Path
+- s:getLibPath():java.lang.String
+- s:getLogDir():java.nio.file.Path
+- s:getLogPath():java.lang.String
+- s:getOptionsDir():java.nio.file.Path
+- s:getOptionsFile(java.lang.String):java.io.File
+- s:getOptionsPath():java.lang.String
+- s:getPluginTempPath():java.lang.String
+- s:getPluginsDir():java.nio.file.Path
+- s:getPluginsPath():java.lang.String
+- s:getScratchDir():java.nio.file.Path
+- s:getScratchPath():java.lang.String
+- s:getSystemDir():java.nio.file.Path
+- s:getSystemPath():java.lang.String
+- s:getTempDir():java.nio.file.Path
+- s:getTempPath():java.lang.String
+- s:isUnderHomeDirectory(java.lang.String):Z
+- s:isUnderHomeDirectory(java.nio.file.Path):Z
 com.intellij.openapi.diagnostic.ExceptionWithAttachments
 - a:getAttachments():com.intellij.openapi.diagnostic.Attachment[]
 com.intellij.openapi.diagnostic.Logger$Factory
@@ -92,6 +125,8 @@ f:com.intellij.openapi.util.UserDataAccessorsKt
 com.intellij.openapi.util.UserDataHolder
 - a:getUserData(com.intellij.openapi.util.Key):java.lang.Object
 - a:putUserData(com.intellij.openapi.util.Key,java.lang.Object):V
+c:com.intellij.openapi.util.UserDataHolderBase
+- java.io.Serializable
 com.intellij.openapi.util.UserDataHolderEx
 - com.intellij.openapi.util.UserDataHolder
 - a:putUserDataIfAbsent(com.intellij.openapi.util.Key,java.lang.Object):java.lang.Object
@@ -147,6 +182,31 @@ e:com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 Fc:com.intellij.openapi.util.io.FileUtil
 - s:findFirstPathThatExist(java.lang.String[]):java.nio.file.Path
 - s:findPathsByMask(java.util.regex.Pattern,java.nio.file.Path):java.util.List
+f:com.intellij.openapi.util.io.NioFiles
+- sf:BROKEN_SYMLINK:java.nio.file.attribute.BasicFileAttributes
+- s:createDirectories(java.nio.file.Path):java.nio.file.Path
+- s:createIfNotExists(java.nio.file.Path):java.nio.file.Path
+- s:createParentDirectories(java.nio.file.Path):java.nio.file.Path
+- s:deleteRecursively(java.nio.file.Path):V
+- s:deleteRecursively(java.nio.file.Path,java.util.function.Consumer):V
+- s:getFileName(java.nio.file.Path):java.lang.String
+- s:isWritable(java.nio.file.Path):Z
+- s:list(java.nio.file.Path):java.util.List
+- s:readAttributes(java.nio.file.Path):java.nio.file.attribute.BasicFileAttributes
+- s:rename(java.nio.file.Path,java.lang.String):java.nio.file.Path
+- s:setExecutable(java.nio.file.Path):V
+- s:setReadOnly(java.nio.file.Path,Z):V
+- s:sizeIfExists(java.nio.file.Path):J
+- s:toPath(java.lang.String):java.nio.file.Path
+a:com.intellij.openapi.util.io.NioFiles$StatsCollectingVisitor
+- java.nio.file.SimpleFileVisitor
+- <init>():V
+- pa:countDirectory(java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):V
+- pa:countFile(java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):V
+- postVisitDirectory(java.nio.file.Path,java.io.IOException):java.nio.file.FileVisitResult
+- preVisitDirectory(java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):java.nio.file.FileVisitResult
+- visitFile(java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):java.nio.file.FileVisitResult
+- visitFileFailed(java.nio.file.Path,java.io.IOException):java.nio.file.FileVisitResult
 f:com.intellij.openapi.util.io.NioJarUtilKt
 - sf:getJarAttribute(java.nio.file.Path,java.util.jar.Attributes$Name):java.lang.String
 com.intellij.openapi.util.registry.RegistryValueListener
@@ -247,6 +307,8 @@ com.intellij.util.Producer
 - java.util.function.Supplier
 - get():java.lang.Object
 - a:produce():java.lang.Object
+f:com.intellij.util.ReflectionUtil
+- s:hasOverriddenMethod(java.lang.Class,java.lang.Class,java.lang.String,java.lang.Class[]):Z
 com.intellij.util.ThrowableConvertor
 - a:convert(java.lang.Object):java.lang.Object
 com.intellij.util.ThrowablePairConsumer

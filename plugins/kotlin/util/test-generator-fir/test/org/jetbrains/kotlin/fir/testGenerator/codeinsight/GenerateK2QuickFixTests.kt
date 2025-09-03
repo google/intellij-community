@@ -49,7 +49,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/addSemicolonBeforeLambdaExpression", pattern = pattern)
             model("$idea/quickfix/addSpreadOperatorForArrayAsVarargAfterSam", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addStarProjections", pattern = pattern)
-            model("$idea/quickfix/addSuspend", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addSuspend", pattern = pattern)
             model("$idea/quickfix/addTypeAnnotationToValueParameter", pattern = pattern)
             model("$idea/quickfix/addUnsafeVarianceAnnotation", pattern = pattern)
             model("$idea/quickfix/addValVar", pattern = pattern)
@@ -151,7 +151,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/removeRedundantLabel", pattern = pattern)
             model("$idea/quickfix/removeRedundantSpreadOperator", pattern = pattern)
             model("$idea/quickfix/removeSingleLambdaParameter", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/removeSuspend", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/removeSuspend", pattern = pattern)
             model("$idea/quickfix/removeToStringInStringTemplate", pattern = pattern)
             model("$idea/quickfix/removeTypeVariance", pattern = pattern)
             model("$idea/quickfix/removeUnused", pattern = pattern)
@@ -169,6 +169,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/replaceWithSafeCall", pattern = pattern)
             model("$idea/quickfix/restrictedRetentionForExpressionAnnotation", pattern = pattern)
             model("$idea/quickfix/runBlockingInSuspendFunction", pattern = pattern)
+            model("$idea/quickfix/addVarianceModifier", pattern = pattern)
             model("$idea/quickfix/simplifyComparison", pattern = pattern)
             model("$idea/quickfix/simplifyExpression", pattern = pattern)
             model("$idea/quickfix/smartCastImpossibleInIfThen", pattern = pattern)
@@ -195,7 +196,8 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/typeParameters", pattern = pattern)
             model("$idea/quickfix/typeProjection", pattern = pattern)
             model("$idea/quickfix/unnecessaryLateinit", pattern = pattern)
-            model("$idea/quickfix/unusedSuppressAnnotation", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/unusedSuppressAnnotation", pattern = pattern)
+            model("$idea/quickfix/useWithIndex", pattern = pattern)
             model("$idea/quickfix/variables", pattern = pattern)
             model("$idea/quickfix/when", pattern = pattern)
             model("$idea/quickfix/wrapArgumentWithParentheses", pattern = pattern)
@@ -203,6 +205,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/wrapWithSafeLetCall", pattern = pattern)
             model("$idea/quickfix/wrongLongSuffix", pattern = pattern)
             model("$idea/quickfix/yieldUnsupported", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/overridingIgnorableWithMustUse", pattern = pattern)
         }
 
         testClass<AbstractHighLevelQuickFixMultiFileTest> {

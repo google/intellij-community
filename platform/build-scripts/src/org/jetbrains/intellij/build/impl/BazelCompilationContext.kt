@@ -15,7 +15,7 @@ import org.jetbrains.intellij.build.BuildPaths
 import org.jetbrains.intellij.build.CompilationContext
 import org.jetbrains.intellij.build.JpsCompilationData
 import org.jetbrains.intellij.build.dependencies.DependenciesProperties
-import org.jetbrains.intellij.build.impl.moduleBased.OriginalModuleRepositoryImpl
+import org.jetbrains.intellij.build.impl.moduleBased.buildOriginalModuleRepository
 import org.jetbrains.intellij.build.io.ZipEntryProcessorResult
 import org.jetbrains.intellij.build.io.readZipFile
 import org.jetbrains.intellij.build.moduleBased.OriginalModuleRepository
@@ -61,10 +61,11 @@ class BazelCompilationContext(
   override val classesOutputDirectory: Path
     get() = delegate.classesOutputDirectory
 
-  override suspend fun getOriginalModuleRepository(): OriginalModuleRepository {
-    generateRuntimeModuleRepository(this)
-    return OriginalModuleRepositoryImpl(this)
+  private val originalModuleRepository = asyncLazy("Build original module repository") {
+    buildOriginalModuleRepository(this@BazelCompilationContext)
   }
+
+  override suspend fun getOriginalModuleRepository(): OriginalModuleRepository = originalModuleRepository.await()
 
   override fun findRequiredModule(name: String): JpsModule = delegate.findRequiredModule(name)
 
@@ -157,6 +158,7 @@ class BazelCompilationContext(
     @Serializable
     data class TargetsFile(
       val modules: Map<String, TargetsFileModuleDescription>,
+      val projectLibraries: Map<String, String>,
     )
   }
 }

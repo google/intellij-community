@@ -2,6 +2,8 @@
 package org.jetbrains.plugins.terminal.block.reworked
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.openapi.editor.impl.FrozenDocument
@@ -49,11 +51,15 @@ class TerminalOutputModelImpl(
   private var isTypeAhead: Boolean = false
 
   override fun freeze(): FrozenTerminalOutputModel =
-    FrozenTerminalOutputModelImpl((document as DocumentImpl).freeze(), trimmedCharsCount, cursorOffsetState.value)
+    FrozenTerminalOutputModelImpl((document as DocumentImpl).freeze(), trimmedCharsCount, trimmedLinesCount, cursorOffsetState.value)
 
   override fun relativeOffset(offset: Int): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, offset)
 
   override fun absoluteOffset(offset: Long): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, (offset - trimmedCharsCount).toInt())
+
+  override fun relativeLine(line: Int): TerminalLine = TerminalLineImpl(trimmedLinesCount, line)
+
+  override fun absoluteLine(line: Long): TerminalLine = TerminalLineImpl(trimmedLinesCount, (line - trimmedLinesCount).toInt())
 
   override fun getAbsoluteLineIndex(documentOffset: Int): Long {
     val documentLineIndex = document.getLineNumber(documentOffset)
@@ -84,6 +90,11 @@ class TerminalOutputModelImpl(
 
   override fun updateCursorPosition(absoluteLineIndex: Long, columnIndex: Int) {
     val documentLineIndex = (absoluteLineIndex - trimmedLinesCount).toInt()
+    LOG.debug {
+      "Updating the cursor position to absolute line = $absoluteLineIndex (relative $documentLineIndex), " +
+      "column = $columnIndex"
+    }
+    ensureDocumentHasLine(documentLineIndex)
     val lineStartOffset = document.getLineStartOffset(documentLineIndex)
     val lineEndOffset = document.getLineEndOffset(documentLineIndex)
     val trimmedCharsInLine = if (documentLineIndex == 0) firstLineTrimmedCharsCount else 0
@@ -98,12 +109,15 @@ class TerminalOutputModelImpl(
       val spaces = " ".repeat(spacesToAdd)
       changeDocumentContent {
         document.insertString(lineEndOffset, spaces)
+        LOG.debug { "Added $spacesToAdd spaces to make the column valid" }
         highlightingsModel.insertEmptyHighlightings(lineEndOffset, spacesToAdd)
         lineEndOffset
       }
     }
 
-    mutableCursorOffsetState.value = lineStartOffset + trimmedColumnIndex
+    val newCursorOffset = lineStartOffset + trimmedColumnIndex
+    LOG.debug { "Updated the cursor position to $newCursorOffset" }
+    mutableCursorOffsetState.value = newCursorOffset
   }
 
   override fun updateCursorPosition(offset: TerminalOffset) {
@@ -112,10 +126,13 @@ class TerminalOutputModelImpl(
 
   /** Returns offset from which document was updated */
   private fun doUpdateContent(documentLineIndex: Int, text: String, styles: List<StyleRange>): Int {
-    if (documentLineIndex > 0 && documentLineIndex >= document.lineCount) {
-      val newLines = "\n".repeat(documentLineIndex - document.lineCount + 1)
-      document.insertString(document.textLength, newLines)
+    LOG.debug {
+      "Content update from the relative line = $documentLineIndex (absolute ${documentLineIndex + trimmedLinesCount}), " +
+      "length = ${text.length}, " +
+      "current length = ${document.textLength} chars, ${document.lineCount} lines, " +
+      "currently trimmed = $trimmedCharsCount chars, $trimmedLinesCount lines"
     }
+    ensureDocumentHasLine(documentLineIndex)
 
     val replaceStartOffset = document.getLineStartOffset(documentLineIndex)
     document.replaceString(replaceStartOffset, document.textLength, text)
@@ -126,7 +143,22 @@ class TerminalOutputModelImpl(
 
     val trimmedCount = trimToSize()
 
+    LOG.debug {
+      "Content updated from relative offset = $replaceStartOffset, " +
+      "new length = ${document.textLength} chars, ${document.lineCount} lines, " +
+      "currently trimmed = $trimmedCharsCount chars, $trimmedLinesCount lines"
+    }
+
     return max(0, replaceStartOffset - trimmedCount)
+  }
+
+  private fun ensureDocumentHasLine(documentLineIndex: Int) {
+    if (documentLineIndex > 0 && documentLineIndex >= document.lineCount) {
+      val newLinesToAdd = documentLineIndex - document.lineCount + 1
+      val newLines = "\n".repeat(newLinesToAdd)
+      document.insertString(document.textLength, newLines)
+      LOG.debug { "Added $newLinesToAdd lines to make the line valid" }
+    }
   }
 
   /** Returns offset from which document was updated */
@@ -447,10 +479,13 @@ class TerminalOutputModelImpl(
 class FrozenTerminalOutputModelImpl(
   override val document: FrozenDocument,
   private val trimmedCharsCount: Long,
+  private val trimmedLinesCount: Long,
   override val cursorOffset: Int,
 ) : FrozenTerminalOutputModel {
   override fun relativeOffset(offset: Int): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, offset)
   override fun absoluteOffset(offset: Long): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, (offset - trimmedCharsCount).toInt())
+  override fun relativeLine(line: Int): TerminalLine = TerminalLineImpl(trimmedLinesCount, line)
+  override fun absoluteLine(line: Long): TerminalLine = TerminalLineImpl(trimmedLinesCount, (line - trimmedLinesCount).toInt())
 }
 
 private data class TerminalOffsetImpl(
@@ -462,3 +497,15 @@ private data class TerminalOffsetImpl(
   override fun toRelative(): Int = relative
   override fun toString(): String = "${toAbsolute()}(${toRelative()})"
 }
+
+private data class TerminalLineImpl(
+  val trimmedLinesCount: Long,
+  val relative: Int,
+) : TerminalLine {
+  override fun compareTo(other: TerminalLine): Int = toAbsolute().compareTo(other.toAbsolute())
+  override fun toAbsolute(): Long = trimmedLinesCount + relative
+  override fun toRelative(): Int = relative
+  override fun toString(): String = "${toAbsolute()}(${toRelative()})"
+}
+
+private val LOG = logger<TerminalOutputModelImpl>()

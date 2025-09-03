@@ -18,9 +18,8 @@ import com.intellij.openapi.vfs.newvfs.RefreshQueue;
 import com.intellij.openapi.vfs.newvfs.events.ChildInfo;
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
-import com.intellij.openapi.vfs.newvfs.persistent.FSRecordsImpl;
-import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
-import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
+import com.intellij.openapi.vfs.newvfs.persistent.*;
+import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS.Attributes;
 import com.intellij.psi.impl.PsiCachedValue;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
@@ -47,16 +46,16 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
   private static final Logger LOG = Logger.getInstance(VirtualDirectoryImpl.class);
   private static final ThrottledLogger THROTTLED_LOG = new ThrottledLogger(LOG, SECONDS.toMillis(30));
 
-  private static final boolean CHECK_CONSISTENCY = ApplicationManager.getApplication().isUnitTestMode();
+  private static final boolean CHECK_CONSISTENCY = ApplicationManager.getApplication().isUnitTestMode()
+                                                   && !ApplicationManagerEx.isInStressTest();
 
   /**
    * Use linear (bruteforce) search for sorted children if size <= this threshold, use binary search by-name, if size is larger.
    * <p>
-   * Children ids ({@link com.intellij.openapi.vfs.newvfs.impl.VfsData.DirectoryData#children} are either unsorted, or sorted
-   * _by (file)name_. It is natural to use binary-search to search in a sorted array, but really even if children ids _are_
-   * sorted by-name -- it may be still faster to look for given childId with linear scan, because scanning through int[] is
-   * quite fast on modern CPUs, while binary search requires costly (String,String) comparison -- especially costly for
-   * case-insensitive directories.
+   * Children ids ({@link VfsData.DirectoryData#children} are either unsorted, or sorted _by (file)name_. It is natural to use
+   * binary-search to search in a sorted array, but really even if children ids _are_ sorted by-name -- it may be still faster
+   * to look for given childId with linear scan, because scanning through int[] is quite fast on modern CPUs, while binary search
+   * requires costly (String,String) comparison -- especially costly for case-insensitive directories.
    * Value=64 is chosen arbitrary, by my intuition.
    */
   private static final int LINEAR_SEARCH_THRESHOLD = getIntProperty("VirtualDirectoryImpl.LINEAR_SEARCH_THRESHOLD", 64);
@@ -111,32 +110,44 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     //MAYBE RC: call it only if doRefresh=true?
     updateCaseSensitivityIfUnknown(name);
 
-    VirtualFileSystemEntry result = findChildImpl(name, ensureCanonicalName, isCaseSensitive());
-
+    VirtualFileSystemEntry child = findChildImpl(name, ensureCanonicalName, isCaseSensitive());
     //noinspection UseVirtualFileEquals
-    if (result == NULL_VIRTUAL_FILE) {
-      result = doRefresh ? createAndFindChildWithEventFire(name) : null;
+    if (child == NULL_VIRTUAL_FILE) {
+      child = doRefresh ? createChildAndFireCreationEvent(name) : null;
     }
-    else if (result != null && doRefresh && fileSystem.isDirectory(result) != result.isDirectory()) {
-      RefreshQueue.getInstance().refresh(false, false, null, result);
-      result = findChild(name, false, ensureCanonicalName);
+    else if (child != null && doRefresh && fileSystem.isDirectory(child) != child.isDirectory()) {
+      RefreshQueue.getInstance().refresh( /*async: */ false, /*recursive: */ false, null, child);
+      child = findChild(name, /*doRefresh: */ false, ensureCanonicalName);
     }
 
-    return result;
+    return child;
   }
 
   /**
-   * @return child with given childName (according to isCaseSensitive), among already cached .children.
-   * null if there is no child with this name, NULL_VIRTUAL_FILE it was adopted
+   * @return child with given childName (according to isCaseSensitive), among already cached .children,
+   * null if there is no child with this name, NULL_VIRTUAL_FILE it was adopted.
    */
-  private @Nullable VirtualFileSystemEntry findInCachedChildren(@NotNull String childName, boolean isCaseSensitive) {
-    if (directoryData.isAdoptedName(childName)) return NULL_VIRTUAL_FILE;
+  private @Nullable VirtualFileSystemEntry findInCachedChildren(@NotNull String childName,
+                                                                boolean isCaseSensitive) {
+    if (directoryData.isAdoptedName(childName)) {
+      return NULL_VIRTUAL_FILE;
+    }
+
     VfsData.ChildrenIds sortedChildren = ensureChildrenSorted(isCaseSensitive);
     int indexByName = findIndexByName(sortedChildren, childName, isCaseSensitive);
-    if (indexByName >= 0) {
-      return getVfsData().getFileById(sortedChildren.id(indexByName), this, /*putInCache: */ true);
+    if (indexByName < 0) {
+      return null;
     }
-    return null;
+
+    VfsData vfsData = getVfsData();
+    int childId = sortedChildren.id(indexByName);
+    VirtualFileSystemEntry entry = vfsData.cachedFileById(childId, this);
+    if (entry == null) {
+      synchronized (directoryData) {
+        return getCachedOrLoadChild(childId, vfsData);
+      }
+    }
+    return entry;
   }
 
   private VfsData.ChildrenIds ensureChildrenSorted(boolean isCaseSensitive) {
@@ -157,29 +168,29 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   /**
    * @return the child, if there is a child with given name (accounting for isCaseSensitive and ensureCanonicalName).
-   * `null` if is no child with given name, ` NULL_VIRTUAL_FILE` if cached as absent (='adopted').
+   * `null` if is no child with given name, ` NULL_VIRTUAL_FILE` if cached as absent (='adopted').<p/>
    * Lookups among: cached children, VFS-persisted children, and actual children in file-system backed this directory.
    */
-  private @Nullable VirtualFileSystemEntry findChildImpl(@NotNull String name,
+  private @Nullable VirtualFileSystemEntry findChildImpl(@NotNull String childName,
                                                          boolean ensureCanonicalName,
                                                          boolean isCaseSensitive) {
-    if (name.isEmpty()) {
+    if (childName.isEmpty()) {
       return null;
     }
     if (!isValid()) {
       return handleInvalidDirectory(null);
     }
 
-    VirtualFileSystemEntry found = findInCachedChildren(name, isCaseSensitive);
-    if (found != null) return found;
+    VirtualFileSystemEntry child = findInCachedChildren(childName, isCaseSensitive);
+    if (child != null) return child;
 
     if (ensureCanonicalName) {
-      String trimmedName = deSlash(name);
+      String trimmedName = deSlash(childName);
       if (trimmedName == null) return null;
-      if (!trimmedName.equals(name)) {
-        found = findInCachedChildren(trimmedName, isCaseSensitive);
-        if (found != null) return found;
-        name = trimmedName;
+      if (!trimmedName.equals(childName)) {
+        child = findInCachedChildren(trimmedName, isCaseSensitive /*loadIfAbsent: */);
+        if (child != null) return child;
+        childName = trimmedName;
       }
     }
 
@@ -188,7 +199,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     }
 
 
-    return findInPersistence(name, ensureCanonicalName, isCaseSensitive);
+    return findInPersistence(childName, ensureCanonicalName, isCaseSensitive);
   }
 
   /**
@@ -201,15 +212,16 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
                                                              boolean isCaseSensitive) {
     VirtualFileSystemEntry newlyLoadedChild;
     synchronized (directoryData) {
-      // maybe another doFindChild() sneaked in the middle
+      // usually we come here after unsuccessful findInCachedChildren() -- but maybe another findChild() sneaked in the middle?
       VirtualFileSystemEntry existingChild = findInCachedChildren(name, isCaseSensitive);
       if (existingChild != null) return existingChild; // including NULL_VIRTUAL_FILE
       if (allChildrenLoaded()) {
         return null;//all children loaded, but child not found -> not exist
       }
 
-      PersistentFSImpl pfs = owningPersistentFS();
-      ChildInfo childInfo = pfs.findChildInfo(this, name, fileSystem);
+      VfsData vfsData = getVfsData();
+      PersistentFSImpl pFS = vfsData.owningPersistentFS();
+      ChildInfo childInfo = pFS.findChildInfo(this, name, fileSystem);
       if (childInfo == null) {
         directoryData.addAdoptedName(name, isCaseSensitive);
         return null;
@@ -218,7 +230,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       if (ensureCanonicalName) {
         CharSequence persistedName = childInfo.getName();
         if (!Comparing.equal(name, persistedName)) {
-          //lookup again, with persistedName: persistedName _could_ be != name because pfs.findChildInfo() could access
+          //lookup again, with persistedName: persistedName _could_ be != name because pFS.findChildInfo() could access
           // actual FS, and FS's rules for file name normalization may be trickier than we implemented in VFS
           existingChild = findInCachedChildren(persistedName.toString(), isCaseSensitive);
           if (existingChild != null) return existingChild;
@@ -232,25 +244,32 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       //Lookup a child by id: it is mostly useful for ensureCanonicalName=false, but it seems there are some cases
       // there even with ensureCanonicalName=true a child couldn't be found by name, but _could_ be found by id
       // so let's be sure:
-      VirtualFileSystemEntry childById = findCachedChildById(childId);
+      VirtualFileSystemEntry childById = vfsData.cachedFileById(childId, this);
       if (childById != null) {
-        if (ensureCanonicalName) {
-          //It is definitely possible for childId to be in this.children list, but not found by name, if
-          // ensureCanonicalName=false -- because of file name normalisation intricacies.
-          // But same for ensureCanonicalName=true it is a suspicious case: why didn't we find a child by name then?
-          logChildLookupFailure(pfs, childId, childNameId, name);
+        int indexOfChild = directoryData.children.indexOfId(childId);
+        if (indexOfChild >= 0) {
+          if (ensureCanonicalName) {
+            //It is definitely possible for childId to be in this.children list, but not found by name, if
+            // ensureCanonicalName=false -- because of file name normalisation intricacies.
+            // But same for ensureCanonicalName=true it is a suspicious case: why didn't we find a child by name then?
+            logChildLookupFailure(pFS, childId, childNameId, name);
+          }
         }
-
+        else {
+          addChild(childById);
+        }
         return childById;
       }
-
-      int childAttributes = pfs.getFileAttributes(childId);
-      //TODO RC: check isDeleted(attributes) before .mayHaveChildren() call,
-      //         otherwise 'already deleted' exception is thrown sometimes (EA-933381)?
-      boolean isEmptyDirectory = PersistentFS.isDirectory(childAttributes) && !pfs.mayHaveChildren(childId);
-
-      newlyLoadedChild = createChildImpl(childId, childNameId, childAttributes, isEmptyDirectory);
-      addChild(newlyLoadedChild);
+      else {
+        if (!vfsData.isFileValid(childId)) {
+          //If childId was already deleted, it should be removed from ChildrenIds list first,
+          // see PersistentFSImpl.executeDelete() -- but here we are, with childId from findChildInfo(),
+          // executed under the directoryLock:
+          throw new IllegalStateException("file(=#" + childId + ") is deleted, but still in .children list");
+        }
+        newlyLoadedChild = getCachedOrLoadChild(childId, vfsData);
+        addChild(newlyLoadedChild);
+      }
     }
 
     if (!newlyLoadedChild.isDirectory()) {
@@ -265,7 +284,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
   /**
    * Updates this directory case-sensitivity to new sensitivity, and set case-sensitivity-cached flag
    * to true.
-   * Updates only in-memory values, does NOT update VFS persistent structures (see {@link PersistentFSImpl#executeChangeCaseSensitivity(VirtualDirectoryImpl, CaseSensitivity)}
+   * Updates only in-memory values, does NOT update VFS persistent structures (see {@link PersistentFSImpl#executeChangeCaseSensitivity(VirtualDirectoryImpl, boolean)}
    * for that).
    * If case-sensitivity value is actually changed -- re-order the children accordingly
    */
@@ -275,7 +294,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     if (oldCaseSensitivity.isUnknown()
         || oldCaseSensitivity.isSensitive() != newIsCaseSensitive) {
       VfsData vfsData = getVfsData();
-      VfsData.Segment segment = vfsData.getSegment(getId(), false);
+      VfsData.Segment segment = vfsData.segmentForFileId(getId(), false);
       int newFlags = VfsDataFlags.CHILDREN_CASE_SENSITIVITY_CACHED |
                      (newIsCaseSensitive ? VfsDataFlags.CHILDREN_CASE_SENSITIVE : 0);
       segment.setFlags(getId(), VfsDataFlags.CHILDREN_CASE_SENSITIVE | VfsDataFlags.CHILDREN_CASE_SENSITIVITY_CACHED, newFlags);
@@ -291,94 +310,135 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     }
   }
 
+  /**
+   * If the slot for a child data in {@link VfsData} in-memory cache isn't already filled in -- method instantiates the
+   * slot, fills it with the data provided, and return {@link VirtualFileSystemEntry} wrapper around that data.
+   * <p/>
+   * Note: the childId is _not_ added to a parent's children list -- this should be done separately.
+   */
   @ApiStatus.Internal
-  public @NotNull VirtualFileSystemEntry createChildIfNotExist(int fileId,
-                                                               int nameId,
-                                                               @PersistentFS.Attributes int attributes,
-                                                               boolean isEmptyDirectory) {
+  public @NotNull VirtualFileSystemEntry initializeChildDataIfNotYet(int fileId,
+                                                                     int nameId,
+                                                                     @Attributes int attributes,
+                                                                     boolean isEmptyDirectory) {
     synchronized (directoryData) {
       //check is it already initialized:
-      //MAYBE RC: getVfsData().hasLoadedFile() is probably a better way to check this?
-      VirtualFileSystemEntry entry = getVfsData().getFileById(fileId, this, /*putInCache: */ true);
+      VirtualFileSystemEntry entry = getVfsData().cachedFileById(fileId, this);
       if (entry != null) {
         return entry;
       }
-      return createChildImpl(fileId, nameId, attributes, isEmptyDirectory);
+      return initializeChildData(fileId, nameId, attributes, isEmptyDirectory);
     }
   }
 
   /**
-   * 'create' is a bit misleading: method instantiates a slot for child data in {@link VfsData} in-memory cache
-   * Note: the id is _not_ added to a parent's children list -- this should be done separately.
+   * Method instantiates a slot for child data in {@link VfsData} in-memory cache, and fills it with the
+   * data provided. childId shouldn't be initialized yet -- otherwise an {@link com.intellij.openapi.vfs.newvfs.impl.VfsData.FileAlreadyCreatedException}
+   * is thrown.<p/>
+   * Note: the childId is _not_ added to a parent's children list -- this should be done separately.
    */
   //@GuardedBy("directoryData")
-  private @NotNull VirtualFileSystemEntry createChildImpl(int id,
-                                                          int nameId,
-                                                          @PersistentFS.Attributes int attributes,
-                                                          boolean isEmptyDirectory) {
+  private @NotNull VirtualFileSystemEntry initializeChildData(int childId,
+                                                              int nameId,
+                                                              @Attributes int attributes,
+                                                              boolean isEmptyDirectory) {
+    if (PersistentFSRecordAccessor.hasDeletedFlag(attributes)) {
+      throw new FileDeletedException(
+        childId, "{nameId: " + nameId + ", attributes: " + attributes + "} is deleted -- can't load deleted file records"
+      );
+    }
     FileLoadingTracker.fileLoaded(this, nameId);
 
     VfsData vfsData = getVfsData();
-    VfsData.Segment segment = vfsData.getSegment(id, true);
+    VfsData.Segment segment = vfsData.segmentForFileId(childId, /*create: */ true);
 
     boolean isDirectory = PersistentFS.isDirectory(attributes);
-    Object fileData = isDirectory ? new VfsData.DirectoryData() : KeyFMap.EMPTY_MAP;
-    segment.initFileData(id, fileData, this);
+    segment.setFlags(childId, ALL_FLAGS_MASK, VfsDataFlags.toFlags(attributes, isDirectory));
 
-    VirtualFileSystemEntry child = vfsData.getFileById(id, this, /*putIntoCache: */ true);
-    assert child != null;
+    VirtualFileSystemEntry childEntry;
+    if (isDirectory) {
+      VfsData.DirectoryData childDirectoryData = new VfsData.DirectoryData();
+      VirtualDirectoryImpl childDirectory = new VirtualDirectoryImpl(childId, segment, childDirectoryData, /*parent: */ this, fileSystem);
+      childDirectoryData.assignDirectory(childDirectory);
 
-    segment.setFlags(id, ALL_FLAGS_MASK, VfsDataFlags.toFlags(attributes, isDirectory));
-    child.updateLinkStatus(this);
+      if (isEmptyDirectory) {
+        // When creating an empty directory, we need to make sure that every file created inside it will fire a "file created" event
+        // for virtual file pointer manager to update its pointers properly
+        // (because currently VirtualFilePointerManager ignores empty directory creation events for performance reasons).
+
+        //noinspection SynchronizationOnLocalVariableOrMethodParameter
+        synchronized (childDirectoryData) {
+          childDirectoryData.children = childDirectoryData.children.withAllChildrenLoaded(true);
+        }
+      }
+
+      //IMPORTANT: publish directoryData only _after_ all the initialization is done:
+      segment.initFileData(childId, childDirectoryData, /*parent: */ this);
+      childEntry = childDirectory;
+    }
+    else {//we're not caching leafs (as of today):
+      //IMPORTANT: publish fileData only _after_ all the initialization is done:
+      segment.initFileData(childId, KeyFMap.EMPTY_MAP, /*parent: */ this);
+      childEntry = new VirtualFileImpl(childId, segment, /*parent: */ this);
+    }
+
+    childEntry.updateLinkStatus(this);
 
     if (fileSystem.markNewFilesAsDirty()) {
-      child.markDirty();
-    }
-    if (isDirectory && (child instanceof VirtualDirectoryImpl) && isEmptyDirectory) {
-      // When creating an empty directory, we need to make sure that every file created inside it will fire a "file created" event
-      // for virtual file pointer manager to update its pointers properly
-      // (because currently VirtualFilePointerManager ignores empty directory creation events for performance reasons).
-      VfsData.DirectoryData childVfsData = ((VirtualDirectoryImpl)child).directoryData;
-      synchronized (childVfsData) {
-        childVfsData.children = childVfsData.children.withAllChildrenLoaded(true);
-      }
+      childEntry.markDirty();
     }
 
-    return child;
+    return childEntry;
   }
 
-  private @Nullable VirtualFileSystemEntry createAndFindChildWithEventFire(@NotNull String name) {
-    VirtualFile fake = new FakeVirtualFile(this, name);
+  private @Nullable VirtualFileSystemEntry createChildAndFireCreationEvent(@NotNull String childName) {
+    VirtualFile fake = new FakeVirtualFile(this, childName);
     FileAttributes attributes = fileSystem.getAttributes(fake);
-    if (attributes == null) return null;
-    String realName = fileSystem.getCanonicallyCasedName(fake);
+    if (attributes == null) {
+      return null;
+    }
+
+    String canonicallyCasedName = fileSystem.getCanonicallyCasedName(fake);
     boolean isDirectory = attributes.isDirectory();
     boolean isEmptyDirectory = isDirectory && !fileSystem.hasChildren(fake);
     String symlinkTarget = attributes.isSymLink() ? fileSystem.resolveSymLink(fake) : null;
     ChildInfo[] children = isEmptyDirectory ? ChildInfo.EMPTY_ARRAY : null;
-    var event = new VFileCreateEvent(REFRESH_REQUESTOR, this, realName, isDirectory, attributes, symlinkTarget, children);
-    RefreshQueue.getInstance().processEvents(false, List.of(event));
-    return findChild(realName);
+    var event = new VFileCreateEvent(REFRESH_REQUESTOR, this, canonicallyCasedName, isDirectory, attributes, symlinkTarget, children);
+    RefreshQueue.getInstance().processEvents(/*async: */ false, List.of(event));
+
+    VirtualFileSystemEntry child = findChild(canonicallyCasedName);
+    if (child == null) {
+      LOG.warn(this + "/[" + childName + "|" + canonicallyCasedName + "]: exists (attributes: " + attributes + "), " +
+               "but somehow still absent after refresh (adopted: " + directoryData.getAdoptedNames() + ")");
+    }
+    return child;
   }
 
   private void updateCaseSensitivityIfUnknown(@NotNull String childName) {
     PersistentFSImpl pFS = owningPersistentFS();
     VFilePropertyChangeEvent caseSensitivityEvent = pFS.determineCaseSensitivityAndPrepareUpdate(this, childName);
     if (caseSensitivityEvent != null) {
-      //TODO RC: here we immediately apply the new case-sensitivity to the this-dir.
-      //         And inside determineCaseSensitivityAndPrepareUpdate() we also immediately apply the new value, if it does not
-      //         lead to externally-visible change (ie. if it is == default).
-      //         But in other uses of determineCaseSensitivityAndPrepareUpdate() we do NOT do that -- we do not immediately apply
-      //         new cs-value, but just post the cs-changing event. Why we difference?
-      //         Could some changes be lost because of this?
-      pFS.executeChangeCaseSensitivity(this, (CaseSensitivity)caseSensitivityEvent.getNewValue());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(".updateCaseSensitivityIfUnknown(): " + caseSensitivityEvent);
+      }
+      //RC: here we immediately apply the new case-sensitivity to the this-dir. And inside determineCaseSensitivityAndPrepareUpdate()
+      //    we also immediately apply the new value, if it does not lead to externally-visible change (ie. if it is == default).
+      //    But in other uses of determineCaseSensitivityAndPrepareUpdate() we do NOT do that -- we do not immediately apply new
+      //    cs-value, but just post the cs-changing event -- because in other use-cases we could _synchronously_ apply the
+      //    cs-changing-event, which leads to executeChangeCaseSensitivity() immediately, among other side effects -- while
+      //    here we can't do that, to not freeze for too long, and do only bare minimum, postponing the else.
+      pFS.executeChangeCaseSensitivity(this, ((CaseSensitivity)caseSensitivityEvent.getNewValue()).toBooleanOrFail());
       // fire event asynchronously to avoid deadlocks with possibly currently held VFP/Refresh queue locks
       RefreshQueue.getInstance().processEvents(/*async: */ true, List.of(caseSensitivityEvent));
     }
-    else if (getChildrenCaseSensitivity().isUnknown()) {
-      // Fallback: cache 'default' case sensitivity when we failed to read it from the disk, to avoid freezes on
-      // constant attempts to re-read -- but do not save the new value in persistence:
+    else if (!isChildrenCaseSensitivityKnown()) {
       boolean defaultCaseSensitivity = fileSystem.isCaseSensitive();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(".updateCaseSensitivityIfUnknown(): set default " + defaultCaseSensitivity);
+      }
+      // Fallback: cache 'default' case sensitivity when we failed to read it from the disk, to avoid freezes on constant
+      // attempts to re-read -- but do not save the new value in persistence, so we'll retry reading it on next IDE run:
+
       setCaseSensitivityFlag(defaultCaseSensitivity);
     }
   }
@@ -397,8 +457,10 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     VfsData vfsData = getVfsData();
     synchronized (directoryData) {
       Comparator<VirtualFile> byName = (f1, f2) -> compareNames(f1.getName(), f2.getName(), isCaseSensitive);
+      //MAYBE RC: we could avoid loading all the children in cache -- use cachedFileById() if child is cached, and
+      //          fallback to getNameByFileId(), if it is not
       VfsData.ChildrenIds sortedChildren = children.sorted(
-        id -> vfsData.getFileById(id, this, /*putIntoMemory: */true),
+        id -> getCachedOrLoadChild(id, vfsData),
         byName
       );
       directoryData.children = sortedChildren;
@@ -429,26 +491,28 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       return Arrays.asList(getChildren()); // may load VFS from other projects
     }
 
-    loadPersistedChildren();
+    loadAllPersistedChildren();
 
     return getCachedChildren();
   }
 
   @Override
   public @NotNull @Unmodifiable Iterable<VirtualFile> iterInDbChildrenWithoutLoadingVfsFromOtherProjects() {
-    if (!owningPersistentFS().wereChildrenAccessed(this)) {
+    PersistentFSImpl pFS = owningPersistentFS();
+    if (!pFS.wereChildrenAccessed(this)) {
       return Collections.emptyList();
     }
-    if (!owningPersistentFS().areChildrenLoaded(this)) {
-      loadPersistedChildren();
+    if (!pFS.areChildrenLoaded(this)) {
+      loadAllPersistedChildren();
     }
     return getCachedChildren();
   }
 
-  private void loadPersistedChildren() {
-    String[] names = owningPersistentFS().listPersisted(this);
-    for (String name : names) {
-      findChild(name, /*doRefresh: */ false, /*canonicalizeName: */ false);
+  /** Loads into memory all the children cached in VFS persistent storage so far. This could be _not all_ the actual directory children */
+  private void loadAllPersistedChildren() {
+    ListResult childrenInPersistence = owningPersistentFS().peer().list(getId());
+    for (ChildInfo childInfo : childrenInPersistence.children) {
+      findChildById(childInfo.getId());
     }
   }
 
@@ -456,21 +520,29 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     VfsData vfsData = getVfsData();
     PersistentFSImpl pFS = vfsData.owningPersistentFS();
 
-    List<? extends ChildInfo> childrenInfo = pFS.listAll(this);
-
-    boolean reallyNeedsSorting = sortChildrenOnLoading && (childrenInfo.size() > 1);
-    if (reallyNeedsSorting) {
-      String someChildName = childrenInfo.get(0).getName().toString();
-      updateCaseSensitivityIfUnknown(someChildName);
-    }
-    boolean isCaseSensitive = isCaseSensitive();
+    //.listAll() could involve underlying FS access, i.e. IO, which is freeze-producing if done under the lock.
+    // But we need it under the .directoryData lock for consistency: to ensure no children list's changes could
+    // sneak in between .listAll() and children processing under the lock below -- see comments in .logDisappearedChildren()
+    // for possible inconsistency.
+    // So the trick: execute .listAll() outside the lock, to trigger FS access, if needed, outside the lock, with
+    // its results being cached. Then repeat .listAll() under the lock to ensure consistency -- that second
+    // .listAll() call 99.99% returns cached data without FS access:
+    pFS.listAll(this);
 
     synchronized (directoryData) {
+      List<? extends ChildInfo> childrenInfo = pFS.listAll(this);
       if (childrenInfo.isEmpty()) {
         directoryData.clearAdoptedNames();
         directoryData.children = VfsData.ChildrenIds.EMPTY.withAllChildrenLoaded(true);
         return VirtualFile.EMPTY_ARRAY;
       }
+
+      boolean reallyNeedsSorting = sortChildrenOnLoading && (childrenInfo.size() > 1);
+      if (reallyNeedsSorting) {
+        String someChildName = childrenInfo.get(0).getName().toString();
+        updateCaseSensitivityIfUnknown(someChildName);
+      }
+      boolean isCaseSensitive = isCaseSensitive();
 
       //We could load children unsorted, and delay the sorting until someone really asks for it:
       if (reallyNeedsSorting) {
@@ -508,33 +580,31 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       }
 
       IntSet prevChildren = directoryData.children.toIntSet();
-      VirtualFile[] files = new VirtualFile[childrenInfo.size()];
-      int[] newChildrenIds = new int[files.length];
-      for (int i = 0; i < files.length; i++) {
-        ChildInfo child = childrenInfo.get(i);
-        int childId = child.getId();
+      VirtualFile[] newChildren = new VirtualFile[childrenInfo.size()];
+      int[] newChildrenIds = new int[newChildren.length];
+      for (int i = 0; i < newChildren.length; i++) {
+        ChildInfo childInfo = childrenInfo.get(i);
+        int childId = childInfo.getId();
         newChildrenIds[i] = childId;
         prevChildren.remove(childId);
-        VirtualFileSystemEntry file = vfsData.getFileById(childId, this, /*putIntoMemory: */true);
-        if (file == null) {
-          int attributes = pFS.getFileAttributes(childId);
-          boolean isEmptyDirectory = PersistentFS.isDirectory(attributes) && !pFS.mayHaveChildren(childId);
-          file = createChildImpl(childId, child.getNameId(), attributes, isEmptyDirectory);
+
+        if (!vfsData.isFileValid(childId)) {
+          //It is an error to come here with childId which was already deleted -- such childId should be removed from ChildrenIds
+          // list first, see PersistentFSImpl.executeDelete()
+          throw new IllegalStateException("file[" + i + "](=#" + childId + ") is deleted, but still in .children list");
         }
-        files[i] = file;
+        VirtualFileSystemEntry child = getCachedOrLoadChild(childId, vfsData);
+        newChildren[i] = child;
       }
       if (!prevChildren.isEmpty()) {
-        var missing = vfsData.getFileById(prevChildren.iterator().nextInt(), this, /*putInCache: */false);
-        LOG.error("Loaded child disappeared: parent=" + verboseToString(this) + "; child=" + verboseToString(missing));
+        logDisappearedChildren(vfsData, prevChildren, newChildren, childrenInfo);
       }
 
       directoryData.clearAdoptedNames();
       directoryData.children = new VfsData.ChildrenIds(newChildrenIds, sortChildrenOnLoading, /*allChildren: */ true);
-      if (CHECK_CONSISTENCY) {
-        assertConsistency(isCaseSensitive, childrenInfo);
-      }
+      assertConsistency(isCaseSensitive, childrenInfo);
 
-      return files;
+      return newChildren;
     }
   }
 
@@ -554,7 +624,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         //MAYBE RC: check case-sensitivity is defined? updateCaseSensitivityIfUnknown()?
         ensureChildrenSorted(isCaseSensitive());
       }
-      return cachedChildrenArray( /*putToMemoryCache: */ true);
+      return cachedChildren( /*putToMemoryCache: */);
     }
     return loadAllChildren(requireSorting);
   }
@@ -566,8 +636,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   /**
    * @return file with childId, _if it belongs to this directory's children_, null otherwise.
-   * If the file is in VFS,
-   * but not in memory cache -- loads it in memory, adds file.id into .children list
+   * If the file is in VFS, but not in memory cache -- loads it in memory, adds file.id into .children list
    */
   @ApiStatus.Internal
   public @Nullable VirtualFileSystemEntry findChildById(int childId) {
@@ -584,24 +653,23 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     VfsData vfsData = getVfsData();
     PersistentFSImpl pFS = vfsData.owningPersistentFS();
 
-    VirtualFileSystemEntry child = vfsData.getFileById(childId, this, /*putToCache: */ true);
+    VirtualFileSystemEntry child = vfsData.cachedFileById(childId, this);
     if (child != null && !child.isValid()) {
       return null; // =removed
     }
 
     synchronized (directoryData) {
-      if (child == null) {
-        //childId hasn't been loaded from persistence yet: load it
-        int childNameId = pFS.peer().getNameIdByFileId(childId);
-        @PersistentFS.Attributes int childAttributes = pFS.getFileAttributes(childId);
-        boolean isEmptyDirectory = PersistentFS.isDirectory(childAttributes) && !pFS.mayHaveChildren(childId);
-        child = createChildIfNotExist(childId, childNameId, childAttributes, isEmptyDirectory);
+      if (child == null) {//childId hasn't been loaded from persistence yet: load it
+        if (!vfsData.isFileValid(childId)) {
+          return null;
+        }
+        child = getCachedOrLoadChild(childId, vfsData);
       }
 
       //now check child is indeed a child of this dir:
       VfsData.ChildrenIds children = directoryData.children;
 
-      //MAYBE RC: code below is similar to addChild(child) -- how to reduce code duplication?
+      //MAYBE RC: the code below is similar to addChild(child) -- how to reduce code duplication?
 
       boolean allChildrenLoaded = children.areAllChildrenLoaded();
       if (children.isSorted() && worthBinarySearch(children)) {
@@ -641,45 +709,29 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       }
 
       //childId not really belong to children:
-      LOG.error(child + " expected to be in [" + this + "].children=" + children + ", but absent -> refresh race or VFS inconsistency?");
+      LOG.error(
+        "[" + child + ", id: " + child.getId() + "] expected to be in [" + this + "].children=" + children + ", but absent. " +
+        "childId in persistent children: " + isInPersistentChildren(pFS, getId(), childId) + " " +
+        "-> refresh race or VFS inconsistency?"
+      );
       return null;
     }
     //since the child is guaranteed to be in children _already known to VFS_ -- adoptedNames shouldn't be changed at all
   }
 
-  /**
-   * @return a _cached_ file by childId, if it belongs to this directory's _cached_ in-memory children,
-   * null otherwise (method name may be a bit misleading)
-   */
-  private @Nullable VirtualFileSystemEntry findCachedChildById(int childId) {
-    int indexOfChild = directoryData.children.indexOfId(childId);
-    if (indexOfChild >= 0) {
-      VirtualFileSystemEntry fileById = getVfsData().getFileById(childId, this, /*putToCache: */true);
-      if (fileById != null) {
-        if (fileById.getId() == childId) {
-          return fileById;
-        }
-
-        //MAYBE RC: how could it be? Maybe throw an exception would be better reaction?
-        LOG.error("getFileById(" + childId + ") returns " + fileById + " with different id(=" + fileById.getId() + ") -> return null");
-      }
-    }
-    return null;
-  }
-
   // optimization: works faster than added.forEach(this::addChild)
   @ApiStatus.Internal
   @Contract(mutates = "this,param1")
-  public void createAndAddChildren(@NotNull List<ChildInfo> added,
-                                   boolean markAllChildrenLoaded,
-                                   @NotNull BiConsumer<? super VirtualFile, ? super ChildInfo> callback) {
+  public void initializeAndAddChildren(@NotNull List<ChildInfo> added,
+                                       boolean markAllChildrenLoaded,
+                                       @NotNull BiConsumer<? super VirtualFile, ? super ChildInfo> callback) {
     int addedSize = added.size();
     if (addedSize <= 1) {//fast-path:
       synchronized (directoryData) {
         for (int i = 0; i < addedSize; i++) {
           ChildInfo info = added.get(i);
           assert info.getId() > 0 : info;
-          @PersistentFS.Attributes int attributes = info.getFileAttributeFlags();
+          @Attributes int attributes = info.getFileAttributeFlags();
           boolean isEmptyDirectory = (info.getChildren() != null) && (info.getChildren().length == 0);
 
           //We look for existing child in children by-id because, likely, linear O(N) search in int[] is still faster than
@@ -688,9 +740,9 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
           // this would be faster
           int indexOfId = directoryData.children.indexOfId(info.getId());
           if (indexOfId < 0) {
-            VirtualFileSystemEntry file = createChildImpl(info.getId(), info.getNameId(), attributes, isEmptyDirectory);
-            addChild(file);//directoryData.children is re-assigned inside .addChild()
-            callback.accept(file, info);
+            VirtualFileSystemEntry child = initializeChildData(info.getId(), info.getNameId(), attributes, isEmptyDirectory);
+            addChild(child);//directoryData.children is re-assigned inside .addChild()
+            callback.accept(child, info);
           }//else: child is already present in children
         }
         if (markAllChildrenLoaded) {
@@ -735,11 +787,11 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         //         and call the callback afterwards -- I'm not sure that semantic consequences could be of this difference.
         if (mergeResult == ContainerUtil.MergeResult.COPIED_FROM_LIST2) {
           assert nextInfo.getId() > 0 : nextInfo;
-          @PersistentFS.Attributes int attributes = nextInfo.getFileAttributeFlags();
+          @Attributes int attributes = nextInfo.getFileAttributeFlags();
           boolean isEmptyDirectory = nextInfo.getChildren() != null && nextInfo.getChildren().length == 0;
           directoryData.removeAdoptedName(nextInfo.getName());
-          VirtualFileSystemEntry file = createChildImpl(nextInfo.getId(), nextInfo.getNameId(), attributes, isEmptyDirectory);
-          callback.accept(file, nextInfo);
+          VirtualFileSystemEntry child = initializeChildData(nextInfo.getId(), nextInfo.getNameId(), attributes, isEmptyDirectory);
+          callback.accept(child, nextInfo);
         }
         mergedIds.add(nextInfo.getId());
       });
@@ -854,7 +906,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         existingNames.add(vfsData.getNameByFileId(id));
       }
       int parentId = getId();
-      existingNames.addAll(peer.listNames(parentId));
+      existingNames.addAll(ContainerUtil.map(peer.list(parentId).children, ChildInfo::getName));
 
       validateAgainst(childrenToCreate, existingNames);
 
@@ -907,7 +959,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   @Override
   public @NotNull @Unmodifiable List<VirtualFile> getCachedChildren() {
-    return Arrays.asList(cachedChildrenArray(/*putToCache: */false));
+    return Arrays.asList(cachedChildren(/*putToCache: */));
   }
 
   @Override
@@ -933,7 +985,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   // optimization: do not travel up unnecessary
   private void markDirtyRecursivelyInternal() {
-    for (VirtualFileSystemEntry child : cachedChildrenArray(/*putToCache: */true)) {
+    for (VirtualFileSystemEntry child : cachedChildren(/*putToCache: */)) {
       child.markDirtyInternal();
       if (child instanceof VirtualDirectoryImpl) {
         ((VirtualDirectoryImpl)child).markDirtyRecursivelyInternal();
@@ -972,7 +1024,6 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
    *
    * @return is this folder actual case-sensitivity was determined and cached?
    */
-  @ApiStatus.Internal
   private boolean isChildrenCaseSensitivityKnown() {
     return getFlagInt(VfsDataFlags.CHILDREN_CASE_SENSITIVITY_CACHED);
   }
@@ -986,24 +1037,52 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
            CaseSensitivity.fromBoolean(isCaseSensitive()) : CaseSensitivity.UNKNOWN;
   }
 
-  private VirtualFileSystemEntry @NotNull [] cachedChildrenArray(boolean putToMemoryCache) {
+  private VirtualFileSystemEntry @NotNull [] cachedChildren() {
     VfsData vfsData = getVfsData();
-    return directoryData.children.asFiles(fileId -> vfsData.getFileById(fileId, this, putToMemoryCache));
+    synchronized (directoryData) {
+      return directoryData.children.asFiles(childId -> {
+        return getCachedOrLoadChild(childId, vfsData);
+      });
+    }
   }
 
   /** @return true if childId is in a persistent (=not cached in memory!) children list of parentId */
   private static boolean isInPersistentChildren(@NotNull PersistentFSImpl pFS,
                                                 int parentId,
                                                 int childId) {
-    //MAYBE RC: better to check childId is in children _without_ loading _all_ the children (which could be quite large)
-    //          Maybe create FSRecordsImpl.isInChildren(parentId, childId) method?
-    int[] childrenFromPersistence = pFS.peer().listIds(parentId);
-    for (int id : childrenFromPersistence) {
-      if (id == childId) {
-        return true;
-      }
+    return pFS.peer().forEachChildOf(
+      parentId,
+      _childId -> (_childId == childId)
+    );
+  }
+
+  /**
+   * @return file entry for given childId, if already cached, if not already cached -- initializes the file entry in cache by
+   * loading the apt file data from VFS persistence (but NOT from backing file-system!)
+   * @throws FileDeletedException if the childId is deleted
+   */
+  //@GuardedBy("directoryData")
+  private @NotNull VirtualFileSystemEntry getCachedOrLoadChild(int childId,
+                                                               @NotNull VfsData vfsData) {
+    VirtualFileSystemEntry cachedChild = vfsData.cachedFileById(childId, this);
+    if (cachedChild != null) {
+      return cachedChild;
     }
-    return false;
+
+    PersistentFSImpl pFS = vfsData.owningPersistentFS();
+    FSRecordsImpl vfsPeer = pFS.peer();
+
+    @Attributes int childAttributes = pFS.getFileAttributes(childId);
+    if (PersistentFSRecordAccessor.hasDeletedFlag(childAttributes)) {
+      //It is an error to come here with childId which was already deleted -- such childId should be removed from ChildrenIds
+      // list first, see PersistentFSImpl.executeDelete()
+      throw new FileDeletedException(childId, "file is deleted, can't be loaded");
+    }
+
+    int childNameId = vfsPeer.getNameIdByFileId(childId);
+    boolean isEmptyDirectory = PersistentFS.isDirectory(childAttributes) && !pFS.mayHaveChildren(childId);
+    //it shouldn't be concurrent initializations, since we've locked directoryData, and checked cachedFileById()
+    return initializeChildData(childId, childNameId, childAttributes, isEmptyDirectory);
   }
 
   // =============================== helpers ====================================================================================== //
@@ -1065,7 +1144,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   private void error(String message, Object... details) {
     var builder = new StringBuilder().append(message).append("\n--- children ---");
-    for (var child : cachedChildrenArray(true)) builder.append('\n').append(verboseToString(child));
+    for (var child : cachedChildren()) builder.append('\n').append(verboseToString(child));
     builder.append("--- details ---");
     for (var o : details) builder.append('\n').append(o instanceof Object[] ? Arrays.toString((Object[])o) : o.toString());
     throw new AssertionError(builder.toString());
@@ -1089,8 +1168,8 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         int cmp = compareNames(name, prevName, isCaseSensitive);
         prevName = name;
         if (cmp <= 0) {
-          VirtualFileSystemEntry prevFile = vfsData.getFileById(prev, this, true);
-          VirtualFileSystemEntry child = vfsData.getFileById(id, this, true);
+          VirtualFileSystemEntry prevFile = vfsData.cachedFileById(prev, this);
+          VirtualFileSystemEntry child = vfsData.cachedFileById(id, this);
           String info = "prevFile.isCaseSensitive()=" + (prevFile == null ? "?" : prevFile.isCaseSensitive()) + ';' +
                         "child.isCaseSensitive()=" + (child == null ? "?" : child.isCaseSensitive()) + ';' +
                         "this.isCaseSensitive()=" + this.isCaseSensitive();
@@ -1118,9 +1197,40 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
            ", id: " + file.getId() +
            ", FS: " + file.getFileSystem() +
            ", fs.attrs: " + file.getFileSystem().getAttributes(file) +
-           ", isCaseSensitive: " + file.isCaseSensitive() +
-           ", canonical: " + file.getFileSystem().getCanonicallyCasedName(file) +
-           ')';
+           ", file.isCaseSensitive: " + file.isCaseSensitive() +
+           ", canonicalName: '" + file.getFileSystem().getCanonicallyCasedName(file) +
+           "')";
+  }
+
+  private void logDisappearedChildren(@NotNull VfsData vfsData,
+                                      @NotNull IntSet prevChildren,
+                                      @NotNull VirtualFile @NotNull [] newChildren,
+                                      @NotNull List<? extends ChildInfo> childrenInfo) {
+    //IJPL-199690:
+    //RC: why it is suspicious: because we _never remove_ the child(ren) from the directory on the reading path -- even
+    //    if the FS reports some children are not there anymore (see comments in PersistentFSImpl.persistAllChildren()).
+    //    We only _add_ new child(ren), if any -- but all previously existing children remain intact.
+    //    Hence, it is unclear: how PersistentFSImpl.listAll() could return a children list there some of the previously
+    //    existing children are absent? PersistentFSImpl.listAll() is either returns already cached children, or the
+    //    previously cached children with merged in FS data -- in both cases previous children must be there.
+    //    But it seems there is some path to that -- the goal is to trace it, and verify is it benign or not.
+    StringBuilder sb = new StringBuilder("Loaded child(ren) disappeared: \n" +
+                                         "parent: " + verboseToString(this) + "\n" +
+                                         "missed children: ");
+    for (int disappearedChildId : prevChildren.toIntArray()) {
+      VirtualFileSystemEntry missing = vfsData.cachedFileById(disappearedChildId, this);
+      sb.append("\n\t[" + disappearedChildId + "] ").append(verboseToString(missing));
+    }
+    sb.append("\nexisting children:");
+    for (VirtualFile existingChild : newChildren) {
+      VirtualFileSystemEntry child = (VirtualFileSystemEntry)existingChild;
+      sb.append("\n\t[" + child.getId() + "] ").append(verboseToString(child));
+    }
+    sb.append("\nchildren infos:");
+    for (final ChildInfo childInfo : childrenInfo) {
+      sb.append("\n\t[" + childInfo.getId() + "] ").append(childInfo);
+    }
+    LOG.error(sb.toString());
   }
 
   protected static void checkLeaks(@NotNull KeyFMap newMap) {
@@ -1150,6 +1260,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     //order locks acquisition by their identity hash code:
     if (System.identityHashCode(lock1) <= System.identityHashCode(lock2)) {
       synchronized (lock1) {
+        //noinspection NestedSynchronizedStatement
         synchronized (lock2) {
           return lambda.compute();
         }
@@ -1157,6 +1268,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     }
     else {
       synchronized (lock2) {
+        //noinspection NestedSynchronizedStatement
         synchronized (lock1) {
           return lambda.compute();
         }

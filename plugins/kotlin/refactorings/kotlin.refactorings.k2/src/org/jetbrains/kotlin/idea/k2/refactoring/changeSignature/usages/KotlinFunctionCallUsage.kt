@@ -13,6 +13,8 @@ import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.components.resolveToCall
+import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
@@ -66,7 +68,8 @@ internal class KotlinFunctionCallUsage(
                 val functionCall = ktCall?.singleFunctionCallOrNull()
                     ?: return@allowAnalysisOnEdt null
                 val partiallyAppliedSymbol = functionCall.partiallyAppliedSymbol
-                if (ktCall is KaErrorCallInfo && partiallyAppliedSymbol.signature.valueParameters.size != element.valueArguments.size) {
+                if (ktCall is KaErrorCallInfo && (partiallyAppliedSymbol.signature.valueParameters.size != element.valueArguments.size ||
+                        ktCall.diagnostic is KaFirDiagnostic.NamedParameterNotFound)) {
                     //don't update broken call sites e.g. if new parameter is added as follows
                     //first add new argument to all function usages and only then call refactoring to update function hierarchy
                     return@allowAnalysisOnEdt null
@@ -143,7 +146,7 @@ internal class KotlinFunctionCallUsage(
     @OptIn(KaAllowAnalysisFromWriteAction::class, KaAllowAnalysisOnEdt::class)
     private val onReceiver  = allowAnalysisFromWriteAction { allowAnalysisOnEdt { analyze(element) { onReceiver(element) } } }
 
-    context(KaSession)
+    context(_: KaSession)
     private fun onReceiver(element: KtElement): Boolean {
         val partiallyAppliedSymbol = element.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
         val receiverValue = (partiallyAppliedSymbol?.dispatchReceiver ?: partiallyAppliedSymbol?.extensionReceiver)?.let { (it as? KaSmartCastedReceiverValue)?.original ?: it }
@@ -275,6 +278,7 @@ internal class KotlinFunctionCallUsage(
                     val element = elementPointer.element
                     when {
                         element == null -> null
+                        element is KtThisExpression -> null
                         (element.mainReference?.resolve() as? KtParameter)?.isContextParameter == true -> null
                         else -> element.text
                     }

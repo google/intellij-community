@@ -1,20 +1,20 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.impl
 
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.readAndEdtWriteAction
-import com.intellij.openapi.application.readAndBackgroundWriteAction
+import com.intellij.openapi.application.*
 import com.intellij.openapi.progress.*
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.util.application
+import com.intellij.util.concurrency.SequentialTaskExecutor
 import com.intellij.util.ui.EDT
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import kotlin.test.assertContains
+import kotlin.test.assertFalse
 
 private const val REPETITIONS: Int = 100
 
@@ -209,6 +209,36 @@ class SuspendingReadAndWriteActionTest {
         Assertions.assertTrue(application.isWriteAccessAllowed)
         Assertions.assertFalse(EDT.isCurrentThreadEdt())
       }
+    }
+  }
+
+  @Test
+  fun `readAndWriteActionUndispatched do not run in default dispatcher`(): Unit = timeoutRunBlocking {
+    val name = "Test executor for undispatched test"
+    val executor = SequentialTaskExecutor.createSequentialApplicationPoolExecutor(name)
+    try {
+      val dispatcher = executor.asCoroutineDispatcher()
+
+      withContext(dispatcher) {
+        readAndEdtWriteActionUndispatched {
+          // contains because in debug mode coroutines append coroutine id
+          assertContains(Thread.currentThread().name, name)
+          writeAction {
+            EDT.assertIsEdt()
+          }
+        }
+        readAndBackgroundWriteActionUndispatched {
+          // contains because in debug mode coroutines append coroutine id
+          assertContains(Thread.currentThread().name, name)
+          writeAction {
+            // todo: this will change after IJPL-392
+            assertFalse { Thread.currentThread().name.contains(name) }
+          }
+        }
+      }
+    }
+    finally {
+      executor.shutdown()
     }
   }
 }

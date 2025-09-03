@@ -3,12 +3,13 @@
 
 package com.jetbrains.python.packaging.management
 
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.errorProcessing.PyResult
+import com.jetbrains.python.packaging.PyPackageName
 import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
-import com.jetbrains.python.packaging.normalizePackageName
 import com.jetbrains.python.packaging.pyRequirement
 import com.jetbrains.python.packaging.pyRequirementVersionSpec
 import com.jetbrains.python.packaging.repository.PyPackageRepository
@@ -18,10 +19,25 @@ import org.jetbrains.annotations.ApiStatus
 
 
 @ApiStatus.Internal
+fun PythonPackageManager.waitInitBlocking() {
+  runBlockingMaybeCancellable {
+    waitForInit()
+  }
+}
+
+@ApiStatus.Internal
+fun PythonPackageManager.reloadPackagesBlocking() {
+  runBlockingMaybeCancellable {
+    reloadPackages().orThrow()
+  }
+}
+
+
+@ApiStatus.Internal
 suspend fun PythonPackageManager.installPackages(vararg packages: String): PyResult<List<PythonPackage>> {
   waitForInit()
   val specifications = packages.map {
-    findPackageSpecification(normalizePackageName(it))
+    findPackageSpecification(PyPackageName.normalizePackageName(it))
     ?: return PyResult.localizedError(PyBundle.message("python.packaging.installing.error.failed.to.find.specification", it))
   }
   return installPackage(PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications(specifications))
@@ -30,13 +46,18 @@ suspend fun PythonPackageManager.installPackages(vararg packages: String): PyRes
 
 @ApiStatus.Internal
 fun PythonPackageManager.getInstalledPackageSnapshot(packageName: String, version: String? = null): PythonPackage? {
-  val normalizedPackage = normalizePackageName(packageName)
+  val normalizedPackage = PyPackageName.normalizePackageName(packageName)
   return listInstalledPackagesSnapshot().firstOrNull { it.name == normalizedPackage && (version == null || version == it.version) }
 }
 
 @ApiStatus.Internal
 fun PythonPackageManager.hasInstalledPackageSnapshot(packageName: String, version: String? = null): Boolean =
   getInstalledPackageSnapshot(packageName, version) != null
+
+
+@ApiStatus.Internal
+fun PythonPackageManager.isNotInstalledAndCanBeInstalled(packageName: String, version: String? = null): Boolean =
+  !hasInstalledPackageSnapshot(packageName, version) && repositoryManager.hasPackageSnapshot(packageName)
 
 
 @ApiStatus.Internal

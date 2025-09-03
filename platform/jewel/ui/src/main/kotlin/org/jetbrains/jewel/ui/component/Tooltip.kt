@@ -64,6 +64,7 @@ import org.jetbrains.jewel.ui.util.isDark
  * @param content The component for which to show the tooltip on hover
  * @see com.intellij.ide.HelpTooltip
  */
+@Suppress("DEPRECATION")
 @Deprecated("Please, use the overload without the [AutoHideBehavior].")
 @Composable
 public fun Tooltip(
@@ -92,6 +93,7 @@ public fun Tooltip(
         modifier = modifier,
         delayMillis = style.metrics.showDelay.inWholeMilliseconds.toInt(),
         tooltipPlacement = tooltipPlacement,
+        cornerSize = style.metrics.cornerSize,
         content = content,
     )
 }
@@ -133,6 +135,7 @@ public fun Tooltip(
         modifier = modifier,
         delayMillis = style.metrics.showDelay.inWholeMilliseconds.toInt(),
         tooltipPlacement = tooltipPlacement,
+        cornerSize = style.metrics.cornerSize,
         content = content,
     )
 }

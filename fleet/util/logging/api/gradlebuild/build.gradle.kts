@@ -35,6 +35,7 @@ kotlin {
   compilerOptions.freeCompilerArgs = listOf(
     "-Xlambdas=class",
     "-Xconsistent-data-class-copy-visibility",
+    "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks",
   )
   jvm {}
   wasmJs {
@@ -63,10 +64,10 @@ kotlin {
     api(jps.com.intellij.platform.kotlinx.coroutines.core.jvm134738847.get().let { "${it.group}:kotlinx-coroutines-core:${it.version}" }) {
       isTransitive = false
     }
-    compileOnly(project(":util-multiplatform"))
+    compileOnly(project(":fleet.util.multiplatform"))
   }
   sourceSets.wasmJsMain.dependencies {
-    api(project(":util-multiplatform"))
+    api(project(":fleet.util.multiplatform"))
   }
   // KOTLIN__MARKER_END
 }

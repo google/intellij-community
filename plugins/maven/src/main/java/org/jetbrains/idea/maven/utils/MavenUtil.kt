@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.utils
 
 import com.intellij.codeInsight.actions.ReformatCodeProcessor
@@ -14,6 +14,8 @@ import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
 import com.intellij.openapi.application.*
+import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.application.PathManager.getSystemDir
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.externalSystem.ExternalSystemModulePropertyManager.Companion.getInstance
@@ -334,7 +336,7 @@ object MavenUtil {
 
   @JvmStatic
   fun getPluginSystemDir(folder: String): Path {
-    return appSystemDir.resolve("Maven").resolve(folder)
+    return getSystemDir().resolve("Maven").resolve(folder)
   }
 
   @JvmStatic
@@ -908,7 +910,7 @@ object MavenUtil {
 
 
     if (list.size > 1) {
-      list.sortWith(Comparator.comparing<Path?, String?>(java.util.function.Function { obj: Path? -> obj.toString() }))
+      list.sortBy { obj: Path? -> obj.toString() }
     }
 
     val file = brewDir?.resolve(list.get(0).toString() + "/libexec")
@@ -1141,13 +1143,9 @@ object MavenUtil {
     val m2DirPath = api.resolveM2Dir()
     val settingsPath: Path = m2DirPath.resolve(SETTINGS_XML)
     val defaultRepo = m2DirPath.resolve(REPOSITORY_DIR)
-    if (!settingsPath.exists()) {
-      return defaultRepo
-    }
-    else {
-      val repoPath = getRepositoryFromSettings(settingsPath) ?: return defaultRepo
-      return api.fs.getPath(repoPath).asNioPath()
-    }
+
+    val repoPath = getRepositoryFromSettings(settingsPath) ?: return defaultRepo
+    return api.fs.getPath(repoPath).asNioPath()
   }
 
   @JvmStatic
@@ -1735,7 +1733,7 @@ object MavenUtil {
     val mavenProjectsManager = MavenProjectsManager.getInstance(project)
     if (mavenProjectsManager.findProject(file) != null) return true
 
-    return ReadAction.compute<Boolean?, RuntimeException?>(ThrowableComputable {
+    return ReadAction.compute<Boolean, RuntimeException>(ThrowableComputable {
       if (project.isDisposed()) return@ThrowableComputable false
       val psiFile = PsiManager.getInstance(project).findFile(file)
       if (psiFile == null) return@ThrowableComputable false

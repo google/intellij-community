@@ -1,25 +1,13 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging.common
 
-import com.jetbrains.python.packaging.PyRequirement
+import com.jetbrains.python.packaging.*
 import com.jetbrains.python.packaging.management.findPackageSpecification
-import com.jetbrains.python.packaging.normalizePackageName
-import com.jetbrains.python.packaging.pyRequirement
-import com.jetbrains.python.packaging.pyRequirementVersionSpec
 import com.jetbrains.python.packaging.repository.PyPackageRepository
 import com.jetbrains.python.packaging.requirement.PyRequirementVersionSpec
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import javax.swing.Icon
-
-@ApiStatus.Internal
-@JvmInline
-value class NormalizedPythonPackageName private constructor(val name: String) {
-  companion object {
-    fun from(name: String): NormalizedPythonPackageName =
-      NormalizedPythonPackageName(normalizePackageName(name))
-  }
-}
 
 open class PythonPackage(name: String, val version: String, val isEditableMode: Boolean) {
   companion object {
@@ -27,7 +15,7 @@ open class PythonPackage(name: String, val version: String, val isEditableMode: 
   }
 
   @ApiStatus.Internal
-  val normalizedName: NormalizedPythonPackageName = NormalizedPythonPackageName.from(name)
+  val normalizedName: PyPackageName = PyPackageName.from(name)
 
   val name: String = normalizedName.name
   val presentableName: String = name
@@ -50,6 +38,16 @@ open class PythonPackage(name: String, val version: String, val isEditableMode: 
     result = HASH_MULTIPLIER * result + version.hashCode()
     result = HASH_MULTIPLIER * result + isEditableMode.hashCode()
     return result
+  }
+
+  @ApiStatus.Internal
+  fun matches(requirement: PyRequirement): Boolean {
+    return toPyPackage().matches(requirement)
+  }
+
+  @ApiStatus.Internal
+  fun toPyPackage(): PyPackage {
+    return PyPackage(name, version)
   }
 }
 
@@ -88,6 +86,7 @@ interface PythonPackageDetails {
     repository.findPackageSpecification(pyRequirement(name, version?.let { pyRequirementVersionSpec(it) }))
 }
 
+@ApiStatus.Internal
 data class PythonSimplePackageDetails(
   override val name: String,
   override val availableVersions: List<String> = emptyList(),

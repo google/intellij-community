@@ -28,6 +28,7 @@ public final class TextContentImpl extends UserDataHolderBase implements TextCon
   public final List<TokenInfo> tokens;
   private volatile String text;
   private volatile int[] tokenOffsets;
+  private volatile Integer hash;
 
   TextContentImpl(TextDomain domain, List<TokenInfo> _tokens) {
     this.domain = domain;
@@ -95,7 +96,8 @@ public final class TextContentImpl extends UserDataHolderBase implements TextCon
 
   @Override
   public int hashCode() {
-    return Objects.hash(domain, tokens);
+    if (hash == null) hash = Objects.hash(domain, tokens);
+    return hash;
   }
 
   @Override
@@ -482,12 +484,15 @@ public final class TextContentImpl extends UserDataHolderBase implements TextCon
     public boolean equals(Object o) {
       if (this == o) return true;
       if (!(o instanceof PsiToken psiToken)) return false;
-      return kind == psiToken.kind && psi.equals(psiToken.psi) && (kind != TokenKind.text || rangeInPsi.equals(psiToken.rangeInPsi));
+      return kind == psiToken.kind
+             && psi.equals(psiToken.psi)
+             && (kind != TokenKind.text || (rangeInPsi.equals(psiToken.rangeInPsi) && rangeInFile.equals(psiToken.rangeInFile)))
+             && text.equals(psiToken.text);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(psi, rangeInPsi, kind);
+      return Objects.hash(psi, rangeInPsi, kind, text);
     }
 
     @Override

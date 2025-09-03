@@ -1,12 +1,14 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.updateSettings.impl
 
+import com.fasterxml.jackson.databind.JsonMappingException
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.externalComponents.ExternalComponentManager
 import com.intellij.ide.externalComponents.ExternalComponentSource
 import com.intellij.ide.plugins.*
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests
 import com.intellij.ide.plugins.newui.PluginUiModel
+import com.intellij.ide.plugins.newui.UiPluginManager
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.*
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
@@ -23,12 +25,10 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.util.ActionCallback
-import com.intellij.openapi.util.BuildNumber
-import com.intellij.openapi.util.JDOMUtil
-import com.intellij.openapi.util.NlsContexts
+import com.intellij.openapi.util.*
 import com.intellij.openapi.util.text.HtmlBuilder
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
+import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import com.intellij.platform.ide.customization.ExternalProductResourceUrls
 import com.intellij.util.Url
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -95,7 +95,6 @@ private class UpdateCheckerHelper(private val coroutineScope: CoroutineScope) {
  */
 object UpdateChecker {
   internal const val MACHINE_ID_DISABLED_PROPERTY: String = "machine.id.disabled"
-  internal const val MACHINE_ID_PARAMETER: String = "mid"
 
   private val productDataLock = ReentrantLock()
   private var productDataUrl: Url? = null
@@ -128,6 +127,7 @@ object UpdateChecker {
     service<UpdateCheckerHelper>().updateAndShowResult(showResults = true)
 
   @ApiStatus.Internal
+  @IntellijInternalApi
   fun getUpdates(): ActionCallback =
     service<UpdateCheckerHelper>().updateAndShowResult(showResults = false)
 
@@ -140,16 +140,21 @@ object UpdateChecker {
   fun updateAndShowResult(project: Project?, customSettings: UpdateSettings? = null) {
     ProgressManager.getInstance().run(object : Task.Backgroundable(project, IdeBundle.message("updates.checking.progress"), true) {
       override fun run(indicator: ProgressIndicator) {
-        doUpdateAndShowResult(
-          project = getProject(),
-          customSettings = customSettings,
-          userInitiated = true,
-          showResults = true,
-          preferDialog = isConditionalModal,
-          showSettingsLink = shouldStartInBackground(),
-          indicator = indicator,
-        )?.let {
-          ApplicationManager.getApplication().invokeLater(it)
+        val coroutineScope = service<CoreUiCoroutineScopeHolder>().coroutineScope
+        coroutineScope.launch {
+          doUpdateAndShowResult(
+            project = getProject(),
+            customSettings = customSettings,
+            userInitiated = true,
+            showResults = true,
+            preferDialog = isConditionalModal,
+            showSettingsLink = shouldStartInBackground(),
+            indicator = indicator,
+          )?.let {
+            withContext(Dispatchers.EDT) {
+              it()
+            }
+          }
         }
       }
 
@@ -162,6 +167,8 @@ object UpdateChecker {
   @JvmOverloads
   @JvmStatic
   @JvmName("getPlatformUpdates")
+  @ApiStatus.Internal
+  @IntellijInternalApi
   internal fun getPlatformUpdates(
     settings: UpdateSettings = UpdateSettings.getInstance(),
     indicator: ProgressIndicator? = null,
@@ -236,6 +243,39 @@ object UpdateChecker {
     }
   }
 
+  @RequiresBackgroundThread
+  @RequiresReadLockAbsence
+  @JvmOverloads
+  @JvmStatic
+  @ApiStatus.Experimental
+  fun getPluginUpdates(
+    pluginId: PluginId,
+    buildNumber: BuildNumber? = null,
+    indicator: ProgressIndicator? = null,
+  ): PluginUpdatesInfo {
+    val updateablePluginsMap = mutableMapOf<PluginId, IdeaPluginDescriptor?>(pluginId to null)
+    val result = getInternalPluginUpdates(buildNumber, indicator, updateablePluginsMap)
+    val updates = result.pluginUpdates
+    return PluginUpdatesInfo(
+      updates.allEnabled,
+      updates.allDisabled,
+      updates.incompatible,
+      result.errors
+    )
+  }
+
+  @ApiStatus.Experimental
+  data class PluginUpdatesInfo(
+    val allEnabled: Collection<PluginDownloader> = emptyList(),
+    val allDisabled: Collection<PluginDownloader> = emptyList(),
+    val incompatible: Collection<IdeaPluginDescriptor> = emptyList(),
+    val errors: Map<String?, Exception> = emptyMap(),
+  ) {
+    val all: List<PluginDownloader> by lazy {
+      allEnabled + allDisabled
+    }
+  }
+
   /**
    * When [buildNumber] is null, returns new versions of plugins compatible with the current IDE version,
    * otherwise, returns versions compatible with the specified build.
@@ -244,6 +284,9 @@ object UpdateChecker {
   @RequiresReadLockAbsence
   @JvmOverloads
   @JvmStatic
+  @IntellijInternalApi
+  @ApiStatus.Internal
+  @Deprecated("Use [getPluginUpdates] instead", ReplaceWith("getPluginUpdates(pluginId, buildNumber, indicator)"))
   fun getInternalPluginUpdates(
     buildNumber: BuildNumber? = null,
     indicator: ProgressIndicator? = null,
@@ -400,6 +443,7 @@ object UpdateChecker {
     return it is SocketTimeoutException
            || it is UnknownHostException
            || it is HttpRequests.HttpStatusException && it.statusCode == HttpURLConnection.HTTP_NOT_FOUND
+           || it is JsonMappingException && it.cause?.message?.contains("Unexpected end-of-input") == true
   }
 
   @RequiresBackgroundThread
@@ -420,6 +464,8 @@ object UpdateChecker {
 
   @JvmOverloads
   @JvmStatic
+  @IntellijInternalApi
+  @ApiStatus.Internal
   fun getExternalPluginUpdates(
     updateSettings: UpdateSettings,
     indicator: ProgressIndicator? = null,
@@ -503,7 +549,8 @@ object UpdateChecker {
 
   @JvmStatic
   @JvmName("isIgnored")
-  internal fun isIgnored(descriptor: IdeaPluginDescriptor): Boolean =
+  @ApiStatus.Internal
+  fun isIgnored(descriptor: IdeaPluginDescriptor): Boolean =
     descriptor.ignoredKey in ignoredPlugins
 
   @JvmStatic
@@ -534,6 +581,7 @@ object UpdateChecker {
 
   /** A helper method for manually testing platform updates (see [com.intellij.internal.ShowUpdateInfoDialogAction]). */
   @ApiStatus.Internal
+  @IntellijInternalApi
   fun testPlatformUpdate(
     project: Project?,
     updateDataText: String,
@@ -607,7 +655,7 @@ private fun doUpdateAndShowResult(
   showSettingsLink: Boolean,
   indicator: ProgressIndicator? = null,
   callback: ActionCallback? = null,
-): (() -> Unit)? {
+): (suspend () -> Unit)? {
   val updateSettings = customSettings ?: UpdateSettings.getInstance()
 
   val platformUpdates = UpdateChecker.getPlatformUpdates(updateSettings, indicator)
@@ -722,7 +770,7 @@ private fun showErrors(project: Project?, @NlsContexts.DialogMessage message: St
 }
 
 @RequiresEdt
-private fun showResults(
+private suspend fun showResults(
   project: Project?,
   updatesForPlugins: List<PluginDownloader>,
   customRepoPlugins: Collection<PluginUiModel>,
@@ -736,9 +784,17 @@ private fun showResults(
     if (userInitiated) {
       shownNotifications.remove(NotificationKind.PLUGINS)?.forEach { it.expire() }
     }
+    val coroutineScope = service<CoreUiCoroutineScopeHolder>().coroutineScope
+    coroutineScope.launch(Dispatchers.EDT) {
 
+    }
+    val plugins = withContext(Dispatchers.IO) {
+      UiPluginManager.getInstance().findInstalledPlugins(updatesForPlugins.map { it.id }.toSet())
+    }
     // offer all updates in a dialog
-    val showUpdateDialog = { PluginUpdateDialog(project, updatesForPlugins, customRepoPlugins).show() }
+    val showUpdateDialog = {
+      PluginUpdateDialog(project, updatesForPlugins, customRepoPlugins, plugins).show()
+    }
 
     if (forceDialog) {
       showUpdateDialog()

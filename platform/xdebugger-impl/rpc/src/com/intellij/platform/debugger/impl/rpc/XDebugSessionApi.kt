@@ -2,6 +2,7 @@
 package com.intellij.platform.debugger.impl.rpc
 
 import com.intellij.execution.rpc.ProcessHandlerDto
+import com.intellij.ide.rpc.AnActionId
 import com.intellij.ide.rpc.FrontendDocumentId
 import com.intellij.ide.ui.icons.IconId
 import com.intellij.ide.vfs.VirtualFileId
@@ -12,14 +13,17 @@ import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.rpc.UID
 import com.intellij.xdebugger.evaluation.EvaluationMode
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider
+import com.intellij.xdebugger.frame.XDescriptor
 import com.intellij.xdebugger.impl.rpc.XBreakpointId
 import com.intellij.xdebugger.impl.rpc.XDebugSessionId
 import com.intellij.xdebugger.impl.rpc.XExecutionStackId
 import com.intellij.xdebugger.impl.rpc.XStackFrameId
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
+import fleet.rpc.core.DeferredSerializer
 import fleet.rpc.core.RpcFlow
 import fleet.rpc.remoteApiDescriptor
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -29,12 +33,6 @@ import org.jetbrains.annotations.Nls
 @ApiStatus.Internal
 @Rpc
 interface XDebugSessionApi : RemoteApi<Unit> {
-  suspend fun currentSourcePosition(sessionId: XDebugSessionId): Flow<XSourcePositionDto?>
-
-  suspend fun topSourcePosition(sessionId: XDebugSessionId): Flow<XSourcePositionDto?>
-
-  suspend fun currentSessionState(sessionId: XDebugSessionId): Flow<XDebugSessionState>
-
   suspend fun createDocument(frontendDocumentId: FrontendDocumentId, sessionId: XDebugSessionId, expression: XExpressionDto, sourcePosition: XSourcePositionDto?, evaluationMode: EvaluationMode): XExpressionDocumentDto?
 
   suspend fun resume(sessionId: XDebugSessionId)
@@ -93,7 +91,11 @@ data class XDebugSessionDto(
   val processHandlerDto: ProcessHandlerDto,
   val smartStepIntoHandlerDto: XSmartStepIntoHandlerDto?,
   val isLibraryFrameFilterSupported: Boolean,
+  val isValuesCustomSorted: Boolean,
   val activeNonLineBreakpointIdFlow: RpcFlow<XBreakpointId?>,
+  val restartActions: List<AnActionId>,
+  val extraActions: List<AnActionId>,
+  val extraStopActions: List<AnActionId>,
 )
 
 @ApiStatus.Internal
@@ -112,8 +114,8 @@ data class XExecutionStackDto(
   val executionStackId: XExecutionStackId,
   val displayName: @Nls String,
   val icon: IconId?,
+  @Serializable(with = DeferredSerializer::class) val descriptor: Deferred<XDescriptor>?
 )
-
 
 // TODO: should be moved to platform
 @ApiStatus.Internal
@@ -138,6 +140,9 @@ data class XDebugSessionState(
   val isReadOnly: Boolean,
   val isPauseActionSupported: Boolean,
   val isSuspended: Boolean,
+  val isStepOverActionAllowed: Boolean,
+  val isStepOutActionAllowed: Boolean,
+  val isRunToCursorActionAllowed: Boolean,
 )
 
 @ApiStatus.Internal

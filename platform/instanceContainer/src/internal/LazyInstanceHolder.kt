@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.instanceContainer.internal
 
+import com.intellij.concurrency.ExternalIntelliJContextElement
 import com.intellij.concurrency.IntelliJContextElement
 import com.intellij.platform.instanceContainer.CycleInitializationException
 import com.intellij.util.findCycle
@@ -128,7 +129,9 @@ internal abstract class LazyInstanceHolder(
       currentCoroutineContext().minusKey(Job)
     }
     else {
-      EmptyCoroutineContext
+      currentCoroutineContext().fold<CoroutineContext>(EmptyCoroutineContext) { acc, element ->
+        if (element is ExternalIntelliJContextElement) acc + element else acc
+      }
     }
     return suspendCancellableCoroutine { waiter ->
       tryAwait(newState, waiter)
@@ -160,7 +163,8 @@ internal abstract class LazyInstanceHolder(
       //  the instance will be initialized even if the container scope is already cancelled.
       withContext(NonCancellable) {
         try {
-          complete(finalState = initializer.createInstance(parentScope, instanceClass))
+          val instance = initializer.createInstance(parentScope, instanceClass)
+          complete(finalState = instance)
         }
         catch (t: Throwable) {
           complete(finalState = CannotInitialize(instanceClass = instanceClass, t))

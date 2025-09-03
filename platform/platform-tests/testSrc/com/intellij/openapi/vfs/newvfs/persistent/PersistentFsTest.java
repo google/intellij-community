@@ -652,19 +652,25 @@ public class PersistentFsTest extends BareTestFixtureTestCase {
     PersistentFSImpl fs = (PersistentFSImpl)PersistentFS.getInstance();
     VirtualFileSystemEntry[] hardReferenceHolder = {vFile, vSubDir3, vSubDir2, vSubDir1};
 
-    VfsTestUtil.deleteFile(vSubDir1);
+    VfsTestUtil.deleteFile(vSubDir1); // delete the top dir => all the files under it should be deleted too
 
     for (VirtualFileSystemEntry f : hardReferenceHolder) {
       assertFalse("file is invalid (=deleted): " + f.getName(), f.isValid());
     }
 
     for (VirtualFileSystemEntry f : hardReferenceHolder) {
-      assertNull(fs.getCachedDir(f.getId()));
-      assertNull(fs.findFileById(f.getId()));
+      int id = f.getId();
+      VirtualFileSystemEntry cachedDir = fs.getCachedDir(id);
+      //RC: we can't strictly define contract 'getCachedDir() returns null for deleted dirs' because of asynchronicity
+      //    -- i.e. it could be the returned cachedDir become deleted right after it was returned. So I think this check
+      //    is a bit of over-specification: it should be (cachedDir == null || !cachedDir.isValid())
+      assertNull(id + " is deleted", cachedDir);
+      NewVirtualFile fileById = fs.findFileById(id);
+      assertNull(id + " is deleted", fileById);
     }
 
     for (VirtualFileSystemEntry f : fs.getDirCache()) {
-      assertTrue(f.isValid());
+      assertTrue("File " + f + " must be valid", f.isValid());
     }
   }
 
@@ -981,7 +987,6 @@ public class PersistentFsTest extends BareTestFixtureTestCase {
     events.clear();
   }
 
-  //@IJIgnore(issue = "IJPL-149673")
   @Test
   public void testChildMove() throws IOException {
     final File firstDirIoFile = tempDirectory.newDirectory("dir1");
@@ -1010,7 +1015,8 @@ public class PersistentFsTest extends BareTestFixtureTestCase {
       return null;
     });
 
-    PersistentFSImpl.moveChildrenRecords(firstDirId, secondDirId);
+    PersistentFSImpl pFS = (PersistentFSImpl)PersistentFSImpl.getInstance();
+    pFS.moveChildren(firstDirId, secondDirId);
 
     assertEmpty(refreshAndFind(firstDirIoFile).getChildren());
 

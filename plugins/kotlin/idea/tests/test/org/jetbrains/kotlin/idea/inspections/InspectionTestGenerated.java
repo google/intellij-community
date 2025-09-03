@@ -136,11 +136,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("testData/inspections/copyWithoutNamedArguments/inspectionData/inspections.test");
         }
 
-        @TestMetadata("coroutines/asyncResultUnused/inspectionData/inspections.test")
-        public void testCoroutines_asyncResultUnused_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspections/coroutines/asyncResultUnused/inspectionData/inspections.test");
-        }
-
         @TestMetadata("declaringClassMigration1_7/inspectionData/inspections.test")
         public void testDeclaringClassMigration1_7_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspections/declaringClassMigration1_7/inspectionData/inspections.test");
@@ -194,11 +189,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("inlineClassDeprecatedMigration/inspectionData/inspections.test")
         public void testInlineClassDeprecatedMigration_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspections/inlineClassDeprecatedMigration/inspectionData/inspections.test");
-        }
-
-        @TestMetadata("javaCollectionsStaticMethodOnImmutableList/inspectionData/inspections.test")
-        public void testJavaCollectionsStaticMethodOnImmutableList_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspections/javaCollectionsStaticMethodOnImmutableList/inspectionData/inspections.test");
         }
 
         @TestMetadata("kt18195/inspectionData/inspections.test")
