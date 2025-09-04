@@ -1,5 +1,5 @@
-Django~=3.0.0
-requests~=2.22.0
-Jinja2~=2.11.1
+Django~=4.2.24
+requests~=2.32.5
+Jinja2~=3.1.6
 pandas~=1.0.1
-numpy~=1.18.1
+numpy~=2.0.2
