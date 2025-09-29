@@ -10,13 +10,13 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
+import com.intellij.util.ThreeState;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
-import com.intellij.xdebugger.impl.CoroutineUtilsKt;
 import com.intellij.xdebugger.impl.XSourceKind;
 import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.frame.XDebugView;
@@ -138,7 +138,6 @@ public class XValueNodeImpl extends XValueContainerNode<XValue> implements XValu
         @Override
         public void computed(XSourcePosition position) {
           if (isObsolete() || position == null) return;
-          LOG.info("Inline debugger data computed: " + position.getLine() + " " + position.getFile());
           VirtualFile file = position.getFile();
           // filter out values from other files
           VirtualFile mainFile = mainPosition != null ? mainPosition.getFile() : null;
@@ -156,7 +155,10 @@ public class XValueNodeImpl extends XValueContainerNode<XValue> implements XValu
         }
       };
 
-      CoroutineUtilsKt.updateInlineDebuggerData(session, getValueContainer(), callback);
+      XValue xValue = getValueContainer();
+      if (xValue.computeInlineDebuggerData(callback) == ThreeState.UNSURE) {
+        xValue.computeSourcePosition(callback::computed);
+      }
     }
     catch (Exception ignore) {
     }

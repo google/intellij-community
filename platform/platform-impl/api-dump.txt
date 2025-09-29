@@ -163,7 +163,6 @@ c:com.intellij.ide.RecentProjectListActionProvider
 - getActions(Z,Z,Z):java.util.List
 - bs:getActions$default(com.intellij.ide.RecentProjectListActionProvider,Z,Z,Z,I,java.lang.Object):java.util.List
 c:com.intellij.ide.RecentProjectsManagerBase
-- f:getCurrentBranch(java.lang.String,Z):java.lang.String
 - willReopenProjectOnStart(kotlin.coroutines.Continuation):java.lang.Object
 c:com.intellij.ide.ReopenProjectAction
 - getNameToDisplayAsText():java.lang.String
@@ -291,8 +290,33 @@ bf:com.intellij.ide.plugins.marketplace.IdeCompatibleUpdate$$serializer
 - f:deserialize(kotlinx.serialization.encoding.Decoder):com.intellij.ide.plugins.marketplace.IdeCompatibleUpdate
 - f:getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
 - f:serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.plugins.marketplace.IdeCompatibleUpdate):V
+f:com.intellij.ide.startup.StartupActionScriptManager
+- s:addActionCommand(com.intellij.ide.startup.StartupActionScriptManager$ActionCommand):V
+- s:addActionCommands(java.util.List):V
 com.intellij.ide.startup.StartupActionScriptManager$ActionCommand
-- a:execute():V
+- execute():V
+- a:execute(java.nio.file.FileSystem):V
+f:com.intellij.ide.startup.StartupActionScriptManager$CopyCommand
+- com.intellij.ide.startup.StartupActionScriptManager$ActionCommand
+- java.io.Serializable
+- <init>(java.io.File,java.io.File):V
+- <init>(java.nio.file.Path,java.nio.file.Path):V
+- execute(java.nio.file.FileSystem):V
+- getSource():java.lang.String
+f:com.intellij.ide.startup.StartupActionScriptManager$DeleteCommand
+- com.intellij.ide.startup.StartupActionScriptManager$ActionCommand
+- java.io.Serializable
+- <init>(java.io.File):V
+- <init>(java.nio.file.Path):V
+- execute(java.nio.file.FileSystem):V
+f:com.intellij.ide.startup.StartupActionScriptManager$UnzipCommand
+- com.intellij.ide.startup.StartupActionScriptManager$ActionCommand
+- java.io.Serializable
+- <init>(java.io.File,java.io.File):V
+- <init>(java.nio.file.Path,java.nio.file.Path):V
+- <init>(java.nio.file.Path,java.nio.file.Path,java.util.function.Predicate):V
+- execute(java.nio.file.FileSystem):V
+- getSource():java.lang.String
 com.intellij.ide.trustedProjects.TrustedProjectsLocator
 - sf:Companion:com.intellij.ide.trustedProjects.TrustedProjectsLocator$Companion
 - a:getProjectRoots(com.intellij.openapi.project.Project):java.util.List
@@ -325,6 +349,42 @@ com.intellij.ide.ui.customization.ToolbarQuickActionInsertStrategy
 - a:addActions(java.util.List,com.intellij.ide.ui.customization.CustomActionsSchema):Z
 - a:checkExists(java.lang.String,com.intellij.ide.ui.customization.CustomActionsSchema):Z
 - orElse(com.intellij.ide.ui.customization.ToolbarQuickActionInsertStrategy):com.intellij.ide.ui.customization.ToolbarQuickActionInsertStrategy
+c:com.intellij.ide.ui.laf.darcula.ui.DarculaButtonUI
+- javax.swing.plaf.basic.BasicButtonUI
+- sf:DEFAULT_STYLE_KEY:com.intellij.openapi.util.Key
+- ps:HELP_BUTTON_DIAMETER:com.intellij.util.ui.JBValue
+- ps:HORIZONTAL_PADDING:com.intellij.util.ui.JBValue
+- <init>():V
+- s:createUI(javax.swing.JComponent):javax.swing.plaf.ComponentUI
+- p:getBackground(javax.swing.JComponent,java.awt.Rectangle):java.awt.Paint
+- p:getButtonColorEnd():java.awt.Color
+- p:getButtonColorStart():java.awt.Color
+- p:getButtonTextColor(javax.swing.AbstractButton):java.awt.Color
+- p:getDarculaButtonSize(javax.swing.JComponent,java.awt.Dimension):java.awt.Dimension
+- p:getDefaultButtonColorEnd():java.awt.Color
+- p:getDefaultButtonColorStart():java.awt.Color
+- s:getDisabledTextColor():java.awt.Color
+- p:getMnemonicIndex(javax.swing.AbstractButton):I
+- f:getPreferredSize(javax.swing.JComponent):java.awt.Dimension
+- installDefaults(javax.swing.AbstractButton):V
+- s:isComboAction(java.awt.Component):Z
+- s:isContrastGotIt(java.awt.Component):Z
+- s:isContrastGotItOnlyButton(java.awt.Component):Z
+- s:isDefaultButton(javax.swing.JComponent):Z
+- s:isGotItButton(java.awt.Component):Z
+- s:isSmallVariant(java.awt.Component):Z
+- s:isSquare(java.awt.Component):Z
+- s:isTag(java.awt.Component):Z
+- paint(java.awt.Graphics,javax.swing.JComponent):V
+- p:paintContents(java.awt.Graphics,javax.swing.AbstractButton):V
+- p:paintDecorations(java.awt.Graphics2D,javax.swing.JComponent):Z
+- p:paintDisabledText(java.awt.Graphics,java.lang.String,javax.swing.JComponent,java.awt.Rectangle,java.awt.FontMetrics):V
+- p:paintText(java.awt.Graphics,javax.swing.JComponent,java.awt.Rectangle,java.lang.String):V
+- p:setupDefaultButton(javax.swing.JComponent,java.awt.Graphics):V
+- p:textIconGap():I
+- update(java.awt.Graphics,javax.swing.JComponent):V
+f:com.intellij.ide.ui.laf.darcula.ui.TextFieldWithPopupHandlerUI$IconHolder
+- iconButton:javax.swing.JButton
 com.intellij.ide.util.ElementsChooser$ElementsMarkListener
 - a:elementMarkChanged(java.lang.Object,Z):V
 com.intellij.ide.util.ElementsChooser$StatisticsCollector
@@ -342,10 +402,6 @@ com.intellij.ide.util.TipUIUtil$Browser
 - a:getComponent():javax.swing.JComponent
 - a:load(java.lang.String):V
 - a:setText(java.lang.String):V
-com.intellij.ide.vcs.RecentProjectsBranchesProvider
-- a:getCurrentBranch(java.lang.String,Z):java.lang.String
-f:com.intellij.ide.vcs.RecentProjectsBranchesProvider$Companion
-- f:getCurrentBranch(java.lang.String,Z):java.lang.String
 c:com.intellij.ide.wizard.AbstractWizardEx
 - p:getHelpId():java.lang.String
 com.intellij.ide.wizard.BuildSystemNewProjectWizardData
@@ -721,6 +777,20 @@ e:com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
 - f:toolName:java.lang.String
 - s:valueOf(java.lang.String):com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
 - s:values():com.intellij.openapi.updateSettings.impl.ExternalUpdateManager[]
+f:com.intellij.openapi.updateSettings.impl.UpdateChannel
+- f:getBuilds():java.util.List
+- f:getEvalDays():I
+- f:getId():java.lang.String
+- f:getLicensing():com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing
+- f:getStatus():com.intellij.openapi.updateSettings.impl.ChannelStatus
+- f:getUrl():java.lang.String
+e:com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing
+- java.lang.Enum
+- sf:EAP:com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing
+- sf:RELEASE:com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing
+- s:getEntries():kotlin.enums.EnumEntries
+- s:valueOf(java.lang.String):com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing
+- s:values():com.intellij.openapi.updateSettings.impl.UpdateChannel$Licensing[]
 com.intellij.openapi.updateSettings.impl.UpdateSettingsProvider
 - a:getPluginRepositories():java.util.List
 com.intellij.openapi.updateSettings.impl.UpdateSettingsUIProvider
@@ -780,7 +850,6 @@ com.intellij.openapi.wm.impl.IdeGlassPaneEx
 - a:remove(java.awt.Component):V
 f:com.intellij.openapi.wm.impl.IdeGlassPaneImpl
 - com.intellij.ide.IdeEventQueue$NonLockedEventDispatcher
-- isColorfulToolbar():Z
 com.intellij.openapi.wm.impl.TitleInfoProvider
 - sf:Companion:com.intellij.openapi.wm.impl.TitleInfoProvider$Companion
 - a:addUpdateListener(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
@@ -1354,6 +1423,18 @@ com.intellij.ui.popup.list.FilterableListPopupStep
 - com.intellij.openapi.ui.popup.ListPopupStep
 - a:updateFilter(java.lang.String):V
 f:com.intellij.ui.render.RenderersKt
+f:com.intellij.ui.render.RenderingHelper
+- sf:RESIZE_EDITOR_TO_RENDERER_SIZE:com.intellij.openapi.util.Key
+- sf:SHRINK_LONG_RENDERER:com.intellij.openapi.util.Key
+- sf:SHRINK_LONG_SELECTION:com.intellij.openapi.util.Key
+- getHeight():I
+- getRightMargin():I
+- getWidth():I
+- getX():I
+- getY():I
+- isExpandableHintShown(I):Z
+- isRendererShrinkingDisabled(I):Z
+- isShrinkingSelectionDisabled(I):Z
 f:com.intellij.ui.tree.AsyncTreeModel
 - com.intellij.ui.tree.Searchable
 - com.intellij.ui.tree.TreeVisitor$LoadingAwareAcceptor
@@ -1404,7 +1485,45 @@ com.intellij.ui.tree.ui.Control$Painter
 - a:paint(java.awt.Component,java.awt.Graphics,I,I,I,I,com.intellij.ui.tree.ui.Control,I,Z,Z,Z):V
 c:com.intellij.ui.tree.ui.DefaultTreeUI
 - com.intellij.ui.tree.ui.CustomBoundsTreeUI
+- javax.swing.plaf.basic.BasicTreeUI
+- sf:AUTO_EXPAND_ALLOWED:com.intellij.openapi.util.Key
+- sf:AUTO_EXPAND_FILTER:com.intellij.openapi.util.Key
+- <init>():V
+- cancelEditing(javax.swing.JTree):V
+- p:completeEditing():V
+- p:configureLayoutCache():V
+- p:createLayoutCache():javax.swing.tree.AbstractLayoutCache
+- p:createMouseListener():java.awt.event.MouseListener
+- p:createNodeDimensions():javax.swing.tree.AbstractLayoutCache$NodeDimensions
+- p:createPropertyChangeListener():java.beans.PropertyChangeListener
+- p:createTreeExpansionListener():javax.swing.event.TreeExpansionListener
+- s:createUI(javax.swing.JComponent):javax.swing.plaf.ComponentUI
 - getActualPathBounds(javax.swing.JTree,javax.swing.tree.TreePath):java.awt.Rectangle
+- getClosestPathForLocation(javax.swing.JTree,I,I):javax.swing.tree.TreePath
+- getEditingPath(javax.swing.JTree):javax.swing.tree.TreePath
+- getPathBounds(javax.swing.JTree,javax.swing.tree.TreePath):java.awt.Rectangle
+- getPathForRow(javax.swing.JTree,I):javax.swing.tree.TreePath
+- getPreferredSize(javax.swing.JComponent,Z):java.awt.Dimension
+- getRowCount(javax.swing.JTree):I
+- getRowForPath(javax.swing.JTree,javax.swing.tree.TreePath):I
+- p:getRowX(I,I):I
+- p:installDefaults():V
+- p:installKeyboardActions():V
+- p:installListeners():V
+- isEditing(javax.swing.JTree):Z
+- p:isLocationInExpandControl(javax.swing.tree.TreePath,I,I):Z
+- p:isToggleEvent(java.awt.event.MouseEvent):Z
+- paint(java.awt.Graphics,javax.swing.JComponent):V
+- p:setLargeModel(Z):V
+- p:setModel(javax.swing.tree.TreeModel):V
+- p:setRootVisible(Z):V
+- p:startEditing(javax.swing.tree.TreePath,java.awt.event.MouseEvent):Z
+- startEditingAtPath(javax.swing.JTree,javax.swing.tree.TreePath):V
+- stopEditing(javax.swing.JTree):Z
+- p:toggleExpandState(javax.swing.tree.TreePath):V
+- p:uninstallListeners():V
+- p:updateCachedPreferredSize():V
+- p:updateSize():V
 com.intellij.ui.tree.ui.PlainSelectionTree
 com.intellij.util.textCompletion.TextCompletionCache
 - a:getItems(java.lang.String,com.intellij.codeInsight.completion.CompletionParameters):java.util.Collection

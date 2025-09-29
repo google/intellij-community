@@ -1,9 +1,9 @@
 ### auto-generated section `build intellij.java.ui` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
-jvm_resources(
+resourcegroup(
   name = "ui_resources",
-  files = glob(["resources/**/*"]),
+  srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
 
@@ -12,6 +12,7 @@ jvm_library(
   module_name = "intellij.java.ui",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
+  resources = [":ui_resources"],
   deps = [
     "//java/openapi:java",
     "//java/compiler/openapi:java-compiler",
@@ -62,8 +63,9 @@ jvm_library(
     "@lib//:slf4j-api",
     "//xml/xml-psi-api:psi",
     "@lib//:asm",
-  ],
-  runtime_deps = [":ui_resources"]
+    "@lib//:jackson",
+    "@lib//:jackson-databind",
+  ]
 )
 ### auto-generated section `build intellij.java.ui` end
 

@@ -5,14 +5,15 @@ import com.google.common.annotations.VisibleForTesting
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.coroutineToIndicator
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.use
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.vcs.log.VcsCommitMetadata
 import com.intellij.vcs.log.VcsShortCommitDetails
 import com.intellij.vcs.log.data.VcsLogData
+import com.intellij.vcs.log.impl.VcsProjectLog
 import com.intellij.vcs.log.util.VcsLogUtil
 import git4idea.DialogManager
 import git4idea.GitOperationsCollector
@@ -26,6 +27,7 @@ import git4idea.i18n.GitBundle
 import git4idea.inMemory.rebase.performInMemoryRebase
 import git4idea.rebase.*
 import git4idea.rebase.interactive.dialog.GitInteractiveRebaseDialog
+import git4idea.rebase.log.GitCommitEditingOperationResult
 import git4idea.repo.GitRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,8 +41,8 @@ internal fun getEntriesUsingLog(
   commit: VcsShortCommitDetails,
   logData: VcsLogData,
 ): List<GitRebaseEntryGeneratedUsingLog> {
-  Disposer.newDisposable().use {
-    val traverser: GitHistoryTraverser = GitHistoryTraverserImpl(repository.project, logData, it)
+  Disposer.newDisposable().use { parentDisposable ->
+    val traverser: GitHistoryTraverser = GitHistoryTraverserImpl(repository.project, logData, parentDisposable)
     val details = mutableListOf<VcsCommitMetadata>()
     try {
       traverser.traverse(repository.root) { (commitId, parents) ->
@@ -57,7 +59,7 @@ internal fun getEntriesUsingLog(
         }
       }
     }
-    catch (e: VcsException) {
+    catch (_: VcsException) {
       throw CantRebaseUsingLogException(CantRebaseUsingLogException.Reason.UNRESOLVED_HASH)
     }
 
@@ -77,18 +79,44 @@ internal fun getEntriesUsingLog(
   }
 }
 
-internal suspend fun interactivelyRebaseUsingLog(repository: GitRepository, commit: VcsCommitMetadata, logData: VcsLogData) {
-  val project = repository.project
-  val root = repository.root
-
+internal suspend fun tryGetEntriesUsingLog(
+  repository: GitRepository,
+  commit: VcsCommitMetadata,
+  logData: VcsLogData? = null,
+): List<GitRebaseEntryGeneratedUsingLog>? {
   val generatedEntries = try {
-    withBackgroundProgress(project, GitBundle.message("rebase.progress.indicator.preparing.title")) {
+    withBackgroundProgress(repository.project, GitBundle.message("rebase.progress.indicator.preparing.title")) {
+      val logData = logData ?: VcsProjectLog.awaitLogIsReady(repository.project)?.dataManager ?: run {
+        LOG.warn("Couldn't use log for rebasing - log not available")
+        return@withBackgroundProgress null
+      }
       getEntriesUsingLog(repository, commit, logData)
     }
   }
   catch (e: CantRebaseUsingLogException) {
     LOG.warn("Couldn't use log for rebasing: ${e.message}")
     logCantRebaseUsingLog(repository.project, e.reason)
+    null
+  }
+  return generatedEntries
+}
+
+/**
+ * The process:
+ * 1. Generate rebase entries from VCS log data
+ * 2. Show a dialog for user to modify the rebase plan
+ * 3. Attempt in-memory rebase if we don't have EDIT entries (faster, no working directory and index changes)
+ * 4. Fall back to traditional Git rebase if in-memory rebase had to stop (merge conflict).
+ *    We lose all our in-memory progress
+ *
+ * If log-based entry generation fails, falls back to traditional Git interactive rebase that gets entries from the editor.
+ */
+internal suspend fun interactivelyRebaseUsingLog(repository: GitRepository, commit: VcsCommitMetadata, logData: VcsLogData? = null) {
+  val project = repository.project
+  val root = repository.root
+
+  val generatedEntries = tryGetEntriesUsingLog(repository, commit, logData)
+  if (generatedEntries == null) {
     startInteractiveRebase(repository, commit)
     return
   }
@@ -106,33 +134,48 @@ internal suspend fun interactivelyRebaseUsingLog(repository: GitRepository, comm
     }
     logRebaseStartUsingLog(repository.project, model.elements.map { it.type.command })
     val shouldTryInMemory = Registry.`is`("git.in.memory.commit.editing.operations.enabled")
-    if (!hasEditActions && shouldTryInMemory && performInMemoryRebase(repository, generatedEntries, model)) {
-      return
-    }
 
-    startInteractiveRebase(repository, commit, GitInteractiveRebaseUsingLogEditorHandler(repository, generatedEntries, model))
+    withBackgroundProgress(repository.project, GitBundle.message("rebase.progress.indicator.title")) {
+      if (!hasEditActions && shouldTryInMemory) {
+        val inMemoryResult = performInMemoryRebase(repository, generatedEntries, model)
+        if (inMemoryResult is GitCommitEditingOperationResult.Complete) return@withBackgroundProgress
+      }
+
+      performInteractiveRebase(repository, commit, GitInteractiveRebaseUsingLogEditorHandler(repository, generatedEntries, model))
+    }
   }
 }
 
+/**
+ * Starts a traditional Git interactive rebase process.
+ */
 internal suspend fun startInteractiveRebase(
   repository: GitRepository,
   commit: VcsShortCommitDetails,
   editorHandler: GitRebaseEditorHandler? = null,
 ) {
-  withBackgroundProgress(repository.project, GitBundle.message("rebase.progress.indicator.title"), true) {
-    coroutineToIndicator { indicator ->
-      val base = getRebaseUpstreamFor(commit)
-      val params = GitRebaseParams.editCommits(repository.vcs.version, base, editorHandler, false)
+  withBackgroundProgress(repository.project, GitBundle.message("rebase.progress.indicator.title")) {
+    performInteractiveRebase(repository, commit, editorHandler)
+  }
+}
 
-      val rebaseActivity = GitOperationsCollector.startInteractiveRebase(repository.project)
-      try {
-        val wasSuccessful = GitRebaseUtils.rebaseWithResult(repository.project, listOf(repository), params, indicator)
-        GitOperationsCollector.endInteractiveRebase(rebaseActivity, wasSuccessful)
-      }
-      catch (e: Exception) {
-        GitOperationsCollector.endInteractiveRebase(rebaseActivity, false)
-        throw e
-      }
+private suspend fun performInteractiveRebase(
+  repository: GitRepository,
+  commit: VcsShortCommitDetails,
+  editorHandler: GitRebaseEditorHandler? = null,
+) {
+  coroutineToIndicator { indicator ->
+    val base = getRebaseUpstreamFor(commit)
+    val params = GitRebaseParams.editCommits(repository.vcs.version, base, editorHandler, false)
+
+    val rebaseActivity = GitOperationsCollector.startInteractiveRebase(repository.project)
+    try {
+      val wasSuccessful = GitRebaseUtils.rebaseWithResult(repository.project, listOf(repository), params, indicator)
+      GitOperationsCollector.endInteractiveRebase(rebaseActivity, wasSuccessful)
+    }
+    catch (e: Exception) {
+      GitOperationsCollector.endInteractiveRebase(rebaseActivity, false)
+      throw e
     }
   }
 }

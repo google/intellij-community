@@ -13,21 +13,20 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.isNotificationSilentMode
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.use
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.jetbrains.python.PyBundle
-import com.jetbrains.python.PySdkBundle
+import com.jetbrains.python.sdk.impl.PySdkBundle
 import com.jetbrains.python.PythonPluginDisposable
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
+import com.jetbrains.python.projectModel.enablePyProjectToml
 import com.jetbrains.python.projectModel.uv.UvProjectModelService
 import com.jetbrains.python.sdk.PySdkPopupFactory
 import com.jetbrains.python.sdk.configuration.suppressors.PyInterpreterInspectionSuppressor
 import com.jetbrains.python.sdk.configuration.suppressors.PyPackageRequirementsInspectionSuppressor
 import com.jetbrains.python.sdk.configuration.suppressors.TipOfTheDaySuppressor
 import com.jetbrains.python.sdk.configurePythonSdk
-import com.jetbrains.python.sdk.persist
 import com.jetbrains.python.sdk.uv.isUv
 import com.jetbrains.python.statistics.ConfiguredPythonInterpreterIdsHolder.Companion.SDK_HAS_BEEN_CONFIGURED_AS_THE_PROJECT_INTERPRETER
 import com.jetbrains.python.util.ShowingMessageErrorSync
@@ -62,7 +61,7 @@ object PyProjectSdkConfiguration {
     } ?: return false
 
     // TODO Move this to PyUvSdkConfiguration, show better notification
-    if (sdk.isUv && Registry.`is`("python.project.model.uv", false)) {
+    if (sdk.isUv && enablePyProjectToml) {
       val ws = UvProjectModelService.findWorkspace(module)
       if (ws != null) {
         for (wsModule in ws.members + ws.root) {
@@ -85,8 +84,6 @@ object PyProjectSdkConfiguration {
     if (module.isDisposed) {
       return
     }
-
-    sdk.persist()
 
     configurePythonSdk(project, module, sdk)
     withContext(Dispatchers.EDT) {

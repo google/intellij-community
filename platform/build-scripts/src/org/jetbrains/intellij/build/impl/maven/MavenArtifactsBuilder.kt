@@ -124,6 +124,7 @@ open class MavenArtifactsBuilder(protected val context: BuildContext) {
     private val FLEET_MODULES_ALLOWED_FOR_PUBLICATION = setOf(
       // region Fleet modules in Community
       "fleet.andel",
+      "fleet.bifurcan",
       "fleet.kernel",
       "fleet.multiplatform.shims",
       "fleet.reporting.api",
@@ -132,9 +133,12 @@ open class MavenArtifactsBuilder(protected val context: BuildContext) {
       "fleet.rpc",
       "fleet.rpc.server",
       "fleet.util.core",
+      "fleet.util.codepoints",
+      "fleet.util.datetime",
       "fleet.util.logging.api",
       "fleet.util.logging.slf4j",
       "fleet.util.multiplatform",
+      "fleet.util.serialization",
       "fleet.fastutil",
       "fleet.lsp.protocol", // Fleet Language Server Protocol modules allowed for publication - https://youtrack.jetbrains.com/issue/IJI-2644
       "fleet.ktor.network.tls",
@@ -546,10 +550,10 @@ private suspend fun layoutMavenArtifacts(
                 "$it module output directory doesn't exist: $moduleOutput"
               }
               if (moduleOutput.toString().endsWith(".jar")) {
-                ZipSource(file = moduleOutput, distributionFileEntryProducer = null, filter = createModuleSourcesNamesFilter(commonModuleExcludes))
+                ZipSource(file = moduleOutput, distributionFileEntryProducer = null, filter = createModuleSourcesNamesFilter(commonModuleExcludes), moduleName = null)
               }
               else {
-                DirSource(dir = moduleOutput, excludes = commonModuleExcludes)
+                DirSource(dir = moduleOutput, excludes = commonModuleExcludes, moduleName = null)
               }
             }
           },
@@ -565,10 +569,10 @@ private suspend fun layoutMavenArtifacts(
             targetFile = sources,
             sources = publishSourcesForModules.flatMap { module ->
               module.getSourceRoots(JavaSourceRootType.SOURCE).asSequence().map {
-                DirSource(dir = it.path, prefix = it.properties.packagePrefix.replace('.', '/'), excludes = commonModuleExcludes)
+                DirSource(dir = it.path, prefix = it.properties.packagePrefix.replace('.', '/'), excludes = commonModuleExcludes, moduleName = null)
               } +
               module.getSourceRoots(JavaResourceRootType.RESOURCE).asSequence().map {
-                DirSource(dir = it.path, prefix = it.properties.relativeOutputPath, excludes = commonModuleExcludes)
+                DirSource(dir = it.path, prefix = it.properties.relativeOutputPath, excludes = commonModuleExcludes, moduleName = null)
               }
             },
             compress = true,
@@ -583,7 +587,7 @@ private suspend fun layoutMavenArtifacts(
           val javadoc = artifactDir.resolve(artifactData.coordinates.getFileName("javadoc", "jar"))
           buildJar(
             targetFile = javadoc,
-            sources = listOf(DirSource(docsFolder)),
+            sources = listOf(DirSource(docsFolder, moduleName = null)),
             compress = true,
           )
           artifacts.add(javadoc)
@@ -596,7 +600,7 @@ private suspend fun layoutMavenArtifacts(
 
 @ApiStatus.Internal
 data class GeneratedMavenArtifacts(
-  val module: JpsModule,
-  val coordinates: MavenCoordinates,
-  val files: List<Path>,
+  @JvmField val module: JpsModule,
+  @JvmField val coordinates: MavenCoordinates,
+  @JvmField val files: List<Path>,
 )

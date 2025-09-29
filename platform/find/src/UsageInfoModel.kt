@@ -3,6 +3,7 @@ package com.intellij.platform.find
 
 
 import com.intellij.concurrency.captureThreadContext
+import com.intellij.find.impl.FindKey
 import com.intellij.ide.SelectInEditorManager
 import com.intellij.ide.ui.icons.icon
 import com.intellij.ide.ui.textChunk
@@ -27,6 +28,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDocument
 import com.intellij.psi.*
 import com.intellij.usageView.UsageInfo
+import com.intellij.usages.ItemWithLazyContent
 import com.intellij.usages.TextChunk
 import com.intellij.usages.UsageInfoAdapter
 import com.intellij.usages.UsagePresentation
@@ -44,7 +46,7 @@ import javax.swing.Icon
 
 private val LOG = logger<UsageInfoModel>()
 
-internal class UsageInfoModel private constructor(val project: Project, val model: FindInFilesResult, val coroutineScope: CoroutineScope, private val initializationListener: Consumer<UsageInfoAdapter>) : UsageInfoAdapter, UsageInFile, UsageDocumentProcessor, Disposable {
+internal class UsageInfoModel private constructor(val project: Project, val model: FindInFilesResult, val coroutineScope: CoroutineScope, private val initializationListener: Consumer<UsageInfoAdapter>) : UsageInfoAdapter, UsageInFile, UsageDocumentProcessor, ItemWithLazyContent, Disposable {
   private val virtualFile: VirtualFile? = run {
     val virtualFile = model.usageInfos.firstOrNull()?.file?.virtualFile ?: model.fileId.virtualFile()
     if (virtualFile == null) LOG.error("Cannot find virtualFile for ${model.presentablePath}")
@@ -65,10 +67,14 @@ internal class UsageInfoModel private constructor(val project: Project, val mode
   private var isLoaded: Boolean = false
     set(value) {
       field = value
-      if (value) {
+      if (value && isRemDev()) {
         initializationListener.accept(this)
       }
     }
+
+  private var isPreviewAccessed: Boolean = false
+
+  private fun isRemDev(): Boolean = model.usageInfos.isEmpty()
   private var initializationJob: Job? = null
 
   private val defaultRange: TextRange = TextRange(model.navigationOffset, model.navigationOffset + model.length)
@@ -94,7 +100,7 @@ internal class UsageInfoModel private constructor(val project: Project, val mode
 
   private fun initialize() {
     //local IDE case
-    if (model.usageInfos.isNotEmpty()) {
+    if (!isRemDev()) {
       cachedUsageInfos = model.usageInfos
       cachedPsiFile = cachedUsageInfos.firstOrNull()?.file
       cachedMergedSmartRanges = cachedUsageInfos.mapNotNull { it.psiFileRange }.sortedBy { it.range?.startOffset ?: 0 }
@@ -103,6 +109,9 @@ internal class UsageInfoModel private constructor(val project: Project, val mode
     }
     //RemDev case - we need to load psi elements
     else {
+      if (FindKey.isLazyPreviewEnabled && !isPreviewAccessed) {
+        return
+      }
       if (initializationJob?.isActive == true) {
         LOG.debug("Initialization job is already in progress ${model.presentablePath}")
         return
@@ -159,6 +168,13 @@ internal class UsageInfoModel private constructor(val project: Project, val mode
         }
       }
     }
+  }
+
+  override fun isContentComputed(): Boolean {
+    if (isLoaded) return true
+    isPreviewAccessed = true
+    initialize()
+    return isLoaded
   }
 
   companion object {
@@ -294,7 +310,9 @@ internal class UsageInfoModel private constructor(val project: Project, val mode
         val doc = psiDoc ?: virtualFile?.findDocument()
         if (doc != null && document == null) {
           document = doc
-          (doc as? DocumentEx)?.addFullUpdateListener(fullUpdateListener)
+          if (isRemDev()) {
+            (doc as? DocumentEx)?.addFullUpdateListener(fullUpdateListener)
+          }
         }
         doc
       }

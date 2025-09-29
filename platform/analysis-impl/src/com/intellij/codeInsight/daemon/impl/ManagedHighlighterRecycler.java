@@ -51,7 +51,7 @@ public final class ManagedHighlighterRecycler {
   }
 
   // null means no highlighter found in the cache
-  synchronized @Nullable InvalidPsi pickupHighlighterFromGarbageBin(int startOffset, int endOffset, int layer) {
+  synchronized @Nullable InvalidPsi pickupHighlighterFromGarbageBin(int startOffset, int endOffset, int layer, @Nullable String preferredDescription) {
     long range = TextRangeScalarUtil.toScalarRange(startOffset, endOffset);
     List<InvalidPsi> list = incinerator.get(range);
     if (list != null) {

@@ -2,10 +2,9 @@
 package com.intellij.vcs.log.impl
 
 import com.intellij.ide.PowerSaveMode
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
@@ -23,7 +22,6 @@ import com.intellij.ui.ComponentUtil
 import com.intellij.util.BitUtil
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import com.intellij.util.containers.MultiMap
 import com.intellij.vcs.log.*
 import com.intellij.vcs.log.data.DataPack
 import com.intellij.vcs.log.data.DataPackChangeListener
@@ -40,6 +38,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 import it.unimi.dsi.fastutil.ints.IntSet
 import it.unimi.dsi.fastutil.ints.IntSets
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.jetbrains.annotations.ApiStatus.*
 import org.jetbrains.annotations.CalledInAny
 import org.jetbrains.annotations.Nls
@@ -74,17 +73,13 @@ open class VcsLogManager @Internal constructor(
 
   init {
     cs.launch(start = CoroutineStart.UNDISPATCHED) {
-      val refresherDisposable = Disposer.newDisposable("Vcs Log Data Refresh for $name")
-      refreshLogOnVcsEvents(refresherDisposable, logProviders, postponableRefresher)
-
       try {
+        refreshLogOnVcsEvents(logProviders)
         awaitCancellation()
       }
       finally {
         LOG.debug { "Disposing $name" }
         withContext(NonCancellable) {
-          Disposer.dispose(refresherDisposable)
-
           withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             runCatching {
               disposeUi()
@@ -290,23 +285,40 @@ open class VcsLogManager @Internal constructor(
     dataManager.clearPersistentStorage()
   }
 
-  private fun refreshLogOnVcsEvents(
-    disposableParent: Disposable,
+  private suspend fun refreshLogOnVcsEvents(
     logProviders: Map<VirtualFile, VcsLogProvider>,
-    refresher: PostponableLogRefresher,
-  ) {
-    val providers2roots = MultiMap.create<VcsLogProvider, VirtualFile>()
-    logProviders.forEach { (key, value) -> providers2roots.putValue(value, key) }
+  ): Nothing {
+    supervisorScope {
+      logProviders.entries.groupBy({ it.value }, { it.key }).forEach { (provider, roots) ->
+        launchRefresher(provider, roots)
+      }
+      awaitCancellation()
+    }
+  }
 
-    val wrappedRefresher = VcsLogRefresher { root ->
-      ApplicationManager.getApplication().invokeLater({
-                                                        refresher.refresh(root, frozen || !(keepUpToDate() || isLogVisible))
-                                                      }, ModalityState.any())
+  private fun CoroutineScope.launchRefresher(provider: VcsLogProvider, roots: List<VirtualFile>) {
+    launch(start = CoroutineStart.UNDISPATCHED) {
+      val disposable = provider.subscribeToRootRefreshEvents(roots) { root ->
+        launch(Dispatchers.UI + ModalityState.any().asContextElement()) {
+          requestRefresh(root)
+        }
+      }
+
+      try {
+        awaitCancellation()
+      }
+      finally {
+        withContext(NonCancellable) {
+          Disposer.dispose(disposable)
+        }
+      }
     }
-    for ((key, value) in providers2roots.entrySet()) {
-      val disposable = key.subscribeToRootRefreshEvents(value, wrappedRefresher)
-      Disposer.register(disposableParent, disposable)
-    }
+  }
+
+  @RequiresEdt
+  private fun requestRefresh(root: VirtualFile) {
+    val shouldBePostponed = frozen || !(keepUpToDate() || isLogVisible)
+    postponableRefresher.refresh(root, shouldBePostponed)
   }
 
   private inner class MyErrorHandler : VcsLogErrorHandler {
@@ -428,7 +440,7 @@ open class VcsLogManager @Internal constructor(
 @Internal
 suspend fun VcsLogManager.awaitContainsCommit(hash: Hash, root: VirtualFile): Boolean {
   if (!containsCommit(hash, root)) {
-    if (isLogUpToDate) return false
+    if (isLogUpToDate && !dataManager.isRefreshInProgress.value) return false
     waitForRefresh()
     if (!containsCommit(hash, root)) return false
   }
@@ -448,7 +460,7 @@ private fun VcsLogManager.containsCommit(hash: Hash, root: VirtualFile): Boolean
 
 private fun VcsLogUiEx.isVisible(): Boolean = ComponentUtil.isShowing(mainComponent, false)
 
-suspend fun VcsLogManager.waitForRefresh() {
+private suspend fun VcsLogManager.waitForUpToDateLog() {
   suspendCancellableCoroutine { continuation ->
     val dataPackListener = object : DataPackChangeListener {
       override fun onDataPackChange(newDataPack: DataPack) {
@@ -469,4 +481,15 @@ suspend fun VcsLogManager.waitForRefresh() {
 
     continuation.invokeOnCancellation { dataManager.removeDataPackChangeListener(dataPackListener) }
   }
+}
+
+private suspend fun VcsLogManager.waitForOngoingRefreshToFinish() {
+  dataManager.isRefreshInProgress.first {
+    !it
+  }
+}
+
+suspend fun VcsLogManager.waitForRefresh() {
+  waitForUpToDateLog()
+  waitForOngoingRefreshToFinish()
 }

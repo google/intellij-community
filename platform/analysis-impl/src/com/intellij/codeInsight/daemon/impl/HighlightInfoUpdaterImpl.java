@@ -71,6 +71,8 @@ import java.util.stream.Collectors;
 
 @ApiStatus.Internal
 public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Disposable {
+  @ApiStatus.Internal
+  static final int FILE_LEVEL_FAKE_LAYER = -4094; // the layer the (fake) RangeHighlighter is created for file-level HighlightInfo in
   private static final Logger LOG = Logger.getInstance(HighlightInfoUpdaterImpl.class);
   private static final Object UNKNOWN_ID = "unknownId";
   /**
@@ -329,7 +331,6 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                                                       @NotNull HighlightingSession session,
                                                       @NotNull ManagedHighlighterRecycler invalidPsiRecycler,
                                                       @NotNull WhatTool toolIdPredicate) {
-    TextRange compositeDocumentDirtyRange = session instanceof HighlightingSessionImpl impl ? impl.getCompositeDocumentDirtyRange() : TextRange.EMPTY_RANGE;
     disposeEvictedInfos(session, toolIdPredicate);
     collectPsiElements(psiFile, requestor, session, toolIdPredicate,
         psiElement -> psiElement != FAKE_ELEMENT && !psiElement.isValid(), // find invalid PSI
@@ -339,7 +340,6 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
           // if however, that invalid PSI highlighter wasn't recycled after a short delay, kill it (runWithInvalidPsiRecycler()) to improve responsiveness to outdated infos
           if (LOG.isDebugEnabled()) {
             LOG.debug("recycleInvalidPsiElements (predicate=" + toolIdPredicate + ") " + info.getHighlighter() +
-                      "; compositeDocumentDirtyRange=" + compositeDocumentDirtyRange +
                       "; toolIdPredicate=" + toolIdPredicate +
                       " for invalid " + psiElement + " from " + requestor +
                       " " +session.getProgressIndicator());
@@ -512,7 +512,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       newInfo.updateLazyFixesPsiTimeStamp(psiTimeStamp);
     }
     synchronized (this) {
-      assertMarkupDataConsistent(psiFile, isInspectionToolId(toolId) ? WhatTool.INSPECTION : WhatTool.ANNOTATOR_OR_VISITOR);
+      assertMarkupConsistentWithData(psiFile, isInspectionToolId(toolId) ? WhatTool.INSPECTION : WhatTool.ANNOTATOR_OR_VISITOR);
       Map<Object, ToolHighlights> data = getData(psiFile, hostDocument);
       ToolHighlights toolHighlights = data.get(toolId);
       List<? extends HighlightInfo> oldInfos = ContainerUtil.notNullize(toolHighlights == null ? null : toolHighlights.elementHighlights.get(visitedPsiElement));
@@ -536,7 +536,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
               recycler.recycleHighlighter(visitedPsiElement, oldInfo);
             }
           }
-          List<? extends HighlightInfo> newInfosToStore = assignRangeHighlighters(newInfos, session, psiFile, hostDocument, invalidElementRecycler, recycler, data);
+          List<? extends HighlightInfo> newInfosToStore = assignRangeHighlighters(newInfos, toolId, session, psiFile, hostDocument, invalidElementRecycler, recycler, data);
           ToolHighlights notNullToolHighlights = toolHighlights == null ? data.computeIfAbsent(toolId, __ -> new ToolHighlights()) : toolHighlights;
 
           if (newInfosToStore.isEmpty()) {
@@ -556,7 +556,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       });
     }
     //assertNoDuplicates(psiFile, getInfosFromMarkup(hostDocument, project), "markup after psiElementVisited ");
-    assertMarkupDataConsistent(psiFile, isInspectionToolId(toolId) ? WhatTool.INSPECTION : WhatTool.ANNOTATOR_OR_VISITOR);
+    assertMarkupConsistentWithData(psiFile, isInspectionToolId(toolId) ? WhatTool.INSPECTION : WhatTool.ANNOTATOR_OR_VISITOR);
     Reference.reachabilityFence(visitedPsiElement); // ensure no psi is gced while in the middle of modifying soft-ref maps
   }
 
@@ -617,15 +617,18 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       .collect(Collectors.toList());
   }
 
-  private synchronized void assertMarkupDataConsistent(@NotNull PsiFile psiFile, @NotNull WhatTool toolIdPredicate) {
+  private synchronized void assertMarkupConsistentWithData(@NotNull PsiFile psiFile, @NotNull WhatTool toolIdPredicate) {
     if (!isAssertInvariants()) return;
     Collection<HighlightInfo> fromMarkup = getInfosFromMarkup(psiFile, toolIdPredicate);
     // todo IJPL-339 process top level infos
     Set<HighlightInfo> fromData = new HashSet<>(getAllData(psiFile, toolIdPredicate));
 
     if (!new HashSet<>(fromMarkup).equals(fromData)) {
-      String fromDataStr = StringUtil.join(ContainerUtil.sorted(fromData, Segment.BY_START_OFFSET_THEN_END_OFFSET), "\n");
-      String fromMarkupStr = StringUtil.join(ContainerUtil.sorted(fromMarkup, Segment.BY_START_OFFSET_THEN_END_OFFSET), "\n");
+      Comparator<Object> toString = Comparator.comparing(o->o.toString());
+      List<HighlightInfo> ds = ContainerUtil.sorted(fromData, toString);
+      List<HighlightInfo> ms = ContainerUtil.sorted(fromMarkup, toString);
+      String fromDataStr = StringUtil.join(ds, "\n");
+      String fromMarkupStr = StringUtil.join(ms, "\n");
       throw new AssertionError("data inconsistent with markup: data:\n"
                                  + fromDataStr + "\n---------------markup:\n"
                                  + fromMarkupStr+"\n========="
@@ -755,7 +758,8 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                 if (i != -1) {
                   PsiElement psiElement = elementEntry.getKey();
                   recycler.recycleHighlighter(psiElement, info);
-                  List<HighlightInfo> listMinusInfo = ContainerUtil.concat(infos.subList(0, i), infos.subList(i + 1, infos.size()));
+                  HighlightInfo toRemove = infos.get(i);
+                  List<HighlightInfo> listMinusInfo = ContainerUtil.filter(infos, h -> h != toRemove);
                   if (listMinusInfo.isEmpty()) {
                     elementHighlights.elementHighlights.remove(psiElement);
                   }
@@ -828,9 +832,9 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
    *  - followed by all other elements
    */
   @ApiStatus.Internal
-  public synchronized @NotNull @Unmodifiable List<? extends PsiElement> sortByPsiElementFertility(@NotNull PsiFile psiFile,
-                                                                                                  @NotNull LocalInspectionToolWrapper toolWrapper,
-                                                                                                  @NotNull List<? extends PsiElement> elements) {
+  public @NotNull @Unmodifiable List<? extends PsiElement> sortByPsiElementFertility(@NotNull PsiFile psiFile,
+                                                                                     @NotNull LocalInspectionToolWrapper toolWrapper,
+                                                                                     @NotNull List<? extends PsiElement> elements) {
     String toolId = toolWrapper.getShortName();
     Map<Object, ToolHighlights> map = getData(psiFile);
     if (map.isEmpty()) return elements;
@@ -838,8 +842,8 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     if (toolHighlights == null) return elements;
     Map<PsiElement, List<? extends HighlightInfo>> highlights = toolHighlights.elementHighlights;
     if (highlights.isEmpty()) return elements;
-    List<PsiElement> sorted = new ArrayList<>(elements);
-    sorted.sort((e1, e2) -> {
+    return ContainerUtil.sorted(elements,
+    (e1, e2) -> {
       List<? extends HighlightInfo> infos1 = highlights.get(e1);
       List<? extends HighlightInfo> infos2 = highlights.get(e2);
       if ((infos1 == null) != (infos2 == null)) {
@@ -851,7 +855,6 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       // put error-generating element first
       return maxSeverity(infos2).compareTo(maxSeverity(infos1));
     });
-    return sorted;
   }
 
   private static @NotNull HighlightSeverity maxSeverity(@NotNull List<? extends HighlightInfo> infos) {
@@ -869,30 +872,41 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                                         @NotNull Consumer<? super ManagedHighlighterRecycler> invalidPsiRecyclerConsumer) {
     ManagedHighlighterRecycler.runWithRecycler(session, invalidPsiRecycler -> {
       recycleInvalidPsiElements(session.getPsiFile(), this, session, invalidPsiRecycler, toolIdPredicate);
-      ScheduledFuture<?> future = AppExecutorUtil.getAppScheduledExecutorService().schedule(() ->
-        ProgressManager.getInstance().executeProcessUnderProgress(() -> {
-          // grab RA first, to avoid deadlock when InvalidPsi.toString() tries to obtain RA again from within this monitor
-          ApplicationManagerEx.getApplicationEx().tryRunReadAction(() -> {
-            // do not incinerate when the session is canceled because even though all RHs here need to be disposed eventually, the new restarted session might have used them to reduce flicker
-            if (session.isCanceled() || session.getProgressIndicator().isCanceled()) {
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("runWithInvalidPsiRecycler: recycler(" + toolIdPredicate + ") abandoned because the session was canceled: " + invalidPsiRecycler+" "+session.getProgressIndicator());
+      ScheduledFuture<?> future;
+      if (invalidPsiRecycler.forAllInGarbageBin().isEmpty()) {
+        future = null;
+      }
+      else {
+        // after some time kill highlighters for invalid elements automatically, because it seems they are not going to be reused
+        future = AppExecutorUtil.getAppScheduledExecutorService().schedule(() ->
+          ProgressManager.getInstance().executeProcessUnderProgress(() -> {
+            // grab RA first, to avoid deadlock when InvalidPsi.toString() tries to obtain RA again from within this monitor
+            ApplicationManagerEx.getApplicationEx().tryRunReadAction(() -> {
+              // do not incinerate when the session is canceled because even though all RHs here need to be disposed eventually, the new restarted session might have used them to reduce flicker
+              if (session.isCanceled() || session.getProgressIndicator().isCanceled()) {
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("runWithInvalidPsiRecycler: recycler(" + toolIdPredicate + ") abandoned because the session was canceled: " + invalidPsiRecycler+" "+session.getProgressIndicator());
+                }
               }
-            }
-            else {
-              incinerateAndRemoveFromDataAtomically(invalidPsiRecycler);
-            }
-          });
-        }, session.getProgressIndicator())
-      , Registry.intValue("highlighting.delay.invalid.psi.info.kill.ms"), TimeUnit.MILLISECONDS);
+              else {
+                incinerateAndRemoveFromDataAtomically(invalidPsiRecycler);
+              }
+            });
+          }, session.getProgressIndicator())
+          , Registry.intValue("highlighting.delay.invalid.psi.info.kill.ms"), TimeUnit.MILLISECONDS);
+      }
+
       try {
         invalidPsiRecyclerConsumer.accept(invalidPsiRecycler);
       }
       finally {
-        future.cancel(false);
+        if (future != null) {
+          future.cancel(false);
+        }
       }
     });
   }
+
   /**
    * We associate each {@link HighlightInfo} with the PSI element for which the inspection builder has produced that info.
    * Unfortunately, there are some crazy inspections that produce infos in their {@link LocalInspectionTool#inspectionFinished(LocalInspectionToolSession, ProblemsHolder)} method instead.
@@ -1188,7 +1202,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
    * could be reentrant, be careful to avoid leaking/blinking RHs
    */
   private static @NotNull @Unmodifiable List<? extends HighlightInfo> assignRangeHighlighters(@NotNull List<? extends HighlightInfo> newInfos,
-                                                                                              @NotNull HighlightingSession session,
+                                                                                              @NotNull Object toolId, @NotNull HighlightingSession session,
                                                                                               @NotNull PsiFile psiFile,
                                                                                               @NotNull Document hostDocument,
                                                                                               @NotNull ManagedHighlighterRecycler invalidElementRecycler,
@@ -1203,10 +1217,10 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     List<InvalidPsi> recycledInvalidPsiHighlightersToBeRemovedFromData = new ArrayList<>(newInfos.size());
     List<? extends HighlightInfo> sorted = ContainerUtil.sorted(newInfos, Segment.BY_START_OFFSET_THEN_END_OFFSET);
     FreezableArrayList<HighlightInfo> newInfosToStore = new FreezableArrayList<>(sorted.size());
+    //noinspection ForLoopReplaceableByForEach
     for (int i = 0; i < sorted.size(); i++) {
       HighlightInfo newInfo = sorted.get(i);
-      //todo fails because of ProblemDescriptorWithReporterName
-      //assert toolId.equals(newInfo.toolId) : newInfo + "; toolId=" + toolId + "(" + toolId.getClass() + ")";
+      assert toolId.equals(newInfo.toolId) : "HighlightInfo generated by "+toolId + "(" + toolId.getClass() + ") must have consistent toolId, but got:"+ newInfo;
       boolean isFileLevel = newInfo.isFileLevelAnnotation();
       long finalInfoRange = isFileLevel
                             ? TextRangeScalarUtil.toScalarRange(0, psiFile.getTextLength())
@@ -1217,14 +1231,14 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       // workaround for rogue plugins that cache HighlightInfos and then return identical HI for different calls
       newInfo = newInfo.copy(true).createUnconditionally();
       newInfosToStore.add(newInfo);
-      int layer = isFileLevel ? DaemonCodeAnalyzerEx.FILE_LEVEL_FAKE_LAYER : UpdateHighlightersUtil.getLayer(newInfo, severityRegistrar);
+      int layer = isFileLevel ? FILE_LEVEL_FAKE_LAYER : UpdateHighlightersUtil.getLayer(newInfo, severityRegistrar);
       int infoStartOffset = TextRangeScalarUtil.startOffset(finalInfoRange);
       int infoEndOffset = TextRangeScalarUtil.endOffset(finalInfoRange);
 
-      InvalidPsi recycled = recycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer);
+      InvalidPsi recycled = recycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer, newInfo.getDescription());
       String from;
       if (recycled == null) {
-        recycled = invalidElementRecycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer);
+        recycled = invalidElementRecycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer, newInfo.getDescription());
         if (recycled != null) {
           recycledInvalidPsiHighlightersToBeRemovedFromData.add(recycled);
         }
@@ -1241,7 +1255,6 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       changeRangeHighlighterAttributes(session, psiFile, markup, newInfo, range2markerCache, finalInfoRange, recycled, isFileLevel, infoStartOffset, infoEndOffset, layer,
                                        severityRegistrar);
     }
-    removeFromDataAtomically(data, recycledInvalidPsiHighlightersToBeRemovedFromData, session);
 
     // this list must be sorted by Segment.BY_START_OFFSET_THEN_END_OFFSET
     for (int i = 0; i < newInfosToStore.size(); i++) {
@@ -1256,6 +1269,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
         assert Segment.BY_START_OFFSET_THEN_END_OFFSET.compare(newInfosToStore.get(i-1), newInfosToStore.get(i)) <= 0 : "assignRangeHighlighters returned unsorted list: "+newInfosToStore;
       }
     }
+    removeFromDataAtomically(data, recycledInvalidPsiHighlightersToBeRemovedFromData, session);
     return newInfosToStore.emptyOrFrozen();
   }
 
@@ -1273,9 +1287,9 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                                                        @NotNull SeverityRegistrar severityRegistrar) {
     CodeInsightContext context = session.getCodeInsightContext();
     TextAttributes infoAttributes = newInfo.getTextAttributes(psiFile, session.getColorsScheme());
-    com.intellij.util.Consumer<RangeHighlighterEx> changeAttributes = finalHighlighter -> {
+    com.intellij.util.Consumer<RangeHighlighterEx> changeAttributes = finalHighlighter ->
       BackgroundUpdateHighlightersUtil.changeAttributes(finalHighlighter, newInfo, session.getColorsScheme(), psiFile, infoAttributes, context);
-    };
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("remap: create " + (recycled == null ? "(new RH)" : "(recycled)") + newInfo + " "+session.getProgressIndicator());
     }
@@ -1301,7 +1315,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       // recycle
       HighlightInfo oldInfo = recycled.info();
       HighlightSeverity oldSeverity = oldInfo.getSeverity();
-      int oldLayer = isFileLevel ? DaemonCodeAnalyzerEx.FILE_LEVEL_FAKE_LAYER : UpdateHighlightersUtil.getLayer(oldInfo, severityRegistrar);
+      int oldLayer = isFileLevel ? FILE_LEVEL_FAKE_LAYER : UpdateHighlightersUtil.getLayer(oldInfo, severityRegistrar);
       highlighter = oldInfo.getHighlighter();
       newInfo.setHighlighter(highlighter);
       if (isFileLevel) {
@@ -1327,7 +1341,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                                                                                   @Nullable CodeInsightContext context) {
     Document document = markupModel.getDocument();
     RangeHighlighterEx highlighter = toReuse != null && toReuse.isValid() ? toReuse
-             : (RangeHighlighterEx)markupModel.addRangeHighlighter(0, document.getTextLength(), DaemonCodeAnalyzerEx.FILE_LEVEL_FAKE_LAYER, null, HighlighterTargetArea.EXACT_RANGE);
+             : (RangeHighlighterEx)markupModel.addRangeHighlighter(0, document.getTextLength(), FILE_LEVEL_FAKE_LAYER, null, HighlighterTargetArea.EXACT_RANGE);
     highlighter.setGreedyToLeft(true);
     highlighter.setGreedyToRight(true);
     highlighter.setErrorStripeTooltip(info);

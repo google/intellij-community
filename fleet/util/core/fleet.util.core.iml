@@ -16,7 +16,7 @@
             <arrayArg name="pluginClasspaths">
               <args>
                 <arg>$KOTLIN_BUNDLED$/lib/kotlinx-serialization-compiler-plugin.jar</arg>
-                <arg>$MAVEN_REPOSITORY$/jetbrains/fleet/expects-compiler-plugin/2.2.20-RC-0.1/expects-compiler-plugin-2.2.20-RC-0.1.jar</arg>
+                <arg>$MAVEN_REPOSITORY$/jetbrains/fleet/expects-compiler-plugin/2.2.20-0.1/expects-compiler-plugin-2.2.20-0.1.jar</arg>
               </args>
             </arrayArg>
           </arrayArguments>
@@ -43,9 +43,7 @@
     <orderEntry type="module" module-name="fleet.reporting.api" />
     <orderEntry type="module" module-name="fleet.reporting.shared" />
     <orderEntry type="module" module-name="fleet.multiplatform.shims" exported="" />
-    <orderEntry type="module" module-name="fleet.fastutil" exported="" />
-    <orderEntry type="library" name="kotlinx-datetime-jvm" level="project" />
     <orderEntry type="module" module-name="fleet.util.multiplatform" scope="PROVIDED" />
-    <orderEntry type="library" name="de.cketti.unicode.kotlin.codepoints.jvm" level="project" />
+    <orderEntry type="module" module-name="fleet.util.serialization" exported="" />
   </component>
 </module>

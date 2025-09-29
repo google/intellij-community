@@ -8,10 +8,7 @@ import com.intellij.concurrency.ThreadContext;
 import com.intellij.ide.plugins.DynamicPluginListener;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.TransactionGuard;
-import com.intellij.openapi.application.TransactionGuardImpl;
-import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.*;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
 import com.intellij.openapi.diagnostic.Logger;
@@ -232,18 +229,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
 
   private void saveAllDocumentsLater() {
     // later because some document might have been blocked by PSI right now
-    ApplicationManager.getApplication().invokeLater(() -> {
-      Document[] unsavedDocuments = getUnsavedDocuments();
-      for (Document document : unsavedDocuments) {
-        VirtualFile file = getFile(document);
-        if (file != null) {
-          Project project = ProjectUtil.guessProjectForFile(file);
-          if (project == null || !PsiDocumentManager.getInstance(project).isDocumentBlockedByPsi(document)) {
-            saveDocument(document);
-          }
-        }
-      }
-    });
+    ApplicationManager.getApplication().invokeLater(() -> saveAllDocuments(false), ModalityState.nonModal());
   }
 
   @Override
@@ -502,8 +488,8 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     if (lineSeparator == null) {
       lineSeparator = document.getUserData(LINE_SEPARATOR_KEY);
       if (lineSeparator == null) {
-        Runnable currentCommand = CommandProcessor.getInstance().getCurrentCommand();
-        Project project = currentCommand == null ? null : CommandProcessor.getInstance().getCurrentCommandProject();
+        CommandProcessor commandProcessor = CommandProcessor.getInstance();
+        Project project = commandProcessor.isCommandInProgress() ? commandProcessor.getCurrentCommandProject() : null;
         if (project == null) {
           project = ProjectUtil.guessProjectForFile(virtualFile);
         }

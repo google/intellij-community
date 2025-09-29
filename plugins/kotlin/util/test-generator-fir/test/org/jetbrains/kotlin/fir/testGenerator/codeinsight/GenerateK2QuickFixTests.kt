@@ -101,7 +101,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/insertDelegationCall", pattern = pattern)
             model("$idea/quickfix/isEnumEntry", pattern = pattern)
             model("$idea/quickfix/javaClassOnCompanion", pattern = pattern)
-            model("$idea/quickfix/kdocMissingDocumentation", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/kdocMissingDocumentation", pattern = pattern)
             model("$idea/quickfix/lateinit", pattern = pattern)
             model("$idea/quickfix/leakingThis", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/libraries", pattern = pattern)
@@ -133,6 +133,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/properties", pattern = pattern)
             model("$idea/quickfix/protectedInFinal", pattern = pattern)
             model("$idea/quickfix/publicApiImplicitType", pattern = pattern)
+            model("$idea/quickfix/receiverShadowedByContextParameter", pattern = pattern)
             model("$idea/quickfix/redundantConst", pattern = pattern)
             model("$idea/quickfix/redundantFun", pattern = pattern)
             model("$idea/quickfix/redundantInline", pattern = pattern)
@@ -222,7 +223,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
                 testMethodName = testMethodName,
             )
             model(
-                "$idea/quickfix/modifiers/addOpenToClassDeclaration",
+                "$idea/quickfix/modifiers",
                 pattern = pattern,
                 testMethodName = testMethodName,
             )

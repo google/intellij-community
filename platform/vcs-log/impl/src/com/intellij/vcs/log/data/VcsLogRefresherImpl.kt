@@ -21,6 +21,12 @@ import com.intellij.vcs.log.graph.GraphCommitImpl
 import com.intellij.vcs.log.impl.RequirementsImpl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.onClosed
+import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.channels.onSuccess
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import org.jetbrains.annotations.TestOnly
 import java.util.function.Consumer
 import kotlin.concurrent.Volatile
@@ -40,9 +46,6 @@ internal class VcsLogRefresherImpl(
   private val refreshRequests = Channel<RefreshRequest>(Channel.UNLIMITED)
   private val refresherJob: Job
 
-  @TestOnly
-  var refreshBatchJobConsumer: ((Job) -> Unit)? = null
-
   @Volatile
   override var currentDataPack: DataPack = DataPack.EMPTY
     private set(value) {
@@ -51,54 +54,73 @@ internal class VcsLogRefresherImpl(
       dataPackUpdateHandler.accept(value)
     }
 
+  private val _isBusy = MutableStateFlow(false)
+  val isBusy = _isBusy.asStateFlow()
+
   private val tracer = TelemetryManager.getInstance().getTracer(VcsScope)
 
   init {
     refresherJob = parentCs.launch(Dispatchers.Default + CoroutineName("Vcs Log Refresher"), CoroutineStart.LAZY) {
       try {
-        currentDataPack = loadFirstBlock()
+        _isBusy.value = true
+        currentDataPack = runInitialRefresh()
+
         refreshRequests.send(RefreshRequest.ReloadAll) // build/rebuild the full log in background
+
+        handleRefreshRequests()
+      }
+      finally {
+        shutDown()
+      }
+    }
+  }
+
+  private suspend fun runInitialRefresh(): DataPack {
+    return try {
+      loadFirstBlock()
+    }
+    catch (ce: CancellationException) {
+      throw ce
+    }
+    catch (e: Exception) {
+      LOG.info("Failed to load initial data", e)
+      ErrorDataPack(e)
+    }
+  }
+
+  private suspend fun handleRefreshRequests(): Nothing {
+    while (true) {
+      checkCanceled()
+      val request = checkWasRequested() ?: refreshRequests.receive()
+      val requests = mutableListOf(request)
+      try { // don't cancel the request processing on processing errors
+        progress.runWithProgress(VcsLogData.DATA_PACK_REFRESH) {
+          var dataPack = currentDataPack
+          val logInfo = LogInfo()
+          while (true) {
+            checkCanceled()
+            refreshRequests.receiveAll(requests::add)
+            if (requests.isEmpty()) {
+              break
+            }
+            LOG.debug("Refresh requests: $requests")
+
+            val cumulativeRequest = requests.fold()
+            requests.clear()
+            LOG.debug("Cumulative refresh request: $cumulativeRequest")
+            dataPack = handleRequest(dataPack, logInfo, cumulativeRequest)
+          }
+
+          if (dataPack !== currentDataPack) {
+            currentDataPack = dataPack
+          }
+        }
       }
       catch (ce: CancellationException) {
         throw ce
       }
       catch (e: Exception) {
-        LOG.info("Failed to load initial data", e)
-        currentDataPack = ErrorDataPack(e)
-      }
-
-      while (true) {
-        checkCanceled()
-        supervisorScope { // don't cancel the request processing on processing errors
-          val request = refreshRequests.receive()
-          val requests = mutableListOf(request)
-
-          launch {
-            progress.runWithProgress(VcsLogData.DATA_PACK_REFRESH) {
-              var dataPack = currentDataPack
-              val logInfo = LogInfo()
-              while (true) {
-                checkCanceled()
-                refreshRequests.receiveAll(requests::add)
-                if (requests.isEmpty()) {
-                  break
-                }
-                LOG.debug("Refresh requests: $requests")
-
-                val cumulativeRequest = requests.fold()
-                requests.clear()
-                LOG.debug("Cumulative refresh request: $cumulativeRequest")
-                dataPack = handleRequest(dataPack, logInfo, cumulativeRequest)
-              }
-
-              if (dataPack !== currentDataPack) {
-                currentDataPack = dataPack
-              }
-            }
-          }.also {
-            refreshBatchJobConsumer?.invoke(it)
-          }
-        }
+        LOG.warn("Failed to handle the VCS Log refresh requests", e)
       }
     }
   }
@@ -160,14 +182,45 @@ internal class VcsLogRefresherImpl(
     refresherJob.start()
   }
 
-  override fun refresh(rootsToRefresh: Collection<VirtualFile>, optimized: Boolean) {
-    refresherJob.start()
-    if (!rootsToRefresh.isEmpty()) {
-      val sent = refreshRequests.trySend(RefreshRequest.RefreshRoots(rootsToRefresh.toSet(), optimized))
-      if (!sent.isSuccess) {
-        LOG.error("Failed to send a refresh request")
-      }
+  /**
+   * Synchronously checks if a request was submitted and resets the busy state if there are none.
+   *
+   * @return true if a request was submitted, false if not.
+   */
+  @Synchronized
+  private fun checkWasRequested(): RefreshRequest? {
+    val request = refreshRequests.tryReceive().getOrNull()
+    if (request == null) {
+      _isBusy.value = false
     }
+    return request
+  }
+
+  @Synchronized
+  override fun refresh(rootsToRefresh: Collection<VirtualFile>, optimized: Boolean) {
+    if (rootsToRefresh.isEmpty()) return
+
+    refresherJob.start()
+    refreshRequests.trySend(
+      RefreshRequest.RefreshRoots(rootsToRefresh.toSet(), optimized)
+    ).onSuccess {
+      _isBusy.value = true
+    }.onClosed {
+      LOG.warn("Log refresher is already shut down. Refresh will not be performed", it)
+    }.onFailure {
+      LOG.error("Failed to send a VCS log refresh request", it)
+    }
+  }
+
+  @Synchronized
+  private fun shutDown() {
+    refreshRequests.close()
+    _isBusy.value = false
+  }
+
+  @TestOnly
+  suspend fun awaitNotBusy() {
+    _isBusy.first { !it }
   }
 
   private suspend fun loadFirstBlock(): DataPack =

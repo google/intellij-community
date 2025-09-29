@@ -86,7 +86,7 @@ object TestKotlinArtifacts {
             ?: error("Unable to find URL for '${label.asLabel}'")
     }
 
-    private val cooperativeRepoRoot = PathManager.getHomeDir().parent.resolve("build/repo")
+    private val cooperativeRepoRoot = communityRoot.communityRoot.resolve("lib/kotlin-snapshot")
 
     private fun downloadFile(label: BazelLabel): Path {
         val downloadFile = findDownloadFile(label)
@@ -154,6 +154,8 @@ object TestKotlinArtifacts {
         val target = Path.of(PathManager.getCommunityHomePath())
             .resolve("out")
             .resolve("kotlin-from-sources-deps")
+            .resolve(label.repo)
+            .resolve(label.packageName)
             .resolve(label.target)
 
         // we could have a file from some previous launch, but with different content
@@ -165,7 +167,7 @@ object TestKotlinArtifacts {
         target.createParentDirectories()
         val tempFile = Files.createTempFile(target.parent, target.name, ".tmp")
         try {
-            dependency.copyTo(tempFile, overwrite = true)
+            dependency.copyToRecursively(tempFile, overwrite = true, followLinks = true)
             // in the case of parallel access target will be overwritten by one of the threads
             tempFile.moveTo(target, StandardCopyOption.ATOMIC_MOVE)
         } finally {
@@ -262,7 +264,20 @@ object TestKotlinArtifacts {
     val composeCompilerPluginForIde: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:compose-compiler-plugin-for-ide.jar") }
 
     @JvmStatic
+    val kotlinStdlibJdk8_2_1_21: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:kotlin-stdlib-jdk8-2.1.21.jar") }
+    @JvmStatic
+    val kotlinStdlib_2_1_21: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:kotlin-stdlib-2.1.21.jar") }
+    @JvmStatic
+    val annotations13: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:annotations-13.0.jar") }
+    @JvmStatic
+    val kotlinxCoroutinesCore_1_10_2: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:kotlinx-coroutines-core-1.10.2.jar") }
+    @JvmStatic
+    val kotlinxCoroutinesCoreJvm_1_10_2: Path by lazy { getKotlinDepsByLabel("@kotlin_test_deps//:kotlinx-coroutines-core-jvm-1.10.2.jar") }
+
+    @JvmStatic
     val kotlinJvmDebuggerTestData: Path by lazy { getKotlinDepsByLabel("@community//plugins/kotlin/jvm-debugger/test:testData") }
+    @JvmStatic
+    val kotlinIdeaTestData: Path by lazy { getKotlinDepsByLabel("@community//plugins/kotlin/idea/tests:testData") }
 
     @Suppress("NO_REFLECTION_IN_CLASS_PATH")
     @JvmStatic

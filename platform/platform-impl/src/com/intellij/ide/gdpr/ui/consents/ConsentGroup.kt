@@ -4,17 +4,20 @@ package com.intellij.ide.gdpr.ui.consents
 import com.intellij.ide.gdpr.Consent
 import com.intellij.ide.gdpr.ConsentOptions
 
-internal data class ConsentGroup(
+internal class ConsentGroup(
   val id: String,
-  val consents: List<Consent>,
+  consents: List<Consent>,
 ) {
+  val consents: List<Consent> = consents.sortedByDescending { it.id }
+
   companion object {
     const val DATA_COLLECTION_GROUP_ID: String = "data.collection"
 
     val CONSENT_GROUP_MAPPING: Map<String, (Consent) -> Boolean> = mapOf(
       DATA_COLLECTION_GROUP_ID to { consent ->
         ConsentOptions.condUsageStatsConsent().test(consent) ||
-        ConsentOptions.condTraceDataCollectionConsent().test(consent)
+        ConsentOptions.condTraceDataCollectionComConsent().test(consent) ||
+        ConsentOptions.condTraceDataCollectionNonComConsent().test(consent)
       }
     )
   }

@@ -6,8 +6,8 @@ import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
+import com.intellij.platform.searchEverywhere.providers.SeSortedProviderIds
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
-import fleet.kernel.DurableRef
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.remoteApiDescriptor
@@ -31,7 +31,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
   // 4. BE sends the next batch of items
   suspend fun getItems(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     providerIds: List<SeProviderId>,
     isAllTab: Boolean,
     params: SeParams,
@@ -41,7 +41,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
 
   suspend fun itemSelected(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     itemData: SeItemData,
     modifiers: Int,
     searchText: String,
@@ -52,34 +52,35 @@ interface SeRemoteApi : RemoteApi<Unit> {
    * Defines if results can be shown in <i>Find</i> toolwindow.
    */
   suspend fun canBeShownInFindResults(projectId: ProjectId,
-                                      sessionRef: DurableRef<SeSessionEntity>,
+                                      session: SeSession,
                                       dataContextId: DataContextId,
                                       providerIds: List<SeProviderId>,
                                       isAllTab: Boolean): Boolean
 
   suspend fun isShownInSeparateTab(projectId: ProjectId,
-                                   sessionRef: DurableRef<SeSessionEntity>,
+                                   session: SeSession,
                                    dataContextId: DataContextId,
                                    providerId: SeProviderId): Boolean
 
   suspend fun openInFindToolWindow(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     dataContextId: DataContextId?,
     providerIds: List<SeProviderId>,
     params: SeParams,
     isAllTab: Boolean
   ): Boolean
 
+  @ApiStatus.Internal
   suspend fun getAvailableProviderIds(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     dataContextId: DataContextId
-  ): Map<String, Set<SeProviderId>>
+  ): SeSortedProviderIds?
 
   suspend fun getSearchScopesInfoForProviders(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
     isAllTab: Boolean,
@@ -88,7 +89,7 @@ interface SeRemoteApi : RemoteApi<Unit> {
   suspend fun getTypeVisibilityStatesForProviders(
     index: Int,
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
     isAllTab: Boolean,
@@ -96,14 +97,17 @@ interface SeRemoteApi : RemoteApi<Unit> {
 
   suspend fun getDisplayNameForProviders(
     projectId: ProjectId,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
     dataContextId: DataContextId,
     providerIds: List<SeProviderId>,
   ): Map<SeProviderId, @Nls String>
 
-  suspend fun getTextSearchOptions(projectId: ProjectId): SeTextSearchOptions?
-
   suspend fun getUpdatedPresentation(projectId: ProjectId, item: SeItemData): SeItemPresentation?
+
+  suspend fun performExtendedAction(projectId: ProjectId,
+                                    session: SeSession,
+                                    itemData: SeItemData,
+                                    isAllTab: Boolean): Boolean
 
   companion object {
     @JvmStatic

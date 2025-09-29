@@ -28,6 +28,9 @@ internal abstract class GitInMemoryCommitEditingOperation(
 
   protected lateinit var initialHeadPosition: String
 
+  /**
+   * A linear range of commits that is being edited is loaded into memory
+   */
   protected val baseToHeadCommitsRange: List<GitObject.Commit> by lazy {
     objectRepo.findCommitsRange(baseCommitMetadata.id.asString(), initialHeadPosition)
   }
@@ -46,7 +49,7 @@ internal abstract class GitInMemoryCommitEditingOperation(
       val upstream = getRebaseUpstreamFor(baseCommitMetadata)
 
       return GitCommitEditingOperationResult.Complete(objectRepo.repository, upstream, initialHeadPosition,
-                                                      result.newHead.hex(), result.commitToFocus?.toHash())
+                                                      result.newHead.hex(), result.commitToFocus?.toHash(), result.commitToFocusOnUndo?.toHash())
     }
     catch (e: VcsException) {
       if (showFailureNotification) notifyOperationFailed(e)
@@ -70,6 +73,7 @@ internal abstract class GitInMemoryCommitEditingOperation(
   protected data class CommitEditingResult(
     val newHead: Oid,
     val commitToFocus: Oid? = null,
+    val commitToFocusOnUndo: Oid? = null,
   )
 
   protected fun assertCurrentRevMatchesInitialHead(performUpdate: Boolean = true) {

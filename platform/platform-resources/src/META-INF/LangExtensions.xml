@@ -385,6 +385,8 @@
     <applicationService serviceInterface="com.intellij.ide.scratch.ScratchFileService"
                         serviceImplementation="com.intellij.ide.scratch.ScratchFileServiceImpl"/>
     <treeStructureProvider implementation="com.intellij.ide.scratch.ScratchTreeStructureProvider" order="last"/>
+    <advancedSetting id="project.view.show.scratches.and.consoles" groupKey="group.advanced.settings.project.view" default="true"/>
+
     <uiDataRule implementation="com.intellij.ide.scratch.ScratchTreeStructureProvider$DataRule"/>
 
     <postStartupActivity implementation="com.intellij.ide.scratch.workspace.ScratchWorkspaceStartupActivity"/>
@@ -984,6 +986,8 @@
                  description="Use the new experimental coroutine-based Project View implementation"/>
     <registryKey defaultValue="true" description="Show the new file or directory button in the project view title"
                  key="ide.project.view.show.new.element.button" />
+    <registryKey defaultValue="[Off|RemDev*|On]" description="Show the new file or directory button in the project view title"
+                 key="ide.project.view.preload.mode" />
     <pathMacroFilter implementation="com.intellij.ide.projectView.impl.ProjectViewPathMacroFilter"/>
     <projectService serviceImplementation="com.intellij.ide.projectView.impl.ProjectViewState"/>
 
@@ -1403,6 +1407,8 @@
                     testServiceImplementation="com.intellij.build.internal.DummySyncViewManager"/>
     <projectService serviceInterface="com.intellij.build.BuildWorkspaceConfiguration"
                     serviceImplementation="com.intellij.build.BuildWorkspaceConfigurationImpl"/>
+    <applicationService serviceInterface="com.intellij.build.events.BuildEvents"
+                        serviceImplementation="com.intellij.build.events.impl.BuildEventsImpl"/>
 
     <moveLeftRightHandler language=""
                           implementationClass="com.intellij.codeInsight.editorActions.moveLeftRight.DefaultMoveElementLeftRightHandler"
@@ -1574,8 +1580,6 @@
                  description="Enable experimental support command completion" restartRequired="false"/>
     <registryKey key="ide.completion.command.enabled" defaultValue="true"
                  description="Enable experimental support command completion for internal mode" restartRequired="false"/>
-    <registryKey key="ide.completion.command.support.read.only.files" defaultValue="false"
-                 description="Enable experimental support command completion for read-only files" restartRequired="false"/>
     <registryKey key="ide.completion.group.enabled" defaultValue="true"
                  description="Enable groups in completions" restartRequired="false"/>
     <registryKey key="ide.completion.group.mode.enabled" defaultValue="false"

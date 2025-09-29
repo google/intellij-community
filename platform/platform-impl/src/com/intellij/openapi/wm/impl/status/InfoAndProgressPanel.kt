@@ -249,7 +249,6 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
       infos.add(info)
       val expanded = createInlineDelegate(info = info, original = original, compact = false)
       val compact = createInlineDelegate(info = info, original = original, compact = true)
-      IntegrationTestsProgressesTracker.progressStarted(original)
       getPopup().addIndicator(expanded)
       balloon.addIndicator(rootPane, compact)
       updateProgressIcon()
@@ -262,7 +261,6 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         // already finished, progress might not send another finished message
         removeProgress(expanded)
         removeProgress(compact)
-        IntegrationTestsProgressesTracker.progressStopped(original)
         return
       }
       coroutineScope.launch {
@@ -294,7 +292,6 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
         return
       }
       mainPanel.removeProgress(progress, last)
-      IntegrationTestsProgressesTracker.progressStopped(original)
       coroutineScope.launch {
         runQuery()
       }
@@ -1221,8 +1218,8 @@ class InfoAndProgressPanel internal constructor(private val statusBar: IdeStatus
 
 private class ScalableCounterIconComponent : JComponent(), UISettingsListener {
   private val icon: CounterIcon = CounterIcon(1,
-                                              JBColor.WHITE,
-                                              JBUI.CurrentTheme.StatusBar.Progresses.COUNTER)
+                                              JBUI.CurrentTheme.StatusBar.Progresses.COUNTER_FOREGROUND,
+                                              JBUI.CurrentTheme.StatusBar.Progresses.COUNTER_BACKGROUND)
 
 
   fun setNumber(value: Int) {
@@ -1232,11 +1229,17 @@ private class ScalableCounterIconComponent : JComponent(), UISettingsListener {
   override fun getPreferredSize(): Dimension {
     val iconSize = JBUI.scale(16) //icon size
     if (icon.number < 10) {
-      return Dimension(iconSize, iconSize)
+      icon.setInsets(0)
+      //added to have equal right and left insets for the resulting [icon]
+      val symmetryWidthBit = (iconSize + icon.iconWidth) % 2
+      val symmetryHeightBit = (iconSize + icon.iconHeight) % 2
+      val dimension = Dimension(iconSize + symmetryWidthBit, iconSize + symmetryHeightBit)
+      return dimension
     }
     val sensibleDefaultInset = JBUI.scale(3)
     icon.setInsets(0, sensibleDefaultInset)
-    return Dimension(max(iconSize, icon.iconWidth), max(iconSize, icon.iconHeight))
+    return Dimension(max(iconSize + (iconSize + icon.iconWidth) % 2, icon.iconWidth),
+                     max(iconSize + (iconSize + icon.iconHeight) % 2, icon.iconHeight))
   }
 
   override fun paintComponent(g: Graphics) {

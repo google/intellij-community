@@ -1055,7 +1055,8 @@ public final class JBUI {
       }
 
       public interface Progresses {
-        Color COUNTER = JBColor.namedColor("ProgressBar.counterColor", new JBColor(0x3574F0, 0x3574F0));
+        Color COUNTER_BACKGROUND = JBColor.namedColor("ProgressBar.progressCounterBackground", ProgressBar.PROGRESS);
+        Color COUNTER_FOREGROUND = JBColor.namedColor("ProgressBar.progressCounterForeground", JBColor.WHITE);
       }
     }
 
@@ -1713,6 +1714,18 @@ public final class JBUI {
     }
 
     public static final class BigPopup {
+      public static @NotNull Border headerBorder() {
+        String key = "SearchEverywhere.Header.insets";
+        JBInsets insets = insets(key, ComplexPopup.headerInsets());
+
+        if (UIManager.getInsets(key) == null) {
+          //noinspection UseDPIAwareBorders
+          return new EmptyBorder(0, insets.left, 0, insets.right);
+        }
+
+        return new EmptyBorder(insets);
+      }
+
       public static @NotNull Color headerBackground() {
         return JBColor.namedColor("SearchEverywhere.Header.background", 0xf2f2f2);
       }

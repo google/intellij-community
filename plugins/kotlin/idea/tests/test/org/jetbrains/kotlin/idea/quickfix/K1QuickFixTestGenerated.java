@@ -5943,6 +5943,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/inLambdaWithExpectedType5.kt");
                     }
 
+                    @TestMetadata("incompileableCode.kt")
+                    public void testIncompileableCode() throws Exception {
+                        runTest("testData/quickfix/createFromUsage/createFunction/call/simple/incompileableCode.kt");
+                    }
+
                     @TestMetadata("insideIfCondition.kt")
                     public void testInsideIfCondition() throws Exception {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/insideIfCondition.kt");
@@ -7014,6 +7019,21 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 @TestMetadata("fromDelegateConstructorCall.kt")
                 public void testFromDelegateConstructorCall() throws Exception {
                     runTest("testData/quickfix/createFromUsage/createVariable/parameter/fromDelegateConstructorCall.kt");
+                }
+
+                @TestMetadata("fromUnqualifiedCallExpression.kt")
+                public void testFromUnqualifiedCallExpression() throws Exception {
+                    runTest("testData/quickfix/createFromUsage/createVariable/parameter/fromUnqualifiedCallExpression.kt");
+                }
+
+                @TestMetadata("fromUnqualifiedCallExpressionNoExpectType.kt")
+                public void testFromUnqualifiedCallExpressionNoExpectType() throws Exception {
+                    runTest("testData/quickfix/createFromUsage/createVariable/parameter/fromUnqualifiedCallExpressionNoExpectType.kt");
+                }
+
+                @TestMetadata("fromUnqualifiedCallExpressionWithUnknownParam.kt")
+                public void testFromUnqualifiedCallExpressionWithUnknownParam() throws Exception {
+                    runTest("testData/quickfix/createFromUsage/createVariable/parameter/fromUnqualifiedCallExpressionWithUnknownParam.kt");
                 }
 
                 @TestMetadata("inAccessorInClass.kt")
@@ -10977,9 +10997,24 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
-        @TestMetadata("simple.kt")
-        public void testSimple() throws Exception {
-            runTest("testData/quickfix/kdocMissingDocumentation/simple.kt");
+        @TestMetadata("funWithKDoc.kt")
+        public void testFunWithKDoc() throws Exception {
+            runTest("testData/quickfix/kdocMissingDocumentation/funWithKDoc.kt");
+        }
+
+        @TestMetadata("internalFun.kt")
+        public void testInternalFun() throws Exception {
+            runTest("testData/quickfix/kdocMissingDocumentation/internalFun.kt");
+        }
+
+        @TestMetadata("privateClass.kt")
+        public void testPrivateClass() throws Exception {
+            runTest("testData/quickfix/kdocMissingDocumentation/privateClass.kt");
+        }
+
+        @TestMetadata("publicClass.kt")
+        public void testPublicClass() throws Exception {
+            runTest("testData/quickfix/kdocMissingDocumentation/publicClass.kt");
         }
 
         @TestMetadata("withIndentation.kt")
@@ -11672,6 +11707,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("basic.kt")
         public void testBasic() throws Exception {
             runTest("testData/quickfix/missingConstructorBrackets/basic.kt");
+        }
+
+        @TestMetadata("constructor.kt")
+        public void testConstructor() throws Exception {
+            runTest("testData/quickfix/missingConstructorBrackets/constructor.kt");
         }
     }
 

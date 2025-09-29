@@ -107,7 +107,11 @@ public class ConsentSettingsUi extends JPanel implements ConfigurableUi<List<Con
     if (ConsentOptions.condUsageStatsConsent().test(consent)) {
       return new UsageStatisticsConsentUi(consent);
     }
-    if (ConsentOptions.condTraceDataCollectionConsent().test(consent)) {
+    if (ConsentOptions.condAiDataCollectionConsent().test(consent)) {
+      return new AiDataCollectionConsentUi(consent);
+    }
+    if (ConsentOptions.condTraceDataCollectionComConsent().test(consent) ||
+        ConsentOptions.condTraceDataCollectionNonComConsent().test(consent)) {
       return new TraceDataCollectionConsentUI(consent);
     }
     return new DefaultConsentUi(consent);

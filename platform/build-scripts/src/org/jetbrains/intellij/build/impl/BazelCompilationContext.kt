@@ -22,9 +22,11 @@ import org.jetbrains.intellij.build.moduleBased.OriginalModuleRepository
 import org.jetbrains.jps.model.JpsModel
 import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.module.JpsModule
+import java.io.File
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.inputStream
+import kotlin.io.path.name
 import kotlin.io.path.pathString
 
 @ApiStatus.Internal
@@ -77,7 +79,14 @@ class BazelCompilationContext(
   }
 
   override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<String> {
-    TODO()
+    return delegate.getModuleRuntimeClasspath(module, forTests).map(Path::of).flatMap {
+      if (it.startsWith(classesOutputDirectory)) {
+        getModuleOutputRoots(findRequiredModule(it.name), it.parent.name == "test").map { it.toString() }
+      }
+      else {
+        listOf(it.toString())
+      }
+    }
   }
 
   override fun findFileInModuleSources(moduleName: String, relativePath: String, forTests: Boolean): Path? = delegate.findFileInModuleSources(moduleName, relativePath, forTests)
@@ -115,6 +124,27 @@ class BazelCompilationContext(
   override suspend fun compileModules(moduleNames: Collection<String>?, includingTestsInModules: List<String>?): Unit = delegate.compileModules(moduleNames, includingTestsInModules)
 
   override suspend fun withCompilationLock(block: suspend () -> Unit): Unit = delegate.withCompilationLock(block)
+
+  fun replaceWithCompressedIfNeededLF(files: List<File>): List<File> {
+    val out = ArrayList<File>(files.size)
+    for (file in files) {
+      val path = file.toPath()
+      if (!path.startsWith(classesOutputDirectory)) {
+        out.add(file)
+        continue
+      }
+      val roots = modulesToOutputRoots[path.name]
+      if (roots == null) {
+        out.add(file)
+        continue
+      }
+      val jars =
+        if (path.parent.name == "test") roots.testJars
+        else roots.productionJars
+      jars.mapTo(out, Path::toFile)
+    }
+    return out
+  }
 
   private class BazelTargetsInfo {
     companion object {
@@ -172,3 +202,11 @@ fun isRunningFromBazelOut(): Boolean {
 
   return url.protocol == URLUtil.JAR_PROTOCOL && Path.of(URI.create(url.path)).any { it.pathString == "bazel-out" }
 }
+
+val CompilationContextImpl.asBazelIfNeeded: CompilationContext
+  get() {
+    return when {
+      isRunningFromBazelOut() -> BazelCompilationContext(this)
+      else -> this
+    }
+  }

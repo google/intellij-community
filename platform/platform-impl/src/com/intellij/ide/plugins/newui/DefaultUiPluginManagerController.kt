@@ -22,8 +22,8 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.asContextElement
-import com.intellij.openapi.application.contextModality
 import com.intellij.openapi.application.ex.ApplicationInfoEx
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.options.ConfigurationException
@@ -32,13 +32,11 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.updateSettings.impl.PluginDownloader
-import com.intellij.openapi.updateSettings.impl.UpdateChecker
+import com.intellij.openapi.updateSettings.impl.UpdateCheckerFacade
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +65,6 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   override suspend fun initSession(sessionId: String): InitSessionResult {
     return initSessionSync(sessionId)
   }
-
 
   fun initSessionSync(sessionId: String): InitSessionResult {
     val session = createSession(sessionId)
@@ -418,7 +415,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
 
   override suspend fun loadDescriptorById(pluginId: PluginId): PluginUiModel? {
     val clientPluginId = PluginId.getId(pluginId.idString)
-    val updateData = UpdateChecker.getInternalPluginUpdates(updateablePluginsMap = mutableMapOf(clientPluginId to null))
+    val updateData = service<UpdateCheckerFacade>().getInternalPluginUpdates(updateablePluginsMap = mutableMapOf(clientPluginId to null))
     return updateData.pluginUpdates.all.asSequence()
       .filter { it.pluginVersion != null }
       .map { it.uiModel ?: PluginUiModelAdapter(it.descriptor) }
@@ -518,7 +515,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   }
 
   override suspend fun updateDescriptorsForInstalledPlugins() {
-    UpdateChecker.updateDescriptorsForInstalledPlugins(InstalledPluginsState.getInstance())
+    service<UpdateCheckerFacade>().updateDescriptorsForInstalledPlugins(InstalledPluginsState.getInstance())
   }
 
   override suspend fun performUninstall(sessionId: String, pluginId: PluginId): Boolean {
@@ -558,6 +555,11 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   override suspend fun loadErrors(sessionId: String): Map<PluginId, CheckErrorsResult> {
     val session = findSession(sessionId) ?: return emptyMap()
     return getPlugins().map { it.pluginId }.associateWith { getErrors(session, it) }
+  }
+
+  override suspend fun loadErrors(sessionId: String, pluginIds: List<PluginId>): Map<PluginId, CheckErrorsResult> {
+    val session = findSession(sessionId) ?: return emptyMap()
+    return pluginIds.associateWith { getErrors(session, it) }
   }
 
   override suspend fun prepareToUninstall(pluginsToUninstall: List<PluginId>): PrepareToUninstallResult {
@@ -661,7 +663,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   }
 
   override suspend fun isRestartRequired(sessionId: String): Boolean {
-    return findSession(sessionId)?.needRestart ?: false
+    return findSession(sessionId)?.needRestart == true || InstalledPluginsState.getInstance().installedPlugins.isNotEmpty()
   }
 
   override fun isPluginRequiresUltimateButItIsDisabled(sessionId: String, pluginId: PluginId): Boolean {
@@ -1081,7 +1083,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     for (rootDescriptor in getInstalledAndPendingPlugins()) {
       val pluginId: PluginId = rootDescriptor.getPluginId()
       session.dependentToRequiredListMap.remove(pluginId)
-      if (session.uninstalledPlugins.contains(rootDescriptor.pluginId) || session.isPluginDisabled(pluginId)) {
+      if (session.uninstalledPlugins.contains(rootDescriptor.pluginId) || !session.isPluginEnabled(pluginId)) {
         continue
       }
 

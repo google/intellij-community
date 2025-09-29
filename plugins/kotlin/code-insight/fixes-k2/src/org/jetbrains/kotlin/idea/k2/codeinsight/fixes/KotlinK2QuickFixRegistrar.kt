@@ -190,6 +190,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeTypeQuickFixFactories.implicitNothingPropertyTypeFixFactory)
         registerFactory(InapplicableJvmFieldFixFactories.removeAnnotationFixFactory)
         registerFactory(OverridingIgnorableWithMustUseFixFactories.addIgnorableReturnValueAnnotationFixFactory)
+        registerFactory(ConstFixFactories.addConstModifierFixFactory)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -578,6 +579,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
 
         registerFactory(RenameUnderscoreFixFactory.renameUnderscore)
         registerFactory(NamedContextParameterInFunctionTypeFixFactory.removeParameterName)
+        registerFactory(ReceiverShadowedByContextParameterFactory.addReceiverFactory)
     }
 
     private val optIn = KtQuickFixesListBuilder.registerPsiQuickFix {

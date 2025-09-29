@@ -197,12 +197,10 @@ internal class MutableEntityStorageImpl(
       .map { entityDataByIdOrDie(it).createEntity(this) as R }
   }
 
-  override fun <E : WorkspaceEntityWithSymbolicId, R : WorkspaceEntity> hasReferrers(
+  override fun <E : WorkspaceEntityWithSymbolicId> hasReferrers(
     id: SymbolicEntityId<E>,
-    entityClass: Class<R>,
   ): Boolean = hasReferrersTimeMs.addMeasuredTime {
-    val classId = entityClass.toClassId()
-    return indexes.softLinks.getIdsByEntry(id).any { it.clazz == classId }
+    return indexes.softLinks.getIdsByEntry(id).isNotEmpty()
   }
 
   @Suppress("UNCHECKED_CAST")
@@ -261,6 +259,11 @@ internal class MutableEntityStorageImpl(
       // Add the change to changelog
       changeLog.addAddEvent(newEntityData.createEntityId(), newEntityData)
 
+      // Update soft links index
+      if (newEntityData is SoftLinkable) {
+        newEntityData.index(indexes.softLinks)
+        trackChangedSoftLinks()
+      }
       // Update indexes
       indexes.entityAdded(newEntityData, symbolicId)
     }
@@ -356,6 +359,7 @@ internal class MutableEntityStorageImpl(
 
       if (modifiableEntity.changedProperty.isNotEmpty()) {
         this.indexes.updateSymbolicIdIndexes(this, updatedEntity, beforeSymbolicId, copiedData, modifiableEntity)
+        trackChangedSoftLinks()
       }
 
       updatedEntity
@@ -402,6 +406,20 @@ internal class MutableEntityStorageImpl(
     finally {
       finishWriting()
     }
+  }
+
+  override fun collectSymbolicEntityIdsChanges(): Set<ReferenceChange<*>> {
+    val result: MutableSet<ReferenceChange<*>> = mutableSetOf()
+
+    for (entry in changeLog.addedSymbolicIds()) {
+      result.add(ReferenceChange.Added(entry))
+    }
+
+    for (entry in changeLog.removedSymbolicIds()) {
+      result.add(ReferenceChange.Removed(entry))
+    }
+
+    return result
   }
 
   override fun collectChanges(): Map<Class<*>, List<EntityChange<*>>> = collectChangesTimeMs.addMeasuredTime {
@@ -832,7 +850,10 @@ internal class MutableEntityStorageImpl(
 
     // Update indexes and generate changelog entry
     val entityData = entityDataByIdOrDie(id)
-    if (entityData is SoftLinkable) indexes.removeFromSoftLinksIndex(entityData)
+    if (entityData is SoftLinkable) {
+      indexes.removeFromSoftLinksIndex(entityData)
+      trackChangedSoftLinks()
+    }
     indexes.entityRemoved(id)
     this.changeLog.addRemoveEvent(id, originalEntityData)
 
@@ -886,6 +907,12 @@ internal class MutableEntityStorageImpl(
         accumulator.add(childId.id)
       }
     }
+  }
+
+  internal fun trackChangedSoftLinks() {
+    changeLog.addAddedIds(indexes.softLinks.addedValues())
+    changeLog.addRemovedIds(indexes.softLinks.removedValues())
+    indexes.softLinks.clearTrackedValues()
   }
 
   companion object {
@@ -1009,9 +1036,8 @@ internal sealed class AbstractEntityStorage : EntityStorageInstrumentation {
       .map { entityDataByIdOrDie(it).createEntity(this) as R }
   }
 
-  override fun <E : WorkspaceEntityWithSymbolicId, R : WorkspaceEntity> hasReferrers(id: SymbolicEntityId<E>, entityClass: Class<R>): Boolean {
-    val classId = entityClass.toClassId()
-    return indexes.softLinks.getIdsByEntry(id).any { it.clazz == classId }
+  override fun <E : WorkspaceEntityWithSymbolicId> hasReferrers(id: SymbolicEntityId<E>): Boolean {
+    return indexes.softLinks.getIdsByEntry(id).isNotEmpty()
   }
 
   override fun <E : WorkspaceEntityWithSymbolicId> resolve(id: SymbolicEntityId<E>): E? {

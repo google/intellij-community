@@ -452,7 +452,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
 
           val language = originalFile.language
           val offsetProvider = IntentionCommandOffsetProvider.EP_NAME.forLanguage(language)
-          val intentionCommandSkipper = IntentionCommandSkipper.EP_NAME.forLanguage(language)
+          val intentionCommandSkipperList = IntentionCommandSkipper.EP_NAME.allForLanguage(language)
 
           val offsets = offsetProvider?.findOffsets(psiFile, offset) ?: mutableListOf(offset)
 
@@ -510,8 +510,9 @@ internal class DirectIntentionCommandProvider : CommandProvider {
             actionsToShow.intentionsToShow.removeAll(toRemove)
             intentionsCache.wrapAndUpdateActions(actionsToShow, false)
             for (intention in intentionsCache.intentions) {
-              if (intention.action is EmptyIntentionAction ||
-                  intentionCommandSkipper != null && intentionCommandSkipper.skip(intention.action, psiFile, currentOffset)) continue
+              if (intention.action is EmptyIntentionAction || intentionCommandSkipperList.any { skipper -> skipper.skip(intention.action, psiFile, currentOffset) }) continue
+              //todo hardcoded, get rid of when it will be clear what to do with this
+              if (IntentionActionDelegate.unwrap(intention.action).javaClass.name == "com.intellij.ml.llm.intentions.chat.AIAssistantIntention") continue
               val intentionCommand =
                 IntentionCompletionCommand(intention, 50, AllIcons.Actions.IntentionBulbGrey,
                                            calculateIntentionHighlighting(intention, editor, psiFile, offset), topLevelCurrentOffset) {
@@ -626,6 +627,10 @@ interface ErrorFixCommandProvider : PossiblyDumbAware {
   }
 }
 
+/**
+ * This class allows skipping some intention actions to be provided by [DirectIntentionCommandProvider].
+ * It might be useful in cases when custom command is provided for this intention action altering its behaviour.
+ */
 interface IntentionCommandSkipper {
   companion object {
     internal val EP_NAME: LanguageExtension<IntentionCommandSkipper> = LanguageExtension<IntentionCommandSkipper>("com.intellij.codeInsight.completion.intention.skipper")

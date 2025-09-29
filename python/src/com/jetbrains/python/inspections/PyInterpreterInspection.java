@@ -29,7 +29,6 @@ import com.intellij.openapi.roots.ui.configuration.ProjectSettingsService;
 import com.intellij.openapi.roots.ui.configuration.projectRoot.ProjectSdksModel;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.UserDataHolderBase;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.platform.backend.workspace.WorkspaceModelChangeListener;
 import com.intellij.platform.workspace.jps.entities.ModuleEntity;
 import com.intellij.platform.workspace.storage.EntityChange;
@@ -43,6 +42,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleEntityUtils;
 import com.jetbrains.python.PyPsiBundle;
 import com.jetbrains.python.PythonIdeLanguageCustomization;
+import com.jetbrains.python.projectModel.ProjectModelKt;
 import com.jetbrains.python.projectModel.uv.UvProjectModelService;
 import com.jetbrains.python.projectModel.uv.UvProjectModelService.UvWorkspace;
 import com.jetbrains.python.psi.LanguageLevel;
@@ -131,7 +131,7 @@ public final class PyInterpreterInspection extends PyInspection {
           boolean isAlreadyUsedByModule = (PySdkExtKt.getPythonSdk(module) == sdk);
           boolean isAssociatedWithThisModule = associatedModulePath != null && associatedModulePath.equals(BasePySdkExtKt.getBasePath(module));
           // TODO: this logic should be generalized via the workspace manager
-          boolean isAssociatedWithUvRoot = associatedModulePath != null && Registry.is("python.project.model.uv", false) &&
+          boolean isAssociatedWithUvRoot = associatedModulePath != null && ProjectModelKt.getEnablePyProjectToml() &&
                                            isAssociatedWithUvWorkspaceRootModule(associatedModulePath, module);
 
           if (!isAlreadyUsedByModule && !isAssociatedWithThisModule && !isAssociatedWithUvRoot &&
@@ -274,9 +274,12 @@ public final class PyInterpreterInspection extends PyInspection {
         return new UseExistingInterpreterFix(systemWideSdk, module);
       }
 
-      LocalQuickFix fallbackFix = PyCondaSdkCustomizer.Companion.getInstance().getFallbackInterpreterFix();
-      if (fallbackFix != null) {
-        return fallbackFix;
+      PyProjectSdkConfigurationExtension configurator = PyCondaSdkCustomizer.Companion.getInstance().getFallbackConfigurator();
+      if (configurator != null) {
+        String intentionName = PyCondaSdkCustomizer.Companion.getIntentionBlocking(configurator, module);
+        if (intentionName != null) {
+          return new UseProvidedInterpreterFix(module, configurator, intentionName);
+        }
       }
 
       final var detectedSystemWideSdk = ContainerUtil.getFirstItem(PySdkExtKt.detectSystemWideSdks(module, existingSdks));

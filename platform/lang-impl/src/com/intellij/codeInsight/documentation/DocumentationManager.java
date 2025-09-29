@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.documentation;
 
 import com.intellij.codeInsight.CodeInsightBundle;
@@ -47,7 +47,6 @@ import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.FileStatusManager;
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.ArchiveFileSystem;
 import com.intellij.openapi.wm.*;
@@ -91,16 +90,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.io.File;
 import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -678,7 +676,7 @@ public class DocumentationManager extends DockablePopupManager<DocumentationComp
         if (sameElement) {
           JComponent preferredFocusableComponent = content.getPreferredFocusableComponent();
           // focus toolwindow on the second actionPerformed
-          boolean focus = requestFocus || CommandProcessor.getInstance().getCurrentCommand() != null;
+          boolean focus = requestFocus || CommandProcessor.getInstance().isCommandInProgress();
           if (preferredFocusableComponent != null && focus) {
             IdeFocusManager.getInstance(myProject).requestFocus(preferredFocusableComponent, true);
           }
@@ -1175,13 +1173,13 @@ public class DocumentationManager extends DockablePopupManager<DocumentationComp
           return;
         }
         if (text == null) {
-          component.setText(decoratedText, element, provider);
+          component.setText(Objects.requireNonNull(decoratedText), element, provider);
         }
         else if (text.isEmpty()) {
           component.setText(component.getDecoratedText(), element, provider);
         }
         else {
-          component.setData(element, decoratedText, collector.effectiveUrl, collector.ref, provider);
+          component.setData(element, Objects.requireNonNull(decoratedText), collector.effectiveUrl, collector.ref, provider);
         }
         if (wasEmpty) {
           component.clearHistory();
@@ -1681,7 +1679,6 @@ public class DocumentationManager extends DockablePopupManager<DocumentationComp
         }
       }
 
-      //noinspection HardCodedStringLiteral T should be inferred to `@Nls String`
       return ReadAction.nonBlocking(() -> doGetDocumentation(element)).executeSynchronously();
     }
 
@@ -1718,10 +1715,10 @@ public class DocumentationManager extends DockablePopupManager<DocumentationComp
     else {
       file = fileOrArchiveRoot;
     }
-    File ioFile = file == null || !file.isInLocalFileSystem() ? null : VfsUtilCore.virtualToIoFile(file);
+    Path ioFile = file == null || !file.isInLocalFileSystem() ? null : file.toNioPath();
     BasicFileAttributes attr = null;
     try {
-      attr = ioFile == null ? null : Files.readAttributes(Paths.get(ioFile.toURI()), BasicFileAttributes.class);
+      attr = ioFile == null ? null : Files.readAttributes(ioFile, BasicFileAttributes.class);
     }
     catch (Exception ignored) {
     }
@@ -1863,7 +1860,6 @@ public class DocumentationManager extends DockablePopupManager<DocumentationComp
     }
   }
 
-  @SuppressWarnings("HardCodedStringLiteral")
   @Internal
   @Contract(pure = true)
   public static @Nls String decorate(@Nls @NotNull String text, @Nullable HtmlChunk location, @Nullable HtmlChunk links,

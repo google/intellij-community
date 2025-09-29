@@ -215,6 +215,7 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:Unselectall:javax.swing.Icon
 - sf:Unshare:javax.swing.Icon
 - sf:Upload:javax.swing.Icon
+- sf:ViewAsImage:javax.swing.Icon
 - sf:Words:javax.swing.Icon
 - sf:WordsHovered:javax.swing.Icon
 - sf:WordsSelected:javax.swing.Icon
@@ -321,8 +322,10 @@ f:com.intellij.icons.AllIcons$Debugger
 - sf:Db_verified_no_suspend_field_breakpoint:javax.swing.Icon
 - sf:Db_verified_no_suspend_method_breakpoint:javax.swing.Icon
 - sf:Db_watch:javax.swing.Icon
+- sf:DebuggerSync:javax.swing.Icon
 - sf:EvaluateExpression:javax.swing.Icon
 - sf:EvaluationResult:javax.swing.Icon
+- sf:ExecuteCurrentStatement:javax.swing.Icon
 - sf:ForceRunToCursor:javax.swing.Icon
 - sf:ForceStepInto:javax.swing.Icon
 - sf:ForceStepOver:javax.swing.Icon
@@ -344,6 +347,8 @@ f:com.intellij.icons.AllIcons$Debugger
 - sf:Selfreference:javax.swing.Icon
 - sf:ShowCurrentFrame:javax.swing.Icon
 - sf:SmartStepInto:javax.swing.Icon
+- sf:SpecialVar:javax.swing.Icon
+- sf:StepIntoMyCode:javax.swing.Icon
 - sf:Thaw:javax.swing.Icon
 - sf:ThawAll:javax.swing.Icon
 - sf:ThreadAtBreakpoint:javax.swing.Icon
@@ -546,6 +551,7 @@ f:com.intellij.icons.AllIcons$General
 - sf:LayoutEditorOnly:javax.swing.Icon
 - sf:LayoutEditorPreview:javax.swing.Icon
 - sf:LayoutPreviewOnly:javax.swing.Icon
+- sf:Learn:javax.swing.Icon
 - sf:LinkDropTriangle:javax.swing.Icon
 - sf:LocalizationSettings:javax.swing.Icon
 - sf:Locate:javax.swing.Icon
@@ -763,6 +769,7 @@ f:com.intellij.icons.AllIcons$Json
 - <init>():V
 f:com.intellij.icons.AllIcons$Language
 - sf:GO:javax.swing.Icon
+- sf:Kotlin:javax.swing.Icon
 - sf:Php:javax.swing.Icon
 - sf:Python:javax.swing.Icon
 - sf:Ruby:javax.swing.Icon
@@ -901,7 +908,6 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:Include:javax.swing.Icon
 - sf:InspectionResults:javax.swing.Icon
 - sf:Interface:javax.swing.Icon
-- sf:J2eeParameter:javax.swing.Icon
 - sf:JarDirectory:javax.swing.Icon
 - sf:JavaDocFolder:javax.swing.Icon
 - sf:JavaModule:javax.swing.Icon
@@ -968,6 +974,7 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:Servlet:javax.swing.Icon
 - sf:Shared:javax.swing.Icon
 - sf:SortBySeverity:javax.swing.Icon
+- sf:Ssh:javax.swing.Icon
 - sf:Static:javax.swing.Icon
 - sf:StaticMark:javax.swing.Icon
 - sf:Symlink:javax.swing.Icon
@@ -976,6 +983,7 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:Tag:javax.swing.Icon
 - sf:Target:javax.swing.Icon
 - sf:Template:javax.swing.Icon
+- sf:TemplateRoot:javax.swing.Icon
 - sf:Test:javax.swing.Icon
 - sf:TestGroup:javax.swing.Icon
 - sf:TestIgnored:javax.swing.Icon
@@ -1083,6 +1091,7 @@ f:com.intellij.icons.AllIcons$Profiler
 - <init>():V
 f:com.intellij.icons.AllIcons$Providers
 - sf:ActiveMQ:javax.swing.Icon
+- sf:AmazonWebServices:javax.swing.Icon
 - sf:Apache:javax.swing.Icon
 - sf:ApacheDerby:javax.swing.Icon
 - sf:ApacheIgnite:javax.swing.Icon
@@ -1107,6 +1116,7 @@ f:com.intellij.icons.AllIcons$Providers
 - sf:Firebird:javax.swing.Icon
 - sf:GaussDB:javax.swing.Icon
 - sf:GeminiDb:javax.swing.Icon
+- sf:GoogleCloud:javax.swing.Icon
 - sf:GoogleCloudSpanner:javax.swing.Icon
 - sf:Greenplum:javax.swing.Icon
 - sf:H2:javax.swing.Icon
@@ -1143,6 +1153,7 @@ f:com.intellij.icons.AllIcons$Providers
 - sf:Tair:javax.swing.Icon
 - sf:Tarantool:javax.swing.Icon
 - sf:TaurusDB:javax.swing.Icon
+- sf:TensorFlow:javax.swing.Icon
 - sf:Teradata:javax.swing.Icon
 - sf:Tibero:javax.swing.Icon
 - sf:Tidb:javax.swing.Icon
@@ -4164,6 +4175,7 @@ f:com.intellij.util.ui.JBUI$CurrentTheme$BigPopup
 - s:advertiserBorderInsetsKey():java.lang.String
 - s:advertiserForeground():java.awt.Color
 - s:headerBackground():java.awt.Color
+- s:headerBorder():javax.swing.border.Border
 - s:listSeparatorColor():java.awt.Color
 - s:listTitleLabelForeground():java.awt.Color
 - s:maxListHeight():I
@@ -4617,7 +4629,8 @@ com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Breadcrumbs
 - s:navBarInsets():java.awt.Insets
 - s:navBarInsetsKey():java.lang.String
 com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Progresses
-- sf:COUNTER:java.awt.Color
+- sf:COUNTER_BACKGROUND:java.awt.Color
+- sf:COUNTER_FOREGROUND:java.awt.Color
 com.intellij.util.ui.JBUI$CurrentTheme$StatusBar$Widget
 - sf:FOREGROUND:java.awt.Color
 - sf:HOVER_BACKGROUND:java.awt.Color

@@ -247,6 +247,11 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   }
 
   @Override
+  public @NotNull IntentionAction createShowDuplicateElementsFix(@NotNull List<@NotNull ? extends NavigatablePsiElement> elements) {
+    return new ShowDuplicateElementsFix(elements).asIntention();
+  }
+
+  @Override
   public @NotNull IntentionAction createConvertToStringLiteralAction() {
     return new ConvertToStringLiteralAction().asIntention();
   }
@@ -721,10 +726,10 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   }
 
   @Override
-  public @NotNull List<@NotNull LocalQuickFix> registerOrderEntryFixes(@NotNull PsiReference reference,
-                                                                       @NotNull PsiMember target,
-                                                                       @NotNull List<? super IntentionAction> registrar) {
-    return OrderEntryFix.registerFixes(reference, target, registrar);
+  public void registerOrderEntryFixes(@NotNull PsiReference reference,
+                                      @NotNull PsiMember target,
+                                      @NotNull List<? super IntentionAction> registrar) {
+    OrderEntryFix.registerFixes(reference, target, registrar);
   }
 
   @Override
@@ -1163,5 +1168,19 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   public @Nullable IntentionAction createLiftThrowOutOfSwitchExpression(@NotNull PsiSwitchExpression psiSwitchExpression) {
     LiftThrowOutOfSwitchExpressionFix fix = LiftThrowOutOfSwitchExpressionFix.create(psiSwitchExpression);
     return fix != null ? fix.asIntention() : null;
+  }
+
+  @Override
+  public @NotNull List<? extends @NotNull ModCommandAction> createReplaceTypeWithWrongImportFixes(@Nullable PsiJavaCodeReferenceElement reference) {
+    if(reference == null) return List.of();
+    return ReplaceTypeWithWrongImportFix.createFixes(reference);
+  }
+
+  @Override
+  public @Nullable ModCommandAction createChangeToSimilarKeyword(@Nullable PsiElement old,
+                                                                 @NotNull Collection<@NotNull String> newKeywords) {
+    if (old == null) return null;
+    if (newKeywords.isEmpty()) return null;
+    return ChangeToSimilarKeywordFix.createFix(old, newKeywords);
   }
 }

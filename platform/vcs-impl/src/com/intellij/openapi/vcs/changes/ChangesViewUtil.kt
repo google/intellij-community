@@ -5,21 +5,21 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.InitialVfsRefreshService
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ui.ChangeNodeDecorator
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserUnversionedLoadingPendingNode
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
-import com.intellij.platform.vcs.impl.shared.changes.ChangesViewModelBuilderService
+import com.intellij.platform.vcs.impl.shared.changes.TreeModelBuilderEx
 import com.intellij.vcs.commit.PartialCommitChangeNodeDecorator
 import org.jetbrains.annotations.ApiStatus
 import javax.swing.tree.DefaultTreeModel
 
+// TODO make shared
 @ApiStatus.Internal
 object ChangesViewUtil {
   private fun getChangeDecoratorProvider(project: Project, isAllowExcludeFromCommit: () -> Boolean): (ChangeNodeDecorator?) -> PartialCommitChangeNodeDecorator {
-    return  { baseDecorator: ChangeNodeDecorator? -> PartialCommitChangeNodeDecorator(project, baseDecorator!!, isAllowExcludeFromCommit) }
+    return  { baseDecorator: ChangeNodeDecorator? -> PartialCommitChangeNodeDecorator(project, baseDecorator, isAllowExcludeFromCommit) }
   }
 
   fun createTreeModel(
@@ -35,14 +35,11 @@ object ChangesViewUtil {
     val shouldShowUntrackedLoading = unversionedFiles.isEmpty() &&
                                      !project.getService(InitialVfsRefreshService::class.java).isInitialVfsRefreshFinished() &&
                                      changeListManager.isUnversionedInUpdateMode
-    val skipSingleDefaultChangeList = Registry.`is`("vcs.skip.single.default.changelist") ||
-                                      !changeListManager.areChangeListsEnabled()
+    val skipSingleDefaultChangeList = !changeListManager.areChangeListsEnabled()
 
     val treeModelBuilder = TreeModelBuilder(project, grouping)
       .setChangeLists(changeLists, skipSingleDefaultChangeList, getChangeDecoratorProvider(project, isAllowExcludeFromCommit))
-      .apply {
-        with(ChangesViewModelBuilderService.getInstance(project)) { createNodes() }
-      }
+      .also { TreeModelBuilderEx.getInstanceOrNull(project)?.modifyTreeModelBuilder(it) }
       .setUnversioned(unversionedFiles)
 
     if (showIgnoredFiles) {

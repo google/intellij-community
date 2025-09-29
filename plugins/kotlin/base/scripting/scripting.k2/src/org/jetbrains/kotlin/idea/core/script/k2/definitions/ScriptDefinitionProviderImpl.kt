@@ -12,27 +12,33 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class ScriptDefinitionProviderImpl(val project: Project) : IdeScriptDefinitionProvider() {
     private val shouldReloadDefinitions = AtomicBoolean(true)
-    @Volatile private var _definitions: List<ScriptDefinition> = emptyList()
 
-    override fun getDefinitions(): List<ScriptDefinition> = _definitions
+    @Volatile
+    private var definitions: List<ScriptDefinition> = emptyList()
+
+    override fun getDefinitions(): List<ScriptDefinition> = currentDefinitions.toList()
 
     override val currentDefinitions: Sequence<ScriptDefinition>
         get() {
-            if (shouldReloadDefinitions.getAndSet(false)) {
-                runCatching {
-                    _definitions = SCRIPT_DEFINITIONS_SOURCES.getExtensions(project).flatMap { it.definitions }
-                }.onFailure {
-                    shouldReloadDefinitions.set(true)
+            if (shouldReloadDefinitions.get()) {
+                synchronized(this) {
+                    if (shouldReloadDefinitions.get()) {
+                        val loaded = SCRIPT_DEFINITIONS_SOURCES
+                            .getExtensions(project)
+                            .flatMap { it.definitions }
+
+                        definitions = loaded
+                        shouldReloadDefinitions.set(false)
+                    }
                 }
             }
 
-            val settingsByDefinitionId =
-                ScriptDefinitionPersistentSettings.getInstance(project).getIndexedSettingsPerDefinition()
+            val settingsProvider = ScriptDefinitionPersistentSettings.getInstance(project)
 
-            return _definitions
-                .filter { settingsByDefinitionId[it.definitionId]?.setting?.enabled != false }
-                .sortedBy { settingsByDefinitionId[it.definitionId]?.index ?: it.order }
+            return definitions
                 .asSequence()
+                .filter { settingsProvider.isScriptDefinitionEnabled(it) }
+                .sortedBy { settingsProvider.getScriptDefinitionOrder(it) }
         }
 
     override fun getDefaultDefinition(): ScriptDefinition = project.defaultDefinition

@@ -39,6 +39,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.recovery.VFSRecoveryInfo;
 import com.intellij.openapi.vfs.pointers.VirtualFilePointerManager;
 import com.intellij.platform.diagnostic.telemetry.PlatformScopesKt;
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
+import com.intellij.serviceContainer.AlreadyDisposedException;
 import com.intellij.util.*;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
@@ -1594,7 +1595,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     runSuppressing(
       () -> publisherBackgroundable.before(toSend),
       () -> runActionOnEdtRegardlessOfCurrentThread(() -> publisherEdt.before(toSend)),
-      () -> runActionOnEdtRegardlessOfCurrentThread(() -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).before(toSend)),
+      () -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).before(toSend),
       EmptyRunnable.INSTANCE
     );
   }
@@ -1604,7 +1605,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                                       @NotNull List<? extends VFileEvent> toSend) {
     runSuppressing(
       () -> CachedFileType.clearCache(),
-      () -> runActionOnEdtRegardlessOfCurrentThread(() -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).after(toSend)),
+      () -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).after(toSend),
       () -> runActionOnEdtRegardlessOfCurrentThread(() -> publisherEdt.after(toSend)),
       () -> publisherBackgroundable.after(toSend)
     );
@@ -1848,6 +1849,10 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     if (fileId == FSRecords.NULL_FILE_ID) {
       fileByIdCacheHits.incrementAndGet();  //a bit of a stretch, but...
       return null;
+    }
+    VfsData vfsData = this.vfsData;
+    if (vfsData == null) {
+      throw new AlreadyDisposedException("VFS is disconnected");
     }
     VirtualDirectoryImpl cached = vfsData.cachedDir(fileId);
     if (cached != null) {
@@ -2118,13 +2123,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     private static @Nullable VirtualFileSystemEntry findChild(@NotNull VirtualDirectoryImpl parent,
                                                               int childId) {
       try {
-        VirtualFileSystemEntry child = parent.findChildById(childId);
-        if (child instanceof VirtualDirectoryImpl) {
-          if (child.getId() != childId) {
-            LOG.error("findChildById(" + childId + "): " + child + " doesn't have expected id!");
-          }
-        }
-        return child;
+        return parent.findChildById(childId);
       }
       catch (FileDeletedException e) {
         return null;

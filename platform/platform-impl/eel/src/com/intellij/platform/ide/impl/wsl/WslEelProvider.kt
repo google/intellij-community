@@ -8,7 +8,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.core.nio.fs.MultiRoutingFileSystemProvider
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
@@ -19,7 +18,7 @@ import com.intellij.platform.ide.impl.wsl.ijent.nio.IjentWslNioFileSystemProvide
 import com.intellij.platform.ijent.IjentPosixApi
 import com.intellij.platform.ijent.community.impl.IjentFailSafeFileSystemPosixApi
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider
-import com.intellij.platform.ijent.community.impl.nio.telemetry.TracingFileSystemProvider
+import com.intellij.platform.eel.impl.fs.telemetry.TracingFileSystemProvider
 import com.intellij.util.containers.ContainerUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.job
@@ -32,6 +31,8 @@ import java.nio.file.FileSystems.getDefault
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.Path
 import kotlin.io.path.pathString
+
+private val useNewFileSystem = System.getProperty("wsl.use.new.filesystem") != null
 
 private val WSLDistribution.roots: Set<String>
   get() {
@@ -52,9 +53,6 @@ private suspend fun WSLDistribution.getIjent(descriptor: EelDescriptor): IjentPo
 class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRoutingFileSystemBackend {
   private val providersCache = ContainerUtil.createConcurrentWeakMap<String, FileSystem>()
 
-  private val useNewFileSystem by lazy {
-    Registry.`is`("wsl.use.new.filesystem")
-  }
 
   private val reportedNonExistentWslIds = AtomicReference<List<String>>(listOf())
 
@@ -96,7 +94,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
       }
 
       try {
-        val fileSystem = if (Registry.`is`("wsl.use.new.filesystem")) {
+        val fileSystem = if (useNewFileSystem) {
           IjentEphemeralRootAwareFileSystemProvider(
             root = Path(wslRoot),
             ijentFsProvider = ijentFsProvider,
@@ -196,6 +194,23 @@ class WslEelProvider : EelProvider {
       WslEelMachine(WSLDistribution(internalName.substring(4)))
     else
       null
+
+  override fun handlesPath(path: @MultiRoutingFileSystemPath String): Boolean {
+    if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
+      return false
+    }
+
+    return WslPath.parseWindowsUncPath(path) != null
+  }
+
+  override fun getPathHandlerPredicate(machine: EelMachine): ((path: @MultiRoutingFileSystemPath String) -> Boolean)? {
+    if (machine !is WslEelMachine) return null
+    if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) return null
+    return predicate@{ path ->
+      val windowsUncPath = WslPath.parseWindowsUncPath(path) ?: return@predicate false
+      windowsUncPath.distributionId == machine.distribution.id
+    }
+  }
 
   override suspend fun tryInitialize(@MultiRoutingFileSystemPath path: String) {
     if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {

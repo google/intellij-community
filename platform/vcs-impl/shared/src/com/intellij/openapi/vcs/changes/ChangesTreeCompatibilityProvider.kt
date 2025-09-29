@@ -38,13 +38,11 @@ interface ChangesTreeCompatibilityProvider {
 
   fun showIgnoredViewDialog(project: Project)
 
-  fun isIgnoredInUpdateMode(project: Project): Boolean
-
   fun showUnversionedViewDialog(project: Project)
 
-  fun isUnversionedInUpdateMode(project: Project): Boolean
-
   fun resolveLocalFile(path: String): VirtualFile?
+
+  fun toHijackedChange(project: Project, file: VirtualFile): Change?
 
   companion object {
     @JvmStatic

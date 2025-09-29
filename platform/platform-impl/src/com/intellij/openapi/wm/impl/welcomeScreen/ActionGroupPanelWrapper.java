@@ -20,7 +20,6 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.IJSwingUtilities;
-import com.intellij.util.MathUtil;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -43,6 +42,9 @@ public final class ActionGroupPanelWrapper {
                                                                       @Nullable Runnable backAction,
                                                                       @NotNull Disposable parentDisposable) {
     var items = getFlattenedActionGroups(actionGroup);
+    if (!items.isEmpty()) {
+      items.removeFirst(); // Skip the root group.
+    }
     return createActionGroupPanel(items, backAction, parentDisposable);
   }
 
@@ -69,7 +71,7 @@ public final class ActionGroupPanelWrapper {
     actionsListPanel.setBackground(getProjectsBackground());
     actionsListPanel.add(pane, BorderLayout.CENTER);
 
-    int width = (int)MathUtil.clamp(Math.round(list.getPreferredSize().getWidth()), JBUIScale.scale(100), JBUIScale.scale(200));
+    int width = Math.clamp(Math.round(list.getPreferredSize().getWidth()), JBUIScale.scale(100), JBUIScale.scale(200));
     pane.setPreferredSize(JBUI.size(width + 14, -1));
 
     boolean singleProjectGenerator = list.getModel().getSize() == 1;
@@ -208,12 +210,8 @@ public final class ActionGroupPanelWrapper {
     });
   }
 
-  private static List<AnAction> getFlattenedActionGroups(ActionGroup actionGroup) {
+  private static ArrayList<AnAction> getFlattenedActionGroups(ActionGroup actionGroup) {
     ArrayList<AnAction> flatActions = new ArrayList<>();
-
-    if (actionGroup instanceof CollapsedActionGroup && ((CollapsedActionGroup)actionGroup).getCollapsed()) {
-      return flatActions;
-    }
 
     AnAction[] children;
     if (actionGroup instanceof DefaultActionGroup) {
@@ -225,6 +223,10 @@ public final class ActionGroupPanelWrapper {
 
     if (children.length != 0) {
       flatActions.add(actionGroup);
+    }
+
+    if (actionGroup instanceof CollapsedActionGroup && ((CollapsedActionGroup)actionGroup).getCollapsed()) {
+      return flatActions;
     }
 
     for (AnAction child : children) {
@@ -241,13 +243,13 @@ public final class ActionGroupPanelWrapper {
   private static @NotNull List<AnAction> getFlattenedActionGroups(@NotNull ActionGroup actionGroup, @NotNull AnActionEvent event) {
     ArrayList<AnAction> flatActions = new ArrayList<>();
 
-    if (actionGroup instanceof CollapsedActionGroup && ((CollapsedActionGroup)actionGroup).getCollapsed()) {
-      return flatActions;
-    }
-
     List<? extends AnAction> children = event.getUpdateSession().children(actionGroup);
     if (!children.isEmpty()) {
       flatActions.add(actionGroup);
+    }
+
+    if (actionGroup instanceof CollapsedActionGroup && ((CollapsedActionGroup)actionGroup).getCollapsed()) {
+      return flatActions;
     }
 
     for (AnAction action : children) {
@@ -273,6 +275,9 @@ public final class ActionGroupPanelWrapper {
         super.update(e);
         if (actionPanel == null) {
           var flatChildrenAndGroups = getFlattenedActionGroups(action, e);
+          if (!flatChildrenAndGroups.isEmpty()) {
+            flatChildrenAndGroups.removeFirst(); // Skip the root group.
+          }
           e.getUpdateSession().compute(this, "initPanel", ActionUpdateThread.EDT, () -> {
             initPanel(e, flatChildrenAndGroups);
             return true;

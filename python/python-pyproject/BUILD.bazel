@@ -1,10 +1,16 @@
 ### auto-generated section `build intellij.python.pyproject` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
-jvm_resources(
+resourcegroup(
   name = "pyproject_resources",
-  files = glob(["resources/**/*"]),
+  srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
+)
+
+resourcegroup(
+  name = "pyproject_test_resources",
+  srcs = glob(["testResources/**/*"]),
+  strip_prefix = "testResources"
 )
 
 jvm_library(
@@ -12,6 +18,7 @@ jvm_library(
   module_name = "intellij.python.pyproject",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = [":pyproject_resources"],
   deps = [
     "@lib//:kotlin-stdlib",
     "//python/openapi:community",
@@ -20,15 +27,15 @@ jvm_library(
     "//python/python-sdk:sdk",
     "//platform/util",
     "//plugins/toml/core",
-    "@lib//:tuweni-toml",
-  ],
-  runtime_deps = [":pyproject_resources"]
+    "@lib//:tuweni-toml-provided",
+  ]
 )
 
 jvm_library(
   name = "pyproject_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
+  resources = [":pyproject_test_resources"],
   associates = [":pyproject"],
   deps = [
     "@lib//:kotlin-stdlib",
@@ -40,11 +47,10 @@ jvm_library(
     "//python/python-sdk:sdk_test_lib",
     "//platform/util",
     "//plugins/toml/core",
-    "@lib//:tuweni-toml",
+    "@lib//:tuweni-toml-provided",
     "@lib//:junit5",
     "@lib//:junit5Params",
-  ],
-  runtime_deps = [":pyproject_resources"]
+  ]
 )
 ### auto-generated section `build intellij.python.pyproject` end
 

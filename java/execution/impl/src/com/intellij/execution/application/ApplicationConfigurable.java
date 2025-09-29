@@ -69,7 +69,7 @@ public class ApplicationConfigurable extends SettingsEditor<ApplicationConfigura
     String className = getMainClassField().getText();
     if (!className.equals(getInitialMainClassName(configuration))) {
       PsiClass aClass = myModuleSelector.findClass(className);
-      configuration.setMainClassName(aClass != null ? JavaExecutionUtil.getRuntimeQualifiedName(aClass) : className);
+      configuration.setMainClassName(aClass != null ? aClass.getQualifiedName() : className);
     }
     configuration.setAlternativeJrePath(myJrePathEditor.getJrePathOrName());
     configuration.setAlternativeJrePathEnabled(myJrePathEditor.isAlternativeJreSelected());
@@ -123,15 +123,7 @@ public class ApplicationConfigurable extends SettingsEditor<ApplicationConfigura
   }
 
   static @NotNull JavaCodeFragment.VisibilityChecker getVisibilityChecker(@NotNull ConfigurationModuleSelector selector) {
-    return (declaration, place) -> {
-      if (declaration instanceof PsiClass aClass) {
-        if (ConfigurationUtil.MAIN_CLASS.value(aClass) && PsiMethodUtil.findMainMethod(aClass) != null ||
-            place != null && place.getParent() != null && selector.findClass(aClass.getQualifiedName()) != null) {
-          return JavaCodeFragment.VisibilityChecker.Visibility.VISIBLE;
-        }
-      }
-      return JavaCodeFragment.VisibilityChecker.Visibility.NOT_VISIBLE;
-    };
+    return JavaApplicationSettingsEditor.getVisibilityChecker(selector);
   }
 
   @Override

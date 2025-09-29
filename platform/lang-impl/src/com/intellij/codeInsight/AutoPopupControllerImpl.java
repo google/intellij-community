@@ -104,7 +104,7 @@ public class AutoPopupControllerImpl extends AutoPopupController {
 
   @Override
   public void autoPopupMemberLookup(@NotNull Editor editor, @Nullable Condition<? super PsiFile> condition) {
-    autoPopupMemberLookup(editor, CompletionType.BASIC, condition);
+    scheduleAutoPopup(editor, condition);
   }
 
   @Override
@@ -121,6 +121,8 @@ public class AutoPopupControllerImpl extends AutoPopupController {
     if (ApplicationManager.getApplication().isUnitTestMode() && !TestModeFlags.is(CompletionAutoPopupHandler.ourTestingAutopopup)) {
       return;
     }
+
+    ThreadingAssertions.assertEventDispatchThread();
 
     boolean alwaysAutoPopup = Boolean.TRUE.equals(editor.getUserData(ALWAYS_AUTO_POPUP));
     if (!CodeInsightSettings.getInstance().AUTO_POPUP_COMPLETION_LOOKUP && !alwaysAutoPopup) {
@@ -140,11 +142,6 @@ public class AutoPopupControllerImpl extends AutoPopupController {
     }
 
     CommittingDocuments.scheduleAsyncCompletion(editor, completionType, condition, myProject, null);
-  }
-
-  @Override
-  public void scheduleAutoPopup(@NotNull Editor editor) {
-    scheduleAutoPopup(editor, CompletionType.BASIC, null);
   }
 
   @Override

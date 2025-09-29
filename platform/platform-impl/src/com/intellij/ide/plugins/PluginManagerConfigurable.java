@@ -11,8 +11,8 @@ import com.intellij.ide.impl.ProjectUtil;
 import com.intellij.ide.plugins.certificates.PluginCertificateManager;
 import com.intellij.ide.plugins.enums.PluginsGroupType;
 import com.intellij.ide.plugins.enums.SortBy;
+import com.intellij.ide.plugins.marketplace.CheckErrorsResult;
 import com.intellij.ide.plugins.marketplace.PluginSearchResult;
-import com.intellij.ide.plugins.newui.UiPluginManager;
 import com.intellij.ide.plugins.marketplace.ranking.MarketplaceLocalRanker;
 import com.intellij.ide.plugins.marketplace.statistics.PluginManagerUsageCollector;
 import com.intellij.ide.plugins.newui.*;
@@ -40,7 +40,10 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
-import com.intellij.openapi.updateSettings.impl.*;
+import com.intellij.openapi.updateSettings.impl.PluginAutoUpdateListener;
+import com.intellij.openapi.updateSettings.impl.PluginAutoUpdateService;
+import com.intellij.openapi.updateSettings.impl.UpdateOptions;
+import com.intellij.openapi.updateSettings.impl.UpdateSettings;
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource;
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiserStartupActivityKt;
 import com.intellij.openapi.util.Disposer;
@@ -49,7 +52,10 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.ui.*;
+import com.intellij.ui.GotItTooltip;
+import com.intellij.ui.JBColor;
+import com.intellij.ui.RelativeFont;
+import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.components.fields.ExtendableTextComponent;
@@ -84,8 +90,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
-import static com.intellij.ide.plugins.newui.PluginsViewCustomizerKt.getPluginsViewCustomizer;
 
 @ApiStatus.Internal
 public final class PluginManagerConfigurable
@@ -225,27 +229,9 @@ public final class PluginManagerConfigurable
     CustomPluginRepositoryService.getInstance().clearCache();
     myPluginUpdatesService =
       UiPluginManager.getInstance().subscribeToUpdatesCount(myPluginModelFacade.getModel().getSessionId(), countValue -> {
-        int count = countValue == null ? 0 : countValue;
-        String text = Integer.toString(count);
-        boolean visible = count > 0;
-
-        String tooltip = PluginUpdatesService.getUpdatesTooltip();
-        myTabHeaderComponent.setTabTooltip(INSTALLED_TAB, tooltip);
-
-        myUpdateAll.setEnabled(true);
-        myUpdateAllBundled.setEnabled(true);
-        myUpdateAll.setVisible(visible && myBundledUpdateGroup.ui == null);
-        myUpdateAllBundled.setVisible(visible);
-
-        myUpdateCounter.setText(text);
-        myUpdateCounter.setToolTipText(tooltip);
-        myUpdateCounterBundled.setText(text);
-        myUpdateCounterBundled.setToolTipText(tooltip);
-        myUpdateCounter.setVisible(visible && myBundledUpdateGroup.ui == null);
-        myUpdateCounterBundled.setVisible(visible);
-
-        myCountIcon.setText(text);
-        myTabHeaderComponent.update();
+        ApplicationManager.getApplication().invokeLater(() -> {
+          onUpdateCountReceived(countValue);
+        });
         return null;
       });
     myPluginModelFacade.getModel().setPluginUpdatesService(myPluginUpdatesService);
@@ -287,7 +273,7 @@ public final class PluginManagerConfigurable
       myForceShowInstalledTabForTag = false;
     }
 
-    getPluginsViewCustomizer().processConfigurable(this);
+    PluginsViewCustomizerKt.getPluginsViewCustomizer().processConfigurable(this);
     if (myPluginManagerCustomizer != null) {
       myPluginManagerCustomizer.initCustomizer(myCardPanel);
     }
@@ -447,6 +433,30 @@ public final class PluginManagerConfigurable
     else {
       myMarketplacePanel.setVisibleRunnable(myMarketplaceRunnable);
     }
+  }
+
+  private void onUpdateCountReceived(Integer countValue) {
+    int count = countValue == null ? 0 : countValue;
+    String text = Integer.toString(count);
+    boolean visible = count > 0;
+
+    String tooltip = PluginUpdatesService.getUpdatesTooltip();
+    myTabHeaderComponent.setTabTooltip(INSTALLED_TAB, tooltip);
+
+    myUpdateAll.setEnabled(true);
+    myUpdateAllBundled.setEnabled(true);
+    myUpdateAll.setVisible(visible && myBundledUpdateGroup.ui == null);
+    myUpdateAllBundled.setVisible(visible);
+
+    myUpdateCounter.setText(text);
+    myUpdateCounter.setToolTipText(tooltip);
+    myUpdateCounterBundled.setText(text);
+    myUpdateCounterBundled.setToolTipText(tooltip);
+    myUpdateCounter.setVisible(visible && myBundledUpdateGroup.ui == null);
+    myUpdateCounterBundled.setVisible(visible);
+
+    myCountIcon.setText(text);
+    myTabHeaderComponent.update();
   }
 
   private static int getStoredSelectionTab() {
@@ -665,7 +675,7 @@ public final class PluginManagerConfigurable
             }
             attributes.add(SearchWords.STAFF_PICKS.getValue());
             attributes.add(SearchWords.SUGGESTED.getValue());
-            if (getPluginsViewCustomizer() != NoOpPluginsViewCustomizer.INSTANCE) {
+            if (PluginsViewCustomizerKt.getPluginsViewCustomizer() != NoOpPluginsViewCustomizer.INSTANCE) {
               attributes.add(SearchWords.INTERNAL.getValue());
             }
             return attributes;
@@ -674,7 +684,6 @@ public final class PluginManagerConfigurable
           @Override
           protected @Nullable List<String> getValues(@NotNull String attribute) {
             SearchWords word = SearchWords.find(attribute);
-            if (word == null) return null;
             return switch (word) {
               case TAG -> {
                 if (myTagsSorted == null || myTagsSorted.isEmpty()) {
@@ -716,6 +725,7 @@ public final class PluginManagerConfigurable
               }
               case REPOSITORY -> RepositoryHelper.getCustomPluginRepositoryHosts();
               case INTERNAL, SUGGESTED, STAFF_PICKS -> null;
+              case null -> null;
             };
           }
 
@@ -906,7 +916,7 @@ public final class PluginManagerConfigurable
 
               if (parser.internal) {
                 PluginsViewCustomizer.PluginsGroupDescriptor groupDescriptor =
-                  getPluginsViewCustomizer().getInternalPluginsGroupDescriptor();
+                  PluginsViewCustomizerKt.getPluginsViewCustomizer().getInternalPluginsGroupDescriptor();
                 if (groupDescriptor != null) {
                   if (parser.searchQuery == null) {
                     result.addDescriptors(groupDescriptor.getPlugins());
@@ -950,6 +960,9 @@ public final class PluginManagerConfigurable
                 }
                 result.removeDuplicates();
                 result.sortByName();
+                Set<PluginId> ids = result.getModels().stream().map(it -> it.getPluginId()).collect(Collectors.toSet());
+                result.getPreloadedModel().setInstalledPlugins(UiPluginManager.getInstance().findInstalledPluginsSync(ids));
+                result.getPreloadedModel().setPluginInstallationStates(UiPluginManager.getInstance().getInstallationStatesSync());
                 updatePanel(runQuery);
               }
               else {
@@ -1062,6 +1075,7 @@ public final class PluginManagerConfigurable
         JBTextField textField = searchTextField.getTextEditor();
         textField.putClientProperty("search.extension", ExtendableTextComponent.Extension
           .create(AllIcons.Actions.More, AllIcons.Actions.More, IdeBundle.message("plugins.configurable.search.options"), // TODO: icon
+                  true,
                   () -> showRightBottomPopup(textField, IdeBundle.message("plugins.configurable.show"), myInstalledSearchGroup)));
         textField.putClientProperty("JTextField.variant", null);
         textField.putClientProperty("JTextField.variant", "search");
@@ -1100,9 +1114,9 @@ public final class PluginManagerConfigurable
           new PluginsGroup(IdeBundle.message("plugins.configurable.downloaded"), PluginsGroupType.INSTALLED);
 
         PluginsGroup installing = new PluginsGroup(IdeBundle.message("plugins.configurable.installing"), PluginsGroupType.INSTALLING);
-        myPluginModelFacade.getModel().setDownloadedGroup(myInstalledPanel, downloaded, installing);
         PluginManagerPanelFactory.INSTANCE.createInstalledPanel(myCoroutineScope, myPluginModelFacade.getModel(), model -> {
           try {
+            myPluginModelFacade.getModel().setDownloadedGroup(myInstalledPanel, downloaded, installing);
             installing.getPreloadedModel().setErrors(model.getErrors());
             installing.getPreloadedModel().setPluginInstallationStates(model.getInstallationStates());
             installing.addModels(MyPluginModel.getInstallingPlugins());
@@ -1160,11 +1174,11 @@ public final class PluginManagerConfigurable
                 .filter(descriptor -> !myPluginModelFacade.getModel().isDisabled(descriptor.getPluginId()))
                 .count();
               downloaded.titleWithCount(Math.toIntExact(enabledNonBundledCount));
-              myInstalledPanel.addGroup(downloaded);
+              if (downloaded.ui == null) {
+                myInstalledPanel.addGroup(downloaded);
+              }
               myPluginModelFacade.getModel().addEnabledGroup(downloaded);
             }
-
-            myPluginModelFacade.getModel().setDownloadedGroup(myInstalledPanel, downloaded, installing);
 
             String defaultCategory = IdeBundle.message("plugins.configurable.other.bundled");
             visibleBundledPlugins
@@ -1406,6 +1420,10 @@ public final class PluginManagerConfigurable
             }
 
             result.addModels(descriptors);
+            Map<PluginId, CheckErrorsResult> errors = UiPluginManager.getInstance()
+              .loadErrors(myPluginModelFacade.getModel().mySessionId.toString(),
+                          ContainerUtil.map(descriptors, PluginUiModel::getPluginId));
+            result.getPreloadedModel().setErrors(MyPluginModel.getErrors(errors));
             PluginManagerUsageCollector.performInstalledTabSearch(
               ProjectUtil.getActiveProject(), parser, result.getModels(), searchIndex, null);
 
@@ -2059,11 +2077,11 @@ public final class PluginManagerConfigurable
       pluginsState.clearShutdownCallback();
     }
 
-    if(myMarketplaceTab != null) {
+    if (myMarketplaceTab != null) {
       myMarketplaceTab.dispose();
     }
 
-    if(myInstalledTab != null) {
+    if (myInstalledTab != null) {
       myInstalledTab.dispose();
     }
 
@@ -2085,6 +2103,7 @@ public final class PluginManagerConfigurable
 
     if (myDisposer != null) {
       Disposer.dispose(myDisposer);
+      CoroutineScopeKt.cancel(myCoroutineScope, null);
       myDisposer = null;
     }
   }
@@ -2110,7 +2129,7 @@ public final class PluginManagerConfigurable
       UpdateOptions state = UpdateSettings.getInstance().getState();
       if (state.isPluginsAutoUpdateEnabled() != myPluginsAutoUpdateEnabled) {
         state.setPluginsAutoUpdateEnabled(myPluginsAutoUpdateEnabled);
-        ApplicationManager.getApplication().getService(PluginAutoUpdateService.class).onSettingsChanged$intellij_platform_ide_impl();
+        ApplicationManager.getApplication().getService(PluginAutoUpdateService.class).onSettingsChanged();
       }
     }
 
@@ -2120,12 +2139,12 @@ public final class PluginManagerConfigurable
       if (myPluginModelFacade.getModel().createShutdownCallback) {
         installedPluginsState.setShutdownCallback(() -> {
           ApplicationManager.getApplication().invokeLater(() -> {
-            myPluginModelFacade.closeSession();
             if (ApplicationManager.getApplication().isExitInProgress()) return; // already shutting down
             if (myPluginManagerCustomizer != null) {
               myPluginManagerCustomizer.requestRestart(myPluginModelFacade, myTabHeaderComponent);
               return;
             }
+            myPluginModelFacade.closeSession();
             shutdownOrRestartApp();
           });
         });
@@ -2133,7 +2152,6 @@ public final class PluginManagerConfigurable
 
       if (myDisposer == null) {
         installedPluginsState.runShutdownCallback();
-        myPluginModelFacade.closeSession();
       }
     });
   }

@@ -15,32 +15,29 @@ import com.intellij.ui.table.TableView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle.message
-import org.jetbrains.kotlin.idea.core.script.shared.KotlinBaseScriptingBundle
 import org.jetbrains.kotlin.idea.core.script.k2.definitions.ScriptDefinitionProviderImpl
 import org.jetbrains.kotlin.idea.core.script.k2.definitions.ScriptTemplatesFromDependenciesDefinitionSource
+import org.jetbrains.kotlin.idea.core.script.k2.settings.ScriptDefinitionPersistentSettings.ScriptDefinitionSetting
+import org.jetbrains.kotlin.idea.core.script.shared.KOTLIN_SCRIPTING_SETTINGS_ID
+import org.jetbrains.kotlin.idea.core.script.shared.KotlinBaseScriptingBundle
 import org.jetbrains.kotlin.idea.core.script.shared.scriptDefinitionsSourceOfType
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 
 internal class KotlinScriptingSettingsConfigurable(val project: Project, val coroutineScope: CoroutineScope) : SearchableConfigurable {
-    companion object {
-        const val ID: String = "preferences.language.Kotlin.scripting"
-    }
 
     private var model = calculateModel()
     private val definitionsFromClassPathTitle: AtomicProperty<String> = AtomicProperty("")
 
     private fun calculateModel(): KotlinScriptDefinitionsModel {
-        val settingsByDefinitionId = ScriptDefinitionPersistentSettings.getInstance(project)
-            .getIndexedSettingsPerDefinition()
-
+        val settingsProvider = ScriptDefinitionPersistentSettings.getInstance(project)
         val definitions = ScriptDefinitionProviderImpl.getInstance(project).getDefinitions()
-            .sortedBy { settingsByDefinitionId[it.definitionId]?.index ?: it.order }
+            .sortedBy { settingsProvider.getScriptDefinitionOrder(it) }
             .map {
-                DefinitionModelDescriptor(
+                ScriptDefinitionModel(
                     it,
-                    settingsByDefinitionId[it.definitionId]?.setting?.enabled != false
+                    settingsProvider.isScriptDefinitionEnabled(it)
                 )
             }.toMutableList()
 
@@ -58,7 +55,10 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
         row {
             button(KotlinBaseScriptingBundle.message("button.scan.classpath")) {
                 coroutineScope.launch {
-                    val definitionsFromClassPath = withBackgroundProgress(project, title = KotlinBaseScriptingBundle.message("looking.for.script.definitions.in.classpath")) {
+                    val definitionsFromClassPath = withBackgroundProgress(
+                        project,
+                        title = KotlinBaseScriptingBundle.message("looking.for.script.definitions.in.classpath")
+                    ) {
                         project.scriptDefinitionsSourceOfType<ScriptTemplatesFromDependenciesDefinitionSource>()?.scanAndLoadDefinitions()
                     } ?: emptyList()
 
@@ -98,10 +98,11 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
 
     override fun apply() {
         if (isScriptDefinitionsChanged()) {
-            val settings = model.items.mapIndexed { index, item ->
-                ScriptDefinitionPersistentSettings.ScriptDefinitionSetting(
-                    item.definition.definitionId,
-                    item.isEnabled
+            val settings = model.items.map {
+                ScriptDefinitionSetting(
+                    it.definition.name,
+                    it.definition.definitionId,
+                    it.isEnabled
                 )
             }
 
@@ -122,6 +123,7 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
             val modelItem = model.items[i]
 
             if (setting.definitionId != modelItem.definition.definitionId
+                || setting.name != modelItem.definition.name
                 || setting.enabled != modelItem.isEnabled
             ) {
                 return true
@@ -133,5 +135,5 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
 
     override fun getDisplayName(): String = message("script.name.kotlin.scripting")
 
-    override fun getId(): String = ID
+    override fun getId(): String = KOTLIN_SCRIPTING_SETTINGS_ID
 }

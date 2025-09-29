@@ -1,11 +1,13 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion
 
+import com.intellij.codeInsight.completion.CompletionPhase.CommittingDocuments.CommittingState.*
 import com.intellij.codeInsight.completion.CompletionPhase.Companion.NoCompletion
 import com.intellij.codeInsight.completion.impl.CompletionServiceImpl
 import com.intellij.codeInsight.completion.impl.CompletionServiceImpl.Companion.assertPhase
 import com.intellij.codeWithMe.ClientId
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -33,7 +35,10 @@ import com.intellij.ui.HintListener
 import com.intellij.ui.LightweightHint
 import com.intellij.util.ThreeState
 import com.intellij.util.concurrency.AppExecutorUtil
+import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.ui.EDT
 import com.intellij.util.ui.accessibility.ScreenReader
 import org.jetbrains.annotations.ApiStatus
@@ -65,41 +70,81 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
 
   override fun dispose() {}
 
-  class CommittingDocuments internal constructor(
-    prevIndicator: CompletionProgressIndicator?,
+  class CommittingDocuments private constructor(
+    indicator: CompletionProgressIndicator?,
     editor: Editor,
     private val event: TypedEvent?
-  ) : CompletionPhase(prevIndicator) {
+  ) : CompletionPhase(indicator) {
     @JvmField
     internal var replaced: Boolean = false
 
     private val myTracker: ActionTracker = ActionTracker(editor, this)
-    private var myRequestCount = 1
+    private var myState: CommittingState = InProgress(1) // access available on EDT only
 
     fun ignoreCurrentDocumentChange() {
       myTracker.ignoreCurrentDocumentChange()
     }
 
+    /**
+     * @return `true` if the phase won't trigger the completion process.
+     */
     @get:ApiStatus.Internal
     val isExpired: Boolean
-      get() = myTracker.hasAnythingHappened() || myRequestCount <= 0
+      get() = myTracker.hasAnythingHappened() || myState !is InProgress
 
-    private val expirationReason: String
-      get() = myTracker.describeChangeEvent() + "; myRequestCount = $myRequestCount"
-
-    internal fun incrementRequestCount() {
-      myRequestCount++
-      LOG.trace { "Increment request count :: new myRequestCount=$myRequestCount" }
+    /**
+     * Several typedHandlers can request auto-popup completion during processing of a single event.
+     * We need to trigger read-action for them independently because they can have different conditions for starting completion.
+     */
+    @RequiresEdt
+    private fun addRequest() {
+      when (val cur = myState) {
+        Cancelled, Disposed, Success -> {
+          LOG.error("Cannot add request for a finished phase: $cur")
+          return
+        }
+        is InProgress -> {
+          myState = InProgress(cur.requests + 1)
+        }
+      }
+      LOG.trace { "Increment request count :: new myState=$myState" }
     }
 
-    private fun decrementRequestCount() {
-      myRequestCount--
-      LOG.trace { "Decrement request count :: new myRequestCount=$myRequestCount" }
+    /**
+     * the current request was not successful (most likely because of the failed condition), but other requests still have a chance to succeed.
+     */
+    @RequiresEdt
+    private fun cancelThisRequest() {
+      when (val cur = myState) {
+        Disposed, Cancelled, Success -> {
+          /* do nothing */
+        }
+
+        is InProgress -> {
+          val requests = cur.requests
+          if (requests > 1) {
+            myState = InProgress(cur.requests - 1)
+          }
+          else {
+            if (requests < 1) {
+              LOG.error("Invalid request count: $requests")
+            }
+            myState = Cancelled
+          }
+        }
+      }
+
+      LOG.trace { "Cancel request :: new myState=$myState" }
     }
 
+    /**
+     * At least one of the requests succeeded, the completion process has been started, no more requests are necessary.
+     */
+    @RequiresEdt
     private fun requestCompleted() {
       LOG.trace { "Request completed" }
-      myRequestCount = 0
+      LOG.assertTrue(myState is InProgress, "myState=$myState")
+      myState = Success
     }
 
     override fun newCompletionStarted(time: Int, repeated: Boolean): Int {
@@ -108,7 +153,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
 
     override fun dispose() {
       LOG.trace { "Dispose completion phase: $this" }
-      myRequestCount = 0
+      myState = Disposed
       if (!replaced && indicator != null) {
         indicator.closeAndFinish(true)
       }
@@ -118,20 +163,52 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
       return "CommittingDocuments{hasIndicator=${indicator != null}}"
     }
 
+    /**
+     * InProgress(1) -> InProgress(2...Xxx) -> InProgress(1) -> Cancelled -> Disposed
+     *      |--------------|------------------------|---------> Success-------^
+     *
+     */
+    private sealed interface CommittingState {
+      object Success : CommittingState
+      object Cancelled : CommittingState
+      object Disposed : CommittingState
+      data class InProgress(val requests: Int) : CommittingState
+    }
+
     @ApiStatus.Internal
     companion object {
       private val ourExecutor = AppExecutorUtil.createBoundedApplicationPoolExecutor("Completion Preparation", 1)
 
       @ApiStatus.Internal
       @JvmStatic
+      fun create(editor: Editor, indicator: CompletionProgressIndicator?): CommittingDocuments {
+        return CommittingDocuments(indicator, editor, null)
+      }
+
+      /**
+       * Schedules completion process for the given [editor] with [completionType] and [condition] for the state of the file.
+       * The condition is checked after committing all the documents inside a read-action.
+       *
+       * @param editor          editor where we start completion
+       * @param completionType  completion type
+       * @param condition       condition to check before starting the completion process.
+       * @param project         the current project
+       * @param prevIndicator   the completion indicator, if any. The indicator exists if completion was already started and we restart it with new parameters.
+       */
+      @ApiStatus.Internal
+      @RequiresEdt
+      @JvmStatic
       fun scheduleAsyncCompletion(
         editor: Editor,
         completionType: CompletionType,
-        condition: Condition<in PsiFile?>?,
+        condition: Condition<in PsiFile>?,
         project: Project,
         prevIndicator: CompletionProgressIndicator?
       ) {
         LOG.trace("Schedule async completion")
+
+        ThreadingAssertions.assertEventDispatchThread()
+
         val topLevelEditor = InjectedLanguageEditorUtil.getTopLevelEditor(editor)
         val offset = topLevelEditor.getCaretModel().offset
 
@@ -141,47 +218,95 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
 
         ReadAction
           .nonBlocking(Callable {
-            if (phase.isExpired) {
-              LOG.trace("Phase is expired")
-              return@Callable null
-            }
-            LOG.trace { "Start non-blocking read action :: phase=${phase.replaced}" }
-            // retrieve the injected file from scratch since our typing might have destroyed the old one completely
-            val topLevelFile = PsiDocumentManager.getInstance(project).getPsiFile(topLevelEditor.getDocument())
-            val completionEditor = InjectedLanguageUtil.getEditorForInjectedLanguageNoCommit(topLevelEditor, topLevelFile, offset)
-            val file = PsiDocumentManager.getInstance(project).getPsiFile(completionEditor.getDocument())
-            if (file == null || autopopup && shouldSkipAutoPopup(completionEditor, file) || condition != null && !condition.value(file)) {
-              LOG.trace { "File is null or should skip auto popup or condition is not met :: file=$file, condition=$condition" }
-              return@Callable null
-            }
-
-            loadContributorsOutsideEdt(completionEditor, file)
-            completionEditor
+            prepareEditorAndDocumentsForAsyncCompletion(phase, topLevelEditor, condition, offset, autopopup, project)
           })
           .withDocumentsCommitted(project)
           .expireWith(phase)
           .finishOnUiThread(ModalityState.current(), Consumer { completionEditor: Editor? ->
-            LOG.trace { "Finish on UI thread :: completionEditor=$completionEditor" }
-            if (completionEditor != null && !phase.isExpired) {
-              LOG.trace { "Starting completion phase :: completionEditor=$completionEditor" }
-              phase.requestCompleted()
-              val time = prevIndicator?.invocationCount ?: 0
-
-              val customId = completionEditor.getUserData(CUSTOM_CODE_COMPLETION_ACTION_ID) ?: "CodeCompletion"
-              val handler = CodeCompletionHandlerBase.createHandler(completionType, false, autopopup, false, customId)
-              handler.invokeCompletion(project, completionEditor, time, false)
-            }
-            else if (phase == CompletionServiceImpl.completionPhase) {
-              LOG.trace { "Setting NoCompletion phase :: completionEditor=$completionEditor, expirationReason=${phase.expirationReason}" }
-              phase.decrementRequestCount()
-              if (phase.isExpired) {
-                CompletionServiceImpl.setCompletionPhase(NoCompletion)
-              }
-            }
+            startAsyncCompletionIfNotExpired(phase, completionEditor, completionType, autopopup, project)
           })
           .submit(ourExecutor)
       }
 
+      @RequiresReadLock
+      private fun prepareEditorAndDocumentsForAsyncCompletion(
+        phase: CommittingDocuments,
+        topLevelEditor: Editor,
+        condition: Condition<in PsiFile>?,
+        offset: Int,
+        autopopup: Boolean,
+        project: Project,
+      ): Editor? {
+        if (phase.myState !is InProgress) {
+          LOG.trace { "Phase is expired ${phase.myState}" }
+          return null
+        }
+        LOG.trace { "Start non-blocking read action :: phase=${phase.replaced}" }
+        // retrieve the injected file from scratch since our typing might have destroyed the old one completely
+        val topLevelFile = PsiDocumentManager.getInstance(project).getPsiFile(topLevelEditor.getDocument())
+        val completionEditor = InjectedLanguageUtil.getEditorForInjectedLanguageNoCommit(topLevelEditor, topLevelFile, offset)
+        val file = PsiDocumentManager.getInstance(project).getPsiFile(completionEditor.getDocument())
+        if (file == null || autopopup && shouldSkipAutoPopup(completionEditor, file) || condition != null && !condition.value(file)) {
+          LOG.trace { "File is null or should skip auto popup or condition is not met :: file=$file, condition=$condition" }
+          return null
+        }
+
+        loadContributorsOutsideEdt(completionEditor, file)
+        return completionEditor
+      }
+
+      @RequiresEdt
+      private fun startAsyncCompletionIfNotExpired(
+        phase: CommittingDocuments,
+        completionEditor: Editor?,
+        completionType: CompletionType,
+        autopopup: Boolean,
+        project: Project,
+      ) {
+        LOG.trace { "Finish on UI thread :: completionEditor=$completionEditor" }
+
+        if (phase != CompletionServiceImpl.completionPhase) {
+          LOG.trace { "Phase is expired :: myPhase=${phase}, completionPhase=${CompletionServiceImpl.completionPhase} " }
+          return
+        }
+
+        if (phase.myState !is InProgress) {
+          LOG.trace { "Phase is expired :: myState=${phase.myState}" }
+          return
+        }
+
+        if (completionEditor == null) {
+          // preparation has failed for this specific request. We must cancel only this request.
+          // If no other requests are pending, we can cancel the phase altogether.
+
+          LOG.trace { "Setting NoCompletion phase :: completionEditor=$completionEditor, expirationReason=editor is null" }
+          phase.cancelThisRequest()
+          if (phase.myState == Cancelled) {
+            CompletionServiceImpl.setCompletionPhase(NoCompletion)
+          }
+          return
+        }
+
+        if (phase.myTracker.hasAnythingHappened() && (phase.indicator == null || !phase.indicator.lookup.isShown)) {
+          // activity has happened in the editor. We must cancel all the requests altogether.
+          // but we want to do this only if lookup is not shown yet. because if it's shown, the lookup is going to handle close by itself.
+          LOG.trace { "Setting NoCompletion phase :: completionEditor=$completionEditor, expirationReason=${phase.myTracker.describeChangeEvent()}" }
+          phase.cancelPhase()
+          CompletionServiceImpl.setCompletionPhase(NoCompletion)
+          return
+        }
+
+        LOG.trace { "Starting completion phase :: completionEditor=$completionEditor" }
+
+        phase.requestCompleted()
+        val time = phase.indicator?.invocationCount ?: 0
+
+        val customId = completionEditor.getUserData(CUSTOM_CODE_COMPLETION_ACTION_ID) ?: IdeActions.ACTION_CODE_COMPLETION
+        val handler = CodeCompletionHandlerBase.createHandler(completionType, false, autopopup, false, customId)
+        handler.invokeCompletion(project, completionEditor, time, false)
+      }
+
+      @RequiresEdt
       private fun getCompletionPhase(
         prevIndicator: CompletionProgressIndicator?,
         topLevelEditor: Editor,
@@ -190,7 +315,9 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
         if (event != null) {
           val currentPhase = CompletionServiceImpl.completionPhase
           if (currentPhase is CommittingDocuments && !currentPhase.isExpired && event == currentPhase.event) {
-            currentPhase.incrementRequestCount()
+            LOG.assertTrue(prevIndicator == currentPhase.indicator, "Indicators must match. prevIndicator=$prevIndicator, currentPhase=$currentPhase, currentPhase.indicator=${currentPhase.indicator}")
+
+            currentPhase.addRequest()
             return currentPhase
           }
         }
@@ -204,6 +331,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
       @RequiresBackgroundThread
       @JvmStatic
       fun loadContributorsOutsideEdt(editor: Editor, file: PsiFile) {
+        ThreadingAssertions.assertBackgroundThread()
         CompletionContributor.forLanguage(PsiUtilCore.getLanguageAtOffset(file, editor.getCaretModel().offset))
       }
 
@@ -231,6 +359,14 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
           }
         }
         return false
+      }
+    }
+
+    @RequiresEdt
+    private fun cancelPhase() {
+      when (myState) {
+        Cancelled, Disposed, Success -> {}
+        is InProgress -> myState = Cancelled
       }
     }
   }

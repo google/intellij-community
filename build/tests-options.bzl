@@ -12,6 +12,7 @@ PKGS = [
     "java.base/java.util",
     "java.base/java.util.concurrent",
     "java.base/java.util.concurrent.atomic",
+    "java.base/jdk.internal.ref",
     "java.base/jdk.internal.vm",
     "java.base/sun.nio.ch",
     "java.base/sun.nio.fs",
@@ -23,15 +24,15 @@ PKGS = [
     "java.desktop/java.awt",
     "java.desktop/java.awt.dnd.peer",
     "java.desktop/java.awt.event",
+    "java.desktop/java.awt.font",
     "java.desktop/java.awt.image",
     "java.desktop/java.awt.peer",
-    "java.desktop/java.awt.font",
     "java.desktop/javax.swing",
     "java.desktop/javax.swing.plaf.basic",
     "java.desktop/javax.swing.text.html",
+    "java.desktop/sun.awt",
     "java.desktop/sun.awt.datatransfer",
     "java.desktop/sun.awt.image",
-    "java.desktop/sun.awt",
     "java.desktop/sun.font",
     "java.desktop/sun.java2d",
     "java.desktop/sun.lwawt",
@@ -82,11 +83,7 @@ def _normalize_runtime_dep(dep):
         return "@community//platform/util:util-tests_test_lib"
     return dep
 
-def jps_test(name, jvm_flags = [], runtime_deps = [], args = [], data = [], tags = [], ignored = True, **kwargs):
-    # Temporary workaround not to generate a lot of *.repo_mapping (waiting for --incompatible_compact_repo_mapping_manifest)
-    if ignored:
-        return
-
+def jps_test(name, jvm_flags = [], runtime_deps = [], args = [], data = [], tags = [], **kwargs):
     # Merge user-provided args with our default ones
     all_jvm_flags = JAVA_TEST_FLAGS + ADD_OPENS_FLAGS + jvm_flags
     all_args = JAVA_TEST_ARGS + args

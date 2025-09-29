@@ -36,7 +36,7 @@ private object Config {
     const val RELEASE_NOTES_FILE = "RELEASE NOTES.md"
 }
 
-class ExtractReleaseNotesCommand : CliktCommand() {
+private class ExtractReleaseNotesCommand : CliktCommand() {
     private val startDate: String by
         option(
                 "--start-date",
@@ -50,7 +50,8 @@ class ExtractReleaseNotesCommand : CliktCommand() {
                 val latestReleaseDate = getLatestReleaseDate()
                 if (latestReleaseDate.isNullOrBlank()) {
                     printlnErr(
-                        "Error: --start-date is required if ${Config.RELEASE_NOTES_FILE} does not exist or contain a release date."
+                        "Error: --start-date is required if ${Config.RELEASE_NOTES_FILE} " +
+                        "does not exist or contain a release date."
                     )
                     exitProcess(1)
                 }
@@ -105,7 +106,7 @@ class ExtractReleaseNotesCommand : CliktCommand() {
 
         val elapsed = mark.elapsedNow()
 
-        println(" DONE")
+        printlnSuccess(" DONE")
 
         println("  ℹ️ Found ${allCommitHashes.size} commits in $elapsed")
 
@@ -138,7 +139,7 @@ class ExtractReleaseNotesCommand : CliktCommand() {
 
         val uniquePrCommits = prCommits.distinctBy { it.prId }.sortedBy { it.issueId }
 
-        println(" DONE")
+        printlnSuccess(" DONE")
 
         println(
             "  ℹ️ Found ${uniquePrCommits.size} unique PRs to process. " +
@@ -224,9 +225,9 @@ class ExtractReleaseNotesCommand : CliktCommand() {
 
         val sectionOrder = listOf("⚠️ Important Changes", "New features", "Bug fixes", "Deprecated API", "Other")
         val sortedSections =
-            allReleaseNotes.keys.sortedWith(
-                compareBy { sectionKey -> sectionOrder.indexOf(sectionKey).let { if (it == -1) Int.MAX_VALUE else it } }
-            )
+            allReleaseNotes.keys.sortedBy{ sectionKey ->
+                sectionOrder.indexOf(sectionKey).takeIf { it >= 0 } ?: Int.MAX_VALUE
+            }
 
         sortedSections.forEach { sectionHeader ->
             val notes = allReleaseNotes[sectionHeader]!!
@@ -273,7 +274,12 @@ class ExtractReleaseNotesCommand : CliktCommand() {
     private val workingDir = File("").absoluteFile
 
     // --- Data Structures ---
-    private data class ReleaseNoteItem(val issueId: String?, val description: String, val prId: String, val prUrl: String)
+    private data class ReleaseNoteItem(
+        val issueId: String?,
+        val description: String,
+        val prId: String,
+        val prUrl: String,
+    )
 
     private enum class PrProcessingStatus {
         Extracted,

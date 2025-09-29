@@ -9,6 +9,7 @@ import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.lang.annotation.AnnotationSession;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.colors.*;
@@ -37,6 +38,7 @@ import java.util.*;
  */
 @ApiStatus.Internal
 final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighlightingPass implements DumbAware {
+  private static final Logger LOG = Logger.getInstance(InjectedGeneralHighlightingPass.class);
   private final @Nullable List<? extends @NotNull TextRange> myReducedRanges;
   private final boolean myUpdateAll;
   private final ProperTextRange myPriorityRange;
@@ -153,12 +155,18 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
 
     if (!JobLauncher.getInstance().invokeConcurrentlyUnderProgress(new ArrayList<>(hosts), progress, element -> {
         ApplicationManager.getApplication().assertReadAccessAllowed();
+      try {
         injectedLanguageManager.enumerateEx(element, myFile, false, (injectedPsi, places) -> {
           if (visitedInjected.add(injectedPsi.getViewProvider())) {
             visitor.visit(injectedPsi, places);
           }
         });
-        advanceProgress(1);
+      }
+      catch (Exception e) {
+        if (Logger.shouldRethrow(e)) throw e;
+        LOG.error(e);
+      }
+      advanceProgress(1);
         return true;
       })) {
       throw new ProcessCanceledException();
@@ -203,7 +211,7 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
                                                () -> createInfoHolder(injectedPsi), (toolId, psiElement, infos) -> {
               // convert injected infos to host
               List<? extends HighlightInfo> hostInfos = infos.isEmpty()
-                                                        ? infos
+                                                        ? List.of()
                                                         : ContainerUtil.flatMap(infos, info -> createPatchedInfos(info, injectedPsi, documentWindow, injectedLanguageManager));
               resultSink.accept(toolId, psiElement, hostInfos);
             });
@@ -247,10 +255,10 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
     }
     resultSink.accept(InjectedLanguageManagerImpl.INJECTION_BACKGROUND_TOOL_ID, injectedPsi, result);
   }
-  private static @NotNull List<HighlightInfo> createPatchedInfos(@NotNull HighlightInfo info,
-                                                                 @NotNull PsiFile injectedPsi,
-                                                                 @NotNull DocumentWindow documentWindow,
-                                                                 @NotNull InjectedLanguageManager injectedLanguageManager) {
+  private static @NotNull List<@NotNull HighlightInfo> createPatchedInfos(@NotNull HighlightInfo info,
+                                                                          @NotNull PsiFile injectedPsi,
+                                                                          @NotNull DocumentWindow documentWindow,
+                                                                          @NotNull InjectedLanguageManager injectedLanguageManager) {
     ProperTextRange infoRange = new ProperTextRange(info.startOffset, info.endOffset);
     List<TextRange> editables = injectedLanguageManager.intersectWithAllEditableFragments(injectedPsi, infoRange);
     List<HighlightInfo> result = new ArrayList<>(editables.size());

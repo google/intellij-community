@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaCompletionExtensionCandidateChecker
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.KtSymbolFromIndexProvider
 import org.jetbrains.kotlin.idea.base.codeInsight.contributorClass
 import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters
@@ -20,6 +21,7 @@ import org.jetbrains.kotlin.idea.completion.weighers.CompletionContributorGroupW
 import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext
 import org.jetbrains.kotlin.idea.util.positionContext.KotlinRawPositionContext
 import kotlin.reflect.KClass
+import kotlin.reflect.KProperty
 
 /**
  * A completion section is an isolated part of code of a [K2CompletionContributor] that can be run independently.
@@ -34,6 +36,10 @@ internal class K2CompletionSection<P : KotlinRawPositionContext>(
     val runnable: K2CompletionSectionRunnable<P>,
 )
 
+/**
+ * This class contains data that is common for all contexts that run within the same analysis session.
+ * This means we do not have to recreate them per section and can reuse them for all sections run in the session.
+ */
 internal class K2CompletionSectionCommonData<P : KotlinRawPositionContext>(
     val completionContext: K2CompletionContext<P>,
     val weighingContext: WeighingContext,
@@ -41,15 +47,22 @@ internal class K2CompletionSectionCommonData<P : KotlinRawPositionContext>(
     val visibilityChecker: CompletionVisibilityChecker,
     val importStrategyDetector: ImportStrategyDetector,
     val symbolFromIndexProvider: KtSymbolFromIndexProvider,
-    val extensionCheckerProvider: () -> KaCompletionExtensionCandidateChecker?,
-)
+    val runtimeTypeProvider: Lazy<KaType?>,
+    val extensionCheckerProvider: Lazy<KaCompletionExtensionCandidateChecker?>,
+) {
+    val sessionStorage: K2CompletionSectionSessionStorage = K2CompletionSectionSessionStorage()
+}
+
+internal class K2CompletionSectionSessionStorage {
+    internal val variables: MutableMap<KProperty<*>, Any?> = mutableMapOf()
+}
 
 /**
  * This is the context used within a [K2CompletionSection] providing common data that might be
  * shared between contributors running in the same analysis session.
  */
 internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
-    private val commonData: K2CompletionSectionCommonData<P>,
+    commonData: K2CompletionSectionCommonData<P>,
     private val contributor: K2CompletionContributor<P>,
     val sink: K2LookupElementSink,
     private val addLaterSection: (K2CompletionSection<P>) -> Unit,
@@ -72,14 +85,25 @@ internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
 
     val symbolFromIndexProvider: KtSymbolFromIndexProvider = commonData.symbolFromIndexProvider
 
-    internal val extensionChecker: KaCompletionExtensionCandidateChecker? by lazy { commonData.extensionCheckerProvider() }
+    val runtimeType: KaType? by commonData.runtimeTypeProvider
+
+    val extensionChecker: KaCompletionExtensionCandidateChecker? by commonData.extensionCheckerProvider
+
+    private val sessionStorage: K2CompletionSectionSessionStorage = commonData.sessionStorage
+
+    internal class CompletionSessionProperty<T : Any> {
+        @Suppress("UNCHECKED_CAST")
+        operator fun getValue(thisRef: K2CompletionSectionContext<*>, desc: KProperty<*>): T? =
+            thisRef.sessionStorage.variables[desc] as? T?
+
+        operator fun setValue(thisRef: K2CompletionSectionContext<*>, desc: KProperty<*>, value: T?) =
+            thisRef.sessionStorage.variables.put(desc, value)
+    }
 
     fun completeLaterInSameSession(
         name: String,
         priority: K2ContributorSectionPriority = K2ContributorSectionPriority.DEFAULT,
-        runnable: KaSession.(
-            context: K2CompletionSectionContext<P>
-        ) -> Unit
+        runnable: context(KaSession, K2CompletionSectionContext<P>) () -> Unit
     ) {
         addLaterSection(
             K2CompletionSection(
@@ -92,7 +116,14 @@ internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
     }
 }
 
-internal typealias K2CompletionSectionRunnable<P> = KaSession.(context: K2CompletionSectionContext<P>) -> Unit
+/**
+ * Creates a property that stores the value and is shared between all sections that run in the same analysis session.
+ */
+internal fun <T: Any> completionSessionProperty(): K2CompletionSectionContext.CompletionSessionProperty<T> {
+    return K2CompletionSectionContext.CompletionSessionProperty()
+}
+
+internal typealias K2CompletionSectionRunnable<P> = context(KaSession, K2CompletionSectionContext<P>) () -> Unit
 
 /**
  * The priority of a completion section determines the order in which the sections are executed.
@@ -175,7 +206,8 @@ internal abstract class K2CompletionContributor<P : KotlinRawPositionContext>(
      * If this method returns false, the execution of the section is skipped.
      * Similar to [isAppropriatePosition], but is executed within the analysis session right before execution of the section.
      */
-    open fun KaSession.shouldExecute(context: K2CompletionSectionContext<P>): Boolean = true
+    context(_: KaSession, context: K2CompletionSectionContext<P>)
+    open fun shouldExecute(): Boolean = true
 
     protected fun K2CompletionSectionContext<P>.addElement(element: LookupElement) {
         sink.addElement(decorateLookupElement(element))
@@ -225,14 +257,12 @@ internal abstract class K2SimpleCompletionContributor<P : KotlinRawPositionConte
     private val priority: K2ContributorSectionPriority = K2ContributorSectionPriority.DEFAULT,
     nameOverride: String? = null,
 ) : K2CompletionContributor<P>(positionContextClass) {
-    abstract fun KaSession.complete(context: K2CompletionSectionContext<P>)
+    context(_: KaSession, context: K2CompletionSectionContext<P>)
+    abstract fun complete()
 
     private val name = nameOverride ?: this::class.simpleName ?: "Unknown"
 
     final override fun K2CompletionSetupScope<P>.registerCompletions() {
-        completion(
-            name = name,
-            priority = priority,
-        ) { complete(it) }
+        completion(name = name, priority = priority) { complete() }
     }
 }

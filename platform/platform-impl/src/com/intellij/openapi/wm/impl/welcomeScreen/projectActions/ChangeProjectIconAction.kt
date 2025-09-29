@@ -9,7 +9,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeScreenUIManager
@@ -22,23 +22,20 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.dialog
 import com.intellij.ui.dsl.builder.RightGap
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.util.io.copy
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.SystemIndependent
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Graphics
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.JComponent
 import javax.swing.JPanel
-import kotlin.io.path.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
-/**
- * @author Konstantin Bulenkov
- */
-internal class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase() {
+private class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase() {
   init {
     isEnabledInModalContext = true  // To allow the action to be run in the Manage Recent Projects modal dialog, see IDEA-302750
   }
@@ -47,7 +44,7 @@ internal class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase()
     val project = event.project
     val selectedItem = getSelectedItem(event)
     val projectPath = getProjectPath(project, selectedItem) ?: return
-    val basePath = RecentProjectIconHelper.getDotIdeaPath(projectPath) ?: return
+    val basePath = RecentProjectIconHelper.getDotIdeaPath(Path.of(projectPath)) ?: return
 
     val ui = ProjectIconUI(projectPath)
 
@@ -70,31 +67,7 @@ internal class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase()
     }
 
     if (dialog(IdeBundle.message("dialog.title.change.project.icon"), panel).showAndGet()) {
-      val iconSvg = basePath.resolve("icon.svg").toFile()
-      val iconPng = basePath.resolve("icon.png").toFile()
-
-      if (ui.pathToIcon != null) {
-        FileUtil.copy(File(ui.pathToIcon!!.path), iconSvg)
-        VfsUtil.markDirtyAndRefresh(false, false, false, iconSvg)
-        FileUtil.delete(iconPng)
-        RecentProjectIconHelper.refreshProjectIcon(projectPath)
-        event.project?.let {
-          val customizer = ProjectWindowCustomizerService.getInstance()
-          customizer.dropProjectIconCache(it)
-          customizer.setIconMainColorAsProjectColor(it)
-        }
-      }
-      if (ui.iconRemoved) {
-        FileUtil.delete(ui.pathToIcon())
-        RecentProjectIconHelper.refreshProjectIcon(projectPath)
-        event.project?.let {
-          ProjectWindowCustomizerService.getInstance().dropProjectIconCache(it)
-        }
-      }
-      // Actually, we can try to drop the needed icon,
-      // but it is a very rare action and this whole cache drop will not have any performance impact.
-      // Moreover, VCS changes will drop the cache also.
-      IconDeferrer.getInstance().clearCache()
+      changeProjectIcon(basePath = basePath, ui = ui, projectPath = projectPath, event = event)
     }
   }
 
@@ -103,7 +76,7 @@ internal class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase()
       return selectedItem.projectPath
     }
     if (project != null && selectedItem == null) {
-      return ProjectWindowCustomizerService.projectPath(project)
+      return ProjectWindowCustomizerService.projectPath(project)?.invariantSeparatorsPathString
     }
     return null
   }
@@ -114,6 +87,42 @@ internal class ChangeProjectIconAction : RecentProjectsWelcomeScreenActionBase()
     event.presentation.isEnabled = getProjectPath(project, selectedItem) != null
     event.presentation.isVisible = selectedItem !is ProviderRecentProjectItem
   }
+}
+
+private fun changeProjectIcon(
+  basePath: Path,
+  ui: ProjectIconUI,
+  projectPath: String,
+  event: AnActionEvent,
+) {
+  val pathToIcon = ui.pathToIcon?.toNioPath()
+  if (pathToIcon != null) {
+    val iconSvg = basePath.resolve("icon.svg")
+    pathToIcon.copy(iconSvg)
+    LocalFileSystem.getInstance().refreshAndFindFileByNioFile(iconSvg)?.let {
+      VfsUtil.markDirtyAndRefresh(/* async = */ false, /* recursive = */ false, /* reloadChildren = */ false, /* ...files = */ it)
+    }
+
+    Files.deleteIfExists(basePath.resolve("icon.png"))
+    RecentProjectIconHelper.refreshProjectIcon(projectPath)
+    event.project?.let {
+      val customizer = ProjectWindowCustomizerService.getInstance()
+      customizer.dropProjectIconCache(it)
+      customizer.setIconMainColorAsProjectColor(it)
+    }
+  }
+
+  if (ui.iconRemoved) {
+    Files.deleteIfExists(ui.pathToIcon())
+    RecentProjectIconHelper.refreshProjectIcon(projectPath)
+    event.project?.let {
+      ProjectWindowCustomizerService.getInstance().dropProjectIconCache(it)
+    }
+  }
+  // Actually, we can try to drop the needed icon,
+  // but it is a very rare action and this whole cache drop will not have any performance impact.
+  // Moreover, VCS changes will drop the cache also.
+  IconDeferrer.getInstance().clearCache()
 }
 
 private class ChangeProjectIcon(private val ui: ProjectIconUI) : AnAction() {
@@ -128,7 +137,7 @@ private class ChangeProjectIcon(private val ui: ProjectIconUI) : AnAction() {
         ui.pathToIcon = files[0]
         ui.iconRemoved = false
       }
-      catch (ignore: Exception) {
+      catch (_: Exception) {
       }
     }
   }
@@ -161,7 +170,10 @@ private class ProjectIconUI(private val projectPath: @SystemIndependent String) 
       .apply { targetComponent = iconLabel }
   }
 
-  fun pathToIcon() = RecentProjectIconHelper.getDotIdeaPath(projectPath)?.resolve("icon.svg") ?: Path("${projectPath}/.idea/icon.svg")
+  fun pathToIcon(): Path {
+    val file = Path.of(projectPath)
+    return RecentProjectIconHelper.getDotIdeaPath(file)?.resolve("icon.svg") ?: file.resolve(".idea/icon.svg")
+  }
 }
 
 private class IconPreviewPanel(component: JComponent) : JPanel(BorderLayout()) {

@@ -47,6 +47,8 @@ import java.util.*;
 public final class BackgroundUpdateHighlightersUtil {
   private static final Logger LOG = Logger.getInstance(BackgroundUpdateHighlightersUtil.class);
 
+  @RequiresBackgroundThread
+  @RequiresReadLock
   public static void setHighlightersToEditor(@NotNull Project project,
                                              @NotNull PsiFile psiFile,
                                              @NotNull Document document,
@@ -255,7 +257,7 @@ public final class BackgroundUpdateHighlightersUtil {
       info.updateQuickFixFields(document, range2markerCache, finalInfoRange);
     };
 
-    RangeHighlighterEx salvagedHighlighter = (RangeHighlighterEx)recycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer);
+    RangeHighlighterEx salvagedHighlighter = (RangeHighlighterEx)recycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer, info.getDescription());
 
     if (info.isFileLevelAnnotation()) {
       HighlightInfo oldFileInfo = salvagedHighlighter == null ? null : HighlightInfo.fromRangeHighlighter(salvagedHighlighter);
@@ -286,9 +288,11 @@ public final class BackgroundUpdateHighlightersUtil {
       TextAttributes actualAttributes = highlighter.getTextAttributes(colorsScheme);
       boolean attributesSet = Comparing.equal(infoAttributes, actualAttributes);
       if (!attributesSet) {
+        TextAttributes forcedTextAttributes = highlighter.getForcedTextAttributes();
         highlighter.setTextAttributes(infoAttributes);
         TextAttributes afterSet = highlighter.getTextAttributes(colorsScheme);
         LOG.error("Expected to set " + infoAttributes + " but actual attributes are: " + actualAttributes +
+                  "; forcedTextAttributes: '" + forcedTextAttributes + "'" +
                   "; colorsScheme: '" + (colorsScheme == null ? "[global]" : colorsScheme.getName()) + "'" +
                   "; highlighter:" + highlighter + " (" + highlighter.getClass() + ")" +
                   "; was reused from the bin: " + (salvagedHighlighter != null) +

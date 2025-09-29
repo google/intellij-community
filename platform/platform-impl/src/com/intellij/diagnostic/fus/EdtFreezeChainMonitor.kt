@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic.fus
 
+import com.intellij.diagnostic.UILatencyLogger
 import com.intellij.diagnostic.fus.EdtFreezeChainMonitor.Companion.CHAIN_MONITOR_WINDOW_MS
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationManagerEx
@@ -16,6 +17,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
+import java.util.*
+import java.util.concurrent.ConcurrentSkipListSet
 import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
@@ -50,7 +53,8 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
     private val CHAIN_MONITOR_WINDOW_MS = SystemProperties.getIntProperty("ui.freeze.chain.window.ms", 100)
     private val CHAIN_END_THRESHOLD_MS = SystemProperties.getIntProperty("ui.freeze.chain.threshold.ms", 50)
     private val REPORTABLE_CHAIN_DURATION_MS = SystemProperties.getIntProperty("ui.freeze.chain.reportable.duration.ms", 1000)
-
+    private val PRIORITY_QUEUE_MAX_SIZE = SystemProperties.getIntProperty("ui.freeze.chain.priority.queue.max.size", 1_000)
+    private val FUS_REPORTING_DELAY = SystemProperties.getIntProperty("ui.freeze.chain.fus.reporting.delay.ms", 120_000)
 
     @JvmStatic
     @TestOnly
@@ -86,6 +90,37 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
   // We compute freeze chains from precise EDT lock intervals using our own listener.
   private val listener = FreezeChainLockListener()
 
+  // We need to carefully debounce data to avoid reporting too much data
+  // We decided to store freeze chains in a bounded priority queue and report the most severe chain each two minutes.
+  // The queue is bounded, i.e. we remove the minimal element if there are too many reports.
+  private val priorityQueue: SortedSet<FreezeChainReport> = ConcurrentSkipListSet(compareBy { it.durationNs })
+
+  private val readSegments: ArrayDeque<Pair<Segment, /* actual length*/ Long>> = ArrayDeque()
+  private val writeSegments: ArrayDeque<Segment> = ArrayDeque()
+
+  // is IDE currently in freeze chain
+  private var chainActive: Boolean = false
+
+  // timestamp when a chain started
+  private var chainStartNs: Long = 0L
+
+  // total time spent on waiting and executing write actions
+  private var totalWriteInChainNs: Long = 0L
+
+  // total time spent on waiting and executing read and write-intent actions
+  private var totalReadInChainNs: Long = 0L
+
+  // total number of write operations in a chain
+  private var totalWriteOps: Int = 0
+
+  // total number of read and write-intent operations in chain
+  private var totalReadOps: Int = 0
+  private var lastWindowDurationNs = 0L
+  private var lastWindowReadDurationNs = 0L
+  private var lastWindowWriteDurationNs = 0L
+
+  // this init section should be called after all properties are initialized
+  // e.g.
   init {
     // Register listeners to get intervals on EDT for read/write/write-intent
     val disposable = scope.asDisposable()
@@ -94,6 +129,7 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
     ApplicationManagerEx.getApplicationEx().addWriteIntentReadActionListener(listener, disposable)
     LaterInvocator.addModalityStateListener(listener, disposable)
     launchWakeupCoroutine()
+    launchReportingCoroutine()
   }
 
   /**
@@ -106,6 +142,27 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
         val nowNs = System.nanoTime()
         checkForChainEnd(nowNs)
         delay(windowMs().milliseconds)
+      }
+    }
+  }
+
+  fun launchReportingCoroutine() {
+    scope.launch(Dispatchers.IO) {
+      while (true) {
+        try {
+          val topReport = priorityQueue.removeLast()
+          UILatencyLogger.reportFreezeChain(
+            totalDuration = topReport.durationNs.nanoseconds,
+            readingDuration = topReport.totalReadNs.nanoseconds,
+            writingDuration = topReport.totalWriteNs.nanoseconds,
+            readingOperations = topReport.totalReadOps,
+            writingOperations = topReport.totalWriteOps,
+          )
+        }
+        catch (_: NoSuchElementException) {
+          // ignored, no freeze chains to report
+        }
+        delay(FUS_REPORTING_DELAY.milliseconds)
       }
     }
   }
@@ -201,27 +258,9 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
 
   // Sliding-window freeze-chain detector below
   private enum class LockKind { READ, WRITE }
-  private data class Segment(val kind: LockKind, val startNs: Long, val endNs: Long)
-
-  private val segments: java.util.ArrayDeque<Segment> = java.util.ArrayDeque()
-
-  // is IDE currently in freeze chain
-  private var chainActive: Boolean = false
-
-  // timestamp when a chain started
-  private var chainStartNs: Long = 0L
-
-  // total time spent on waiting and executing write actions
-  private var totalWriteInChainNs: Long = 0L
-
-  // total time spent on waiting and executing read and write-intent actions
-  private var totalReadInChainNs: Long = 0L
-
-  // total number of write operations in a chain
-  private var totalWriteOps: Int = 0
-
-  // total number of read and write-intent operations in chain
-  private var totalReadOps: Int = 0
+  private data class Segment(val kind: LockKind, val startNs: Long, val endNs: Long) {
+    fun length(): Long = endNs - startNs
+  }
 
   /**
    * Handle the incoming interval
@@ -229,7 +268,7 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
   private fun onBlockedInterval(kind: LockKind, startNs: Long, endNs: Long) {
     if (endNs <= startNs) return
     // record segment
-    segments.addLast(Segment(kind, startNs, endNs))
+    addSegment(Segment(kind, startNs, endNs))
     // if a chain is active, accumulate time right away
     if (chainActive) {
       val delta = endNs - startNs
@@ -250,10 +289,23 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
   private fun pruneOld(nowNs: Long) {
     val windowNs = windowMs() * 1_000_000L
     val cutoff = nowNs - windowNs
-    while (!segments.isEmpty()) {
-      val first = segments.first
-      if (first.endNs <= cutoff) {
-        segments.removeFirst()
+    while (!readSegments.isEmpty()) {
+      val (topSegment, realLength) = readSegments.first
+      if (topSegment.endNs <= cutoff) {
+        lastWindowDurationNs -= realLength
+        lastWindowReadDurationNs -= topSegment.length()
+        readSegments.removeFirst()
+      }
+      else {
+        break
+      }
+    }
+    while (!writeSegments.isEmpty()) {
+      val topSegment = writeSegments.first
+      if (topSegment.endNs <= cutoff) {
+        lastWindowDurationNs -= topSegment.length()
+        lastWindowWriteDurationNs -= topSegment.length()
+        writeSegments.removeFirst()
       }
       else {
         break
@@ -263,82 +315,76 @@ class EdtFreezeChainMonitor(val scope: CoroutineScope) {
 
   data class WindowBlocked(val actualStartNs: Long, val report: FreezeChainReport)
 
-  /**
-   * How long was EDT blocked in the last time window in nanoseconds.
-   * The returned number can be bigger than [windowMs] * 1_000_000 because long locking action could start before the window.
-   */
-  private fun blockedInLastWindow(nowNs: Long): WindowBlocked {
-    pruneOld(nowNs)
-    var sum = 0L
-    var sumRead = 0L
-    var sumWrite = 0L
-    var totalReads = 0
-    var totalWrites = 0
-    var lastSegment: Segment? = null
-    var actualStartNs = nowNs
-    for (seg in segments) {
-      //println("Last segment: $lastSegment, current: $seg")
-      actualStartNs = min(seg.startNs, actualStartNs)
-      // we record busy time in write only if it was not upgraded from write-intent
-      // otherwise we would have double recording of time spent under write lock
-      if (lastSegment == null || seg.startNs >= lastSegment.endNs) {
-        sum += (seg.endNs - seg.startNs).coerceAtLeast(0L)
-        lastSegment = seg
+  private fun addSegment(segment: Segment) {
+    when (segment.kind) {
+      LockKind.READ -> {
+        var resultLength = segment.length()
+        val counter = writeSegments.descendingIterator()
+        while (counter.hasNext()) {
+          val writeSegment = counter.next()
+          if (writeSegment.startNs >= segment.startNs) {
+            resultLength -= writeSegment.length()
+          }
+          else {
+            break
+          }
+        }
+        lastWindowDurationNs += resultLength
+        lastWindowReadDurationNs += segment.length()
+        readSegments.addLast(segment to resultLength)
       }
-      when (seg.kind) {
-        LockKind.READ -> {
-          sumRead += (seg.endNs - seg.startNs).coerceAtLeast(0L)
-          totalReads++
-        }
-        LockKind.WRITE -> {
-          sumWrite += (seg.endNs - seg.startNs).coerceAtLeast(0L)
-          totalWrites++
-        }
+      LockKind.WRITE -> {
+        lastWindowDurationNs += segment.length()
+        lastWindowWriteDurationNs += segment.length()
+        writeSegments.addLast(segment)
       }
     }
-    return WindowBlocked(actualStartNs = actualStartNs,
-                         report = FreezeChainReport(
-                           durationNs = sum,
-                           totalReadNs = sumRead,
-                           totalWriteNs = sumWrite,
-                           totalReadOps = totalReads,
-                           totalWriteOps = totalWrites,
-                         ))
+  }
+
+  fun recordReportForFus(report: FreezeChainReport) {
+    while (priorityQueue.size >= PRIORITY_QUEUE_MAX_SIZE) {
+      priorityQueue.removeFirst()
+    }
+    priorityQueue.add(report)
   }
 
   private fun updateChain(nowNs: Long) {
-    val blockReport = blockedInLastWindow(nowNs)
+    pruneOld(nowNs)
+    val blockedInLastWindowNs = lastWindowDurationNs
     val thresholdNs = thresholdMs() * 1_000_000L
     if (!chainActive) {
-      if (blockReport.report.durationNs >= thresholdNs) {
+      if (blockedInLastWindowNs >= thresholdNs) {
         chainActive = true
-        chainStartNs = blockReport.actualStartNs // the start of the chain is the start of busy segment
+        chainStartNs = min(writeSegments.peekFirst()?.startNs ?: Long.MAX_VALUE, readSegments.peekFirst()?.first?.startNs
+                                                                                 ?: Long.MAX_VALUE) // the start of the chain is the start of busy segment
         // reset per-chain aggregates at the start
-        totalWriteInChainNs = blockReport.report.totalWriteNs
-        totalReadInChainNs = blockReport.report.totalReadNs
-        totalWriteOps = blockReport.report.totalWriteOps
-        totalReadOps = blockReport.report.totalReadOps
+        totalWriteInChainNs = lastWindowWriteDurationNs
+        totalReadInChainNs = lastWindowReadDurationNs
+        totalWriteOps = writeSegments.size
+        totalReadOps = readSegments.size
       }
     }
     else {
-      if (blockReport.report.durationNs < thresholdNs) {
+      if (blockedInLastWindowNs < thresholdNs) {
         // chain ends; also end if there were no events for a full window already captured by drop in blockedNs
         val duration = (nowNs - chainStartNs).nanoseconds
         if (duration.inWholeMilliseconds >= reportableMs()) { // avoid spurious tiny chains
           thisLogger().trace("Freeze chain detected: $duration (Read duration: ${totalReadInChainNs.nanoseconds}, $totalReadOps operations, Write duration: ${totalWriteInChainNs.nanoseconds}, $totalWriteOps operations)")
+          val report = FreezeChainReport(
+            durationNs = nowNs - chainStartNs,
+            totalReadNs = totalReadInChainNs,
+            totalWriteNs = totalWriteInChainNs,
+            totalReadOps = totalReadOps,
+            totalWriteOps = totalWriteOps,
+          )
+
+          recordReportForFus(report)
+
           testingConfig?.apply {
-            val report = FreezeChainReport(
-              durationNs = nowNs - chainStartNs,
-              totalReadNs = totalReadInChainNs,
-              totalWriteNs = totalWriteInChainNs,
-              totalReadOps = totalReadOps,
-              totalWriteOps = totalWriteOps,
-            )
             recordReport(report)
           }
         }
         chainActive = false
-        segments.clear()
       }
     }
   }

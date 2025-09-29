@@ -21,24 +21,6 @@ import org.jetbrains.annotations.ApiStatus
 import javax.swing.JComponent
 
 internal object PluginModelAsyncOperationsExecutor {
-  fun performUninstall(
-    cs: CoroutineScope,
-    descriptor: PluginUiModel,
-    sessionId: String,
-    controller: UiPluginManagerController,
-    callback: (Boolean, Map<PluginId, CheckErrorsResult>) -> Unit,
-  ) {
-    cs.launch {
-      val needRestart = controller.performUninstall(sessionId, descriptor.pluginId)
-      descriptor.isDeleted = true
-      PluginManagerCustomizer.getInstance()?.onPluginDeleted(descriptor, controller.getTarget())
-      val errors = UiPluginManager.getInstance().loadErrors(sessionId)
-      withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-        callback(needRestart, errors)
-      }
-    }
-  }
-
   fun performAutoInstall(
     cs: CoroutineScope,
     modelFacade: PluginModelFacade,
@@ -109,7 +91,8 @@ internal object PluginModelAsyncOperationsExecutor {
     cs.launch(Dispatchers.IO) {
       val result = UiPluginManager.getInstance().enablePlugins(sessionId, descriptorIds, enable, project)
       withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-        PluginManagerCustomizer.getInstance()?.updateAfterModificationAsync { callback(result) }
+        PluginManagerCustomizer.getInstance()?.updateAfterModificationAsync { }
+        callback(result)
       }
     }
   }

@@ -7,20 +7,23 @@ import com.intellij.grazie.ide.ui.components.utils.html
 import com.intellij.grazie.jlanguage.Lang
 import com.intellij.grazie.jlanguage.LangTool
 import com.intellij.grazie.text.*
+import com.intellij.grazie.utils.NaturalTextDetector
+import com.intellij.grazie.utils.TextStyleDomain
+import com.intellij.grazie.utils.getTextDomain
 import com.intellij.grazie.utils.trimToNull
-import com.intellij.openapi.application.ex.ApplicationUtil
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.coroutineToIndicator
-import com.intellij.openapi.progress.runBlockingCancellable
-import com.intellij.openapi.util.ClassLoaderUtil
+import com.intellij.openapi.util.ClassLoaderUtil.computeWithClassLoader
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.Predicates
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vcs.ui.CommitMessage
 import com.intellij.util.ExceptionUtil
 import com.intellij.util.containers.Interner
+import com.intellij.util.io.computeDetached
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.html.p
 import kotlinx.html.style
 import org.jetbrains.annotations.ApiStatus
@@ -33,53 +36,46 @@ import org.languagetool.rules.en.EnglishUnpairedQuotesRule
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.function.Predicate
+import kotlin.coroutines.cancellation.CancellationException
 
 
-open class LanguageToolChecker : TextChecker() {
+open class LanguageToolChecker : ExternalTextChecker() {
   @ApiStatus.Internal
   class TestChecker : LanguageToolChecker()
 
   override fun getRules(locale: Locale): Collection<Rule> {
     val language = Languages.getLanguageForLocale(locale)
     val lang = Lang.entries.find { it.jLanguage == language } ?: return emptyList()
-    return grammarRules(LangTool.getTool(lang), lang)
+    return grammarRules(LangTool.getTool(lang, TextStyleDomain.Other), lang)
   }
 
-  override fun check(extracted: TextContent): List<Problem> {
-    val text = extracted.toString()
-    if (text.isBlank()) {
+  @OptIn(DelicateCoroutinesApi::class)
+  override suspend fun checkExternally(content: TextContent): List<Problem> {
+    val text = content.toString()
+    if (text.isBlank() || !NaturalTextDetector.seemsNatural(text)) {
       return emptyList()
     }
 
+    val domain = content.getTextDomain()
     val language = LangDetector.getLang(text) ?: return emptyList()
-    try {
-      return runBlockingCancellable {
-        // LT will use indicator for cancelled checks
-        coroutineToIndicator {
-          val indicator = ProgressManager.getGlobalProgressIndicator()
-          checkNotNull(indicator) { "Indicator was not set for current job" }
-          return@coroutineToIndicator ApplicationUtil.runWithCheckCanceled(
-            {
-              ClassLoaderUtil.computeWithClassLoader<List<Problem>, Throwable>(GraziePlugin.classLoader) {
-                collectLanguageToolProblems(extracted = extracted, text = text, lang = language)
-              }
-            },
-            indicator
-          )
+    return computeDetached(currentCoroutineContext()) {
+      try {
+        computeWithClassLoader<List<Problem>, Throwable>(GraziePlugin.classLoader) {
+          collectLanguageToolProblems(content, text, language, domain)
         }
       }
-    }
-    catch (exception: Throwable) {
-      if (ExceptionUtil.causedBy(exception, ProcessCanceledException::class.java)) {
-        throw ProcessCanceledException()
+      catch (exception: Throwable) {
+        if (ExceptionUtil.causedBy(exception, CancellationException::class.java)) {
+          throw ProcessCanceledException()
+        }
+        logger.warn("Got exception from LanguageTool", exception)
+        emptyList()
       }
-      logger.warn("Got exception from LanguageTool", exception)
     }
-    return emptyList()
   }
 
-  private fun collectLanguageToolProblems(extracted: TextContent, text: String, lang: Lang): List<Problem> {
-    val tool = LangTool.getTool(lang)
+  private fun collectLanguageToolProblems(extracted: TextContent, text: String, lang: Lang, domain: TextStyleDomain): List<Problem> {
+    val tool = LangTool.getTool(lang, domain)
     val sentences = tool.sentenceTokenize(text)
     if (sentences.any { it.length > 1000 }) {
       return emptyList()

@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
 
+import com.intellij.openapi.application.ArchivedCompilationContextUtil
 import com.intellij.util.containers.MultiMap
 import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xml.dom.readXmlAsModel
@@ -13,12 +14,16 @@ import org.jetbrains.jps.model.module.JpsLibraryDependency
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.jps.util.JpsPathUtil
-import java.io.FileInputStream
+import java.nio.file.FileSystem
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.function.BiPredicate
-import java.util.jar.JarInputStream
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.invariantSeparatorsPathString
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
+import kotlin.io.path.walk
 
 private const val includeName = "include"
 private const val fallbackName = "fallback"
@@ -43,6 +48,7 @@ class ModuleStructureValidator(private val context: BuildContext, private val al
 
   private val errors = ArrayList<AssertionError>()
   private val libraryFiles = HashMap<JpsLibrary, Set<String>>()
+  private val libraryClasses = HashMap<JpsLibrary, Set<String>>()
 
   private fun getLibraryFiles(library: JpsLibrary): Set<String> {
     @Suppress("NAME_SHADOWING")
@@ -50,13 +56,27 @@ class ModuleStructureValidator(private val context: BuildContext, private val al
       val result = HashSet<String>()
       for (libraryRootUrl in library.getRootUrls(JpsOrderRootType.COMPILED)) {
         val path = Path.of(JpsPathUtil.urlToPath(libraryRootUrl))
-        JarInputStream(FileInputStream(path.toFile())).use { jarStream ->
-          while (true) {
-            result.add((jarStream.nextJarEntry ?: break).name)
+        FileSystems.newFileSystem(path).use {
+          it.rootDirectories.forEach { rootDirectory ->
+            rootDirectory.walk().forEach { file ->
+              result.add(file.invariantSeparatorsPathString.removePrefix("/"))
+            }
           }
         }
       }
       result
+    }
+  }
+
+  private fun getLibraryClasses(library: JpsLibrary): Set<String> {
+    return libraryClasses.computeIfAbsent(library) { library ->
+      getLibraryFiles(library)
+        .filter { file ->
+          file.endsWith(".class") && !file.endsWith("Kt.class")
+        }
+        .mapTo(HashSet()) { file ->
+          removeSuffixStrict(file, ".class").replace("/", ".")
+        }
     }
   }
 
@@ -213,31 +233,27 @@ class ModuleStructureValidator(private val context: BuildContext, private val al
     for (moduleName in allProductModules.map { it.moduleName }.distinct()) {
       val jpsModule = context.findRequiredModule(moduleName)
 
-      val outputDirectory = JpsJavaExtensionService.getInstance().getOutputDirectory(jpsModule, false)!!.toPath()
-      val outputDirectoryPrefix = outputDirectory.toString().replace('\\', '/') + "/"
-      if (!Files.isDirectory(outputDirectory)) {
-        if (jpsModule.contentRootsList.urls.isEmpty()) {
-          // no content roots -> no classes
-          continue
-        }
-
-        throw IllegalStateException("Module output directory '$outputDirectory' is missing")
+      if (jpsModule.sourceRoots.isEmpty()) {
+        // no source roots -> no classes
+        continue
       }
 
-      Files.find(outputDirectory, Int.MAX_VALUE, BiPredicate { path, attributes ->
-        if (attributes.isRegularFile) {
-          val fileName = path.fileName.toString()
-          fileName.endsWith(".class") && !fileName.endsWith("Kt.class")
+      var hasOutput = false
+      jpsModule.processProductionOutput { outputRoots ->
+        hasOutput = outputRoots.all(Path::exists)
+        outputRoots.forEach { outputRoot -> outputRoot
+          .walk()
+          .filter { path ->
+            path.isRegularFile() && path.name.endsWith(".class") && !path.name.endsWith("Kt.class")
+          }.forEach { path ->
+            val normalizedPath = outputRoot.relativize(path).invariantSeparatorsPathString
+            val className = removeSuffixStrict(normalizedPath, ".class").replace('/', '.')
+            classes.add(className)
+          }
         }
-        else {
-          false
-        }
-      }).use { stream ->
-        stream.forEach {
-          val normalizedPath = it.toString().replace('\\', '/')
-          val className = removeSuffixStrict(removePrefixStrict(normalizedPath, outputDirectoryPrefix), ".class").replace('/', '.')
-          classes.add(className)
-        }
+      }
+      if (!hasOutput) {
+        throw IllegalStateException("Module '$moduleName' output is missing while module has source roots")
       }
 
       for (dependencyElement in jpsModule.dependenciesList.dependencies) {
@@ -248,14 +264,7 @@ class ModuleStructureValidator(private val context: BuildContext, private val al
             continue
           }
 
-          val libraryFiles = getLibraryFiles(jpsLibrary)
-          for (fileName in libraryFiles) {
-            if (!fileName.endsWith(".class") || fileName.endsWith("Kt.class")) {
-              return
-            }
-
-            classes.add(removeSuffixStrict(fileName, ".class").replace("/", "."))
-          }
+          classes.addAll(getLibraryClasses(jpsLibrary))
         }
       }
     }
@@ -301,9 +310,38 @@ class ModuleStructureValidator(private val context: BuildContext, private val al
     if (value.isNullOrEmpty() || classes.contains(value)) {
       return
     }
+    if (value.startsWith("com.intellij.testFramework.fixtures.")) {
+      //todo test-only services should be registered in test resources, see IJPL-206480
+      return
+    }
     errors.add(AssertionError("Unresolved registration '$value' in $source"))
   }
 }
+
+/**
+ * Calls [processor] for the path containing the production output of [this@processModuleProductionOutput].
+ * Works both when module output is located in a directory and when it's packed in a JAR.
+ */
+private fun <T> JpsModule.processProductionOutput(processor: (outputRoots: List<Path>) -> T): T {
+  val archivedCompiledClassesMapping = ArchivedCompilationContextUtil.archivedCompiledClassesMapping
+  val outputJarPaths = archivedCompiledClassesMapping?.get("production/$name")
+  if (outputJarPaths == null) {
+    val outputDirectoryPath = JpsJavaExtensionService.getInstance().getOutputDirectoryPath(this, false)
+                              ?: error("Output directory is not specified for '$name'")
+    return processor(listOf(outputDirectoryPath))
+  }
+  else {
+    outputJarPaths.map(Path::of).map(FileSystems::newFileSystem).let {
+      try {
+        return processor(it.map { it.rootDirectories.single() })
+      }
+      finally {
+        it.forEach(FileSystem::close)
+      }
+    }
+  }
+}
+
 
 private fun removeSuffixStrict(string: String, @Suppress("SameParameterValue") suffix: String?): String {
   if (suffix.isNullOrEmpty()) {
@@ -314,7 +352,7 @@ private fun removeSuffixStrict(string: String, @Suppress("SameParameterValue") s
     throw IllegalStateException("String must end with '$suffix': $string")
   }
 
-  return string.substring(0, string.length - suffix.length)
+  return string.dropLast(suffix.length)
 }
 
 private fun findDescriptorFile(name: String, roots: List<Path>): Path? {
@@ -325,16 +363,4 @@ private fun findDescriptorFile(name: String, roots: List<Path>): Path? {
     }
   }
   return null
-}
-
-private fun removePrefixStrict(string: String, prefix: String?): String {
-  if (prefix.isNullOrEmpty()) {
-    throw IllegalArgumentException("'prefix' is null or empty")
-  }
-
-  if (!string.startsWith(prefix)) {
-    throw IllegalStateException("String must start with '$prefix': $string")
-  }
-
-  return string.substring(prefix.length)
 }

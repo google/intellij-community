@@ -15,9 +15,12 @@ import com.intellij.platform.eel.fs.EelFileSystemApi.StatError
 import com.intellij.platform.eel.fs.EelFileSystemApi.SymlinkPolicy
 import com.intellij.platform.eel.fs.EelFileSystemApi.TimeSinceEpoch
 import com.intellij.platform.eel.fs.EelFileSystemApi.UnwatchOptions
+import com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions.WalkDirectoryEntryOrder
+import com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions.WalkDirectoryTraversalOrder
 import com.intellij.platform.eel.fs.EelFileSystemApi.WatchOptions
 import com.intellij.platform.eel.fs.EelFileSystemApi.WatchedPath
 import com.intellij.platform.eel.path.EelPath
+import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.CheckReturnValue
 
@@ -62,7 +65,7 @@ fun EelFileSystemApi.createTemporaryFile(): EelFileSystemApiHelpers.CreateTempor
  * Returns names of files in a directory and the attributes of the corresponding files.
  * If [path] is a symlink, it will be resolved regardless of [symlinkPolicy].
  *  TODO Is it an expected behaviour?
- *
+ * 
  * [symlinkPolicy] controls resolution of symlinks among children.
  *  TODO The behaviour is different from resolveSymlinks in [stat]. To be fixed.
  */
@@ -103,10 +106,10 @@ fun EelFileSystemApi.stat(
 
 /**
  * Unregisters a previously watched path.
- *
+ * 
  * @param unwatchOptions The options specifying the path to be unwatched. See [UnwatchOptions].
  * @return True if the operation was successful. False if the path hadn't been previously watched or unwatch failed.
- *
+ * 
  * @throws UnsupportedOperationException if the method isn't implemented for the file system.
  */
 @GeneratedBuilder.Result
@@ -120,8 +123,26 @@ fun EelFileSystemApi.unwatch(
   )
 
 /**
+ * Traverses given directory, yielding directory entries, including the target directory.
+ * 
+ * Default walkDirectory options are to traverse in a DFS manner, yield entries in a random order, yielding all file types, and to not
+ * yield metadata and file hash.
+ * 
+ * @param path Path to the directory that is to be traversed. If the path is not a directory, WalkDirectory will still yield just the file itself.
+ */
+@GeneratedBuilder.Result
+@ApiStatus.Internal
+fun EelFileSystemApi.walkDirectory(
+  path: EelPath,
+): EelFileSystemApiHelpers.WalkDirectory =
+  EelFileSystemApiHelpers.WalkDirectory(
+    owner = this,
+    path = path,
+  )
+
+/**
  * Adds the watched paths from the specified set of file paths. A path is watched till [unwatch] method is explicitly called for it.
- *
+ * 
  * Use [WatchOptionsBuilder] to construct the watch configuration. Example:
  * ```
  * val flow = eel.fs.addWatchRoots(
@@ -130,7 +151,7 @@ fun EelFileSystemApi.unwatch(
  *         .paths(setOf(eelPath))
  *         .build())
  * ```
- *
+ * 
  * @param watchOptions The options to use for file watching. See [WatchOptions]
  * @return True if the operation was successful.
  */
@@ -539,6 +560,153 @@ object EelFileSystemApiHelpers {
       owner.unwatch(
         UnwatchOptionsImpl(
           path = path,
+        )
+      )
+  }
+
+  /**
+   * Create it via [com.intellij.platform.eel.fs.EelFileSystemApi.walkDirectory].
+   */
+  @GeneratedBuilder.Result
+  @ApiStatus.Internal
+  class WalkDirectory(
+    private val owner: EelFileSystemApi,
+    private var path: EelPath,
+  ) : OwnedBuilder<Flow<WalkDirectoryEntryResult>> {
+    private var entryOrder: WalkDirectoryEntryOrder = WalkDirectoryEntryOrder.RANDOM
+
+    private var fileContentsHash: Boolean = false
+
+    private var maxDepth: Int = -1
+
+    private var readMetadata: Boolean = false
+
+    private var traversalOrder: WalkDirectoryTraversalOrder = WalkDirectoryTraversalOrder.DFS
+
+    private var yieldDirectories: Boolean = true
+
+    private var yieldOtherFileTypes: Boolean = true
+
+    private var yieldRegularFiles: Boolean = true
+
+    private var yieldSymlinks: Boolean = true
+
+    /**
+     * The default is RANDOM.
+     */
+    fun entryOrder(arg: WalkDirectoryEntryOrder): WalkDirectory = apply {
+      this.entryOrder = arg
+    }
+
+    fun alphabetical(): WalkDirectory =
+      entryOrder(WalkDirectoryEntryOrder.ALPHABETICAL)
+
+    fun random(): WalkDirectory =
+      entryOrder(WalkDirectoryEntryOrder.RANDOM)
+
+    /**
+     * Yield hash of the regular file's contents. Contents are hashed using xxHash. Default is false.
+     */
+    fun fileContentsHash(arg: Boolean): WalkDirectory = apply {
+      this.fileContentsHash = arg
+    }
+
+    /**
+     * maxDepth parameter specifies how many levels deep to traverse within the given directory. A negative depth (the default is -1) means
+     * the entire directory will be traversed without any depth limit. Depth of 0 will just return the directory itself.
+     *
+     * Example for depth = 1:
+     * ```
+     * a/
+     * |- b/
+     * |  |- c
+     * |  |- d
+     * |- e
+     * ```
+     * Returned:
+     * ```
+     * a
+     * a/b
+     * a/e
+     * ```
+     */
+    fun maxDepth(arg: Int): WalkDirectory = apply {
+      this.maxDepth = arg
+    }
+
+    /**
+     * Path to the directory that is to be traversed. If the path is not a directory, WalkDirectory will still yield just the file itself.
+     */
+    fun path(arg: EelPath): WalkDirectory = apply {
+      this.path = arg
+    }
+
+    /**
+     * Yield permissions and timestamps. Default is false.
+     */
+    fun readMetadata(arg: Boolean): WalkDirectory = apply {
+      this.readMetadata = arg
+    }
+
+    /**
+     * The default is DFS.
+     */
+    fun traversalOrder(arg: WalkDirectoryTraversalOrder): WalkDirectory = apply {
+      this.traversalOrder = arg
+    }
+
+    fun bfs(): WalkDirectory =
+      traversalOrder(WalkDirectoryTraversalOrder.BFS)
+
+    fun dfs(): WalkDirectory =
+      traversalOrder(WalkDirectoryTraversalOrder.DFS)
+
+    /**
+     * Default is true.
+     */
+    fun yieldDirectories(arg: Boolean): WalkDirectory = apply {
+      this.yieldDirectories = arg
+    }
+
+    /**
+     * Default is true.
+     */
+    fun yieldOtherFileTypes(arg: Boolean): WalkDirectory = apply {
+      this.yieldOtherFileTypes = arg
+    }
+
+    /**
+     * Default is true.
+     */
+    fun yieldRegularFiles(arg: Boolean): WalkDirectory = apply {
+      this.yieldRegularFiles = arg
+    }
+
+    /**
+     * Default is true.
+     */
+    fun yieldSymlinks(arg: Boolean): WalkDirectory = apply {
+      this.yieldSymlinks = arg
+    }
+
+    /**
+     * Complete the builder and call [com.intellij.platform.eel.fs.EelFileSystemApi.walkDirectory]
+     * with an instance of [com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions].
+     */
+    @CheckReturnValue
+    override suspend fun eelIt(): Flow<WalkDirectoryEntryResult> =
+      owner.walkDirectory(
+        WalkDirectoryOptionsImpl(
+          entryOrder = entryOrder,
+          fileContentsHash = fileContentsHash,
+          maxDepth = maxDepth,
+          path = path,
+          readMetadata = readMetadata,
+          traversalOrder = traversalOrder,
+          yieldDirectories = yieldDirectories,
+          yieldOtherFileTypes = yieldOtherFileTypes,
+          yieldRegularFiles = yieldRegularFiles,
+          yieldSymlinks = yieldSymlinks,
         )
       )
   }

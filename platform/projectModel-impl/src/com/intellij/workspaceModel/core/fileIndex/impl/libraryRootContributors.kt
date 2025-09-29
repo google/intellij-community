@@ -3,37 +3,33 @@ package com.intellij.workspaceModel.core.fileIndex.impl
 
 import com.intellij.ide.highlighter.ArchiveFileType
 import com.intellij.openapi.fileTypes.FileTypeRegistry
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.StandardFileSystems
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.platform.backend.workspace.virtualFile
-import com.intellij.platform.workspace.jps.entities.LibraryDependency
 import com.intellij.platform.workspace.jps.entities.LibraryEntity
 import com.intellij.platform.workspace.jps.entities.LibraryId
 import com.intellij.platform.workspace.jps.entities.LibraryRoot.InclusionOptions.*
 import com.intellij.platform.workspace.jps.entities.LibraryRootTypeId
 import com.intellij.platform.workspace.jps.entities.LibraryTableId
-import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.util.asSafely
 import com.intellij.util.io.URLUtil
 import com.intellij.workspaceModel.core.fileIndex.*
-import com.intellij.workspaceModel.ide.legacyBridge.ModuleDependencyIndex
 
 class LibraryRootFileIndexContributor : WorkspaceFileIndexContributor<LibraryEntity>, PlatformInternalWorkspaceFileIndexContributor {
   override val entityClass: Class<LibraryEntity> get() = LibraryEntity::class.java
 
   override fun registerFileSets(entity: LibraryEntity, registrar: WorkspaceFileSetRegistrar, storage: EntityStorage) {
     val libraryId = entity.symbolicId
-    if (libraryId.tableId !is LibraryTableId.ModuleLibraryTableId &&
-        storage.referrers(libraryId, ModuleEntity::class.java).none()) {
+    if (libraryId.tableId !is LibraryTableId.ModuleLibraryTableId && !storage.hasReferrers(libraryId)) {
       return
     }
     val compiledRootsData = LibraryRootFileSetData(libraryId)
     val sourceRootFileSetData = LibrarySourceRootFileSetData(libraryId)
+
     for (root in entity.roots) {
       val data: LibraryRootFileSetData
       val kind: WorkspaceFileKind
@@ -57,11 +53,11 @@ class LibraryRootFileIndexContributor : WorkspaceFileIndexContributor<LibraryEnt
   }
 
   override val dependenciesOnOtherEntities: List<DependencyDescription<LibraryEntity>>
-    get() = listOf(
-      DependencyDescription.OnReference(ModuleEntity::class.java) { moduleEntity ->
-        moduleEntity.dependencies.asSequence().filterIsInstance<LibraryDependency>().map { it.library }
-      }
-    )
+    get() {
+      return listOf(
+        DependencyDescription.OnReference(LibraryId::class.java)
+      )
+    }
 
   private fun registerArchivesUnderRoot(root: VirtualFileUrl,
                                         registrar: WorkspaceFileSetRegistrar,
@@ -110,21 +106,9 @@ class LibraryRootFileIndexContributor : WorkspaceFileIndexContributor<LibraryEnt
   }
 }
 
-internal class LibrarySourceRootFileSetData(libraryId: LibraryId?)
-  : LibraryRootFileSetData(libraryId), ModuleOrLibrarySourceRootData, JvmPackageRootDataInternal
-
-internal open class LibraryRootFileSetData(internal val libraryId: LibraryId?) : UnloadableFileSetData, JvmPackageRootDataInternal {
-  override fun isUnloaded(project: Project): Boolean {
-    return libraryId != null && !ModuleDependencyIndex.getInstance(project).hasDependencyOn(libraryId)
-  }
-
+internal open class LibraryRootFileSetData(internal val libraryId: LibraryId?): JvmPackageRootDataInternal {
   override val packagePrefix: String = ""
 }
 
-/**
- * Provides a way to exclude [WorkspaceFileSet] with custom data from [WorkspaceFileIndex] based on some condition. This is a temporary
- * solution to exclude project-level libraries which aren't used in modules from the index.
- */
-internal interface UnloadableFileSetData : WorkspaceFileSetData {
-  fun isUnloaded(project: Project): Boolean
-}
+internal class LibrarySourceRootFileSetData(libraryId: LibraryId?)
+  : LibraryRootFileSetData(libraryId), ModuleOrLibrarySourceRootData

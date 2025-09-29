@@ -126,18 +126,18 @@ internal class GHPRReviewFileEditorViewModelImpl(
     allMappedThreads.mapState { map -> map.filterValues { it.change == change } }
 
   override val threads: StateFlow<Collection<GHPRReviewFileEditorThreadViewModel>> =
-    threadsVm.compactThreads.mapModelsToViewModels { sharedVm ->
+    threadsVm.compactThreads.mapStatefulToStateful { sharedVm ->
       MappedGHPRReviewEditorThreadViewModel(this, sharedVm, mappedThreads.mapNotNull { it[sharedVm.id] })
     }.stateInNow(cs, emptyList())
 
   override val linesWithComments: StateFlow<Set<Int>> =
     mappedThreads.map {
-      it.values.mapNotNullTo(mutableSetOf()) { (isVisible, _, location) -> location?.takeIf { isVisible } }
+      it.values.mapNotNullTo(mutableSetOf()) { (isVisible, _, location) -> location?.last.takeIf { isVisible } }
     }.stateInNow(cs, emptySet())
 
   private val newCommentsContainer =
     MappingScopedItemsContainer.byIdentity<GHPRReviewNewCommentEditorViewModel, GHPRReviewFileEditorNewCommentViewModel>(cs) {
-      GHPRReviewFileEditorNewCommentViewModelImpl(it.position.location.lineIdx, it)
+      GHPRReviewFileEditorNewCommentViewModelImpl(it.position.location, it)
     }
   override val newComments: StateFlow<Collection<GHPRReviewFileEditorNewCommentViewModel>> =
     newCommentsContainer.mappingState.mapState { it.values }

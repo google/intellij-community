@@ -1,6 +1,7 @@
 // Copyright 2000-2017 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python;
 
+import com.intellij.idea.TestFor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.jetbrains.python.fixtures.PyTestCase;
@@ -16,6 +17,37 @@ import java.util.Map;
 
 public class Py3TypeTest extends PyTestCase {
   public static final String TEST_DIRECTORY = "/types/";
+
+  /** 
+  Overload signatures for dict.get and dict.pop in builtins.pyi differ slightly,
+  dict.get has default value for "default" parameter. This affect the logic of overload resolution.
+  Therefore it makes sense to test both.
+  <p>
+   <pre>{@code
+  @overload
+  def get(self, key: _KT, default: None = None, /) -> _VT | None: ...
+  # mode overloads...
+   }</pre>
+   <p>
+   <pre>{@code
+  @overload
+  def pop(self, key: _KT, /) -> _VT: ...
+  # mode overloads...
+   }</pre>
+   */
+  // PY-82818
+  public void testGetFromDictWithDefaultNoneValue() {
+    doTest("Any | None", """
+             d = {}
+             expr = d.get("abc", None)""");
+  }
+
+  // PY-82818
+  public void testPopFromDictWithDefaultNoneValue() {
+    doTest("Any", """
+             d = {}
+             expr = d.pop("abc", None)""");
+  }
 
   public void testYieldInsideLambda() {
     // Checks that foo is not a generator
@@ -660,7 +692,7 @@ public class Py3TypeTest extends PyTestCase {
   }
 
   public void testIsEnumMember() {
-    doTest("Literal[Answer.No, Answer.Yes]",
+    doTest("Literal[Answer.Yes, Answer.No]",
            """
              from enum import Enum
              
@@ -672,7 +704,7 @@ public class Py3TypeTest extends PyTestCase {
                  if v is Answer.Yes or v is Answer.No:
                      expr = v
              """);
-    doTest("Literal[Answer.No, Answer.Yes]",
+    doTest("Literal[Answer.Yes, Answer.No]",
            """
              from enum import Enum
              
@@ -685,7 +717,7 @@ public class Py3TypeTest extends PyTestCase {
                      raise ValueError("Invalid value")
                  expr = v
              """);
-    doTest("Literal[Answer.No, Answer.Yes]",
+    doTest("Literal[Answer.Yes, Answer.No]",
            """
              from enum import Enum
 
@@ -3972,6 +4004,20 @@ public class Py3TypeTest extends PyTestCase {
       from lib import f
       
       expr = f()
+      """);
+  }
+
+  @TestFor(issues="PY-81651")
+  public void testEqWithAny() {
+    // the actual result is `Any`, but we don't have the technology yet
+    doTest("UnsafeUnion[Any, bool]", """
+      from typing import Any
+      
+      class A:
+          def __eq__(self, other) -> Any:
+            return "hello :)"
+
+      expr = A() == 1
       """);
   }
 

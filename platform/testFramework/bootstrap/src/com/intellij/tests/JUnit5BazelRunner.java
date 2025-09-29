@@ -2,6 +2,7 @@
 package com.intellij.tests;
 
 import com.intellij.tests.bazel.BazelJUnitOutputListener;
+import com.intellij.tests.bazel.bucketing.BucketsPostDiscoveryFilter;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.Filter;
 import org.junit.platform.engine.FilterResult;
@@ -53,6 +54,8 @@ public final class JUnit5BazelRunner {
 
   private static final ClassLoader ourClassLoader = Thread.currentThread().getContextClassLoader();
   private static final Launcher launcher = LauncherFactory.create();
+
+  private static final BucketsPostDiscoveryFilter bucketingPostDiscoveryFilter = new BucketsPostDiscoveryFilter();
 
   private static LauncherDiscoveryRequest getDiscoveryRequest() throws Throwable {
     List<? extends DiscoverySelector> bazelTestSelectors = getTestsSelectors(ourClassLoader);
@@ -152,27 +155,44 @@ public final class JUnit5BazelRunner {
 
       System.out.println("Number of test engines: " + ServiceLoader.load(TestEngine.class).stream().count());
 
+      var xmlOutputFile = getXmlOutputFile();
+
+      // If bucketing filters out all tests, we emit a minimal JUnit XML with a single testsuite named "Bucketing".
+      // See: com.intellij.tests.JUnit5BazelRunner.xmlReportBucketingTestsFilteringOut
       TestPlan testPlan = getTestPlan();
       if (!testPlan.containsTests()) {
-        //see org.jetbrains.intellij.build.impl.TestingTasksImpl.NO_TESTS_ERROR
-        System.err.println("No tests found");
-        System.exit(42);
+        if (!bucketingPostDiscoveryFilter.hasExcludedClasses() && !bucketingPostDiscoveryFilter.hasIncludedClasses()) {
+          //see org.jetbrains.intellij.build.impl.TestingTasksImpl.NO_TESTS_ERROR
+          System.err.println("No tests found");
+          System.exit(42);
+        } else {
+          System.err.println("No tests executed: all tests were filtered out by bucketing.");
+          // Emit an empty XML with a single testsuite explaining that bucketing filtered out all tests
+          //This is emitted only in the scenario where:
+          //- The JUnit TestPlan is empty (no tests to run), and
+          //- The bucketing post-discovery filter did include/exclude classes
+          //  (meaning discovery was successful, but all relevant tests belong to other buckets).
+          xmlReportBucketingTestsFilteringOut(xmlOutputFile);
+          System.exit(EXIT_CODE_SUCCESS);
+        }
       }
 
-      var testExecutionListener = getTestExecutionListener();
-      var xmlOutputFile = getXmlOutputFile();
+      var testExecutionListeners = getTestExecutionListeners();
 
       try (var bazelJUnitOutputListener = new BazelJUnitOutputListener(xmlOutputFile)) {
         Runtime.getRuntime()
           .addShutdownHook(
             new Thread(() -> bazelJUnitOutputListener.closeForInterrupt(), "BazelJUnitOutputListenerShutdownHook")
           );
-        launcher.registerTestExecutionListeners(bazelJUnitOutputListener, testExecutionListener);
+        testExecutionListeners.add(bazelJUnitOutputListener);
+        launcher.registerTestExecutionListeners(testExecutionListeners.toArray(TestExecutionListener[]::new));
         launcher.execute(testPlan);
       }
 
-      if (testExecutionListener instanceof ConsoleTestLogger &&
-          ((ConsoleTestLogger)testExecutionListener).hasTestsWithThrowableResults()) {
+      if (testExecutionListeners.stream().anyMatch(
+        l -> (l instanceof ConsoleTestLogger && ((ConsoleTestLogger)l).hasTestsWithThrowableResults()) ||
+             (l instanceof BazelJUnitOutputListener && ((BazelJUnitOutputListener)l).hasTestsWithThrowableResults()))
+      ) {
         System.err.println("Some tests failed");
         System.exit(EXIT_CODE_TEST_FAILURE_OTHER);
       }
@@ -209,25 +229,28 @@ public final class JUnit5BazelRunner {
     return xmlOut;
   }
 
-  private static TestExecutionListener getTestExecutionListener() {
-    if (isUnderTeamCity()) {
-      return new JUnit5TeamCityRunnerForTestAllSuite.TCExecutionListener();
-    } else {
-      return new ConsoleTestLogger();
+  private static List<TestExecutionListener> getTestExecutionListeners() {
+    List<TestExecutionListener> myListeners = new ArrayList<>();
+    if (!isUnderTeamCity()) {
+      myListeners.add(new ConsoleTestLogger());
     }
+    return myListeners;
   }
 
   private static Filter<?>[] getTestFilters(List<? extends DiscoverySelector> bazelTestSelectors) {
+    List<Filter<?>> filters = new ArrayList<>();
+    filters.add(bucketingPostDiscoveryFilter);
+
     // value of --test_filter, if specified
     // https://bazel.build/reference/test-encyclopedia
     String testFilter = System.getenv(bazelEnvTestBridgeTestOnly);
     if (testFilter == null || testFilter.isBlank()) {
-      return new Filter[0];
+      return filters.toArray(new Filter[0]);
     }
 
     // in case when we already have precise method selectors, so we aren't going to filter by test class name
     if (bazelTestSelectors.stream().allMatch(selector -> selector instanceof MethodSelector)) {
-      return new Filter[0];
+      return filters.toArray(new Filter[0]);
     }
 
     String[] parts = testFilter.split("#", 2);
@@ -237,7 +260,8 @@ public final class JUnit5BazelRunner {
     String classNamePart = parts[0];
     ClassNameFilter classNameFilter = getClassNameFilter(classNamePart);
 
-    return new Filter[]{classNameFilter};
+    filters.add(classNameFilter);
+    return filters.toArray(new Filter[0]);
   }
 
   private static List<? extends DiscoverySelector> getTestsSelectors(ClassLoader classLoader) throws Throwable {
@@ -461,16 +485,6 @@ public final class JUnit5BazelRunner {
           }
         });
       }
-
-      if (testIdentifier.isTest()) {
-        System.out.println("Finished: " + testIdentifier.getDisplayName() + " -> " + result.getStatus());
-        result.getThrowable().ifPresent(t -> {
-          t.printStackTrace(System.err);
-          if (!IgnoreException.isIgnoringThrowable(t)) {
-            testsWithThrowableResult.add(testIdentifier);
-          }
-        });
-      }
     }
 
     @Override
@@ -480,6 +494,36 @@ public final class JUnit5BazelRunner {
 
     private Boolean hasTestsWithThrowableResults() {
       return !testsWithThrowableResult.isEmpty();
+    }
+  }
+
+
+  /**
+   * If all discovered test classes are filtered out by the bucketing mechanism
+   * (i.e., the current runner/bucket owns none of the selected tests),
+   * `JUnit5BazelRunner` writes a minimal JUnit XML to `XML_OUTPUT_FILE`
+   * with a single testsuite named `Bucketing` and zero tests.
+   *
+   * Do not interpret this as "no tests found" across the entire target.
+   * Other buckets likely execute the actual tests.
+   *
+   * The intent is a compact, unambiguous signal that this runner instance had nothing to execute
+   * due to bucketing. Detailed per-test entries are unnecessary and could bloat outputs.
+   * The XML is a valid JUnit format. Most parsers accept suites with zero tests. The message is in `system-out`.
+   */
+  private static void xmlReportBucketingTestsFilteringOut(Path xmlOutputFile) {
+    try {
+      String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                   "<testsuites>" +
+                   "<testsuite name=\"Bucketing\" tests=\"0\" failures=\"0\" errors=\"0\" skipped=\"0\">" +
+                   "<system-out>No tests executed: all tests were filtered out by bucketing.</system-out>" +
+                   "</testsuite>" +
+                   "</testsuites>";
+      Files.writeString(xmlOutputFile, xml);
+    }
+    catch (IOException t) {
+      // Non-fatal: we still exit successfully, but log the problem to stderr
+      System.err.println("Failed to write XML_OUTPUT_FILE for bucketing-empty plan: " + t.getMessage());
     }
   }
 }

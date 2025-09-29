@@ -44,7 +44,8 @@ internal sealed class EdtCoroutineDispatcher(
     else {
       DispatchedRunnable(context.job, lockingAwareBlock)
     }
-    ApplicationManagerEx.getApplicationEx().dispatchCoroutineOnEDT(runnable, state)
+    val useWeakWriteIntent = useNonBlockingIntentLockForEdtCoroutines && type.lockBehavior == EdtDispatcherKind.LockBehavior.LOCKS_ALLOWED_MANDATORY_WRAPPING
+    ApplicationManagerEx.getApplicationEx().dispatchCoroutineOnEDT(runnable, state, useWeakWriteIntent)
   }
 
   protected fun CoroutineContext.effectiveContextModality(): ModalityState =
@@ -65,15 +66,15 @@ internal sealed class EdtCoroutineDispatcher(
         runnable
       }
       EdtDispatcherKind.LockBehavior.LOCKS_ALLOWED_MANDATORY_WRAPPING -> {
-        return if (isCoroutineWILEnabled) {
+        if (useNonBlockingIntentLockForEdtCoroutines) {
+          runnable
+        }
+        else {
           Runnable {
             WriteIntentReadAction.run {
               runnable.run()
             }
           }
-        }
-        else {
-          runnable
         }
       }
     }
@@ -112,7 +113,10 @@ private class ImmediateEdtCoroutineDispatcher(type: EdtDispatcherKind) : EdtCoro
       // `Dispatchers.Main.immediate` must look only at the thread where it is executing.
       // This is needed to support 3rd party libraries which use this dispatcher for getting the UI thread
       // Relaxed UI dispatcher is indifferent to locks, so it can run in-place.
-      EdtDispatcherKind.MAIN, EdtDispatcherKind.LAX_UI -> false
+      EdtDispatcherKind.MAIN -> false
+      // Immediate relaxed dispatcher should do redispatch if it runs under Dispatchers.UI
+      // that's because the context of Dispatchers.UI forbids taking locks, so we need to get into an appropriate context
+      EdtDispatcherKind.LAX_UI -> ApplicationManager.getApplication().isLockingProhibited != null
       // `Dispatchers.EdtImmediate` must perform dispatch when invoked on a thread without locks, because it needs to get into correct context.
       EdtDispatcherKind.EDT -> !ApplicationManager.getApplication().isWriteIntentLockAcquired
       // `Dispatchers.UIImmediate` must perform dispatch when invoked on a thread with locks, because it needs to escape locking and forbid using them inside.

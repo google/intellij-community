@@ -313,21 +313,12 @@ internal class BazelBuildFileGenerator(
   }
 
   fun computeModuleList(): ModuleList {
-    val bazelPluginDir = ultimateRoot?.resolve("plugins/bazel")
-
     val community = ArrayList<ModuleDescriptor>()
     val ultimate = ArrayList<ModuleDescriptor>()
     val skippedModules = ArrayList<String>()
     for (module in project.model.project.modules) {
       if (module.name == "intellij.platform.buildScripts.bazel") {
         // Skip bazel generator itself since it's a standalone Bazel project
-        skippedModules.add(module.name)
-        continue
-      }
-
-      val imlDir = JpsModelSerializationDataService.getBaseDirectory(module)!!.toPath()
-      if (bazelPluginDir != null && imlDir.startsWith(bazelPluginDir)) {
-        // Skip bazel plugin, they have their own bazel definitions
         skippedModules.add(module.name)
         continue
       }
@@ -523,6 +514,7 @@ internal class BazelBuildFileGenerator(
     val javacOptionsLabel = computeJavacOptions(moduleDescriptor, jvmTarget)
 
     val resourceTargets = mutableListOf<BazelLabel>()
+    val testResourceTargets = mutableListOf<BazelLabel>()
     val productionCompileTargets = mutableListOf<BazelLabel>()
     val productionCompileJars = mutableListOf<BazelLabel>()
     val testCompileTargets = mutableListOf<BazelLabel>()
@@ -531,13 +523,10 @@ internal class BazelBuildFileGenerator(
     if (moduleDescriptor.resources.isNotEmpty()) {
       val result = generateResources(module = moduleDescriptor, forTests = false)
       resourceTargets.addAll(result.resourceTargets)
-      productionCompileTargets.addAll(result.resourceTargets)
-      productionCompileJars.addAll(result.resourceTargets)
     }
     if (moduleDescriptor.testResources.isNotEmpty()) {
       val result = generateResources(module = moduleDescriptor, forTests = true)
-      resourceTargets.addAll(result.resourceTargets)
-      testCompileTargets.addAll(result.resourceTargets)
+      testResourceTargets.addAll(result.resourceTargets)
     }
 
     // if someone depends on such a test module from another production module
@@ -554,6 +543,9 @@ internal class BazelBuildFileGenerator(
         option("module_name", module.name)
         visibility(arrayOf("//visibility:public"))
         option("srcs", sourcesToGlob(sources, moduleDescriptor))
+        if (resourceTargets.isNotEmpty()) {
+          option("resources", resourceTargets.map { ":${it.label}" })
+        }
         if (javacOptionsLabel != null) {
           option("javac_opts", javacOptionsLabel)
         }
@@ -594,7 +586,7 @@ internal class BazelBuildFileGenerator(
           deps = deps.copy(deps = deps.deps + extraDeps)
         }
 
-        renderDeps(deps = deps, target = this, resourceDependencies = resourceTargets, forTests = false)
+        renderDeps(deps = deps, target = this, resourceDependencies = emptyList(), forTests = false)
       }
     }
     else {
@@ -604,12 +596,15 @@ internal class BazelBuildFileGenerator(
         option("name", moduleDescriptor.targetName)
         visibility(arrayOf("//visibility:public"))
         option("srcs", sourcesToGlob(sources, moduleDescriptor))
+        if (resourceTargets.isNotEmpty()) {
+          option("resources", resourceTargets.map { ":${it.label}" })
+        }
 
         val deps = moduleList.deps.get(moduleDescriptor)
         renderDeps(
           deps = deps?.copy(plugins = emptyList()), // do not apply plugins to an empty library regardless of dependencies
           target = this,
-          resourceDependencies = resourceTargets,
+          resourceDependencies = emptyList(),
           forTests = false
         )
       }
@@ -632,9 +627,10 @@ internal class BazelBuildFileGenerator(
     }
 
     val moduleHasTestSources = moduleDescriptor.testSources.isNotEmpty()
+    val moduleHasTestResources = moduleDescriptor.testResources.isNotEmpty()
 
     // Decide whether to render a test target at all
-    if (moduleHasTestSources || isTestClasspathModule(moduleDescriptor)) {
+    if (moduleHasTestSources || moduleHasTestResources || isTestClasspathModule(moduleDescriptor)) {
       val testLibTargetName = "${moduleDescriptor.targetName}$TEST_LIB_NAME_SUFFIX"
       testCompileTargets.add(BazelLabel(testLibTargetName, moduleDescriptor))
 
@@ -650,11 +646,14 @@ internal class BazelBuildFileGenerator(
         visibility(arrayOf("//visibility:public"))
 
         option("srcs", sourcesToGlob(moduleDescriptor.testSources, moduleDescriptor))
+        if (testResourceTargets.isNotEmpty()) {
+          option("resources", testResourceTargets.map { ":${it.label}" })
+        }
 
         javacOptionsLabel?.let { option("javac_opts", it) }
         kotlincOptionsLabel?.let { option("kotlinc_opts", it) }
 
-        renderDeps(deps = testDeps, target = this, resourceDependencies = resourceTargets, forTests = true)
+        renderDeps(deps = testDeps, target = this, resourceDependencies = emptyList(), forTests = true)
       }
     }
 
@@ -749,16 +748,16 @@ internal class BazelBuildFileGenerator(
       return GenerateResourcesResult(resourceTargets = fixedTargetsList)
     }
 
-    load("@rules_jvm//:jvm.bzl", "jvm_resources")
+    load("@rules_jvm//:jvm.bzl", "resourcegroup")
 
     val targetNameSuffix = if (forTests) TEST_RESOURCES_TARGET_SUFFIX else PRODUCTION_RESOURCES_TARGET_SUFFIX
 
     val resourceTargets = resources.withIndex().map { (i, resource) ->
       val name = "${module.targetName}$targetNameSuffix" + (if (i == 0) "" else "_$i")
 
-      target("jvm_resources") {
+      target("resourcegroup") {
         option("name", name)
-        option("files", glob(resource.files, allowEmpty = false))
+        option("srcs", glob(resource.files, allowEmpty = false))
         if (resource.baseDirectory.isNotEmpty()) {
           option("strip_prefix", resource.baseDirectory)
         }
@@ -1104,16 +1103,16 @@ private fun computeKotlincOptions(buildFile: BuildFile, module: ModuleDescriptor
     }
   }
   //x_x_language
-  val xXLanguageInlineClass = mergedCompilerArguments.internalArguments.any { it.stringRepresentation == "-XXLanguage:+InlineClasses"}
-  if (xXLanguageInlineClass) {
-    options.put("x_x_language", "+InlineClasses")
+  val effectiveXXLanguage = mergedCompilerArguments.internalArguments.map { it.stringRepresentation }.filter { it.startsWith("-XXLanguage:") }
+  if (effectiveXXLanguage.size != 1 || effectiveXXLanguage[0] != "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks") {
+    options.put("x_x_language", effectiveXXLanguage.map { it.removePrefix("-XXLanguage:") })
   }
 
   checkNoUnhandledKotlincOptions(
     module.module,
     mergedCompilerArguments,
     handledArguments = handledArguments + setOf("jvmTarget", "pluginClasspaths"),
-    handledInternalArguments = setOf("-XXLanguage:+InlineClasses", "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks"),
+    handledInternalArguments = setOf("-XXLanguage:+AllowEagerSupertypeAccessibilityChecks", "-XXLanguage:+InlineClasses"),
     handledUnknownExtraFlags = setOf("-Xallow-result-return-type", "-Xstrict-java-nullability-assertions", "-Xwasm-attach-js-exception", "-Xwasm-kclass-fqn"),
   )
 
@@ -1196,7 +1195,7 @@ private fun renderDeps(
 
   if (resourceDependencies.isNotEmpty() || (deps != null && deps.runtimeDeps.isNotEmpty())) {
     val runtimeDeps = resourceDependencies
-                        .filter {
+                        .map {
                           check(
                             PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
                             TEST_RESOURCES_TARGET_REGEX.matches(it.label)
@@ -1209,9 +1208,10 @@ private fun renderDeps(
                           ) {
                             "Resource dependency target name matches both prod and test regex: $it"
                           }
-                          return@filter PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
-                          (forTests && TEST_RESOURCES_TARGET_REGEX.matches(it.label))
-                        }.map {
+                          check(PRODUCTION_RESOURCES_TARGET_REGEX.matches(it.label) ||
+                                (forTests && TEST_RESOURCES_TARGET_REGEX.matches(it.label))) {
+                            "Unexpected resource dependency target name: $it"
+                          }
                           if (it.label.startsWith('@') || it.label.startsWith("//")) {
                             it
                           } else {

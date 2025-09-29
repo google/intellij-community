@@ -17,6 +17,7 @@ import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.vcs.commit.CommitSessionCollector
 import com.intellij.vcsUtil.VcsImplUtil
+import com.intellij.vcsUtil.VcsUtil
 import com.intellij.vcsUtil.VcsUtil.getVcsFor
 import java.awt.event.MouseEvent
 import javax.swing.tree.TreePath
@@ -49,19 +50,17 @@ internal class BackendChangesTreeCompatibilityProvider : ChangesTreeCompatibilit
     if (!project.isDisposed) IgnoredViewDialog(project).show()
   }
 
-  override fun isIgnoredInUpdateMode(project: Project): Boolean {
-    return ChangeListManagerImpl.getInstanceImpl(project).isIgnoredInUpdateMode
-  }
-
   override fun showUnversionedViewDialog(project: Project) {
     if (!project.isDisposed) UnversionedViewDialog(project).show()
   }
 
-  override fun isUnversionedInUpdateMode(project: Project): Boolean {
-    return ChangeListManagerImpl.getInstanceImpl(project).isUnversionedInUpdateMode
-  }
-
   override fun resolveLocalFile(path: String): VirtualFile? = LocalFileSystem.getInstance().findFileByPath(path)
+
+  override fun toHijackedChange(project: Project, file: VirtualFile): Change? {
+    val before = VcsCurrentRevisionProxy.create(file, project) ?: return null
+    val after = CurrentContentRevision(VcsUtil.getFilePath(file))
+    return Change(before, after, FileStatus.HIJACKED)
+  }
 
   override fun getScopeVirtualFileFor(filePath: FilePath): VirtualFile? {
     if (filePath.isNonLocal()) return null

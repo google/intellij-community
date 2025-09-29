@@ -33,7 +33,7 @@ private data class CommitInfo(
     val subject: String,
 )
 
-class CompareBranchesCommand : SuspendingCliktCommand() {
+private class CompareBranchesCommand : SuspendingCliktCommand() {
     private val verbose: Boolean by
         option("--verbose", help = "Prints the normalized commit subjects being compared.").flag(default = false)
     private val jewelOnly: Boolean by
@@ -105,7 +105,8 @@ class CompareBranchesCommand : SuspendingCliktCommand() {
         if (anyPathMissing) exitProcess(1)
 
         println(
-            "🔍 Comparing commits for paths '${Config.PATHS_TO_CHECK.joinToString()}' between '$branch1' and '$branch2' since $sinceDate..."
+            "🔍 Comparing commits for paths '${Config.PATHS_TO_CHECK.joinToString()}' between " +
+            "'$branch1' and '$branch2' since $sinceDate..."
         )
 
         val pathsArg = Config.PATHS_TO_CHECK.joinToString(separator = " ") { "-- $it" }
@@ -206,12 +207,6 @@ class CompareBranchesCommand : SuspendingCliktCommand() {
             println(output)
         }
     }
-
-    private suspend fun isDirectoryGitRepo(directory: File): Boolean =
-        runCommand("git rev-parse --is-inside-work-tree", directory).isSuccess
-
-    private suspend fun branchExists(branch: String, directory: File): Boolean =
-        runCommand("git rev-parse --verify $branch", directory).isSuccess
 
     private fun normalizeSubject(subject: String): String =
         subject

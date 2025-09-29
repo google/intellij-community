@@ -190,11 +190,8 @@ open class EditorComposite internal constructor(
   protected open suspend fun beforeFileOpen(scope: CoroutineScope, model: EditorCompositeModel) {}
   @Internal
   protected open suspend fun afterFileOpen(scope: CoroutineScope, model: EditorCompositeModel) {}
-  @Internal
-  protected open suspend fun onHandleModel(model: EditorCompositeModel) {}
 
   private suspend fun handleModel(model: EditorCompositeModel) {
-    onHandleModel(model)
     val fileEditorWithProviders = model.fileEditorAndProviderList
     fileEditorWithProviders.assignEditorProperties()
 
@@ -1085,8 +1082,7 @@ internal fun focusEditorOnComposite(
     }
     else {
       if (toFront) {
-        IdeFocusManager.getGlobalInstance().toFront(preferredFocusedComponent)
-        preferredFocusedComponent.requestFocus()
+        IdeFocusManager.getGlobalInstance().requestFocusInProject(preferredFocusedComponent, composite.project)
       }
       else {
         preferredFocusedComponent.requestFocusInWindow()

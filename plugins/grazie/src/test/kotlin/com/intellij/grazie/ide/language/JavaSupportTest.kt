@@ -1,16 +1,24 @@
 // Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.grazie.ide.language
 
+import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.GrazieTestBase
 import com.intellij.grazie.jlanguage.Lang
+import com.intellij.grazie.utils.TextStyleDomain
+import com.intellij.openapi.components.service
+import com.intellij.openapi.util.Disposer
 import com.intellij.spellchecker.ProjectDictionaryLayer
+import com.intellij.spellchecker.SpellCheckerManager
+import com.intellij.spellchecker.dictionary.Loader
+import com.intellij.spellchecker.grazie.GrazieSpellCheckerEngine
+import com.intellij.spellchecker.settings.SpellCheckerSettings
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase
 import com.intellij.tools.ide.metrics.benchmark.Benchmark
+import java.util.function.Consumer
 
 
 class JavaSupportTest : GrazieTestBase() {
-  override val additionalEnabledRules: Set<String> = setOf("LanguageTool.EN.UPPERCASE_SENTENCE_START", "LanguageTool.EN.FILE_EXTENSIONS_CASE")
   override val enableGrazieChecker: Boolean = true
 
   override fun getProjectDescriptor(): LightProjectDescriptor {
@@ -116,7 +124,7 @@ class JavaSupportTest : GrazieTestBase() {
     )
   }
 
-  fun `test meaningful suggestions in RenameTo action`() {
+  fun `test meaningful single suggestion in RenameTo action`() {
     myFixture.configureByText("a.java", """
       class A {
         void foo() {
@@ -125,7 +133,7 @@ class JavaSupportTest : GrazieTestBase() {
       }
     """)
     myFixture.checkHighlighting()
-    val intention = myFixture.findSingleIntention("Typo: Rename to…")
+    val intention = myFixture.findSingleIntention("Typo: Rename to 'targetDir'")
     myFixture.launchAction(intention)
     myFixture.checkResult("""
       class A {
@@ -136,10 +144,76 @@ class JavaSupportTest : GrazieTestBase() {
     """)
   }
 
+  fun `test multiple suggestions in RenameTo action`() {
+    myFixture.configureByText("a.java", """
+      class A {
+        void foo() {
+          int <TYPO descr="Typo: In word 'barek'">barek<caret></TYPO> = 1;
+        }
+      }
+    """)
+    myFixture.checkHighlighting()
+    val intention = myFixture.findSingleIntention("Typo: Rename to…")
+    myFixture.launchAction(intention)
+    myFixture.checkResult("""
+      class A {
+        void foo() {
+          int bark = 1;
+        }
+      }
+    """)
+  }
+
   fun `test no highlighting after fixing an error within the same range`() {
     runHighlightTestForFile("ide/language/java/PDF.java")
     myFixture.launchAction(myFixture.findSingleIntention("PDF"))
     myFixture.checkHighlighting()
+  }
+
+  fun `test no highlighting inside of markdown code`() {
+    runHighlightTestForFile("ide/language/java/MarkdownCode.java")
+  }
+
+  fun `test java keeps trailing spaces properly`() {
+    runHighlightTestForFile("ide/language/java/Trailing.java")
+  }
+
+  @Suppress("MISSING_DEPENDENCY_SUPERCLASS_IN_TYPE_ARGUMENT")
+  fun `test add capitalized word to dictionary`() {
+    val isUseSingleDictionary = SpellCheckerSettings.getInstance(project).isUseSingleDictionaryToSave
+    Disposer.register(testRootDisposable) {
+      SpellCheckerSettings.getInstance(project).isUseSingleDictionaryToSave = isUseSingleDictionary
+    }
+    SpellCheckerSettings.getInstance(project).isUseSingleDictionaryToSave = true
+
+    myFixture.configureByText("a.java", "// <TYPO descr=\"Typo: In word 'Qdrant'\">Qdra<caret>nt</TYPO>")
+    myFixture.checkHighlighting()
+    val intention = myFixture.findSingleIntention("Save 'Qdrant' to dictionary")
+    myFixture.launchAction(intention)
+    myFixture.configureByText("a.java", "// Qdrant")
+    myFixture.checkHighlighting()
+  }
+
+  fun `test capitalized and uppercases words are not treated as typo if lowercase version is in the custom dictionary`() {
+    SpellCheckerManager.getInstance(project).spellChecker!!.loadDictionary(object: Loader {
+      override fun load(consumer: Consumer<String>) {
+        consumer.accept("wexwex")
+      }
+      override fun getName(): String = "TestLoader"
+    })
+
+    myFixture.configureByText("a.java", "// wexwex, Wexwex, WEXWEX")
+    myFixture.checkHighlighting()
+  }
+
+  fun `test performance on typos by word-level spellchecker`() {
+    // German is not enabled on purpose to disable suggestion-based typo detection
+    Benchmark.newBenchmark("word-level spellchecking performance") {
+      runHighlightTestForFile("ide/language/java/Dictionary.java")
+    }.setup {
+      psiManager.dropPsiCaches()
+      project.service<GrazieSpellCheckerEngine>().dropSuggestionCache()
+    }.start()
   }
 
   private fun doTest(beforeText: String, afterText: String, hint: String) {

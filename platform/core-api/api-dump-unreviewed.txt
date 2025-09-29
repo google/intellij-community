@@ -115,10 +115,6 @@ a:com.intellij.concurrency.JobScheduler
 com.intellij.concurrency.ResultConsumer
 - a:onFailure(java.lang.Throwable):V
 - a:onSuccess(java.lang.Object):V
-f:com.intellij.core.CoreBundle
-- sf:BUNDLE:java.lang.String
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messageOrNull(java.lang.String,java.lang.Object[]):java.lang.String
 com.intellij.diagnostic.Dumpable
 - a:dumpState():java.lang.String
 f:com.intellij.diagnostic.ImplementationConflictException
@@ -1543,7 +1539,6 @@ f:com.intellij.openapi.project.ProjectCoreUtil
 - sf:INSTANCE:com.intellij.openapi.project.ProjectCoreUtil
 - sf:isProjectOrWorkspaceFile(com.intellij.openapi.vfs.VirtualFile):Z
 - sf:isProjectOrWorkspaceFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileTypes.FileType):Z
-- sf:isProjectOrWorkspaceFile(com.intellij.openapi.vfs.VirtualFile,java.lang.CharSequence):Z
 Fa:com.intellij.openapi.project.ProjectLocator
 - sf:Companion:com.intellij.openapi.project.ProjectLocator$Companion
 - <init>():V
@@ -1765,13 +1760,6 @@ c:com.intellij.openapi.vfs.ReadonlyStatusHandlerBase
 - ps:createResultStatus(java.util.Collection,java.util.Collection):com.intellij.openapi.vfs.ReadonlyStatusHandler$OperationStatus
 - ensureFilesWritable(java.util.Collection):com.intellij.openapi.vfs.ReadonlyStatusHandler$OperationStatus
 - p:ensureFilesWritable(java.util.Collection,java.util.Collection):com.intellij.openapi.vfs.ReadonlyStatusHandler$OperationStatus
-f:com.intellij.openapi.vfs.ReadonlyStatusHandlerBase$OperationStatusImpl
-- com.intellij.openapi.vfs.ReadonlyStatusHandler$OperationStatus
-- <init>(com.intellij.openapi.vfs.VirtualFile[]):V
-- getHyperlinkListener():javax.swing.event.HyperlinkListener
-- getReadonlyFiles():com.intellij.openapi.vfs.VirtualFile[]
-- getReadonlyFilesMessage():java.lang.String
-- hasReadonlyFiles():Z
 f:com.intellij.openapi.vfs.StandardFileSystems
 - sf:FILE_PROTOCOL:java.lang.String
 - sf:FILE_PROTOCOL_PREFIX:java.lang.String

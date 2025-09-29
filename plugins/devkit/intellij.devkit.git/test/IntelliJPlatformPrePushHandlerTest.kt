@@ -1,15 +1,13 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.commit
 
-import com.intellij.mock.MockVirtualFile
-import com.intellij.openapi.vfs.VirtualFile
 import org.junit.Test
 import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import org.junit.runners.Parameterized.Parameter
+import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.io.path.pathString
 
 @RunWith(Enclosed::class)
 class IntelliJPlatformPrePushHandlerTest {
@@ -42,7 +40,7 @@ class IntelliJPlatformPrePushHandlerTest {
 
     @Test
     fun testThatChecksForFileSet() {
-      val filesSet = files.map { fileAt(it) }
+      val filesSet = files.asSequence().map { pathAt(it) }
       assert(prePushHandler.containSources(filesSet)) {
         "The following set of files doesn't trigger the check: $filesSet"
       }
@@ -77,7 +75,7 @@ class IntelliJPlatformPrePushHandlerTest {
 
     @Test
     fun testThatIgnoresFileSet() {
-      val filesSet = files.map { fileAt(it) }
+      val filesSet = files.asSequence().map { pathAt(it) }
       assert(!prePushHandler.containSources(filesSet)) {
         "The following set of files triggered the check: $filesSet"
       }
@@ -212,18 +210,28 @@ class IntelliJPlatformPrePushHandlerTest {
             
             Relates to #WHATEVER-123
           """.trimIndent(),
+          """
+            [subsystem] refactoring: rename a to b
 
-          "IJ-MR-123", "IJ-CR-0",
+            Explains why it is needed.
+          """.trimIndent(),
 
           "test thing", "test: thing", "[test] thing", "Test thing",
           "tests thing", "tests: thing", "[tests] thing",
           "cleanup thing", "cleanup: thing", "[cleanup] thing", "Cleanup stuff",
+          "clean up thing", "clean up: thing", "[clean up] thing", "Clean Up stuff",
           "docs thing", "docs: thing", "[docs] thing", "Docs thing",
           "doc thing", "doc: thing", "[doc] thing", "Doc very much",
           "typo thing", "typo: thing", "[typo] thing",
           "format thing", "format: thing", "[format] thing",
           "style thing", "style: thing", "[style] thing",
           "refactor this thing", "refactor: this thing",
+          "WIP", "[WIP] do stuff", "Add thingies WIP", "wip", "(wip) hoho", "wip: haha",
+          """
+            WIP
+            
+            Some additional remarks.
+          """.trimIndent(),
 
           "Cleanup (reason)",
           "[subsystem][tests] new tests",
@@ -233,6 +241,7 @@ class IntelliJPlatformPrePushHandlerTest {
           "[testFramework] whatever",
           "[test framework] whatever",
           "test framework",
+          "Rename .java to .kt"
         )
       }
     }
@@ -242,7 +251,7 @@ class IntelliJPlatformPrePushHandlerTest {
 
     @Test
     fun testThatCommitMessageIsValid() {
-      assert(prePushHandler.commitMessageIsCorrect(commitMessage)) {
+      assert(prePushHandler.isCommitMessageCorrect(commitMessage)) {
         "The following commit message was considered invalid: $commitMessage"
       }
     }
@@ -272,10 +281,21 @@ class IntelliJPlatformPrePushHandlerTest {
             Body-line-1
             Body-line-N
           """.trimIndent(),
+          """
+            No explanation
+            
+            Test added
+          """.trimIndent(),
+          """
+            No explanation
+            
+            WIP
+          """.trimIndent(),
 
           "test", "test:", "[test]", "test ", "add test", "drop test",
           "tests", "tests:", "[tests]", "tests ", "add tests", "drop tests",
           "cleanup", "cleanup:", "[cleanup]", "cleanup ", "do cleanup",
+          "clean up", "clean up:", "[clean up]", "clean up ", "do clean up",
           "docs", "docs:", "[docs]", "docs ", "add docs",
           "doc", "doc:", "[doc]", "doc ", "add doc",
           "typo", "typo:", "[typo]", "typo ", "fix typo",
@@ -285,6 +305,7 @@ class IntelliJPlatformPrePushHandlerTest {
           "stuff", "stuff:", "[stuff]", "very important stuff",
           "refactor", "refactor:", "[refactor]",
           "refactoring", "refactoring:", "[refactoring]",
+          "wipe", "swipe", "wipe the db",
 
           "[subsystem] Do very important stuff very very important",
           "platform: add 'thing' here and there",
@@ -294,6 +315,9 @@ class IntelliJPlatformPrePushHandlerTest {
           "Fix test",
           "[subsystem] docs",
           "null",
+
+          "IJ-CR-160532 do not highlight parser errors twice for java",
+          "IJ-MR-123", "IJ-CR-0",
         )
       }
     }
@@ -303,7 +327,7 @@ class IntelliJPlatformPrePushHandlerTest {
 
     @Test
     fun testThatCommitMessageIsValid() {
-      assert(!prePushHandler.commitMessageIsCorrect(commitMessage)) {
+      assert(!prePushHandler.isCommitMessageCorrect(commitMessage)) {
         "The following commit message was considered as valid: $commitMessage"
       }
     }
@@ -315,7 +339,6 @@ private val tempDir: String = System.getProperty("java.io.tmpdir")
 private const val COMMUNITY_PLATFORM = "community/platform/"
 private const val COMMUNITY = "community/"
 
-private fun fileAt(path: String): VirtualFile {
-  val path: String =  Paths.get(tempDir, *path.split("/").filterNot { it.isEmpty() }.toTypedArray()).pathString
-  return MockVirtualFile(path)
+private fun pathAt(path: String): Path {
+  return Paths.get(tempDir, *path.split("/").filterNot { it.isEmpty() }.toTypedArray())
 }

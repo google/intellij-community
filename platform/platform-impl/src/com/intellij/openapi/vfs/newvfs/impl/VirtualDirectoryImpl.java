@@ -74,7 +74,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
    * it could be >=1 VirtualDirectoryImpl instances wrapping the same shared directoryData.
    * Field is made package-local-visible _only_ for building diagnostic info on errors
    */
-  final VfsData.DirectoryData directoryData;
+  public final VfsData.DirectoryData directoryData;
   private final NewVirtualFileSystem fileSystem;
 
   @VisibleForTesting
@@ -624,7 +624,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         //MAYBE RC: check case-sensitivity is defined? updateCaseSensitivityIfUnknown()?
         ensureChildrenSorted(isCaseSensitive());
       }
-      return cachedChildren( /*putToMemoryCache: */);
+      return cachedChildren();
     }
     return loadAllChildren(requireSorting);
   }
@@ -672,6 +672,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       //MAYBE RC: the code below is similar to addChild(child) -- how to reduce code duplication?
 
       boolean allChildrenLoaded = children.areAllChildrenLoaded();
+      Boolean wasInPersistentChildren = null; //for diagnostics only
       if (children.isSorted() && worthBinarySearch(children)) {
         String childName = child.getName();
         //If children are sorted => 99% caseSensitivity _is_ known; otherwise how could children be sorted?
@@ -684,7 +685,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
           return child;//childId is in cached children: OK
         }
         else if (!allChildrenLoaded
-                 && (TRUST_FIND_CHILD_BY_ID_CALLERS || isInPersistentChildren(pFS, getId(), childId))) {
+                 && (TRUST_FIND_CHILD_BY_ID_CALLERS || (wasInPersistentChildren = isInPersistentChildren(pFS, getId(), childId)))) {
           // Assume (either by 'trust' or because we checked) that childId is indeed a child of this directory
           // => we add it to the children list, once it is not there yet:
           int insertionIndex = -indexOfName - 1;
@@ -698,21 +699,68 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
           return child;//childId is in cached children: OK
         }
         else if (!allChildrenLoaded
-                 && (TRUST_FIND_CHILD_BY_ID_CALLERS || isInPersistentChildren(pFS, getId(), childId))) {
+                 && (TRUST_FIND_CHILD_BY_ID_CALLERS || (wasInPersistentChildren = isInPersistentChildren(pFS, getId(), childId)))) {
           // Assume (either by 'trust' or because we checked) that childId is indeed a child of this directory
           // => we add it to the children list, once it is not there yet:
-          //Here we 'trust' that childId is indeed a child of this directory -- so we add it to the children list, if it
-          // is not there yet -- we do not check childId really belongs to the children list
           directoryData.children = children.appendId(childId);
           return child;
         }
       }
 
-      //childId not really belong to children:
+      //childId not really belong to children. It could be because:
+      // 1. 'Orphan' file: child indeed has 'this' as it's parent, but 'this' doesn't count child as its child -- i.e. it
+      //    is a VFS inconsistency, should be detected by VFSHealthCheck -- and indeed we have some small number of reports
+      //    about it
+      // 2. Race condition #1: someone has removed the child from 'this' children while we climb up and down the hierarchy
+      //    in PersistentFSImpl.findFileById(). This is possible because in VFS we don't protect hierarchy walking with a
+      //    single lock. But WA/RA _should_ be used to access VFS from the outside, which prohibits the race -- so if such
+      //    a race exists, it is a client error of using VFS without proper RA/WA wrapping
+      // 3. Race condition #2: someone _is adding_ the child to 'this' children, but not yet finished the addition. Same as
+      //    in previous item, this is possible because in VFS we don't protect hierarchy walking with a single lock. The
+      //    difference is that _there is_ a known case there addition is done without WA around: 'local refresh'.
+      //
+      //   'Local refresh' (see comments in PersistentFSImpl.findChildInfo() for details about it) adds a new record into
+      //   the VFS during _read_ -- usually, during resolution of some path. Since it is a 'read' operation, it is usually
+      //   wrapped in RA, not in WA, and RA doesn't prohibit parallel RA with .findFileById() in it. It makes possible the
+      //   scenario there one thread is inserting a new record to VFS during the local refresh, under RA, and already inserted
+      //   the record into FSRecords and InvertedFilenameIndex -- but not yet updated parent.children list. Another RA with
+      //   FilenameIndex lookup runs in parallel, sees the just added fileId in invertedFilenameIndex, tries resolving it
+      //   via .findFileById(), and falls through here, since the fileId is not yet added into parent.children.
+      //   FIXME RC: this scenario is not true -- LocalRefresh .findChildInfo() is running under directoryLock acquired,
+      //   hence can't run in parallel with this code. So it is something else then.
+      //
+      //   So far I have no good ideas about what to do with that case: some reasons for it are 'errors' while others are
+      //   legit ones. Without 'local refresh' that would be an 100% error, so abandoning local refresh would be a solution
+      //   -- and we would like to abandon local refresh by other reasons too, but because of backward compatibility it is
+      //   unlikely to be done soon.
+      //   A more conservative solution would be to move the InvertedFilenameIndex updates out from FSRecords: be InvertedFilenameIndex
+      //   updated in the same way other indexes are, unfinished VFS records would not appear in it, and the 'legit' issue
+      //   would disappear too -- but it seems like the same 'local refresh' would then lead to some filenames being absent
+      //   in the filename index...
+
+      //   ...Until the good solution is found, here is a dirty but workable 'solution': just yield for a while, leaving another
+      //   thread a chance to finish child record initialization -- and if it does (judging by isInPersistentChildren() changed
+      //   it's return value) then re-try findChildById():
+      if (Boolean.FALSE.equals(wasInPersistentChildren)) {
+        for (int i = 0; i < 3; i++) {
+          try { directoryData.wait(0, 1); } catch (InterruptedException ignored) {}
+          boolean isInPersistentChildren = isInPersistentChildren(pFS, getId(), childId);
+          if (isInPersistentChildren) {
+            return findChildById(childId);
+          }
+        }
+      }
+
+      boolean isInPersistentChildren = isInPersistentChildren(pFS, getId(), childId);
+      int parentId = pFS.peer().getParent(childId);
+      VirtualDirectoryImpl parent = child.getParent();
       LOG.error(
-        "[" + child + ", id: " + child.getId() + "] expected to be in [" + this + "].children=" + children + ", but absent. " +
-        "childId in persistent children: " + isInPersistentChildren(pFS, getId(), childId) + " " +
-        "-> refresh race or VFS inconsistency?"
+        "[" + child + ", id: " + child.getId() + ", parentId: " + parentId + ", parent.id: " + parent.getId() + "] " +
+        "expected to be in " +
+        "[" + this + ", id: " + getId() + ", this == parent?: " + (this == parent) + "].children=" + children + " -- but absent. " +
+        "childId in persistent children: " + isInPersistentChildren + ", " +
+        "was in persistent children: " + wasInPersistentChildren +
+        " -> refresh race or VFS inconsistency?"
       );
       return null;
     }
@@ -959,7 +1007,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
 
   @Override
   public @NotNull @Unmodifiable List<VirtualFile> getCachedChildren() {
-    return Arrays.asList(cachedChildren(/*putToCache: */));
+    return Arrays.asList(cachedChildren());
   }
 
   @Override
@@ -983,9 +1031,9 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
     markDirtyRecursivelyInternal();
   }
 
-  // optimization: do not travel up unnecessary
+  // optimization: do not travel up unnecessarily
   private void markDirtyRecursivelyInternal() {
-    for (VirtualFileSystemEntry child : cachedChildren(/*putToCache: */)) {
+    for (VirtualFileSystemEntry child : cachedChildren()) {
       child.markDirtyInternal();
       if (child instanceof VirtualDirectoryImpl) {
         ((VirtualDirectoryImpl)child).markDirtyRecursivelyInternal();

@@ -23,6 +23,10 @@ jvm_library(
     "@lib//:fastutil-min",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
-  ]
+    "//fleet/util/codepoints",
+    "//fleet/bifurcan",
+    "//fleet/fastutil",
+  ],
+  exports = ["//fleet/bifurcan"]
 )
 ### auto-generated section `build fleet.andel` end

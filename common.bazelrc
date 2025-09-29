@@ -31,7 +31,7 @@ common --javacopt=-Xlint:-options
 # https://bazel.build/docs/bazel-and-java#hermetic-testing
 # The code is compiled for, executed, and tested on this JVM.
 common --java_language_version=21
-common --java_runtime_version=remotejdk_21
+common --java_runtime_version=remotejbr_21
 
 # see https://bazel.build/external/lockfile
 # use `bazel mod deps --lockfile_mode=refresh` to update lock file
@@ -90,6 +90,9 @@ common --experimental_platform_in_output_dir
 # Do not depend on external environment
 build --action_env BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
+# Enable compact *.repo_mapping manifest
+build --incompatible_compact_repo_mapping_manifest
+
 # Generally good remote cache tweaks
 # on CI, set remote_cache_async to false! set to false for local runs also, to investigate https://github.com/bazelbuild/bazel/issues/19273
 common --remote_cache_async=false --remote_cache_compression=true
@@ -111,5 +114,9 @@ common:ci --show_progress_rate_limit=30
 build --nobuild_runfile_links
 
 # detailed tests output by default
-# https://bazel.build/reference/command-line-reference?utm_source=chatgpt.com#build-flag--test_summary
+# https://bazel.build/reference/command-line-reference#build-flag--test_summary
 test --test_summary=detailed
+
+# https://bazel.build/reference/test-encyclopedia
+# https://bazel.build/reference/command-line-reference#flag--test_timeout
+test --test_timeout=60,300,900,14400

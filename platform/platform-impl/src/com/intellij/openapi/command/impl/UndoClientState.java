@@ -50,10 +50,7 @@ final class UndoClientState implements Disposable {
   private final boolean isCompactSupported;
   private final boolean isGlobalSplitSupported;
 
-  // yet it is not a client state but shared one defined by undo manager
-  private final @NotNull SharedAdjustableUndoableActionsHolder adjustableUndoableActionsHolder;
-  private final @NotNull SharedUndoRedoStacksHolder sharedUndoStacksHolder;
-  private final @NotNull SharedUndoRedoStacksHolder sharedRedoStacksHolder;
+  private final @NotNull UndoSharedState sharedState;
 
   private OperationInProgress currentOperation = OperationInProgress.NONE;
   private CommandMerger currentCommandMerger = null;
@@ -73,26 +70,23 @@ final class UndoClientState implements Disposable {
   }
 
   private UndoClientState(@NotNull UndoManagerImpl undoManager, @NotNull ClientId clientId) {
+    this.clientId = clientId;
     this.project = undoManager.getProject();
     this.undoSpy = undoManager.getUndoSpy();
     this.isTransparentSupported = undoManager.isTransparentSupported();
     this.isConfirmationSupported = undoManager.isConfirmationSupported();
     this.isCompactSupported = undoManager.isCompactSupported();
     this.isGlobalSplitSupported = undoManager.isGlobalSplitSupported();
-    this.clientId = clientId;
-    this.adjustableUndoableActionsHolder = undoManager.getAdjustableUndoableActionsHolder();
-    this.sharedUndoStacksHolder = undoManager.getSharedUndoStacksHolder();
-    this.sharedRedoStacksHolder = undoManager.getSharedRedoStacksHolder();
-    this.undoStacksHolder = new UndoRedoStacksHolder(adjustableUndoableActionsHolder, true);
-    this.redoStacksHolder = new UndoRedoStacksHolder(adjustableUndoableActionsHolder, false);
+    this.sharedState = undoManager.getUndoSharedState();
+    this.undoStacksHolder = new UndoRedoStacksHolder(sharedState.getAdjustableActions(), true);
+    this.redoStacksHolder = new UndoRedoStacksHolder(sharedState.getAdjustableActions(), false);
     this.commandMerger = new CommandMerger(project, false, isTransparentSupported);
   }
 
   @Override
   public void dispose() {
     Set<DocumentReference> affected = clearStacks();
-    sharedRedoStacksHolder.trimStacks(affected);
-    sharedUndoStacksHolder.trimStacks(affected);
+    sharedState.trimStacks(affected);
   }
 
   boolean isActive() {
@@ -343,10 +337,7 @@ final class UndoClientState implements Disposable {
     commandMerger.clearDocumentReferences(document);
   }
 
-  @Nullable PerClientLocalUndoRedoSnapshot getUndoRedoSnapshotForDocument(
-    @NotNull DocumentReference reference,
-    @NotNull SharedAdjustableUndoableActionsHolder adjustableUndoableActionsHolder
-  ) {
+  @Nullable PerClientLocalUndoRedoSnapshot getUndoRedoSnapshotForDocument(@NotNull DocumentReference reference) {
     CommandMerger currentMerger = currentCommandMerger;
     if (currentMerger != null && currentMerger.hasActions()) {
       return null;
@@ -358,8 +349,7 @@ final class UndoClientState implements Disposable {
     return new PerClientLocalUndoRedoSnapshot(
       mergerSnapshot,
       undoStacksHolder.getStack(reference).snapshot(),
-      redoStacksHolder.getStack(reference).snapshot(),
-      adjustableUndoableActionsHolder.getStack(reference).snapshot()
+      redoStacksHolder.getStack(reference).snapshot()
     );
   }
 
@@ -391,8 +381,7 @@ final class UndoClientState implements Disposable {
       flushCurrentCommand(UndoCommandFlushReason.CLEAR_STACKS);
       redoStacksHolder.clearStacks(new HashSet<>(refs), true);
       undoStacksHolder.clearStacks(new HashSet<>(refs), true);
-      sharedRedoStacksHolder.trimStacks(refs);
-      sharedUndoStacksHolder.trimStacks(refs);
+      sharedState.trimStacks(refs);
     }
   }
 
@@ -443,22 +432,6 @@ final class UndoClientState implements Disposable {
     );
   }
 
-  private void addActionToSharedStack(@NotNull UndoableAction action) {
-    if (action instanceof AdjustableUndoableAction adjustable) {
-      DocumentReference[] affected = action.getAffectedDocuments();
-      if (affected == null) {
-        return;
-      }
-      adjustableUndoableActionsHolder.addAction(adjustable);
-      for (DocumentReference reference : affected) {
-        for (MutableActionChangeRange changeRange : adjustable.getChangeRanges(reference)) {
-          sharedUndoStacksHolder.addToStack(reference, changeRange.toImmutable(false));
-          sharedRedoStacksHolder.addToStack(reference, changeRange.toImmutable(true));
-        }
-      }
-    }
-  }
-
   private void compactIfNeeded() {
     if (isCompactSupported && !isUndoOrRedoInProgress() && commandTimestamp % COMMAND_TO_RUN_COMPACT == 0) {
       Set<DocumentReference> docsOnStacks = collectReferencesWithoutMergers();
@@ -472,8 +445,7 @@ final class UndoClientState implements Disposable {
             break;
           }
           clearUndoRedoQueue(doc);
-          sharedRedoStacksHolder.trimStacks(Collections.singleton(doc));
-          sharedUndoStacksHolder.trimStacks(Collections.singleton(doc));
+          sharedState.trimStacks(Collections.singleton(doc));
         }
       }
     }
@@ -543,12 +515,12 @@ final class UndoClientState implements Disposable {
       return null;
     }
     return isUndo
-           ? new Undo(project, editor, undoStacksHolder, redoStacksHolder, sharedUndoStacksHolder, sharedRedoStacksHolder)
-           : new Redo(project, editor, undoStacksHolder, redoStacksHolder, sharedUndoStacksHolder, sharedRedoStacksHolder);
+           ? new Undo(project, editor, undoStacksHolder, redoStacksHolder, sharedState.getUndoStacks(), sharedState.getRedoStacks())
+           : new Redo(project, editor, undoStacksHolder, redoStacksHolder, sharedState.getUndoStacks(), sharedState.getRedoStacks());
   }
 
   private void addUndoableAction(@NotNull UndoableAction action) {
-    addActionToSharedStack(action);
+    sharedState.addAction(action);
     currentCommandMerger.addAction(action);
     if (!(currentProject instanceof DummyProject)) {
       undoSpy.undoableActionAdded(currentProject, action, UndoableActionType.forAction(action));

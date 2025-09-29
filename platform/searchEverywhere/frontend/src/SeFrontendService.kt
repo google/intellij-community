@@ -14,7 +14,10 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.WindowStateService
 import com.intellij.openapi.wm.WindowManager
+import com.intellij.platform.searchEverywhere.SeProviderId
+import com.intellij.platform.searchEverywhere.SeSession
 import com.intellij.platform.searchEverywhere.SeSessionEntity
+import com.intellij.platform.searchEverywhere.asRef
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionsTab
 import com.intellij.platform.searchEverywhere.frontend.tabs.all.SeAllTab
 import com.intellij.platform.searchEverywhere.frontend.tabs.classes.SeClassesTab
@@ -37,7 +40,6 @@ import com.intellij.ui.popup.AbstractPopup
 import com.intellij.util.ui.EDT
 import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
-import fleet.kernel.DurableRef
 import fleet.kernel.change
 import fleet.kernel.shared
 import kotlinx.coroutines.*
@@ -50,6 +52,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
+import kotlin.String
 
 @ApiStatus.Internal
 @Service(Service.Level.PROJECT, Service.Level.APP)
@@ -72,6 +75,8 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
 
   private val historyList = SearchHistoryList(true)
 
+  private var selectionState: SeSelectionState? = null
+
   val removeSessionRef: AtomicBoolean = AtomicBoolean(true)
 
   override fun show(tabId: String, searchText: String?, initEvent: AnActionEvent) {
@@ -80,12 +85,13 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
 
     coroutineScope.launch {
       val popupScope = coroutineScope.childScope("SearchEverywhereFrontendService popup scope")
-      val sessionRef = SeSessionEntity.createRef()
+      val session = SeSessionEntity.createSession()
 
       try {
         popupSemaphore.withPermit {
-          localProvidersHolder = SeProvidersHolder.initialize(initEvent, project, sessionRef, "Frontend")
-          val completable = doShowPopup(popupFuture, tabId, searchText, initEvent, popupScope, sessionRef)
+          val providersHolder = SeProvidersHolder.initialize(initEvent, project, session, "Frontend", false)
+          localProvidersHolder = providersHolder
+          val completable = doShowPopup(popupFuture, tabId, searchText, initEvent, popupScope, session, providersHolder.legacyAllTabContributors)
           completable.await()
         }
       }
@@ -99,7 +105,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
           if (removeSessionRef.get()) {
             change {
               shared {
-                sessionRef.derefOrNull()?.delete()
+                session.asRef().derefOrNull()?.delete()
               }
             }
           }
@@ -114,7 +120,8 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
     searchText: String?,
     initEvent: AnActionEvent,
     popupScope: CoroutineScope,
-    sessionRef: DurableRef<SeSessionEntity>,
+    session: SeSession,
+    availableLegacyContributors: Map<SeProviderId, SearchEverywhereContributor<Any>>
   ): CompletableDeferred<Unit> {
     val startTime = System.currentTimeMillis()
     val tabInitializationTimoutMillis: Long = 50
@@ -125,7 +132,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
     val tabsOrDeferredTabs = tabFactories.map {
       it.id to initAsync(popupScope) {
         computeCatchingOrNull({ e -> "Error while getting tab from ${it.id} tab factory: ${e.message}" }) {
-          it.getTab(popupScope, project, sessionRef, initEvent) { action ->
+          it.getTab(popupScope, project, session, initEvent) { action ->
             popupInstance?.registerShortcut?.invoke(action)
           }
         }
@@ -157,7 +164,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
     val deferredTabs = tabsOrDeferredTabs.filterIsInstance<SuspendLazyProperty<SeTab?>>()
 
     var popup: JBPopup? = null
-    val popupVm = SePopupVm(popupScope, project, sessionRef, tabs, deferredTabs, searchText, tabId, historyList) {
+    val popupVm = SePopupVm(popupScope, session, project, tabs, deferredTabs, searchText, tabId, historyList, availableLegacyContributors) {
       popup?.cancel()
       popup = null
     }
@@ -176,15 +183,16 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
                                              }
                                            },
                                            searchStatePublisher,
-                                           getStateService().getSize(POPUP_LOCATION_SETTINGS_KEY)) {
+                                           getStateService().getSize(POPUP_LOCATION_SETTINGS_KEY),
+                                           selectionState) {
         popupScope.launch(NonCancellable) {
           removeSessionRef.set(false)
           try {
-            popupVm.openInFindWindow(sessionRef, initEvent)
+            popupVm.openInFindWindow(session, initEvent)
           } finally {
             change {
               shared {
-                sessionRef.derefOrNull()?.delete()
+                session.asRef().derefOrNull()?.delete()
               }
             }
           }
@@ -194,6 +202,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
 
       popup = createPopup(contentPane, popupVm, project) {
         completable.complete(Unit)
+        selectionState = contentPane.getSelectionState()
       }
 
       popup?.let { popup ->
@@ -213,6 +222,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
       .setProject(project)
       .setModalContext(false)
       .setNormalWindowLevel(StartupUiUtil.isWaylandToolkit())
+      .setCancelOnWindowDeactivation(!StartupUiUtil.isWaylandToolkit())
       .setCancelOnClickOutside(true)
       .setRequestFocus(true)
       .setCancelKeyEnabled(false)

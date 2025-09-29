@@ -7,9 +7,7 @@ import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.grazie.GrazieBundle
 import com.intellij.grazie.GrazieConfig
-import com.intellij.grazie.text.CheckerRunner
-import com.intellij.grazie.text.TextContent
-import com.intellij.grazie.text.TextExtractor
+import com.intellij.grazie.text.*
 import com.intellij.grazie.text.TextExtractor.findAllTextContents
 import com.intellij.lang.Language
 import com.intellij.openapi.project.DumbAware
@@ -21,36 +19,72 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.spellchecker.ui.SpellCheckingEditorCustomization
+import org.jetbrains.annotations.NonNls
 import java.util.*
 
 class GrazieInspection : LocalInspectionTool(), DumbAware {
 
-  override fun getDisplayName() = GrazieBundle.message("grazie.grammar.inspection.grammar.text")
+  class Grammar: LocalInspectionTool(), DumbAware {
+    override fun getShortName(): @NonNls String = GRAMMAR_INSPECTION
+
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
+      return PsiElementVisitor.EMPTY_VISITOR
+    }
+  }
+
+  class Style: LocalInspectionTool(), DumbAware {
+    override fun getShortName(): @NonNls String = STYLE_INSPECTION
+
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
+      return PsiElementVisitor.EMPTY_VISITOR
+    }
+  }
+
+  override fun getDisplayName(): String = GrazieBundle.message("grazie.grammar.inspection.grammar.text")
 
   override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
     val file = holder.file
-    if (ignoreGrammarChecking(file) || InspectionProfileManager.hasTooLowSeverity(session, this)) {
-      return PsiElementVisitor.EMPTY_VISITOR
-    }
+    if (ignoreGrammarChecking(file) || hasTooLowSeverity(session)) return PsiElementVisitor.EMPTY_VISITOR
 
     val checkedDomains = checkedDomains()
     val areChecksDisabled = getDisabledChecker(file)
 
     return object : PsiElementVisitor() {
+      override fun visitWhiteSpace(space: PsiWhiteSpace) {}
+
       override fun visitElement(element: PsiElement) {
-        if (element is PsiWhiteSpace || areChecksDisabled(element)) return
+        if (areChecksDisabled(element)) return
 
         val texts = TextExtractor.findUniqueTextsAt(element, checkedDomains)
         if (skipCheckingTooLargeTexts(texts)) return
 
-        for (extracted in sortByPriority(texts, session.priorityRange)) {
-          val runner = CheckerRunner(extracted)
-          runner.run()
-            .filterNot { it.isStyleLike }
-            .forEach { runner.toProblemDescriptors(it, isOnTheFly).forEach(holder::registerProblem) }
+        sortByPriority(texts, session.priorityRange)
+          .map { CheckerRunner(it) }
+          .map { it to it.run() }
+          .forEach { (runner, problems) ->
+            problems.forEach { problem ->
+              runner.toProblemDescriptors(problem, holder.isOnTheFly).forEach(holder::registerProblem)
+            }
+          }
+
+        if (element == file) {
+          checkTextLevel(file, holder)
         }
       }
     }
+  }
+
+  private fun checkTextLevel(file: PsiFile, holder: ProblemsHolder) {
+    TreeRuleChecker.checkTextLevelProblems(file).forEach { reportProblem(it, holder) }
+  }
+
+  private fun reportProblem(problem: TextProblem, holder: ProblemsHolder) {
+    CheckerRunner(problem.text).toProblemDescriptors(problem, holder.isOnTheFly)
+      .forEach { holder.registerProblem(it) }
+  }
+
+  private fun hasTooLowSeverity(session: LocalInspectionToolSession): Boolean {
+    return inspections.all { InspectionProfileManager.hasTooLowSeverity(session, it) }
   }
 
   /**
@@ -58,8 +92,12 @@ class GrazieInspection : LocalInspectionTool(), DumbAware {
    */
   @Suppress("CompanionObjectInExtension")
   companion object {
+    private val inspections: List<LocalInspectionTool> = listOf(Grammar(), Style())
+
     private const val MAX_TEXT_LENGTH_IN_PSI_ELEMENT = 50_000
     private const val MAX_TEXT_LENGTH_IN_FILE = 200_000
+    const val GRAMMAR_INSPECTION: String = "GrazieInspection"
+    const val STYLE_INSPECTION: String = "GrazieStyle"
 
     private val hasSpellChecking: Boolean by lazy {
       try {

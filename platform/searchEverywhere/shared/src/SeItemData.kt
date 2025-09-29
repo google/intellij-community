@@ -13,7 +13,7 @@ import org.jetbrains.annotations.ApiStatus
 @Serializable
 @ApiStatus.Experimental
 @ApiStatus.Internal
-class SeItemData(
+class SeItemData private constructor(
   val uuid: String,
   val providerId: SeProviderId,
   val weight: Int,
@@ -37,7 +37,7 @@ class SeItemData(
   @ApiStatus.Internal
   companion object {
     suspend fun createItemData(
-      sessionRef: DurableRef<SeSessionEntity>,
+      session: SeSession,
       uuid: String,
       item: SeItem,
       providerId: SeProviderId,
@@ -46,11 +46,11 @@ class SeItemData(
       additionalInfo: Map<String, String>,
       uuidToReplace: List<String>,
     ): SeItemData? {
-      val entityRef = SeItemEntity.createWith(sessionRef, item) ?: return null
+      val entityRef = SeItemEntity.createWith(session, item) ?: return null
       val additionalInfo = additionalInfo.toMutableMap()
 
       if (item is SeLegacyItem) {
-        computeCatchingOrNull(true, { e-> "Couldn't add language info (${providerId.value}): $e" }) {
+        computeCatchingOrNull(true, { e -> "Couldn't add language info (${providerId.value}): $e" }) {
           PSIPresentationBgRendererWrapper.toPsi(item.rawObject)?.let {
             readAction {
               additionalInfo[SeItemDataKeys.PSI_LANGUAGE_ID] = it.language.id
@@ -58,7 +58,7 @@ class SeItemData(
           }
         }
 
-        computeCatchingOrNull(true, { e-> "Couldn't add isSemantic info (${providerId.value}): $e" }) {
+        computeCatchingOrNull(true, { e -> "Couldn't add isSemantic info (${providerId.value}): $e" }) {
           val isSemanticElement = (item.contributor as? SemanticSearchEverywhereContributor)?.isElementSemantic(item.rawObject) ?: false
           additionalInfo[SeItemDataKeys.IS_SEMANTIC] = isSemanticElement.toString()
         }
@@ -66,5 +66,12 @@ class SeItemData(
 
       return SeItemData(uuid, providerId, weight, presentation, uuidToReplace, additionalInfo, entityRef)
     }
+  }
+
+  fun contentEquals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is SeItemData) return false
+
+    return presentation.contentEquals(other.presentation)
   }
 }

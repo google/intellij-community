@@ -30,8 +30,8 @@ class TerminalOutputModelImpl(
   override val document: Document,
   private val maxOutputLength: Int,
 ) : TerminalOutputModel {
-  private val mutableCursorOffsetState: MutableStateFlow<Int> = MutableStateFlow(0)
-  override val cursorOffsetState: StateFlow<Int> = mutableCursorOffsetState.asStateFlow()
+  private val mutableCursorOffsetState: MutableStateFlow<TerminalOffset> = MutableStateFlow(absoluteOffset(0))
+  override val cursorOffsetState: StateFlow<TerminalOffset> = mutableCursorOffsetState.asStateFlow()
 
   private val highlightingsModel = HighlightingsModel()
 
@@ -117,11 +117,11 @@ class TerminalOutputModelImpl(
 
     val newCursorOffset = lineStartOffset + trimmedColumnIndex
     LOG.debug { "Updated the cursor position to $newCursorOffset" }
-    mutableCursorOffsetState.value = newCursorOffset
+    mutableCursorOffsetState.value = relativeOffset(newCursorOffset)
   }
 
   override fun updateCursorPosition(offset: TerminalOffset) {
-    mutableCursorOffsetState.value = offset.toRelative()
+    mutableCursorOffsetState.value = offset
   }
 
   /** Returns offset from which document was updated */
@@ -175,8 +175,9 @@ class TerminalOutputModelImpl(
     // If the document became shorter, immediately ensure that the cursor is still within the document.
     // It'll update itself later to the correct position anyway, but having the incorrect value can cause exceptions before that.
     val newLength = document.textLength
-    if (mutableCursorOffsetState.value > newLength) {
-      mutableCursorOffsetState.value = newLength
+    val docEndOffset = relativeOffset(newLength)
+    if (mutableCursorOffsetState.value > docEndOffset) {
+      mutableCursorOffsetState.value = docEndOffset
     }
   }
 
@@ -261,7 +262,7 @@ class TerminalOutputModelImpl(
       trimmedLinesCount = trimmedLinesCount,
       trimmedCharsCount = trimmedCharsCount,
       firstLineTrimmedCharsCount = firstLineTrimmedCharsCount,
-      cursorOffset = cursorOffsetState.value,
+      cursorOffset = cursorOffsetState.value.toRelative(),
       highlightings = highlightingsModel.dumpState()
     )
   }
@@ -273,7 +274,7 @@ class TerminalOutputModelImpl(
       firstLineTrimmedCharsCount = state.firstLineTrimmedCharsCount
       document.setText(state.text)
       highlightingsModel.restoreFromState(state.highlightings)
-      mutableCursorOffsetState.value = state.cursorOffset
+      mutableCursorOffsetState.value = relativeOffset(state.cursorOffset)
 
       0  // the document is changed from right from the start
     }
@@ -304,7 +305,7 @@ class TerminalOutputModelImpl(
         HighlightingInfo(
           startOffset = (it.startOffset - trimmedCharsCount).toInt(),
           endOffset = (it.endOffset - trimmedCharsCount).toInt(),
-          textAttributesProvider = TextStyleAdapter(it.style, colorPalette),
+          textAttributesProvider = TextStyleAdapter(it.style, colorPalette, it.ignoreContrastAdjustment),
         )
       }
       val snapshot = TerminalOutputHighlightingsSnapshot(document, documentRelativeHighlightings)
@@ -329,7 +330,7 @@ class TerminalOutputModelImpl(
         HighlightingInfo(
           startOffset = (range.startOffset - trimmedCharsCount).toInt(),
           endOffset = (range.endOffset - trimmedCharsCount).toInt(),
-          textAttributesProvider = TextStyleAdapter(range.style, colorPalette),
+          textAttributesProvider = TextStyleAdapter(range.style, colorPalette, range.ignoreContrastAdjustment),
         )
       }
       else null
@@ -341,7 +342,7 @@ class TerminalOutputModelImpl(
       check(styleRanges.isEmpty() || styleRanges.last().endOffset <= absoluteOffset) { "New highlightings overlap with existing" }
 
       val adjustedStyles = styles.map {
-        StyleRange(absoluteOffset + it.startOffset, absoluteOffset + it.endOffset, it.style)
+        it.copy(startOffset = absoluteOffset + it.startOffset, endOffset = absoluteOffset + it.endOffset)
       }
       styleRanges.addAll(adjustedStyles)
 
@@ -361,7 +362,7 @@ class TerminalOutputModelImpl(
       if (updateFromIndex < styleRanges.size) {
         for (ind in (updateFromIndex until styleRanges.size)) {
           val cur = styleRanges[ind]
-          styleRanges[ind] = StyleRange(cur.startOffset + length, cur.endOffset + length, cur.style)
+          styleRanges[ind] = cur.copy(startOffset = cur.startOffset + length, endOffset = cur.endOffset + length)
         }
 
         highlightingsSnapshot = null
@@ -480,7 +481,7 @@ class FrozenTerminalOutputModelImpl(
   override val document: FrozenDocument,
   private val trimmedCharsCount: Long,
   private val trimmedLinesCount: Long,
-  override val cursorOffset: Int,
+  override val cursorOffset: TerminalOffset,
 ) : FrozenTerminalOutputModel {
   override fun relativeOffset(offset: Int): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, offset)
   override fun absoluteOffset(offset: Long): TerminalOffset = TerminalOffsetImpl(trimmedCharsCount, (offset - trimmedCharsCount).toInt())
