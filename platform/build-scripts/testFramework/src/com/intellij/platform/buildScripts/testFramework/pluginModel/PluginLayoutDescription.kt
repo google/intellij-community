@@ -32,22 +32,86 @@ data class PluginLayoutDescription(
   val jpsModulesInClasspath: Set<String>,
 )
 
-fun createLayoutProviderByContentYamlFiles(ideContentYamlPath: Path, mainModuleOfCorePlugin: String, corePluginDescriptorPath: String, nameOfTestWhichGeneratesFiles: String): PluginLayoutProvider {
-  return YamlFileBasedPluginLayoutProvider(ideContentYamlPath, mainModuleOfCorePlugin, corePluginDescriptorPath, nameOfTestWhichGeneratesFiles = nameOfTestWhichGeneratesFiles) 
+fun createLayoutProviderByContentYamlFiles(
+  ideContentYamlPath: Path,
+  mainModuleOfCorePlugin: String,
+  corePluginDescriptorPath: String,
+  nameOfTestWhichGeneratesFiles: String,
+  project: org.jetbrains.jps.model.JpsProject,
+): PluginLayoutProvider {
+  return YamlFileBasedPluginLayoutProvider(
+    ideContentYamlPath = ideContentYamlPath,
+    mainModuleOfCorePlugin = mainModuleOfCorePlugin,
+    corePluginDescriptorPath = corePluginDescriptorPath,
+    nameOfTestWhichGeneratesFiles = nameOfTestWhichGeneratesFiles,
+    project = project,
+  )
 }
 
 private class YamlFileBasedPluginLayoutProvider(
-  private val ideContentYamlPath: Path, 
+  private val ideContentYamlPath: Path,
   private val mainModuleOfCorePlugin: String,
   private val corePluginDescriptorPath: String,
   private val nameOfTestWhichGeneratesFiles: String,
+  private val project: org.jetbrains.jps.model.JpsProject,
 ) : PluginLayoutProvider {
   private val ideContentData by lazy {
     deserializeContentData(ideContentYamlPath.readText())
   }
-  
+
+  private val mergedContentData by lazy {
+    loadMergedContentData()
+  }
+
+  private fun loadMergedContentData(): List<FileEntry> {
+    val baseEntries = ideContentData.toMutableList()
+
+    // Collect productModules and productEmbeddedModules separately
+    val productModuleNames = ideContentData.flatMap { it.productModules }.distinct()
+    val productEmbeddedModuleNames = ideContentData.flatMap { it.productEmbeddedModules }.distinct()
+
+    if (productModuleNames.isEmpty() && productEmbeddedModuleNames.isEmpty()) {
+      return baseEntries
+    }
+
+    // Process productModules with "dist.all/lib/modules/{moduleName}.jar" pattern
+    for (moduleName in productModuleNames) {
+      loadAndMergeModuleContent(moduleName, "dist.all/lib/modules/$moduleName.jar", baseEntries)
+    }
+
+    // Process productEmbeddedModules with "dist.all/lib/module-{moduleName}.jar" pattern
+    for (moduleName in productEmbeddedModuleNames) {
+      loadAndMergeModuleContent(moduleName, "dist.all/lib/module-$moduleName.jar", baseEntries)
+    }
+
+    return baseEntries
+  }
+
+  private fun loadAndMergeModuleContent(moduleName: String, jarName: String, baseEntries: MutableList<FileEntry>) {
+    val module = project.findModuleByName(moduleName) ?: return
+    val contentRootUrl = module.contentRootsList.urls.firstOrNull() ?: return
+    val moduleContentPath = JpsPathUtil.urlToNioPath(contentRootUrl).resolve("module-content.yaml")
+
+    if (!moduleContentPath.exists()) {
+      return
+    }
+
+    val moduleEntries = deserializeContentData(moduleContentPath.readText())
+
+    // replace <file> placeholder with actual jar path
+    for (entry in moduleEntries) {
+      if (entry.name == "<file>") {
+        baseEntries.add(entry.copy(name = jarName))
+      }
+      else {
+        baseEntries.add(entry)
+      }
+    }
+  }
+
   override fun loadCorePluginLayout(): PluginLayoutDescription {
-    return ideContentData.toPluginLayoutDescription(
+    return toPluginLayoutDescription(
+      entries = mergedContentData,
       mainModuleName = mainModuleOfCorePlugin,
       pluginDescriptorPath = corePluginDescriptorPath,
       mainLibDir = "dist.all/lib",
@@ -66,14 +130,18 @@ private class YamlFileBasedPluginLayoutProvider(
     if (!contentDataPath.exists()) return null
     val pluginDescriptorPath = "META-INF/plugin.xml"
     if (JpsJavaExtensionService.getInstance().findSourceFileInProductionRoots(mainModule, pluginDescriptorPath) == null) {
-      throw PluginModuleConfigurationError(mainModule.name, """
-        '$pluginDescriptorPath' file is not found in source and resource roots of module '"${mainModule.name}', but '$pluginContentPath' is present in it.
-        If '${mainModule.name}' is not the main module of a plugin anymore, delete '$pluginContentPath' to avoid confusion. 
-      """.trimIndent())
+      throw PluginModuleConfigurationError(
+        pluginModelModuleName = mainModule.name,
+        errorMessage = """
+                '$pluginDescriptorPath' file is not found in source and resource roots of module '"${mainModule.name}', but '$pluginContentPath' is present in it.
+                If '${mainModule.name}' is not the main module of a plugin anymore, delete '$pluginContentPath' to avoid confusion. 
+              """.trimIndent(),
+      )
     }
-    
+
     val contentData = deserializeContentData(contentDataPath.readText())
-    return contentData.toPluginLayoutDescription(
+    return toPluginLayoutDescription(
+      entries = contentData,
       mainModuleName = mainModule.name,
       pluginDescriptorPath = pluginDescriptorPath,
       mainLibDir = "lib",
@@ -85,12 +153,19 @@ private class YamlFileBasedPluginLayoutProvider(
     get() = "Note that the test uses the data from *content.yaml files, so if you changed the layouts, run '$nameOfTestWhichGeneratesFiles' to make sure that they are up-to-date."
 }
 
-private fun List<FileEntry>.toPluginLayoutDescription(mainModuleName: String, pluginDescriptorPath: String, mainLibDir: String, jarsToIgnore: Set<String>): PluginLayoutDescription {
+private fun toPluginLayoutDescription(
+  entries: List<FileEntry>,
+  mainModuleName: String,
+  pluginDescriptorPath: String,
+  mainLibDir: String,
+  jarsToIgnore: Set<String>,
+): PluginLayoutDescription {
   return PluginLayoutDescription(
     mainJpsModule = mainModuleName,
     pluginDescriptorPath = pluginDescriptorPath,
-    jpsModulesInClasspath = 
-      filter { it.name.substringBeforeLast('/', "") == mainLibDir && it.name !in jarsToIgnore }
-        .flatMapTo(LinkedHashSet()) { it.modules.map { it.name } }
+    jpsModulesInClasspath = entries
+      .asSequence()
+      .filter { it.name.substringBeforeLast('/', "") == mainLibDir && it.name !in jarsToIgnore }
+      .flatMapTo(LinkedHashSet()) { entry -> entry.modules.map { it.name } }
   )
 }

@@ -166,7 +166,7 @@ internal class WeighingContext private constructor(
                 is KotlinTypeNameReferencePositionContext -> {
                     val typeReferenceOwner = positionContext.typeReference?.parent
                     if (typeReferenceOwner?.parent?.parent is KtCatchClause) {
-                        // Prefer Throwables for exceptions
+                        // Prefer Throwables in catch clauses
                         buildClassType(StandardClassIds.Throwable) as? KaClassType
                     } else {
                         val leftHandExpression = when (typeReferenceOwner) {
@@ -334,11 +334,11 @@ internal object Weighers {
             CompletionContributorGroupWeigher.Weigher,
             ExpectedTypeWeigher.Weigher,
             DeprecatedWeigher.Weigher,
-            PreferMatchingArgumentNameWeigher.Weigher,
             PriorityWeigher.Weigher,
             PreferredSubtypeWeigher.Weigher,
             PreferGetSetMethodsToPropertyWeigher.Weigher,
             NotImportedWeigher.Weigher,
+            PreferMatchingArgumentNameWeigher.Weigher,
             KindWeigher.Weigher,
             CallableWeigher.Weigher,
             ClassifierWeigher.Weigher,

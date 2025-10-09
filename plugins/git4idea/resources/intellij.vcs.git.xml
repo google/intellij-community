@@ -1,3 +1,4 @@
+<!-- todo: register this as a content module (IJPL-210868); currently it's included via 'xi:include' tag -->
 <idea-plugin package="git4idea">
   <resource-bundle>messages.GitBundle</resource-bundle>
 
@@ -6,6 +7,7 @@
     <module name="intellij.platform.vcs.dvcs"/>
     <module name="intellij.platform.vcs.log.graph.impl"/>
     <module name="intellij.platform.collaborationTools"/>
+    <module name="intellij.platform.ide.impl.wsl"/>
   </dependencies>
 
   <actions resource-bundle="messages.GitBundle">
@@ -857,7 +859,6 @@
                  restartRequired="true"
                  description="Amount of time in minutes to check new Git version after IDE inactivity.\n
                              -1 to disable check."/>
-    <postStartupActivity os="windows" implementation="git4idea.config.GitNewVersionChecker$Starter"/>
     <settingsEntryPointActionProvider os="windows" implementation="git4idea.config.GitVersionUpdateSettingsEntryProvider"/>
 
     <history.activityPresentationProvider implementation="git4idea.GitActivityPresentationProvider"/>
@@ -927,5 +928,7 @@
               topic="com.intellij.ide.ui.UISettingsListener"/>
     <listener class="git4idea.config.GitBackendVcsSettingsListener"
               topic="git4idea.config.GitVcsSettings$GitVcsSettingsListener"/>
+    <listener os="windows" class="git4idea.config.GitNewVersionCheckerStarter"
+              topic="com.intellij.openapi.vcs.VcsMappingListener"/>
   </projectListeners>
 </idea-plugin>

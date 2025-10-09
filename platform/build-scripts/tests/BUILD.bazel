@@ -29,7 +29,7 @@ jvm_library(
     "//build/tasks",
     "//build/tasks:tasks_test_lib",
     "@lib//:kotlinx-collections-immutable",
-    "@lib//:commons-compress",
+    "//libraries/commons/compress",
     "//build",
     "@lib//:kotlinx-coroutines-core",
     "//platform/util/zip",
@@ -37,14 +37,14 @@ jvm_library(
     "//platform/util-ex",
     "@community//build:zip",
     "@lib//:netty-buffer",
-    "@lib//:hash4j",
-    "@lib//:fastutil-min",
+    "//libraries/hash4j",
+    "//libraries/fastutil",
     "@lib//:maven-resolver-provider",
     "//libraries/mockito",
     "@lib//:mockito-kotlin",
     "//jps/model-serialization",
     "//jps/model-api:model",
-    "@lib//:jsoup",
+    "//libraries/jsoup",
   ]
 )
 ### auto-generated section `build intellij.platform.buildScripts.tests` end

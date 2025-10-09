@@ -44,7 +44,7 @@
 
   <xi:include href="parcelize.k1.xml"/>
 
-  <content>
+  <content namespace="jetbrains">
     <module name="kotlin.base.analysis-api-platform"/>
     <module name="kotlin.base.external-build-system"/>
     <module name="kotlin.base.fe10.plugin"/>
@@ -91,6 +91,7 @@
     <module name="kotlin.compiler-plugins.kapt"/>
     <module name="kotlin.compiler-plugins.kotlinx-serialization.gradle"/>
     <module name="kotlin.compiler-plugins.kotlinx-serialization.maven"/>
+    <module name="kotlin.compiler-plugins.kotlin-dataframe.maven"/>
     <module name="kotlin.compiler-plugins.lombok.gradle"/>
     <module name="kotlin.compiler-plugins.lombok.maven"/>
     <module name="kotlin.compiler-plugins.assignment.common.k1"/>

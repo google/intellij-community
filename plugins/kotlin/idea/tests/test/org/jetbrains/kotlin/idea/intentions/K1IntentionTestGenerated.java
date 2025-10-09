@@ -3048,6 +3048,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
                     runTest("testData/intentions/branched/ifWhen/whenToIf/whenGuardsUnsupported.kt");
                 }
 
+                @TestMetadata("whenInLambda.kt")
+                public void testWhenInLambda() throws Exception {
+                    runTest("testData/intentions/branched/ifWhen/whenToIf/whenInLambda.kt");
+                }
+
                 @TestMetadata("whenTrueOrFalse.kt")
                 public void testWhenTrueOrFalse() throws Exception {
                     runTest("testData/intentions/branched/ifWhen/whenToIf/whenTrueOrFalse.kt");
@@ -11175,11 +11180,6 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/importAllMembers/EnumSyntheticMethods12.kt");
         }
 
-        @TestMetadata("EnumSyntheticMethods13.kt")
-        public void testEnumSyntheticMethods13() throws Exception {
-            runTest("testData/intentions/importAllMembers/EnumSyntheticMethods13.kt");
-        }
-
         @TestMetadata("EnumSyntheticMethods2.kt")
         public void testEnumSyntheticMethods2() throws Exception {
             runTest("testData/intentions/importAllMembers/EnumSyntheticMethods2.kt");
@@ -11699,6 +11699,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("addImportHasOtherAlias.kt")
         public void testAddImportHasOtherAlias() throws Exception {
             runTest("testData/intentions/introduceImportAlias/addImportHasOtherAlias.kt");
+        }
+
+        @TestMetadata("addImportOnJavaClass.kt")
+        public void testAddImportOnJavaClass() throws Exception {
+            runTest("testData/intentions/introduceImportAlias/addImportOnJavaClass.kt");
         }
 
         @TestMetadata("addImportWithDefaultClass.kt")

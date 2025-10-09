@@ -26,8 +26,8 @@ jvm_library(
     "//platform/lang-impl",
     "//spellchecker",
     "//platform/core-ui",
-    "@lib//:fastutil-min",
-    "@lib//:guava",
+    "//libraries/fastutil",
+    "//libraries/guava",
   ]
 )
 
@@ -51,8 +51,8 @@ jvm_library(
     "//spellchecker",
     "//spellchecker:spellchecker_test_lib",
     "//platform/core-ui",
-    "@lib//:fastutil-min",
-    "@lib//:guava",
+    "//libraries/fastutil",
+    "//libraries/guava",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/IntelliLang:langInjection",

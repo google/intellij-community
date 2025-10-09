@@ -40,7 +40,7 @@ jvm_library(
     "@lib//:kotlin-gradle-plugin-idea-proto",
     "@lib//:kotlin-gradle-plugin-idea",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:guava",
+    "//libraries/guava",
     "@lib//:gradle",
     "//jps/model-api:model",
     "//platform/lang-core",
@@ -87,7 +87,7 @@ jvm_library(
     "//platform/backend/observation",
     "//plugins/kotlin/code-insight/utils",
     "@lib//:opentelemetry",
-    "@lib//:commons-lang3",
+    "//libraries/commons/lang3",
     "//plugins/kotlin/jvm-debugger/coroutines",
   ]
 )
@@ -114,7 +114,7 @@ jvm_library(
     "@lib//:kotlin-gradle-plugin-idea-proto",
     "@lib//:kotlin-gradle-plugin-idea",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:guava",
+    "//libraries/guava",
     "@lib//:gradle",
     "//jps/model-api:model",
     "//platform/lang-core",
@@ -171,7 +171,7 @@ jvm_library(
     "//platform/backend/observation:observation_test_lib",
     "//plugins/kotlin/code-insight/utils",
     "@lib//:opentelemetry",
-    "@lib//:commons-lang3",
+    "//libraries/commons/lang3",
     "//plugins/kotlin/jvm-debugger/coroutines",
   ]
 )

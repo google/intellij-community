@@ -134,6 +134,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     installSource: FUSEventSource?,
     modalityState: ModalityState?,
     pluginEnabler: PluginEnabler?,
+    customRepoPlugins: List<PluginUiModel>,
   ): InstallPluginResult {
     val session = findSession(sessionId) ?: return InstallPluginResult.FAILED
     val pluginEnabler = pluginEnabler ?: SessionStatePluginEnabler(session)
@@ -213,7 +214,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
                                                         session.needRestart
         )
 
-        return@withContext performInstallOperation(installPluginRequest, parentComponent, modalityState, pluginEnabler)
+        return@withContext performInstallOperation(installPluginRequest, parentComponent, modalityState, pluginEnabler, customRepoPlugins)
 
       }
     }
@@ -227,6 +228,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     pluginEnabler: PluginEnabler?,
     modalityState: ModalityState?,
     parentComponent: JComponent?,
+    customRepoPlugins: List<PluginUiModel>,
   ): InstallPluginResult {
     val session = findSession(sessionId) ?: return InstallPluginResult.FAILED
     val pluginEnabler = pluginEnabler ?: SessionStatePluginEnabler(session)
@@ -250,11 +252,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
                                                     session.needRestart
     )
 
-    return performInstallOperation(installPluginRequest, parentComponent, modalityState, pluginEnabler)
-  }
-
-  private fun getCustomRepoPlugins(): List<PluginUiModel> {
-    return CustomPluginRepositoryService.getInstance().getCustomRepositoryPlugins().toList().withSource()
+    return performInstallOperation(installPluginRequest, parentComponent, modalityState, pluginEnabler, customRepoPlugins)
   }
 
   private suspend fun loadDetails(descriptor: PluginUiModel): PluginUiModel? {
@@ -414,8 +412,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   }
 
   override suspend fun loadDescriptorById(pluginId: PluginId): PluginUiModel? {
-    val clientPluginId = PluginId.getId(pluginId.idString)
-    val updateData = service<UpdateCheckerFacade>().getInternalPluginUpdates(updateablePluginsMap = mutableMapOf(clientPluginId to null))
+    val updateData = service<UpdateCheckerFacade>().getInternalPluginUpdates(updateablePluginsMap = mutableMapOf(pluginId to null))
     return updateData.pluginUpdates.all.asSequence()
       .filter { it.pluginVersion != null }
       .map { it.uiModel ?: PluginUiModelAdapter(it.descriptor) }
@@ -464,12 +461,13 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
     parentComponent: JComponent?,
     modalityState: ModalityState?,
     pluginEnabler: PluginEnabler,
+    customRepoPlugins: List<PluginUiModel>,
   ): InstallPluginResult {
     val session = findSession(request.sessionId) ?: return InstallPluginResult.FAILED
     val result = InstallPluginResult()
     val pluginsToInstallSynchronously: MutableList<PendingDynamicPluginInstall> = mutableListOf()
     coroutineToIndicator {
-      val operation = PluginInstallOperation(request.pluginsToInstall, getCustomRepoPlugins(), it, pluginEnabler)
+      val operation = PluginInstallOperation(request.pluginsToInstall, customRepoPlugins, it, pluginEnabler)
       operation.setAllowInstallWithoutRestart(request.allowInstallWithoutRestart)
       var cancel = false
       var success = true

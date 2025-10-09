@@ -1,7 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.frame
 
-import com.intellij.execution.RunContentDescriptorId
+import com.intellij.execution.RunContentDescriptorIdImpl
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.Disposable
@@ -13,6 +13,7 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.xdebugger.SplitDebuggerMode
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebugSessionListener
 import com.intellij.xdebugger.XSourcePosition
@@ -23,7 +24,6 @@ import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.frame.XSuspendContext
 import com.intellij.xdebugger.impl.XDebugSessionImpl
-import com.intellij.xdebugger.impl.XDebuggerSplitModeEnabler
 import com.intellij.xdebugger.impl.XSourceKind
 import com.intellij.xdebugger.impl.XSteppingSuspendContext
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase
@@ -36,13 +36,15 @@ import com.intellij.xdebugger.ui.XDebugTabLayouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import javax.swing.event.HyperlinkListener
 
 @ApiStatus.Internal
 interface XDebugSessionProxy {
-  val runContentDescriptorId: RunContentDescriptorId?
+  val runContentDescriptorId: RunContentDescriptorIdImpl?
 
   val project: Project
 
@@ -80,6 +82,8 @@ interface XDebugSessionProxy {
   val smartStepIntoHandlerEntry: XSmartStepIntoHandlerEntry?
   val currentSuspendContextCoroutineScope: CoroutineScope?
 
+  val activeNonLineBreakpointFlow: Flow<XBreakpointProxy?>
+
   fun getCurrentPosition(): XSourcePosition?
   fun getTopFramePosition(): XSourcePosition?
   fun getFrameSourcePosition(frame: XStackFrame): XSourcePosition?
@@ -87,6 +91,7 @@ interface XDebugSessionProxy {
   fun getCurrentExecutionStack(): XExecutionStack?
   fun getCurrentStackFrame(): XStackFrame?
   fun setCurrentStackFrame(executionStack: XExecutionStack, frame: XStackFrame, isTopFrame: Boolean = executionStack.topFrame == frame)
+  fun isTopFrameSelected(): Boolean
   fun hasSuspendContext(): Boolean
   fun isSteppingSuspendContext(): Boolean
   fun computeExecutionStacks(provideContainer: () -> XSuspendContext.XExecutionStackContainer)
@@ -95,7 +100,6 @@ interface XDebugSessionProxy {
   fun rebuildViews()
   fun registerAdditionalActions(leftToolbar: DefaultActionGroup, topLeftToolbar: DefaultActionGroup, settings: DefaultActionGroup)
   fun putKey(sink: DataSink)
-  fun updateExecutionPosition()
   fun createFileColorsCache(framesList: XDebuggerFramesList): XStackFramesListColorsCache
 
   fun areBreakpointsMuted(): Boolean
@@ -118,23 +122,20 @@ interface XDebugSessionProxy {
 
     @JvmStatic
     fun useFeProxy(): Boolean {
-      val testProperty = System.getProperty("xdebugger.toolwindow.split.for.tests")
-      if (testProperty != null) {
-        return testProperty.toBoolean()
-      }
-      return useFeProxyCachedValue
+      return SplitDebuggerMode.useFeProxy()
     }
 
     @JvmStatic
     fun useFeLineBreakpointProxy(): Boolean = useFeProxy()
 
+    @JvmStatic
     fun showFeWarnings(): Boolean = Registry.`is`("xdebugger.toolwindow.split.warnings")
   }
 
   // TODO WeakReference<XDebugSession>?
   class Monolith(val session: XDebugSession) : XDebugSessionProxy {
-    override val runContentDescriptorId: RunContentDescriptorId?
-      get() = session.runContentDescriptor.id
+    override val runContentDescriptorId: RunContentDescriptorIdImpl?
+      get() = (session as XDebugSessionImpl).getRunContentDescriptorIfInitialized()?.id as RunContentDescriptorIdImpl?
 
     override val project: Project
       get() = session.project
@@ -161,7 +162,7 @@ interface XDebugSessionProxy {
     override val editorsProvider: XDebuggerEditorsProvider
       get() = session.debugProcess.editorsProvider
     override val valueMarkers: XValueMarkers<*, *>?
-      get() = (session as XDebugSessionImpl).valueMarkers
+      get() = (session as? XDebugSessionImpl)?.valueMarkers
     override val sessionTab: XDebugSessionTab?
       get() = (session as? XDebugSessionImpl)?.sessionTab
     override val sessionTabWhenInitialized: Deferred<XDebugSessionTab>
@@ -206,6 +207,9 @@ interface XDebugSessionProxy {
     override val currentSuspendContextCoroutineScope: CoroutineScope?
       get() = (session as XDebugSessionImpl).currentSuspendCoroutineScope
 
+    override val activeNonLineBreakpointFlow: Flow<XBreakpointProxy?> get() = (session as XDebugSessionImpl)
+      .activeNonLineBreakpointFlow.map { (it as? XBreakpointBase<*, *, *>)?.asProxy() }
+
     override fun getCurrentPosition(): XSourcePosition? {
       return session.currentPosition
     }
@@ -232,6 +236,10 @@ interface XDebugSessionProxy {
 
     override fun setCurrentStackFrame(executionStack: XExecutionStack, frame: XStackFrame, isTopFrame: Boolean) {
       (session as? XDebugSessionImpl)?.setCurrentStackFrame(executionStack, frame, isTopFrame)
+    }
+
+    override fun isTopFrameSelected(): Boolean {
+      return (session as? XDebugSessionImpl)?.isTopFrameSelected ?: false
     }
 
     override fun hasSuspendContext(): Boolean {
@@ -262,10 +270,6 @@ interface XDebugSessionProxy {
 
     override fun putKey(sink: DataSink) {
       sink[XDebugSession.DATA_KEY] = session
-    }
-
-    override fun updateExecutionPosition() {
-      (session as? XDebugSessionImpl)?.updateExecutionPosition()
     }
 
     override fun createFileColorsCache(framesList: XDebuggerFramesList): XStackFramesListColorsCache {
@@ -361,8 +365,4 @@ interface XDebugSessionProxy {
 @ApiStatus.Internal
 interface XSmartStepIntoHandlerEntry {
   val popupTitle: String
-}
-
-private val useFeProxyCachedValue by lazy {
-  Registry.`is`("xdebugger.toolwindow.split") || XDebuggerSplitModeEnabler.EP_NAME.extensionList.any { it.useSplitDebuggerMode() }
 }

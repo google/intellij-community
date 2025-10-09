@@ -52,7 +52,7 @@ public class OrderRootType {
    * {@link #EP_NAME} and are combined with this list in {@link #getAllPersistentTypesList()}.
    */
   private static final @NotNull @Unmodifiable List<PersistentOrderRootType> PREDEFINED_PERSISTENT_TYPES =
-    ContainerUtil.map(List.of(CLASSES, SOURCES), PersistentOrderRootType.class::cast);
+    List.of((PersistentOrderRootType)CLASSES, (PersistentOrderRootType)SOURCES);
 
   /**
    * Generic documentation order root type
@@ -89,10 +89,22 @@ public class OrderRootType {
     return false;
   }
 
+  /**
+   * <h3>Obsolescence notice</h3>
+   * Returns the same elements as {@link #getAllPersistentTypesList()}, but as an array.
+   * Kept for compatibility; prefer {@link #getAllPersistentTypesList()}.
+   */
+  @ApiStatus.Obsolete
   public static OrderRootType @NotNull [] getAllTypes() {
     return getAllPersistentTypes();
   }
 
+  /**
+   * <h3>Obsolescence notice</h3>
+   * Returns the same elements as {@link #getAllPersistentTypesList()}, but as an array.
+   * Kept for compatibility; prefer {@link #getAllPersistentTypesList()}.
+   */
+  @ApiStatus.Obsolete
   public static PersistentOrderRootType @NotNull [] getAllPersistentTypes() {
     return getAllPersistentTypesList().toArray(new PersistentOrderRootType[0]);
   }

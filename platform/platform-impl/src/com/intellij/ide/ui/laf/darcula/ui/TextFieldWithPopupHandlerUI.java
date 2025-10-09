@@ -310,7 +310,6 @@ public abstract class TextFieldWithPopupHandlerUI extends BasicTextFieldUI imple
         for (IconHolder holder : icons.values()) {
           if (holder.iconButton != null) {
             holder.iconButton.setEnabled(enabled);
-            holder.iconButton.setFocusable(enabled);
           }
         }
       }
@@ -616,7 +615,6 @@ public abstract class TextFieldWithPopupHandlerUI extends BasicTextFieldUI imple
     if (component != null && holder.iconButton != null) {
       component.add(holder.iconButton);
       holder.iconButton.setEnabled(component.isEnabled());
-      holder.iconButton.setFocusable(component.isEnabled());
     }
   }
 
@@ -650,7 +648,7 @@ public abstract class TextFieldWithPopupHandlerUI extends BasicTextFieldUI imple
 
     private IconHolder(Extension extension) {
       this.extension = extension;
-      if (extension.isFocusable() && Registry.is("text.field.extension.buttons.focusable")) {
+      if (extension.isFocusable() && Registry.is("text.field.extension.buttons.focusable", true)) {
         iconButton = new IconButton(this);
         iconButton.setToolTipText(extension.getTooltip());
         iconButton.getAccessibleContext().setAccessibleName(extension.getTooltip());

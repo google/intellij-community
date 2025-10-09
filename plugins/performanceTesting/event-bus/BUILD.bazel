@@ -16,10 +16,10 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:jackson",
-    "@lib//:jackson-module-kotlin",
-    "@lib//:jackson-databind",
-    "@lib//:kotlin-reflect",
+    "//libraries/jackson/jackson",
+    "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
+    "//libraries/jackson/databind",
+    "//libraries/kotlin/reflect",
   ]
 )
 
@@ -32,10 +32,10 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:junit5",
-    "@lib//:jackson",
-    "@lib//:jackson-module-kotlin",
-    "@lib//:jackson-databind",
-    "@lib//:kotlin-reflect",
+    "//libraries/jackson/jackson",
+    "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
+    "//libraries/jackson/databind",
+    "//libraries/kotlin/reflect",
   ]
 )
 ### auto-generated section `build intellij.tools.ide.starter.bus` end

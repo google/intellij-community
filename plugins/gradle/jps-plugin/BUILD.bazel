@@ -22,11 +22,11 @@ jvm_library(
     "//jps/model-serialization",
     "@lib//:gradle",
     "@lib//:gradle-jps-ant",
-    "@lib//:gson",
+    "//libraries/gson",
     "//plugins/groovy/jps-plugin:jps",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "//platform/util/jdom",
-    "@lib//:hash4j",
+    "//libraries/hash4j",
   ]
 )
 
@@ -45,14 +45,14 @@ jvm_library(
     "//jps/model-serialization",
     "@lib//:gradle",
     "@lib//:gradle-jps-ant",
-    "@lib//:gson",
+    "//libraries/gson",
     "//plugins/groovy/jps-plugin:jps",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "//platform/util/jdom",
     "//jps/jps-builders:build-tests_test_lib",
-    "@lib//:hash4j",
+    "//libraries/hash4j",
   ]
 )
 ### auto-generated section `build intellij.gradle.jps` end

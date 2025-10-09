@@ -15,7 +15,7 @@ jvm_library(
   resources = [":configuration-script_resources"],
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlin-reflect",
+    "//libraries/kotlin/reflect",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
@@ -42,7 +42,7 @@ jvm_library(
   associates = [":configuration-script"],
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlin-reflect",
+    "//libraries/kotlin/reflect",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
@@ -64,7 +64,7 @@ jvm_library(
     "//platform/configuration-store-impl:configurationStore-impl",
     "//platform/object-serializer",
     "//platform/object-serializer:object-serializer_test_lib",
-    "@lib//:jackson",
+    "//libraries/jackson/jackson",
     "//platform/service-container",
     "//platform/service-container:service-container_test_lib",
     "@lib//:snakeyaml-engine",

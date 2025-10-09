@@ -5,6 +5,7 @@ import com.intellij.ide.IdeBundle
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.util.Disposer
+import com.intellij.platform.searchEverywhere.SePreviewInfo
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
 import com.intellij.platform.searchEverywhere.SeResultEvent
@@ -22,8 +23,7 @@ import org.jetbrains.annotations.ApiStatus.Internal
 
 @Internal
 class SeFilesTab(private val delegate: SeTabDelegate) : SeTab {
-  override val name: String get() = IdeBundle.message("search.everywhere.group.name.files")
-  override val shortName: String get() = name
+  override val name: String get() = NAME
   override val id: String get() = ID
   override val isIndexingDependent: Boolean get() = true
 
@@ -58,6 +58,14 @@ class SeFilesTab(private val delegate: SeTabDelegate) : SeTab {
     return delegate.performExtendedAction(item)
   }
 
+  override suspend fun isPreviewEnabled(): Boolean {
+    return delegate.isPreviewEnabled()
+  }
+
+  override suspend fun getPreviewInfo(itemData: SeItemData): SePreviewInfo? {
+    return delegate.getPreviewInfo(itemData, false)
+  }
+
   override fun dispose() {
     Disposer.dispose(delegate)
   }
@@ -65,5 +73,7 @@ class SeFilesTab(private val delegate: SeTabDelegate) : SeTab {
   companion object {
     @Internal
     const val ID: String = "FileSearchEverywhereContributor"
+    @Internal
+    val NAME: String = IdeBundle.message("search.everywhere.group.name.files")
   }
 }

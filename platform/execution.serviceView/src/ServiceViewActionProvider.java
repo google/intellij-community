@@ -42,7 +42,6 @@ public final class ServiceViewActionProvider {
   private static final @NonNls String SERVICE_VIEW_TREE_TOOLBAR = "ServiceViewTreeToolbar";
 
   static final DataKey<List<ServiceViewItem>> SERVICES_SELECTED_ITEMS = DataKey.create("services.selected.items");
-  static final DataKey<List<ServiceViewDescriptorId>> SERVICES_SELECTED_DESCRIPTOR_IDS = DataKey.create("services.selected.descriptor.ids");
 
   private static final ServiceViewActionProvider ourInstance = new ServiceViewActionProvider();
 
@@ -132,6 +131,7 @@ public final class ServiceViewActionProvider {
   }
 
   static boolean isActionToolBarRequired(JComponent component) {
+    if (component instanceof FrontendServiceViewLuxComponent) return false;
     Boolean holder = ClientProperty.get(component, ServiceViewDescriptor.ACTION_HOLDER_KEY);
     if (Boolean.TRUE == holder) {
       return false;

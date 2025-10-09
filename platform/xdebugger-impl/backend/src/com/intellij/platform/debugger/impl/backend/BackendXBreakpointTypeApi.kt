@@ -2,6 +2,7 @@
 package com.intellij.platform.debugger.impl.backend
 
 import com.intellij.ide.rpc.DocumentPatchVersion
+import com.intellij.ide.rpc.util.toRpc
 import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.vfs.VirtualFileId
 import com.intellij.ide.vfs.virtualFile
@@ -11,6 +12,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.impl.EditorId
 import com.intellij.openapi.editor.impl.findEditorOrNull
@@ -24,7 +26,6 @@ import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.findProject
 import com.intellij.platform.project.findProjectOrNull
-import com.intellij.platform.rpc.backend.impl.DocumentSync
 import com.intellij.util.DocumentUtil
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.xdebugger.XDebuggerManager
@@ -246,23 +247,18 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
   override suspend fun computeInlineBreakpointVariants(projectId: ProjectId, fileId: VirtualFileId, lines: Set<Int>, documentPatchVersion: DocumentPatchVersion?): List<InlineBreakpointVariantsOnLine>? {
     val project = projectId.findProject()
     val file = fileId.virtualFile() ?: return emptyList()
-    DocumentSync.awaitDocumentSync()
     val document = readAction { file.findDocument() } ?: return emptyList()
-    if (!document.documentVersionMatches(project, documentPatchVersion)) return null
+    if (!document.awaitIsInSyncAndCommitted(project, documentPatchVersion)) return null
     val lineToVariants = InlineBreakpointsVariantsManager.getInstance(project).calculateBreakpointsVariants(document, lines)
     return lineToVariants.map { (line, variants) ->
-      InlineBreakpointVariantsOnLine(line, variants.map { it.toRpc() })
+      InlineBreakpointVariantsOnLine(line, variants.map { it.toRpc(project, document) })
     }
   }
 
-  override suspend fun createVariantBreakpoint(projectId: ProjectId, fileId: VirtualFileId, line: Int, variantIndex: Int) {
+  override suspend fun createVariantBreakpoint(projectId: ProjectId, fileId: VirtualFileId, line: Int, variantId: XInlineBreakpointVariantId) {
     val project = projectId.findProject()
     val file = fileId.virtualFile() ?: return
-    val document = readAction { file.findDocument() } ?: return
-    // TODO avoid collecting variants again
-    val variants = InlineBreakpointsVariantsManager.getInstance(project).calculateBreakpointsVariants(document, setOf(line))
-      .getOrDefault(line, emptyList())
-    val variant = variants.getOrNull(variantIndex)?.variant ?: return
+    val variant = variantId.findValue() ?: return
     edtWriteAction {
       val breakpointManager = XDebuggerManager.getInstance(project).breakpointManager
       XDebuggerUtilImpl.addLineBreakpoint(breakpointManager, variant, file, line)
@@ -347,15 +343,16 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
 @Service(Service.Level.PROJECT)
 private class BackendXBreakpointTypeApiProjectCoroutineScope(val cs: CoroutineScope)
 
-private suspend fun InlineVariantWithMatchingBreakpoint.toRpc(): InlineBreakpointVariantWithMatchingBreakpointDto {
+private suspend fun InlineVariantWithMatchingBreakpoint.toRpc(project: Project, document: Document): InlineBreakpointVariantWithMatchingBreakpointDto {
   return InlineBreakpointVariantWithMatchingBreakpointDto(
-    variant = variant?.toRpc(),
+    variant = variant?.toRpc(project, document),
     breakpointId = breakpoint?.breakpointId,
   )
 }
 
-private suspend fun XLineBreakpointType<*>.XLineBreakpointVariant.toRpc(): XInlineBreakpointVariantDto {
+private suspend fun XLineBreakpointType<*>.XLineBreakpointVariant.toRpc(project: Project, document: Document): XInlineBreakpointVariantDto {
   return XInlineBreakpointVariantDto(
+    InlineBreakpointsIdManager.getInstance(project).createId(this, document),
     highlightRange = readAction { highlightRange?.toRpc() },
     icon = type.enabledIcon.rpcId(),
     tooltipDescription = tooltipDescription,

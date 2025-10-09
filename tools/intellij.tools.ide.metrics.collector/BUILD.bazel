@@ -22,10 +22,10 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
-    "@lib//:jackson",
+    "//libraries/jackson/jackson",
     "//platform/util",
-    "@lib//:jackson-databind",
-    "@lib//:jackson-module-kotlin",
+    "//libraries/jackson/databind",
+    "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
     "//platform/diagnostic/telemetry",
     "//platform/diagnostic/telemetry.exporters",
     "@lib//:opentelemetry",
@@ -33,7 +33,7 @@ jvm_library(
     "//tools/intellij.tools.ide.util.common:ide-util-common",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
   ]
 )
 
@@ -47,10 +47,10 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
-    "@lib//:jackson",
+    "//libraries/jackson/jackson",
     "//platform/util",
-    "@lib//:jackson-databind",
-    "@lib//:jackson-module-kotlin",
+    "//libraries/jackson/databind",
+    "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
     "@lib//:kotlin-test-assertions-core-jvm",
     "@lib//:junit5",
     "//libraries/mockito",
@@ -63,7 +63,7 @@ jvm_library(
     "//tools/intellij.tools.ide.util.common:ide-util-common",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "@lib//:assert_j",
   ]
 )

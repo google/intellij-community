@@ -15,8 +15,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.dependency.DependencyGraph;
 import org.jetbrains.jps.dependency.GraphConfiguration;
 import org.jetbrains.jps.dependency.impl.DependencyGraphImpl;
+import org.jetbrains.jps.util.SystemInfo;
 
 import java.io.*;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.*;
@@ -122,7 +124,7 @@ public class StorageManager implements CloseableExt {
     if (builder == null) {
       Path output = myContext.getOutputZip();
       Path previousOutput = DataPaths.getJarBackupStoreFile(myContext, output);
-      myOutputBuilder = builder = new ZipOutputBuilderImpl(createOffHeapMap(output.getFileName().toString()), previousOutput, output);
+      myOutputBuilder = builder = new ZipOutputBuilderImpl(createOffHeapMap(output.getFileName().toString()), previousOutput, output, true);
     }
     return builder;
   }
@@ -134,7 +136,7 @@ public class StorageManager implements CloseableExt {
       Path abiOutputPath = myContext.getAbiOutputZip();
       if (abiOutputPath != null) {
         Path previousAbiOutput = DataPaths.getJarBackupStoreFile(myContext, abiOutputPath);
-        myAbiOutputBuilder = builder = new ZipOutputBuilderImpl(createOffHeapMap(abiOutputPath.getFileName().toString()), previousAbiOutput, abiOutputPath);
+        myAbiOutputBuilder = builder = new ZipOutputBuilderImpl(createOffHeapMap(abiOutputPath.getFileName().toString()), previousAbiOutput, abiOutputPath, false);
       }
     }
     return builder;
@@ -178,6 +180,7 @@ public class StorageManager implements CloseableExt {
       closeDataStorages(saveChanges);
     }
     finally {
+      myDataSwapStore.rollback();
       if (myDataSwapStore.getFileStore() instanceof OffHeapStore store) {
         store.truncate(0); // forcibly clean byte buffers
       }
@@ -251,7 +254,24 @@ public class StorageManager implements CloseableExt {
     return null;
   }
 
-  private static final String WINDOWS_ERROR_TOO_MANY_LINKS = "An attempt was made to create more links on a file than the file system supports";
+  private static final String WINDOWS_ERROR_TOO_MANY_LINKS;
+  static {
+    // sun.nio.fs.WindowsNativeDispatcher.FormatMessage(1142)
+    String errorMessage = "An attempt was made to create more links on a file than the file system supports"; // default
+    if (SystemInfo.isWindows) {
+      try {
+        // attempt to get the locate specific error message
+        Method requestMethod = Class.forName("sun.nio.fs.WindowsNativeDispatcher").getDeclaredMethod("FormatMessage", int.class);
+        requestMethod.setAccessible(true);
+        errorMessage = (String)requestMethod.invoke(null, 1142 /*the code for 'too many hardlinks' error*/);
+      }
+      catch (Throwable err) {
+        throw new RuntimeException(err);
+      }
+    }
+    WINDOWS_ERROR_TOO_MANY_LINKS = errorMessage;
+  }
+  
   private static boolean tryCreateLink(Path link, Path existing) {
     try {
       Files.createLink(link, existing);
@@ -259,7 +279,7 @@ public class StorageManager implements CloseableExt {
     }
     catch (FileSystemException e) {
       String message = e.getMessage();
-      if (message != null && e.getMessage().endsWith(WINDOWS_ERROR_TOO_MANY_LINKS)) {
+      if (message != null && message.endsWith(WINDOWS_ERROR_TOO_MANY_LINKS)) {
         return false;
       }
       else {

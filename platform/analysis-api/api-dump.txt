@@ -5,6 +5,24 @@ com.intellij.codeInsight.completion.BatchConsumer
 f:com.intellij.codeInsight.completion.CompletionConfidenceEP
 - com.intellij.lang.LanguageExtensionPoint
 - <init>():V
+f:com.intellij.codeInsight.completion.CompletionParameters
+- getCompletionType():com.intellij.codeInsight.completion.CompletionType
+- getEditor():com.intellij.openapi.editor.Editor
+- getInvocationCount():I
+- getOffset():I
+- getOriginalFile():com.intellij.psi.PsiFile
+- getOriginalPosition():com.intellij.psi.PsiElement
+- getPosition():com.intellij.psi.PsiElement
+- getProcess():com.intellij.codeInsight.completion.CompletionProcess
+- isAutoPopup():Z
+- isCompleteOnlyNotImported():Z
+- isExtendedCompletion():Z
+- isTestingMode():Z
+- setCompleteOnlyNotImported(Z):V
+- setTestingMode(Z):V
+- withInvocationCount(I):com.intellij.codeInsight.completion.CompletionParameters
+- withPosition(com.intellij.psi.PsiElement,I):com.intellij.codeInsight.completion.CompletionParameters
+- withType(com.intellij.codeInsight.completion.CompletionType):com.intellij.codeInsight.completion.CompletionParameters
 com.intellij.codeInsight.completion.CompletionProcess
 - a:isAutopopupCompletion():Z
 a:com.intellij.codeInsight.completion.CompletionService
@@ -607,6 +625,7 @@ com.intellij.modcommand.ModCommandExecutor
 - a:executeForFileCopy(com.intellij.modcommand.ModCommand,com.intellij.psi.PsiFile):V
 - a:executeInBatch(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModCommand):com.intellij.modcommand.ModCommandExecutor$BatchExecutionResult
 - a:executeInteractively(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModCommand,com.intellij.openapi.editor.Editor):V
+- s:executeInteractively(com.intellij.modcommand.ActionContext,java.lang.String,com.intellij.openapi.editor.Editor,java.util.function.Supplier):V
 - s:getInstance():com.intellij.modcommand.ModCommandExecutor
 - a:getPreview(com.intellij.modcommand.ModCommand,com.intellij.modcommand.ActionContext):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 com.intellij.modcommand.ModCommandService

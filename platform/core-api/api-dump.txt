@@ -385,7 +385,6 @@ com.intellij.openapi.application.AppUIExecutor
 - s:onUiThread(com.intellij.openapi.application.ModalityState):com.intellij.openapi.application.AppUIExecutor
 - s:onWriteThread():com.intellij.openapi.application.AppUIExecutor
 - s:onWriteThread(com.intellij.openapi.application.ModalityState):com.intellij.openapi.application.AppUIExecutor
-- a:withDocumentsCommitted(com.intellij.openapi.project.Project):com.intellij.openapi.application.AppUIExecutor
 com.intellij.openapi.application.Application
 - com.intellij.openapi.components.ComponentManager
 - a:acquireReadActionLock():com.intellij.openapi.application.AccessToken
@@ -872,7 +871,6 @@ com.intellij.openapi.vfs.AsyncFileListener
 com.intellij.openapi.vfs.AsyncFileListener$ChangeApplier
 - afterVfsChange():V
 - beforeVfsChange():V
-com.intellij.openapi.vfs.LocalFileProvider
 com.intellij.openapi.vfs.NonPhysicalFileSystem
 com.intellij.openapi.vfs.SavingRequestor
 com.intellij.openapi.vfs.VersionManagingFileSystem

@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationNamesInfo;
+import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -24,11 +25,11 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.BuildNumber;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.ContainerUtil;
+import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.intellij.ide.actions.SettingsEntryPointAction.*;
 
@@ -43,7 +44,7 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
   private static boolean myNewPlatformUpdate;
   private static @Nullable String myNextRunPlatformUpdateVersion;
   private static @Nullable PlatformUpdates.Loaded myPlatformUpdateInfo;
-  private static @Nullable Collection<? extends IdeaPluginDescriptor> myIncompatiblePlugins;
+  private static @Nullable List<String> myIncompatiblePluginNames;
 
   private static @Nullable Set<String> myAlreadyShownPluginUpdates;
   private static @Nullable Collection<PluginDownloader> myUpdatesForPlugins;
@@ -140,7 +141,7 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
 
   public static void newPlatformUpdate(@NotNull PlatformUpdates.Loaded platformUpdateInfo,
                                        @NotNull List<PluginDownloader> updatesForPlugins,
-                                       @NotNull Collection<? extends IdeaPluginDescriptor> incompatiblePlugins) {
+                                       @NotNull List<String> incompatiblePluginNames) {
     UpdateSettings settings = UpdateSettings.getInstance();
     if (settings.isCheckNeeded()) {
       setPlatformUpdateInfo(platformUpdateInfo);
@@ -149,7 +150,7 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
       setPlatformUpdateInfo(null);
     }
     if (settings.isPluginsCheckNeeded()) {
-      newPlatformUpdate(updatesForPlugins, incompatiblePlugins, null);
+      newPlatformUpdate(updatesForPlugins, incompatiblePluginNames, null);
     }
     else {
       newPlatformUpdate(null, null, (String)null);
@@ -176,10 +177,10 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
   }
 
   private static void newPlatformUpdate(@Nullable List<PluginDownloader> updatesForPlugins,
-                                        @Nullable Collection<? extends IdeaPluginDescriptor> incompatiblePlugins,
+                                        @Nullable List<String> incompatiblePluginNames,
                                         @Nullable String nextRunPlatformUpdateVersion) {
     myUpdatesForPlugins = updatesForPlugins;
-    myIncompatiblePlugins = incompatiblePlugins;
+    myIncompatiblePluginNames = incompatiblePluginNames;
     myNextRunPlatformUpdateVersion = nextRunPlatformUpdateVersion;
   }
 
@@ -272,7 +273,7 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
           if (platformUpdateInfo instanceof PlatformUpdates.Loaded && pluginResults != null) {
             setPlatformUpdateInfo((PlatformUpdates.Loaded)platformUpdateInfo);
             newPlatformUpdate(pluginResults.getPluginUpdates().getAllEnabled().stream().toList(),
-                              pluginResults.getPluginUpdates().getIncompatible().stream().toList(),
+                              ContainerUtil.map(pluginResults.getPluginUpdates().getIncompatible(), PluginDescriptor::getName),
                               null);
             super.actionPerformed(e);
           }
@@ -330,19 +331,15 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public void actionPerformed(@NotNull AnActionEvent e) {
-          Set<PluginId> pluginIds = myUpdatesForPlugins.stream().map(it -> it.getId()).collect(Collectors.toSet());
-          PluginModelAsyncOperationsExecutor.INSTANCE.findPlugins(pluginIds, plugins -> {
-            PluginUpdateDialog dialog =
-              new PluginUpdateDialog(e.getProject(), myUpdatesForPlugins, myCustomRepositoryPlugins, (Map<PluginId, PluginUiModel>)plugins);
+          PluginModelAsyncOperationsExecutor.INSTANCE.findPlugins(myUpdatesForPlugins, plugins -> {
+            var dialog = new PluginUpdateDialog(e.getProject(), plugins.values(), myCustomRepositoryPlugins, plugins);
             dialog.setFinishCallback(() -> setEnableUpdateAction(true));
             setEnableUpdateAction(false);
-
-            if (!dialog.showAndGet()) {
+            if (!PluginUpdateDialog.showDialogAndUpdate(myUpdatesForPlugins, dialog)) {
               setEnableUpdateAction(true);
             }
-            return null;
+            return Unit.INSTANCE;
           });
         }
       });
@@ -375,7 +372,7 @@ final class UpdateSettingsEntryPointActionProvider implements ActionProvider {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       PlatformUpdateDialog dialog = new PlatformUpdateDialog(e.getProject(), Objects.requireNonNull(myPlatformUpdateInfo),
-                                                             true, myUpdatesForPlugins, myIncompatiblePlugins);
+                                                             true, myUpdatesForPlugins, myIncompatiblePluginNames);
       if (dialog.showAndGet()) {
         clearUpdatesInfo();
       }

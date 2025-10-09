@@ -29,7 +29,7 @@ jvm_library(
     "@lib//:jediterm-ui",
     "//platform/core-ui",
     "//platform/code-style-api:codeStyle",
-    "@lib//:guava",
+    "//libraries/guava",
     "//platform/kernel/shared:kernel",
     "//platform/ide-core-impl",
     "//platform/statistics",
@@ -41,11 +41,14 @@ jvm_library(
     "//platform/inline-completion/shared:inline-completion",
     "//plugins/terminal/completion",
     "//platform/eel-provider",
-    "@lib//:caffeine",
+    "//libraries/caffeine",
     "//platform/observable",
     "@lib//:kotlinx-datetime-jvm",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
+    "//platform/project/shared:project",
+    "@lib//:pty4j",
+    "//platform/util/jdom",
   ]
 )
 ### auto-generated section `build intellij.terminal.frontend` end

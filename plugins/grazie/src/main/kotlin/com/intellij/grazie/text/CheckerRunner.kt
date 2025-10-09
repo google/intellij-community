@@ -2,6 +2,7 @@
 
 package com.intellij.grazie.text
 
+import ai.grazie.nlp.langs.Language
 import ai.grazie.nlp.tokenizer.Tokenizer
 import ai.grazie.nlp.tokenizer.sentence.StandardSentenceTokenizer
 import ai.grazie.utils.toLinkedSet
@@ -20,7 +21,14 @@ import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieCustomFixWrappe
 import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieReplaceTypoQuickFix
 import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieRuleSettingsAction
 import com.intellij.grazie.ide.language.LanguageGrammarChecking
+import com.intellij.grazie.text.TextChecker.ProofreadingContext
+import com.intellij.grazie.utils.HighlightingUtil
+import com.intellij.grazie.utils.NaturalTextDetector.seemsNatural
+import com.intellij.grazie.utils.getTextDomain
+import com.intellij.grazie.utils.toProofreadingContext
+import com.intellij.lang.annotation.ProblemGroup
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.runBlockingCancellable
@@ -38,6 +46,7 @@ import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 
 private val problemsKey = Key.create<CachedResults>("grazie.text.problems")
+private val LOG = Logger.getInstance(CheckerRunner::class.java)
 
 class CheckerRunner(val text: TextContent) {
   private val tokenizer
@@ -56,10 +65,15 @@ class CheckerRunner(val text: TextContent) {
   }
 
   fun run(): List<TextProblem> {
+    if (text.isBlank() || !seemsNatural(text.toString())) return emptyList()
+
+    val context = text.toProofreadingContext()
+    if (context.language == Language.UNKNOWN || HighlightingUtil.findInstalledLang(context.language) == null) return emptyList()
+
     val configStamp = service<GrazieConfig>().modificationCount
     var cachedProblems = getCachedProblems(configStamp)
     if (cachedProblems != null) return cachedProblems
-    cachedProblems = filter(doRun(TextChecker.allCheckers()))
+    cachedProblems = filter(doRun(TextChecker.allCheckers(), context))
     text.putUserData(problemsKey, CachedResults(configStamp, cachedProblems))
     return cachedProblems
   }
@@ -79,19 +93,31 @@ class CheckerRunner(val text: TextContent) {
     return null
   }
 
-  private fun doRun(checkers: List<TextChecker>): List<TextProblem> {
+  /**
+   * We want for the CPU-bound checkers to all happen on the same thread
+   * because other threads are all needed by other inspections during highlighting.
+   * But we also want for external checkers to make their network requests in parallel.
+   *
+   * So we split the checkers into coroutines but dispatch them on the same thread sequentially.
+   * We schedule the external checkers to start as soon as possible
+   * to allow them to make the requests and suspend, giving up the thread to others.
+   * Then we explicitly start the non-external checkers to do their work, probably CPU-bound.
+   * We periodically yield to allow the external checkers to process their network responses (if any) and possibly suspend further.
+   *
+   * In the end, we still collect the results in the checker registration order
+   * so that problems from the first checkers can override intersecting problems from others.
+   */
+  private fun doRun(checkers: List<TextChecker>, context: ProofreadingContext): List<TextProblem> {
     return runBlockingCancellable {
       val deferred = checkers.map { checker ->
         when (checker) {
-          is ExternalTextChecker -> async { checker.checkExternally(text) }
-          else -> async(start = CoroutineStart.LAZY) { checker.check(text) }
+          is ExternalTextChecker -> async { checker.checkExternally(context) }
+          else -> async(start = CoroutineStart.LAZY) { checker.check(context) }
         }
       }
-      launch {
-        for (job in deferred) {
-          yield() // allow the main coroutine to process the available results as soon as possible
-          job.start()
-        }
+      for (job in deferred) {
+        yield() // let all pending external checker jobs complete what they're ready to do and possibly suspend further
+        job.start()
       }
       deferred.awaitAll().flatten()
     }
@@ -127,14 +153,28 @@ class CheckerRunner(val text: TextContent) {
     val tooltip = problem.tooltipTemplate
     val description = problem.getDescriptionTemplate(isOnTheFly)
     return fileHighlightRanges(problem).map { range ->
-      val descriptor = GrazieProblemDescriptor(parent, description, range.shiftLeft(parent.startOffset), isOnTheFly, tooltip)
+      val rangeInElement = range.shiftLeft(parent.startOffset)
+      validateRangeInElement(parent, rangeInElement, problem)
+      val grazieDescriptor = GrazieProblemDescriptor(parent, description, rangeInElement, isOnTheFly, tooltip)
       if (isOnTheFly) {
-        descriptor.quickFixes = toFixes(problem, descriptor)
+        grazieDescriptor.quickFixes = toFixes(problem, grazieDescriptor)
       }
-      ProblemDescriptorWithReporterName(
-        descriptor,
-        if (problem.isStyleLike) GrazieInspection.STYLE_INSPECTION else GrazieInspection.GRAMMAR_INSPECTION
-      )
+      val shortName = if (problem.isStyleLike) GrazieInspection.STYLE_INSPECTION else GrazieInspection.GRAMMAR_INSPECTION
+      val descriptor = ProblemDescriptorWithReporterName(grazieDescriptor, shortName)
+      descriptor.problemGroup = ProblemGroup { shortName }
+      descriptor
+    }
+  }
+
+  private fun validateRangeInElement(psi: PsiElement, rangeInElement: TextRange?, problem: TextProblem) {
+    if (rangeInElement != null && psi.textRange != null) {
+      TextRange.assertProperRange(rangeInElement)
+      val psiTextLength = psi.textRange.length
+      if (rangeInElement.endOffset > psiTextLength) {
+        LOG.error("Argument rangeInElement ($rangeInElement) endOffset must not exceed descriptor text range " +
+                  "(${psi.textRange.startOffset}, ${psi.textRange.endOffset}) length ($psiTextLength). " +
+                  "PSI language: ${psi.language.id}, TextContent.fileRanges: ${problem.text.rangesInFile}")
+      }
     }
   }
 
@@ -233,7 +273,7 @@ class CheckerRunner(val text: TextContent) {
         super.applyFix(project, psiFile, editor)
       }
     })
-    result.add(GrazieRuleSettingsAction(problem.rule.presentableName, problem.rule))
+    result.add(GrazieRuleSettingsAction(problem.rule, problem.text.getTextDomain()))
     return result.toTypedArray()
   }
 

@@ -1,4 +1,4 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.gradleJava">
+<idea-plugin visibility="internal" package="org.jetbrains.kotlin.idea.gradleJava">
 
   <dependencies>
     <plugin id="org.jetbrains.plugins.gradle"/>
@@ -118,6 +118,7 @@
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <projectConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinGradleModuleConfigurator"/>
+    <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.SpringGradleKotlinCompilerPluginProjectConfigurator"/>
     <gradleModelFacade implementation="org.jetbrains.kotlin.idea.gradleJava.inspections.DefaultGradleModelFacade"/>
     <kotlinCompilerVersionProvider implementation="org.jetbrains.kotlin.idea.gradleJava.GradleKotlinCompilerVersionProvider"/>
   </extensions>

@@ -13,40 +13,44 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.terminal.completion.spec.ShellCommandSpec
-import com.intellij.terminal.frontend.ReworkedTerminalView
-import com.intellij.terminal.frontend.TimedKeyEvent
-import com.intellij.terminal.frontend.completion.TerminalLookupPrefixUpdater
-import com.intellij.terminal.session.TerminalBlocksModelState
-import com.intellij.terminal.session.TerminalOutputBlock
-import com.intellij.terminal.session.TerminalSession
+import com.intellij.terminal.frontend.view.activeOutputModel
+import com.intellij.terminal.frontend.view.completion.TerminalLookupPrefixUpdater
+import com.intellij.terminal.frontend.view.impl.TerminalViewImpl
+import com.intellij.terminal.frontend.view.impl.TimedKeyEvent
 import com.intellij.terminal.tests.block.util.TestCommandSpecsProvider
 import com.intellij.testFramework.ExtensionTestUtil
+import kotlinx.coroutines.cancel
 import org.jetbrains.plugins.terminal.JBTerminalSystemSettingsProvider
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecConflictStrategy
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecInfo
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecsProvider
+import org.jetbrains.plugins.terminal.block.reworked.MutableTerminalOutputModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
 import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
+import org.jetbrains.plugins.terminal.session.TerminalBlocksModelState
+import org.jetbrains.plugins.terminal.session.TerminalOutputBlock
+import org.jetbrains.plugins.terminal.util.terminalProjectScope
 import org.junit.Assume
 import java.awt.event.KeyEvent
 import java.awt.event.KeyEvent.VK_UNDEFINED
-import java.util.concurrent.CompletableFuture
-import kotlin.text.iterator
 import kotlin.time.TimeSource
 
 class TerminalCompletionFixture(val project: Project, val testRootDisposable: Disposable) {
 
-  private val view: ReworkedTerminalView
+  private val view: TerminalViewImpl
 
-  val outputModel: TerminalOutputModel
-    get() = view.outputModel
+  val outputModel: MutableTerminalOutputModel
+    get() = view.activeOutputModel() as MutableTerminalOutputModel
 
   init {
-    val sessionFuture: CompletableFuture<TerminalSession> = CompletableFuture<TerminalSession>()
-    view = ReworkedTerminalView(project, JBTerminalSystemSettingsProvider(), sessionFuture, null)
-    Disposer.register(testRootDisposable, view)
-    val terminalOutputBlock = TerminalOutputBlock(0, 0, 0, -1, 0, null)
+    val terminalScope = terminalProjectScope(project).childScope("TerminalViewImpl")
+    Disposer.register(testRootDisposable) {
+      terminalScope.cancel()
+    }
+    view = TerminalViewImpl(project, JBTerminalSystemSettingsProvider(), null, terminalScope)
+    val terminalOutputBlock = TerminalOutputBlock(0, outputModel.startOffset, outputModel.startOffset, null, outputModel.startOffset, null)
     val blocksModelState = TerminalBlocksModelState(listOf(terminalOutputBlock), 0)
     view.blocksModel.restoreFromState(blocksModelState)
 
@@ -114,13 +118,14 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
       KeyEvent.KEY_LOCATION_STANDARD
     )
     view.outputEditorEventsHandler.keyPressed(TimedKeyEvent(keyPressEvent, TimeSource.Monotonic.markNow()))
-    val offset = view.outputModel.cursorOffsetState.value.toRelative()
+
+    val offset = outputModel.cursorOffset
     val newOffset = when (keycode) {
       KeyEvent.VK_LEFT -> offset - 1
       KeyEvent.VK_RIGHT -> offset + 1
       else -> offset
     }
-    view.outputModel.updateCursorPosition(view.outputModel.relativeOffset(newOffset))
+    outputModel.updateCursorPosition(newOffset)
 
     awaitLookupPrefixUpdated()
   }
@@ -130,7 +135,7 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     val context = SimpleDataContext.builder()
       .add(CommonDataKeys.PROJECT, project)
       .add(CommonDataKeys.EDITOR, view.outputEditor)
-      .add(TerminalOutputModel.DATA_KEY, view.outputModel)
+      .add(TerminalOutputModel.DATA_KEY, outputModel)
       .build()
     val event = AnActionEvent.createEvent(action, context, null,
                                           "", ActionUiKind.NONE, null)

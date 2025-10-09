@@ -67,11 +67,9 @@ internal val DEFAULT_CUSTOM_MODULES: Map<String, CustomModuleDescription> = list
   CustomModuleDescription(moduleName = "intellij.idea.community.build.zip", bazelPackage = "@community//build", bazelTargetName = "zip",
                           outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build"),
   CustomModuleDescription(moduleName = "intellij.platform.jps.build.dependencyGraph", bazelPackage = "@community//build", bazelTargetName = "dependency-graph",
-                          outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build",
-                          additionalProductionTargets = listOf("@rules_jvm//dependency-graph:dependency-graph_resources"), additionalProductionJars = listOf("out/bazel-out/jvm-fastbuild/bin/external/rules_jvm+/dependency-graph/dependency-graph_resources.jar")),
+                          outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build"),
   CustomModuleDescription(moduleName = "intellij.platform.jps.build.javac.rt", bazelPackage = "@community//build", bazelTargetName = "build-javac-rt",
-                          outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build",
-                          additionalProductionTargets = listOf("@rules_jvm//jps-builders-6:build-javac-rt_resources"), additionalProductionJars = listOf("out/bazel-out/jvm-fastbuild/bin/external/rules_jvm+/jps-builders-6/build-javac-rt_resources.jar")),
+                          outputDirectory = "out/bazel-out/jvm-fastbuild/bin/external/community+/build"),
 ).associateBy { it.moduleName }
 
 @Suppress("ReplaceGetOrSet", "SSBasedInspection")
@@ -312,7 +310,7 @@ internal class BazelBuildFileGenerator(
     return internedLib
   }
 
-  fun computeModuleList(): ModuleList {
+  fun computeModuleList(m2Repo: Path): ModuleList {
     val community = ArrayList<ModuleDescriptor>()
     val ultimate = ArrayList<ModuleDescriptor>()
     val skippedModules = ArrayList<String>()
@@ -338,12 +336,12 @@ internal class BazelBuildFileGenerator(
     for (module in (community + ultimate)) {
       val hasSources = module.sources.isNotEmpty()
       if (hasSources || module.testSources.isEmpty()) {
-        result.deps.put(module, generateDeps(module = module, isTest = false, context = this, hasSources = hasSources))
+        result.deps.put(module, generateDeps(m2Repo, module = module, isTest = false, context = this, hasSources = hasSources))
       }
 
       val hasTestSources = module.testSources.isNotEmpty()
       if (hasTestSources || isTestClasspathModule(module)) {
-        result.testDeps.put(module, generateDeps(module = module, isTest = true, context = this, hasSources = hasTestSources))
+        result.testDeps.put(module, generateDeps(m2Repo = m2Repo, module = module, hasSources = hasTestSources, isTest = true, context = this))
       }
     }
 

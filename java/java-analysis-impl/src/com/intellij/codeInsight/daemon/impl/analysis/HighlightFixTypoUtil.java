@@ -110,6 +110,7 @@ public final class HighlightFixTypoUtil {
   }
 
   private static @Nullable ModCommandAction createThrowsTypoFix(@NotNull PsiErrorElement psiErrorElement) {
+    // class A throw<caret> SomeException
     PsiElement prevVisibleLeaf = PsiTreeUtil.prevVisibleLeaf(psiErrorElement);
     if (!(prevVisibleLeaf instanceof PsiJavaToken token && token.getTokenType() == JavaTokenType.RPARENTH)) return null;
     if (!(token.getParent() instanceof PsiParameterList parameterList && parameterList.getParent() instanceof PsiMethod)) {
@@ -130,6 +131,7 @@ public final class HighlightFixTypoUtil {
 
   @Nullable
   private static CommonIntentionAction createSynchronizedSwitchTypoFix(@NotNull PsiMethodCallExpression methodCallExpression) {
+    // switc<caret>()
     PsiExpressionList argumentList = methodCallExpression.getArgumentList();
     PsiExpression[] expressions = argumentList.getExpressions();
     if (expressions.length != 0 && expressions.length != 1) return null;
@@ -167,7 +169,64 @@ public final class HighlightFixTypoUtil {
     action = createCatchFinallyTypoFix(ref);
     if (action != null) return action;
     action = createSwitchDefaultTypoFix(ref);
+    if (action != null) return action;
+    action = createReturnTypoFix(ref);
+    if (action != null) return action;
+    action = createNewTypoFix(ref);
     return action;
+  }
+
+  @Nullable
+  private static CommonIntentionAction createNewTypoFix(@NotNull PsiJavaCodeReferenceElement ref) {
+    //return ne<caret> Something();
+    if (!(ref instanceof PsiReferenceExpression)) return null;
+    if (!(ref.getNextSibling() instanceof PsiErrorElement)) return null;
+    PsiElement nextVisibleLeaf = PsiTreeUtil.nextVisibleLeaf(ref);
+    if (!(nextVisibleLeaf instanceof PsiIdentifier identifier &&
+          identifier.getParent() instanceof PsiReferenceExpression referenceExpression &&
+          referenceExpression.getParent() instanceof PsiMethodCallExpression)) {
+      return null;
+    }
+    return QuickFixFactory.getInstance().createChangeToSimilarKeyword(ref, Collections.singleton(JavaKeywords.NEW));
+  }
+
+  @Nullable
+  private static CommonIntentionAction createReturnTypoFix(@NotNull PsiJavaCodeReferenceElement ref) {
+    boolean possiblePlace = false;
+    if (PsiTreeUtil.getParentOfType(ref, PsiStatement.class) instanceof PsiStatement statement &&
+        statement.getParent() instanceof PsiIfStatement) {
+      possiblePlace = true;
+    }
+
+    if (!possiblePlace) {
+      PsiCodeBlock codeBlock = PsiTreeUtil.getParentOfType(ref, PsiCodeBlock.class);
+      if (codeBlock == null) return null;
+      PsiStatement[] statements = codeBlock.getStatements();
+      if (statements.length == 0) return null;
+      //  static int test() {
+      //    retur<caret>
+      //  }
+      if (PsiTreeUtil.isAncestor(statements[statements.length - 1], ref, false)) {
+        possiblePlace = true;
+      }
+      //retur<caret> a();
+      if (statements.length > 1 &&
+          PsiTreeUtil.isAncestor(statements[statements.length - 2], ref, false) &&
+          PsiTreeUtil.hasErrorElements(statements[statements.length - 2])) {
+        possiblePlace = true;
+      }
+    }
+    if (!possiblePlace) return null;
+    if (ref instanceof PsiReferenceExpression referenceExpression &&
+        referenceExpression.getParent() instanceof PsiExpressionStatement &&
+        ref.getNextSibling() instanceof PsiErrorElement errorElement &&
+        errorElement.getErrorDescription().equals(JavaSyntaxBundle.message("expected.semicolon"))) {
+      return QuickFixFactory.getInstance().createChangeToSimilarKeyword(ref, Collections.singleton(JavaKeywords.RETURN));
+    }
+    if (ref.getParent() instanceof PsiTypeElement) {
+      return QuickFixFactory.getInstance().createChangeToSimilarKeyword(ref, Collections.singleton(JavaKeywords.RETURN));
+    }
+    return null;
   }
 
   @Nullable
@@ -338,6 +397,7 @@ public final class HighlightFixTypoUtil {
 
   @Nullable
   private static CommonIntentionAction createBreakContinueTypoFix(@NotNull PsiJavaCodeReferenceElement ref) {
+    // contine<caret>;
     if (ref.getParent() instanceof PsiExpressionStatement expressionStatement) {
       PsiElement[] children = expressionStatement.getChildren();
       if (children.length == 2 &&
@@ -361,6 +421,7 @@ public final class HighlightFixTypoUtil {
 
   private static CommonIntentionAction createBooleanNullTypoFix(@NotNull PsiJavaCodeReferenceElement ref) {
     if (ref instanceof PsiReferenceExpression expression) {
+      //call(tru<caret>)
       Set<String> targetKeywords = new HashSet<>();
       PsiType expectedType = ExpectedTypeUtils.findExpectedType(expression, false);
       if (expectedType != null) {
@@ -404,6 +465,7 @@ public final class HighlightFixTypoUtil {
       return QuickFixFactory.getInstance().createChangeToSimilarKeyword(typeElement, targetKeywords);
     }
     if (ref.getParent() instanceof PsiExpressionStatement expressionStatement) {
+      // val<caret> something = something();
       PsiElement[] children = expressionStatement.getChildren();
       if (children.length == 2 && children[0] == ref && children[1] instanceof PsiErrorElement) {
         Set<String> targetKeywords = new HashSet<>(PsiTypes.primitiveTypeNames());

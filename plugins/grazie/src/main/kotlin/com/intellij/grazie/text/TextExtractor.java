@@ -15,10 +15,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPoint;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.psi.FileViewProvider;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.SyntaxTraverser;
+import com.intellij.psi.*;
 import com.intellij.psi.util.CachedValue;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
@@ -48,6 +45,7 @@ public abstract class TextExtractor {
   private static final Key<CachedValue<Map<TextContent, TextContent>>> CONTENT_INTERNER = Key.create("TextExtractor interner");
   private static final Pattern NOINSPECTION_SUPPRESSION = Pattern.compile(SuppressionUtil.COMMON_SUPPRESS_REGEXP);
   private static final Pattern PROPERTY_SUPPRESSION = Pattern.compile("\\s*suppress inspection \"" + LocalInspectionTool.VALID_ID_PATTERN + "\"");
+  private static final Pattern LICENSE_PATTERN = Pattern.compile("(?i)License.*?(as is|MIT|GNU|GPL|Apache|BSD)", Pattern.DOTALL);
 
   /**
    * Extract text from the given PSI element, if possible.
@@ -181,7 +179,7 @@ public abstract class TextExtractor {
     var provider = TextContentModificationTrackerProvider.EP_NAME.forLanguage(psi.getLanguage());
     var providedTracker = provider != null ? provider.getModificationTracker(psi) : null;
     var tracker = providedTracker != null ? providedTracker : PsiModificationTracker.MODIFICATION_COUNT;
-    
+
     CachedValue<T> cache = CachedValuesManager.getManager(psi.getProject())
       .createCachedValue(() -> CachedValueProvider.Result.create(supplier.get(), tracker));
     cache = ((UserDataHolderEx)psi).putUserDataIfAbsent(key, cache);
@@ -264,9 +262,13 @@ public abstract class TextExtractor {
   }
 
   private static boolean isCopyrightComment(TextContent content) {
-    return (content.getDomain() == TextContent.TextDomain.COMMENTS || content.getDomain() == TextContent.TextDomain.DOCUMENTATION) &&
-           StringUtil.containsIgnoreCase(content.toString(), "Copyright") &&
-           isAtFileStart(content);
+    return (content.getDomain() == TextContent.TextDomain.COMMENTS || content.getDomain() == TextContent.TextDomain.DOCUMENTATION)
+           && StringUtil.containsIgnoreCase(content.toString(), "Copyright")
+           && (isAtFileStart(content) || looksLikeLicense(content));
+  }
+
+  private static boolean looksLikeLicense(TextContent content) {
+    return LICENSE_PATTERN.matcher(content).find();
   }
 
   private static boolean isAtFileStart(TextContent content) {
@@ -302,6 +304,7 @@ public abstract class TextExtractor {
     Set<TextContent> allContents = new HashSet<>();
     for (PsiFile root : vp.getAllFiles()) {
       for (PsiElement element : SyntaxTraverser.psiTraverser(root)) {
+        if (element instanceof PsiWhiteSpace) continue;
         allContents.addAll(findTextsExactlyAt(element, domains));
       }
     }
@@ -361,6 +364,6 @@ public abstract class TextExtractor {
   
   @TestOnly
   public @NotNull List<TextContent> buildTextContentsTestAccessor(@NotNull PsiElement element, @NotNull Set<TextContent.TextDomain> allowedDomains) {
-    return buildTextContents(element, allowedDomains); 
+    return buildTextContents(element, allowedDomains);
   }
 }

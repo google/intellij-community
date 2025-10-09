@@ -19,6 +19,10 @@
             interface="org.jetbrains.kotlin.idea.configuration.KotlinProjectConfigurator"
             dynamic="true"/>
     <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.compilerPluginConfigurator"
+            interface="org.jetbrains.kotlin.idea.configuration.KotlinCompilerPluginProjectConfigurator"
+            dynamic="true"/>
+    <extensionPoint
             qualifiedName="org.jetbrains.kotlin.kotlinCompilerVersionProvider"
             interface="org.jetbrains.kotlin.idea.base.plugin.KotlinCompilerVersionProvider"
             dynamic="true"/>
@@ -227,11 +231,6 @@
             key="kotlin.code-vision.inheritors"
             description="Enable Code-Vision inheritors search"
             defaultValue="false"
-            restartRequired="false"/>
-    <registryKey
-            key="kotlin.experimental.new.j2k"
-            description="Enable new Java to Kotlin converter"
-            defaultValue="true"
             restartRequired="false"/>
     <registryKey
             key="kotlin.disable.auto.completion.inside.expression"

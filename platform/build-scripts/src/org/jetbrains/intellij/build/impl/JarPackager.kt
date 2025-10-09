@@ -71,17 +71,14 @@ import kotlin.io.path.invariantSeparatorsPathString
 private val JAR_NAME_WITH_VERSION_PATTERN = "(.*)-\\d+(?:\\.\\d+)*\\.jar*".toPattern()
 
 private val libsUsedInJps = setOf(
-  "ASM",
   "netty-buffer",
   "netty-codec-http",
   "netty-codec-protobuf",
   "netty-handler-proxy",
-  "gson",
   "Log4J",
   "slf4j-api",
   "slf4j-jdk14",
   // see getBuildProcessApplicationClasspath - used in JPS
-  "lz4-java",
   "jna",
   "maven-resolver-provider",
   "OroMatcher",
@@ -90,11 +87,7 @@ private val libsUsedInJps = setOf(
   // see ArtifactRepositoryManager.getClassesFromDependencies
   "plexus-utils",
   "http-client",
-  "commons-codec",
-  "commons-logging",
-  "commons-lang3",
   "kotlin-stdlib",
-  "fastutil-min",
 )
 
 private val presignedLibNames = setOf(
@@ -113,25 +106,20 @@ private val notImportantKotlinLibs = setOf(
 const val rdJarName: String = "rd.jar"
 
 // must be sorted
+
 private val predefinedMergeRules = listOf<Pair<String, (String, FrontendModuleFilter) -> Boolean>>(
   "groovy.jar" to { it, _ -> it.startsWith("org.codehaus.groovy:") },
   "jsch-agent.jar" to { it, _ -> it.startsWith("jsch-agent") },
   rdJarName to { it, _ -> it.startsWith("rd-") },
-  // separate file to use in Gradle Daemon classpath
-  "guava.jar" to { it, _ -> it == "Guava" },
   "opentelemetry.jar" to { it, _ -> it == "opentelemetry" || it == "opentelemetry-semconv" || it.startsWith("opentelemetry-exporter-otlp") },
   "bouncy-castle.jar" to { it, _ -> it.startsWith("bouncy-castle-") },
   PRODUCT_BACKEND_JAR to { name, filter -> (name.startsWith("License") || name.startsWith("jetbrains.codeWithMe.lobby.server.")) && filter.isBackendProjectLibrary(name) },
   PRODUCT_JAR to { name, filter -> (name.startsWith("License") || name.startsWith("jetbrains.codeWithMe.lobby.server.")) && !filter.isBackendProjectLibrary(name) },
   // see ClassPathUtil.getUtilClassPath
-  UTIL_8_JAR to { it, _ ->
-    libsUsedInJps.contains(it) ||
-    (it.startsWith("kotlinx-") && !notImportantKotlinLibs.contains(it)) ||
-    it == "kotlin-reflect"
-  },
+  UTIL_8_JAR to { it, _ -> libsUsedInJps.contains(it) || (it.startsWith("kotlinx-") && !notImportantKotlinLibs.contains(it)) },
 
   // used in an external process - see `ConsoleProcessListFetcher.getConsoleProcessCount`
-  UTIL_JAR to { it, _ -> it == "pty4j" || it == "jvm-native-trusted-roots" || it == "caffeine" },
+  UTIL_JAR to { it, _ -> it == "pty4j" || it == "jvm-native-trusted-roots" },
 )
 
 internal fun getLibraryFileName(library: JpsLibrary): String {
@@ -454,7 +442,7 @@ class JarPackager private constructor(
     withTests: Boolean,
   ) {
     val moduleName = module.name
-    val includeProjectLib = if (layout is PluginLayout) layout.auto else item.reason == ModuleIncludeReasons.PRODUCT_MODULES
+    val includeProjectLib = if (layout is PluginLayout) layout.auto else item.isProductModule()
 
     val excluded = if (layout is PluginLayout) (layout.excludedLibraries.get(moduleName) ?: emptyList()) + (layout.excludedLibraries.get(null) ?: emptyList()) else emptySet()
     for (element in helper.getLibraryDependencies(module, withTests = withTests)) {
@@ -471,7 +459,12 @@ class JarPackager private constructor(
             continue
           }
 
-          projectLibraryData = ProjectLibraryData(libraryName = libName, reason = "<- $moduleName")
+          if (layout !is PluginLayout && item.isProductModule()) {
+            projectLibraryData = ProjectLibraryData(libraryName = libName, owner = item, reason = null)
+          }
+          else {
+            projectLibraryData = ProjectLibraryData(libraryName = libName, reason = "<- $moduleName")
+          }
         }
         else if (platformLayout != null && platformLayout.isLibraryAlwaysPackedIntoPlugin(libName)) {
           platformLayout.findProjectLibrary(libName)?.let {
@@ -495,7 +488,7 @@ class JarPackager private constructor(
         continue
       }
 
-      if (item.reason == ModuleIncludeReasons.PRODUCT_MODULES) {
+      if (item.isProductModule()) {
         packLibFilesIntoModuleJar(
           asset = asset.value,
           item = item,
@@ -565,6 +558,7 @@ class JarPackager private constructor(
                 size = size,
                 hash = hash,
                 relativeOutputFile = item.relativeOutputFile,
+                owner = item,
               )
             }
             else {
@@ -756,7 +750,8 @@ class JarPackager private constructor(
                 libraryFile = file,
                 size = size,
                 hash = hash,
-                relativeOutputFile = relativeOutputFile
+                relativeOutputFile = relativeOutputFile,
+                owner = null,
               )
             }
           },
@@ -1161,7 +1156,7 @@ private fun computeDistributionFileEntries(
     list.add(
       ModuleOutputEntry(
         path = asset.effectiveFile,
-        moduleName = module.moduleName,
+        owner = module,
         size = size,
         hash = hash,
         relativeOutputFile = module.relativeOutputFile,

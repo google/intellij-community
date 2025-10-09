@@ -16,8 +16,8 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util",
-    "@lib//:gson",
+    "//libraries/gson",
   ],
-  runtime_deps = ["@lib//:commons-compress"]
+  runtime_deps = ["//libraries/commons/compress"]
 )
 ### auto-generated section `build intellij.tools.reproducibleBuilds.diff` end

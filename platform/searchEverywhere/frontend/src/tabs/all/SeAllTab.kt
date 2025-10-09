@@ -26,11 +26,7 @@ import java.util.function.Function
 
 @ApiStatus.Internal
 class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
-  override val name: String
-    get() = IdeBundle.message("searcheverywhere.all.elements.tab.name")
-
-  override val shortName: String
-    get() = name
+  override val name: String get() = NAME
 
   override val isIndexingDependent: Boolean get() = true
 
@@ -64,7 +60,7 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
 
   override suspend fun openInFindToolWindow(session: SeSession, params: SeParams, initEvent: AnActionEvent): Boolean {
     val allTabFilter = SeEverywhereFilter.from(params.filter)
-    return delegate.openInFindToolWindow(session, params, initEvent, true,allTabFilter.disabledProviderIds)
+    return delegate.openInFindToolWindow(session, params, initEvent, true, allTabFilter.disabledProviderIds)
   }
 
   override suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {
@@ -75,6 +71,12 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
     return delegate.performExtendedAction(item)
   }
 
+  override suspend fun isPreviewEnabled(): Boolean = true
+
+  override suspend fun getPreviewInfo(itemData: SeItemData): SePreviewInfo? {
+    return delegate.getPreviewInfo(itemData, true)
+  }
+
   override fun dispose() {
     Disposer.dispose(delegate)
   }
@@ -82,6 +84,8 @@ class SeAllTab(private val delegate: SeTabDelegate) : SeTab {
   companion object {
     @ApiStatus.Internal
     const val ID: String = SearchEverywhereManagerImpl.ALL_CONTRIBUTORS_GROUP_ID
+    @ApiStatus.Internal
+    val NAME: String = IdeBundle.message("searcheverywhere.all.elements.tab.name")
   }
 }
 

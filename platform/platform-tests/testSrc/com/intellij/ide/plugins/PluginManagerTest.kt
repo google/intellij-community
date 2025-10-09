@@ -276,13 +276,13 @@ class PluginManagerTest {
       for (descriptor in loadPluginResult.pluginSet.getEnabledModules()) {
         text.append(if (descriptor.isEnabled()) "+ " else "  ").append(descriptor.getPluginId().idString)
         if (descriptor is ContentModuleDescriptor) {
-          text.append(" | ").append(descriptor.moduleId)
+          text.append(" | ").append(descriptor.moduleId.id)
         }
         text.append('\n')
       }
       text.append("\n\n")
       for (html in PluginManagerCore.getAndClearPluginLoadingErrors()) {
-        text.append(html.get().toString().replace("<br/>", "\n").replace("&#39;", "")).append('\n')
+        text.append(html.htmlMessage.toString().replace("<br/>", "\n").replace("&#39;", "")).append('\n')
       }
       UsefulTestCase.assertSameLinesWithFile(File(testDataPath, "$testDataName.txt").path, text.toString())
     }

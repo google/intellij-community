@@ -24,8 +24,8 @@ jvm_library(
     "//platform/analysis-impl",
     "//platform/util/coroutines",
     "//platform/indexing-api:indexing",
-    "@lib//:guava",
-    "@lib//:caffeine",
+    "//libraries/guava",
+    "//libraries/caffeine",
   ]
 )
 
@@ -46,10 +46,10 @@ jvm_library(
     "//platform/analysis-impl",
     "//platform/util/coroutines",
     "//platform/indexing-api:indexing",
-    "@lib//:guava",
+    "//libraries/guava",
     "@lib//:junit5",
     "@lib//:assert_j",
-    "@lib//:caffeine",
+    "//libraries/caffeine",
   ]
 )
 ### auto-generated section `build intellij.platform.ide.concurrency` end

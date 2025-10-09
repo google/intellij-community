@@ -146,7 +146,7 @@ object CommunityLibraryLicenses {
     LibraryLicense("AsciiDoc support for Visual Studio Code", version = "3.2.4", attachedTo = "intellij.textmate", url = "https://github.com/asciidoctor/asciidoctor-vscode")
       .mit("https://github.com/asciidoctor/asciidoctor-vscode/blob/master/README.md"),
 
-    LibraryLicense("ASM (JetBrains's fork)", libraryName = "ASM", url = "https://github.com/JetBrains/intellij-deps-asm")
+    LibraryLicense("ASM (JetBrains's fork)", libraryName = "asm", url = "https://github.com/JetBrains/intellij-deps-asm")
       .newBsd("https://github.com/JetBrains/intellij-deps-asm/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS)
       .forkedFrom(
@@ -267,6 +267,10 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/JetBrains/compose-multiplatform/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
+    LibraryLicense("Compose Runtime", libraryName = "compose.runtime.desktop", url = "https://source.android.com/")
+      .apache("https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.GOOGLE),
+
     // For ADB wireless QR Code generation
     LibraryLicense("Core barcode encoding/decoding library", url = "https://github.com/zxing/zxing/tree/master/core", libraryName = "zxing-core")
       .apache("https://github.com/zxing/zxing/blob/master/LICENSE")
@@ -326,6 +330,9 @@ object CommunityLibraryLicenses {
     LibraryLicense("EditorConfig Java Parser", libraryName = "ec4j-core", url = "https://github.com/ec4j/ec4j")
       .apache("https://github.com/ec4j/ec4j/blob/master/LICENSE")
       .suppliedByPersons("Peter Palaga", "Angelo Zerr"),
+
+    LibraryLicense("Ehcache SizeOf", libraryName = "ehcache.sizeof", url = "https://github.com/ehcache/sizeof")
+      .apache("https://github.com/ehcache/sizeof/blob/master/LICENSE"),
 
     LibraryLicense("emoji-java", libraryName = "com.vdurmont:emoji-java", url = "https://github.com/vdurmont/emoji-java")
       .mit("https://github.com/vdurmont/emoji-java/blob/master/LICENSE.md")
@@ -567,9 +574,6 @@ object CommunityLibraryLicenses {
     LibraryLicense("Java Server Pages (JSP) for Visual Studio Code", version = "0.0.3", attachedTo = "intellij.textmate", url = "https://github.com/pthorsson/vscode-jsp")
       .mit("https://github.com/pthorsson/vscode-jsp/blob/master/LICENSE"),
 
-    LibraryLicense("Java Simple Serial Connector", libraryName = "io.github.java.native.jssc", url = "https://github.com/java-native/jssc")
-      .lgpl3("https://github.com/java-native/jssc/blob/master/LICENSE.txt"),
-
     LibraryLicense("Java String Similarity", libraryName = "java-string-similarity", url = "https://github.com/tdebatty/java-string-similarity")
       .mit("https://github.com/tdebatty/java-string-similarity/blob/master/LICENSE.md")
       .suppliedByPersons("Thibault Debatty"),
@@ -657,6 +661,10 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/JetBrains/jetCheck/blob/master/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
+    LibraryLicense("Jettison", libraryName = "jettison", url = "https://github.com/codehaus/jettison")
+      .apache("https://github.com/codehaus/jettison/blob/master/pom.xml")
+      .suppliedByOrganizations("The Jettison Team"),
+
     LibraryLicense("JGit (Settings Sync and SettingsRepo)", libraryName = "jetbrains.intellij.deps.eclipse.jgit", url = "https://www.eclipse.org/jgit/")
       .license("Eclipse Distribution License 1.0", "https://www.eclipse.org/org/documents/edl-v10.php")
       .suppliedByOrganizations(Suppliers.ECLIPSE),
@@ -706,6 +714,10 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "jsch-agent-proxy", url = "https://github.com/ymnk/jsch-agent-proxy")
       .newBsd("https://github.com/ymnk/jsch-agent-proxy/blob/master/LICENSE.txt")
       .suppliedByPersons("Atsuhiko Yamanaka"),
+
+    LibraryLicense("jSerialComm", libraryName = "jetbrains.intellij.deps.jSerialComm", url= "https://github.com/JetBrains/jSerialComm")
+      .apache("https://github.com/JetBrains/jSerialComm/blob/master/LICENSE-APACHE-2.0")
+      .forkedFrom(groupId = "com.fazecast", artifactId = "jSerialComm", version = "2.11.2", mavenRepositoryUrl = "https://repo1.maven.org/maven2/"),
 
     LibraryLicense("JSON", libraryName = "json.jar", version = LibraryLicense.CUSTOM_REVISION, url = "https://www.json.org/")
       .license("JSON License", "https://www.json.org/license.html"),
@@ -1054,6 +1066,15 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "opentest4j", url = "https://github.com/ota4j-team/opentest4j")
       .apache("https://github.com/ota4j-team/opentest4j/blob/master/LICENSE"),
 
+    LibraryLicense("org.eclipse.xtext.xbase", libraryName = "xtext-xbase", url = "https://github.com/eclipse/xtext-lib")
+      .eplV2("https://github.com/eclipse/xtext-lib/blob/master/LICENSE")
+      .suppliedByPersons(
+        "Sven Efftinge", "Sebastian Benz", "Lorenzo Bettini", "Arne Deutsch", "Christian Dietrich", "Moritz Eysholdt",
+        "Dennis Hübner", "Jan Köhnlein", "Anton Kosyakov", "Stefan Oehme", "Holger Schill", "Christian Schneider",
+        "Miro Spönemann", "Karsten Thoms", "Titouan Vervack", "Tamas Miklossy",
+        "Michael Clay", "Knut Wannheden", "Sebastian Zarnekow"
+      ),
+
     LibraryLicense("OverlayScrollbars", version = "2.1.1", attachedTo = "intellij.idea.community.main", url = "https://kingsora.github.io/OverlayScrollbars")
       .mit("https://github.com/KingSora/OverlayScrollbars/blob/master/LICENSE"),
 
@@ -1326,7 +1347,7 @@ object CommunityLibraryLicenses {
       .apache("https://svn.jetbrains.org/idea/Trunk/bundled/WebServices/resources/lib/xmlbeans-2.3.0/xmlbeans.LICENSE")
       .suppliedByPersons("Cezar Andrei", "Radu Preotiuc", "Radu Preotiuc", "Wing Yew Poon", "Jacob Danner", "POI Team"),
 
-    LibraryLicense("XmlRPC", libraryName = "XmlRPC", url = "https://ws.apache.org/xmlrpc/xmlrpc2/")
+    LibraryLicense("XmlRPC", libraryName = "xml-rpc", url = "https://ws.apache.org/xmlrpc/xmlrpc2/")
       .apache("https://ws.apache.org/xmlrpc/xmlrpc2/license.html")
       .suppliedByPersons(
         "Daniel Rall", "Jon Scott Stevens", "John Wilson",
@@ -1335,7 +1356,7 @@ object CommunityLibraryLicenses {
         "Leonard Richarson", "Hannes Wallnoefer"
       ),
 
-    LibraryLicense("XStream", libraryName = "XStream", url = "https://x-stream.github.io/")
+    LibraryLicense("XStream", libraryName = "xstream", url = "https://x-stream.github.io/")
       .newBsd("https://x-stream.github.io/license.html")
       .suppliedByOrganizations("XStream Committers"),
 
@@ -1406,9 +1427,9 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("jetbrains.kotlin.jps.plugin.classpath"),
     jetbrainsLibrary("jetbrains.ml.models.jetenry.inline.prompt.detection.model"),
     jetbrainsLibrary("jetbrains.ml.models.python.imports.ranking.model"),
+    jetbrainsLibrary("jetbrains.mlapi.catboost"),
     jetbrainsLibrary("jetbrains.mlapi.catboost.shadow.need.slf4j"),
-    jetbrainsLibrary("jetbrains.mlapi.ml.api"),
-    jetbrainsLibrary("jetbrains.mlapi.ml.tools"),
+    jetbrainsLibrary("jetbrains.mlapi.core"),
     jetbrainsLibrary("jshell-frontend"),
     jetbrainsLibrary("jvm-native-trusted-roots"),
     jetbrainsLibrary("kotlin-gradle-plugin-idea"),

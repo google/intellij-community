@@ -25,8 +25,8 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/statistics",
     "//platform/platform-impl:ide-impl",
-    "@lib//:fastutil-min",
-    "@lib//:guava",
+    "//libraries/fastutil",
+    "//libraries/guava",
     "//platform/ide-core-impl",
     "//platform/execution.serviceView",
     "//platform/platform-impl/rpc",
@@ -37,6 +37,7 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/object-serializer",
     "//platform/kernel/shared:kernel",
+    "//platform/lang-core",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.dashboard` end

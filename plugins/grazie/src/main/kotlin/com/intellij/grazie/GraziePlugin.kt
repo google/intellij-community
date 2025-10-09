@@ -20,12 +20,12 @@ object GraziePlugin {
   const val id = "tanvd.grazi"
 
   object LanguageTool {
-    const val version = "6.6.17"
+    const val version = "6.6.18"
     const val url = "https://resources.jetbrains.com/grazie/model/language-tool"
   }
 
   object Hunspell : GrazieStateLifecycle {
-    const val version = "0.2.288"
+    const val version = "0.2.318"
     const val url = "https://packages.jetbrains.team/maven/p/grazi/grazie-platform-public/ai/grazie/spell"
 
     override fun update(prevState: GrazieConfig.State, newState: GrazieConfig.State) {

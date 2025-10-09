@@ -59,7 +59,6 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + seq
   "intellij.keymap.netbeans",
   "intellij.performanceTesting",
   "intellij.compose.ide.plugin",
-  "intellij.java.jshell"
 )
 
 val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
@@ -69,7 +68,6 @@ val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
   "lib/annotations.jar" to "1.8",
   "lib/util_rt.jar" to "1.8",
   "lib/util-8.jar" to "1.8",
-  "lib/guava.jar" to "1.8",
   "lib/external-system-rt.jar" to "1.8",
   "plugins/java-coverage/lib/java-coverage-rt.jar" to "1.8",
   "plugins/junit/lib/junit-rt.jar" to "1.8",
@@ -80,7 +78,6 @@ val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
   "plugins/maven/lib/maven3-server-common.jar" to "1.8",
   "plugins/maven/lib/maven3-server.jar" to "1.8",
   "plugins/maven/lib/artifact-resolver-m31.jar" to "1.8",
-  "plugins/java/lib/jshell-frontend.jar" to "9",
   "plugins/java/lib/sa-jdwp" to "",  // ignored
   "plugins/java/lib/rt/debugger-agent.jar" to "1.7",
   "plugins/Groovy/lib/groovy-rt.jar" to "1.8",

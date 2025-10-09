@@ -163,7 +163,6 @@ a:com.intellij.extapi.psi.ASTDelegatePsiElement
 - delete():V
 - deleteChildInternal(com.intellij.lang.ASTNode):V
 - deleteChildRange(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement):V
-- p:findChildByFilter(com.intellij.psi.tree.TokenSet):com.intellij.psi.PsiElement
 - p:findChildByType(com.intellij.psi.tree.IElementType):com.intellij.psi.PsiElement
 - p:findChildByType(com.intellij.psi.tree.TokenSet):com.intellij.psi.PsiElement
 - p:findChildrenByType(com.intellij.psi.tree.IElementType):java.util.List
@@ -926,37 +925,22 @@ a:com.intellij.openapi.application.ex.ApplicationInfoEx
 - a:areSubscriptionTipsAvailable():Z
 - a:getApiVersionAsNumber():com.intellij.openapi.util.BuildNumber
 - a:getApplicationSvgIconUrl():java.lang.String
-- a:getBuiltinPluginsUrl():java.lang.String
 - a:getCopyrightStart():java.lang.String
 - a:getDefaultClassicDarkLaf():java.lang.String
 - a:getDefaultClassicLightLaf():java.lang.String
 - a:getDefaultDarkLaf():java.lang.String
 - a:getDefaultLightLaf():java.lang.String
-- a:getDocumentationUrl():java.lang.String
-- f:getDownloadUrl():java.lang.String
 - a:getEssentialPluginIds():java.util.List
-- a:getFeedbackUrl():java.lang.String
 - s:getInstanceEx():com.intellij.openapi.application.ex.ApplicationInfoEx
-- a:getMacKeymapUrl():java.lang.String
 - a:getMajorReleaseBuildDate():java.util.Calendar
 - a:getPluginDownloadUrl():java.lang.String
 - a:getPluginManagerUrl():java.lang.String
 - a:getPluginsListUrl():java.lang.String
 - a:getSmallApplicationSvgIconUrl():java.lang.String
 - a:getSubscriptionFormId():java.lang.String
-- a:getSupportUrl():java.lang.String
-- a:getUpdateUrls():com.intellij.openapi.application.ex.ApplicationInfoEx$UpdateUrls
-- a:getWebHelpUrl():java.lang.String
-- a:getWhatsNewUrl():java.lang.String
-- a:getWinKeymapUrl():java.lang.String
-- a:getYoutrackUrl():java.lang.String
 - a:isMajorEAP():Z
-- a:isShowWhatsNewOnUpdate():Z
 - f:isVendorJetBrains():Z
 - a:usesJetBrainsPluginRepository():Z
-com.intellij.openapi.application.ex.ApplicationInfoEx$UpdateUrls
-- a:getCheckingUrl():java.lang.String
-- a:getPatchesUrl():java.lang.String
 f:com.intellij.openapi.application.ex.ApplicationManagerEx
 - com.intellij.openapi.application.ApplicationManager
 - sf:IS_INTERNAL_PROPERTY:java.lang.String
@@ -967,8 +951,6 @@ f:com.intellij.openapi.application.ex.ApplicationManagerEx
 - s:setInStressTest(Z):V
 f:com.intellij.openapi.application.ex.ApplicationUtil
 - sf:INSTANCE:com.intellij.openapi.application.ex.ApplicationUtil
-- sf:invokeAndWaitSomewhere(com.intellij.openapi.application.EdtReplacementThread,com.intellij.openapi.application.ModalityState,java.lang.Runnable):V
-- sf:invokeLaterSomewhere(com.intellij.openapi.application.EdtReplacementThread,com.intellij.openapi.application.ModalityState,java.lang.Runnable):V
 - sf:runWithCheckCanceled(java.util.concurrent.Callable,com.intellij.openapi.progress.ProgressIndicator):java.lang.Object
 - sf:runWithCheckCanceled(java.util.concurrent.Future,com.intellij.openapi.progress.ProgressIndicator):java.lang.Object
 - sf:showDialogAfterWriteAction(java.lang.Runnable):V
@@ -1293,7 +1275,6 @@ c:com.intellij.openapi.progress.impl.CoreProgressManager
 - executeProcessUnderProgress(java.lang.Runnable,com.intellij.openapi.progress.ProgressIndicator):V
 - p:finishTask(com.intellij.openapi.progress.Task,Z,java.lang.Throwable):V
 - getCurrentProgressModality():com.intellij.openapi.application.ModalityState
-- s:getCurrentThreadProgressModality():com.intellij.openapi.application.ModalityState
 - getProgressIndicator():com.intellij.openapi.progress.ProgressIndicator
 - hasModalProgressIndicator():Z
 - hasProgressIndicator():Z
@@ -1318,7 +1299,6 @@ c:com.intellij.openapi.progress.impl.CoreProgressManager
 - runProcessWithProgressSynchronously(java.lang.Runnable,java.lang.String,Z,com.intellij.openapi.project.Project,javax.swing.JComponent):Z
 - silenceGlobalIndicator(java.util.function.Supplier):java.lang.Object
 - p:sleepIfNeededToGivePriorityToAnotherThread():Z
-- p:startTask(com.intellij.openapi.progress.Task,com.intellij.openapi.progress.ProgressIndicator,java.lang.Runnable):V
 f:com.intellij.openapi.progress.impl.ProgressResult
 - <init>(java.lang.Object,Z,java.lang.Throwable):V
 - equals(java.lang.Object):Z
@@ -1512,7 +1492,6 @@ c:com.intellij.openapi.vfs.local.CoreLocalFileSystem
 - refreshAndFindFileByPath(java.lang.String):com.intellij.openapi.vfs.VirtualFile
 c:com.intellij.openapi.vfs.local.CoreLocalVirtualFile
 - com.intellij.openapi.vfs.VirtualFile
-- <init>(com.intellij.openapi.vfs.local.CoreLocalFileSystem,java.io.File):V
 - <init>(com.intellij.openapi.vfs.local.CoreLocalFileSystem,java.nio.file.Path):V
 - <init>(com.intellij.openapi.vfs.local.CoreLocalFileSystem,java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):V
 - <init>(com.intellij.openapi.vfs.local.CoreLocalFileSystem,java.nio.file.Path,Z):V
@@ -2698,7 +2677,6 @@ f:com.intellij.psi.impl.source.resolve.reference.PsiReferenceContributorEP
 f:com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistryImpl
 - com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistry
 - <init>():V
-- s:disableUnderlyingElementChecks(com.intellij.openapi.Disposable):V
 - unloadProvidersFor(com.intellij.lang.Language):V
 a:com.intellij.psi.impl.source.resolve.reference.impl.CachingReference
 - com.intellij.psi.PsiReference
@@ -3395,7 +3373,6 @@ f:com.intellij.psi.stubs.StubTextInconsistencyException
 - com.intellij.openapi.diagnostic.ExceptionWithAttachments
 - s:checkStubTextConsistency(com.intellij.psi.PsiFile):V
 - s:checkStubTextConsistency(com.intellij.psi.PsiFile,com.intellij.psi.stubs.StubInconsistencyReporter$SourceOfCheck):V
-- s:checkStubTextConsistency(com.intellij.psi.PsiFile,com.intellij.psi.stubs.StubInconsistencyReporter$SourceOfCheck,com.intellij.psi.stubs.StubInconsistencyReporter$EnforcedInconsistencyType):V
 - getAttachments():com.intellij.openapi.diagnostic.Attachment[]
 - getStubsFromPsi():java.lang.String
 - getStubsFromText():java.lang.String

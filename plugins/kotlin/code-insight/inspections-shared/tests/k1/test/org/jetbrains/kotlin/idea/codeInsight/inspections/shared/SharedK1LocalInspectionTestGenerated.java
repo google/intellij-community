@@ -2175,6 +2175,16 @@ public abstract class SharedK1LocalInspectionTestGenerated extends AbstractShare
                 runTest("../testData/inspectionsLocal/coroutines/preferCurrentCoroutineContextToCoroutineContext/coroutineScopeContext_implicitReceiver.kt");
             }
 
+            @TestMetadata("importDirective.kt")
+            public void testImportDirective() throws Exception {
+                runTest("../testData/inspectionsLocal/coroutines/preferCurrentCoroutineContextToCoroutineContext/importDirective.kt");
+            }
+
+            @TestMetadata("importDirective_aliased.kt")
+            public void testImportDirective_aliased() throws Exception {
+                runTest("../testData/inspectionsLocal/coroutines/preferCurrentCoroutineContextToCoroutineContext/importDirective_aliased.kt");
+            }
+
             @TestMetadata("noCoroutinesDependency.kt")
             public void testNoCoroutinesDependency() throws Exception {
                 runTest("../testData/inspectionsLocal/coroutines/preferCurrentCoroutineContextToCoroutineContext/noCoroutinesDependency.kt");
@@ -2425,6 +2435,75 @@ public abstract class SharedK1LocalInspectionTestGenerated extends AbstractShare
         @TestMetadata("string.kt")
         public void testString() throws Exception {
             runTest("../testData/inspectionsLocal/forEachParameterNotUsed/string.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../testData/inspectionsLocal/implicitNullableNothingType")
+    public static class ImplicitNullableNothingType extends AbstractSharedK1LocalInspectionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K1;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("final.kt")
+        public void testFinal() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/final.kt");
+        }
+
+        @TestMetadata("function.kt")
+        public void testFunction() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/function.kt");
+        }
+
+        @TestMetadata("overrideFunction.kt")
+        public void testOverrideFunction() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideFunction.kt");
+        }
+
+        @TestMetadata("overrideNullableNothingFunction.kt")
+        public void testOverrideNullableNothingFunction() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideNullableNothingFunction.kt");
+        }
+
+        @TestMetadata("overrideNullableNothingVal.kt")
+        public void testOverrideNullableNothingVal() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideNullableNothingVal.kt");
+        }
+
+        @TestMetadata("overrideNullableNothingVar.kt")
+        public void testOverrideNullableNothingVar() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideNullableNothingVar.kt");
+        }
+
+        @TestMetadata("overrideVal.kt")
+        public void testOverrideVal() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideVal.kt");
+        }
+
+        @TestMetadata("overrideVar.kt")
+        public void testOverrideVar() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/overrideVar.kt");
+        }
+
+        @TestMetadata("top.kt")
+        public void testTop() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/top.kt");
+        }
+
+        @TestMetadata("val.kt")
+        public void testVal() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/val.kt");
+        }
+
+        @TestMetadata("variable.kt")
+        public void testVariable() throws Exception {
+            runTest("../testData/inspectionsLocal/implicitNullableNothingType/variable.kt");
         }
     }
 
@@ -5305,6 +5384,11 @@ public abstract class SharedK1LocalInspectionTestGenerated extends AbstractShare
         @TestMetadata("labeledReturn3.kt")
         public void testLabeledReturn3() throws Exception {
             runTest("../testData/inspectionsLocal/replaceMapIndexedWithListGenerator/labeledReturn3.kt");
+        }
+
+        @TestMetadata("labeledReturnImplicitUnit.kt")
+        public void testLabeledReturnImplicitUnit() throws Exception {
+            runTest("../testData/inspectionsLocal/replaceMapIndexedWithListGenerator/labeledReturnImplicitUnit.kt");
         }
 
         @TestMetadata("thisReceiver.kt")

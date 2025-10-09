@@ -104,7 +104,7 @@ public final class JavaErrorKinds {
   public static final Simple<PsiAnnotation> ANNOTATION_NOT_ALLOWED_IN_PERMIT_LIST = error("annotation.not.allowed.in.permit.list");
   public static final Simple<PsiPackageStatement> ANNOTATION_NOT_ALLOWED_ON_PACKAGE =
     error(PsiPackageStatement.class, "annotation.not.allowed.on.package")
-      .withAnchor(PsiPackageStatement::getAnnotationList);
+      .withAnchor(statement -> requireNonNull(statement.getAnnotationList()));
   public static final Simple<PsiReferenceList> ANNOTATION_MEMBER_THROWS_NOT_ALLOWED =
     error(PsiReferenceList.class, "annotation.member.may.not.have.throws.list").withAnchor(list -> requireNonNull(list.getFirstChild()));
   public static final Simple<PsiParameterList> ANNOTATION_MEMBER_MAY_NOT_HAVE_PARAMETERS =
@@ -765,8 +765,11 @@ public final class JavaErrorKinds {
       .withDescription((cls, ctx) -> message("method.inheritance.clash.does.not.throw",
                                              formatClashMethodMessage(ctx.method(), ctx.superMethod()),
                                              formatType(ctx.exceptionType())));
-  public static final Parameterized<PsiMethod, String> METHOD_MISSING_RETURN_TYPE =
+  public static final Parameterized<PsiMethod, @NotNull String> METHOD_MISSING_RETURN_TYPE =
     parameterized(PsiMethod.class, String.class, "method.missing.return.type")
+      .withAnchor(method -> requireNonNullElse(method.getNameIdentifier(), method));
+  public static final Simple<PsiMethod> METHOD_MISSING_RETURN_TYPE_NOT_CONSTRUCTOR =
+    error(PsiMethod.class, "method.missing.return.type.not.constructor")
       .withAnchor(method -> requireNonNullElse(method.getNameIdentifier(), method));
 
   public static final Parameterized<PsiMember, AmbiguousImplicitConstructorCallContext> CONSTRUCTOR_AMBIGUOUS_IMPLICIT_CALL =
@@ -1126,10 +1129,6 @@ public final class JavaErrorKinds {
     parameterized(PsiReferenceParameterList.class, PsiDiamondType.DiamondInferenceResult.class, "new.expression.diamond.inference.failure")
       .withDescription(
         (list, inferenceResult) -> message("new.expression.diamond.inference.failure", inferenceResult.getErrorMessage()));
-  public static final Simple<PsiConstructorCall> NEW_EXPRESSION_ARGUMENTS_TO_DEFAULT_CONSTRUCTOR_CALL =
-    error(PsiConstructorCall.class, "new.expression.arguments.to.default.constructor.call")
-      .withAnchor(call -> call.getArgumentList())
-      .withNavigationShift(1);
   public static final Parameterized<PsiConstructorCall, UnresolvedConstructorContext> NEW_EXPRESSION_UNRESOLVED_CONSTRUCTOR =
     parameterized(PsiConstructorCall.class, UnresolvedConstructorContext.class, "new.expression.unresolved.constructor")
       .withAnchor(PsiCall::getArgumentList)

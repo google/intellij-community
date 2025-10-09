@@ -25,15 +25,15 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/execution-impl",
     "//platform/projectModel-api:projectModel",
-    "@lib//:guava",
+    "//libraries/guava",
     "//platform/statistics",
     "//platform/util/progress",
     "//json/backend",
     "//platform/core-ui",
     "//platform/statistics/uploader",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:jackson",
-    "@lib//:jackson-databind",
+    "//libraries/jackson/jackson",
+    "//libraries/jackson/databind",
     "//platform/util/jdom",
   ]
 )
@@ -57,7 +57,7 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "@lib//:guava",
+    "//libraries/guava",
     "//platform/statistics",
     "//platform/statistics:statistics_test_lib",
     "//platform/util/progress",
@@ -65,8 +65,8 @@ jvm_library(
     "//platform/core-ui",
     "//platform/statistics/uploader",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:jackson",
-    "@lib//:jackson-databind",
+    "//libraries/jackson/jackson",
+    "//libraries/jackson/databind",
     "//platform/util/jdom",
   ]
 )

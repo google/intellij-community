@@ -13,9 +13,7 @@ import com.intellij.codeInsight.quickfix.UnresolvedReferenceQuickFixProvider
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.IntelliJProjectUtil
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
@@ -64,17 +62,7 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
     private var holder: HighlightInfoHolder? = null
     private var coroutineScope: CoroutineScope? = null
     override fun suitableForFile(file: PsiFile): Boolean {
-        if (file !is KtFile || file.isCompiled) return false
-
-        val viewProvider = file.viewProvider
-        val isInjection = InjectedLanguageManager.getInstance(file.project).isInjectedViewProvider(viewProvider)
-        if (isInjection && (!viewProvider.isInjectedFileShouldBeAnalyzed || file.injectionRequiresOnlyEssentialHighlighting)) {
-            // do not highlight errors in injected code
-            return false
-        }
-
-        val highlightingManager = HighlightingLevelManager.getInstance(file.project)
-        return highlightingManager.shouldHighlight(file) && !highlightingManager.runEssentialHighlightingOnly(file)
+        return shouldHighlightDiagnostics(file)
     }
 
     override fun analyze(file: PsiFile, updateWholeFile: Boolean, holder: HighlightInfoHolder, action: Runnable): Boolean {
@@ -90,7 +78,7 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
             diagnosticsMap = analyzeFile(contextFile)
             action.run()
         } catch (e: Throwable) {
-            if (e is ControlFlowException) throw e
+            if (Logger.shouldRethrow(e)) throw e
             // TODO: Port KotlinHighlightingSuspender to K2 to avoid the issue with infinite highlighting loop restart
             throw e
         } finally {
@@ -326,10 +314,10 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
         return application.isInternal || application.isUnitTestMode
     }
 
-
-    private fun KaSession.getHighlightInfoType(psi: KaDiagnosticWithPsi<*>): HighlightInfoType = when {
+    private fun getHighlightInfoType(psi: KaDiagnosticWithPsi<*>): HighlightInfoType = when {
         isUnresolvedDiagnostic(psi) -> HighlightInfoType.WRONG_REF
         isDeprecatedDiagnostic(psi) -> HighlightInfoType.DEPRECATED
+        isUnusedElementDiagnostic(psi) -> HighlightInfoType.UNUSED_SYMBOL
         else -> when (psi.severity) {
             KaSeverity.INFO -> HighlightInfoType.INFORMATION
             KaSeverity.ERROR -> HighlightInfoType.ERROR
@@ -337,7 +325,7 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
         }
     }
 
-    private fun KaSession.isUnresolvedDiagnostic(psi: KaDiagnosticWithPsi<*>) = when (psi) {
+    private fun isUnresolvedDiagnostic(psi: KaDiagnosticWithPsi<*>) = when (psi) {
         is KaFirDiagnostic.UnresolvedReference -> true
         is KaFirDiagnostic.UnresolvedLabel -> true
         is KaFirDiagnostic.UnresolvedReferenceWrongReceiver -> true
@@ -346,8 +334,15 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
         else -> false
     }
 
-    private fun KaSession.isDeprecatedDiagnostic(psi: KaDiagnosticWithPsi<*>) = when (psi) {
+    private fun isDeprecatedDiagnostic(psi: KaDiagnosticWithPsi<*>) = when (psi) {
         is KaFirDiagnostic.Deprecation -> true
+        else -> false
+    }
+
+    private fun isUnusedElementDiagnostic(psi: KaDiagnosticWithPsi<*>) = when (psi) {
+        is KaFirDiagnostic.UselessCast -> true
+        is KaFirDiagnostic.UselessElvis -> true
+        is KaFirDiagnostic.UselessIsCheck -> true
         else -> false
     }
 
@@ -366,5 +361,21 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRangeExtensi
 
     override fun clone(): HighlightVisitor {
         return KotlinDiagnosticHighlightVisitor()
+    }
+
+    companion object {
+        fun shouldHighlightDiagnostics(file: PsiFile): Boolean {
+            if (file !is KtFile || file.isCompiled) return false
+
+            val viewProvider = file.viewProvider
+            val isInjection = InjectedLanguageManager.getInstance(file.project).isInjectedViewProvider(viewProvider)
+            if (isInjection && (!viewProvider.isInjectedFileShouldBeAnalyzed || file.injectionRequiresOnlyEssentialHighlighting)) {
+                // do not highlight errors in injected code
+                return false
+            }
+
+            val highlightingManager = HighlightingLevelManager.getInstance(file.project)
+            return highlightingManager.shouldHighlight(file) && !highlightingManager.runEssentialHighlightingOnly(file)
+        }
     }
 }

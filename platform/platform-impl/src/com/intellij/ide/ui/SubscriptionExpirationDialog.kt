@@ -3,13 +3,18 @@ package com.intellij.ide.ui
 
 import com.intellij.ide.IdeBundle
 import com.intellij.openapi.project.Project
+import com.intellij.ui.EditorNotificationPanel
+import com.intellij.ui.InlineBanner
+import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.bind
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.PlatformUtils
 import com.intellij.util.ui.JBFont
+import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
+import java.awt.BorderLayout
 import java.awt.event.ActionListener
 import javax.swing.JComponent
 
@@ -58,6 +63,17 @@ class SubscriptionExpirationDialog(project: Project?, private val settings: Subs
 
   init {
     initDialog(dialogTitle())
+  }
+
+  override fun configureHeader(header: JComponent) {
+    if (settings.errorMessage != null) {
+      val banner = InlineBanner(settings.errorMessage, EditorNotificationPanel.Status.Warning).showCloseButton(false)
+      val errorLabel = Wrapper(banner)
+      errorLabel.border = JBUI.Borders.empty(20, 20, 0, 20)
+
+      header.layout = BorderLayout()
+      header.add(errorLabel, BorderLayout.NORTH)
+    }
   }
 
   override fun createPanel(): JComponent {
@@ -134,10 +150,54 @@ class SubscriptionExpirationDialog(project: Project?, private val settings: Subs
 }
 
 @Internal
-data class SubscriptionExpirationSettings(
+class SubscriptionExpirationSettings(
   val isEvaluation: Boolean,
   val showPromise: Boolean,
   val showExtendTrial: Boolean,
   val showContinueWithoutSubscription: Boolean,
   val showRemDevHint: Boolean,
-)
+  @param:Nls val errorMessage: String?,
+) {
+  @Internal
+  class Builder {
+    private var isEvaluation: Boolean = false
+    private var showPromise: Boolean = false
+    private var showExtendTrial: Boolean = false
+    private var showContinueWithoutSubscription: Boolean = false
+    private var showRemDevHint: Boolean = false
+
+    @Nls
+    private var errorMessage: String? = null
+
+    @JvmOverloads
+    fun evaluation(isEvaluation: Boolean = true): Builder = apply { this.isEvaluation = isEvaluation }
+
+    @JvmOverloads
+    fun showPromise(show: Boolean = true): Builder = apply { this.showPromise = show }
+
+    @JvmOverloads
+    fun showExtendTrial(show: Boolean = true): Builder = apply { this.showExtendTrial = show }
+
+    @JvmOverloads
+    fun showContinueWithoutSubscription(show: Boolean = true): Builder = apply { this.showContinueWithoutSubscription = show }
+
+    @JvmOverloads
+    fun showRemDevHint(show: Boolean = true): Builder = apply { this.showRemDevHint = show }
+
+    fun showErrorMessage(@Nls message: String): Builder = apply { this.errorMessage = message }
+
+    fun build(): SubscriptionExpirationSettings = SubscriptionExpirationSettings(
+      isEvaluation = isEvaluation,
+      showPromise = showPromise,
+      showExtendTrial = showExtendTrial,
+      showContinueWithoutSubscription = showContinueWithoutSubscription,
+      showRemDevHint = showRemDevHint,
+      errorMessage = errorMessage,
+    )
+  }
+
+  companion object {
+    @JvmStatic
+    fun builder(): Builder = Builder()
+  }
+}

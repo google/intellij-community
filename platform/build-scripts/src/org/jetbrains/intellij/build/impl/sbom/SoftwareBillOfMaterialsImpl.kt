@@ -600,10 +600,10 @@ class SoftwareBillOfMaterialsImpl(
     }
   }
 
-  private fun MavenCoordinates.externalRef(document: SpdxDocument, repositoryUrl: String): ExternalRef {
+  private fun MavenCoordinates.externalRef(document: SpdxDocument, repositoryUrl: String?): ExternalRef {
     val (refType, locator) = when (repositoryUrl) {
       "https://repo1.maven.org/maven2" -> "maven-central" to "$groupId:$artifactId:$version"
-      else -> "purl" to "pkg:maven/$groupId/$artifactId@$version?repository_url=$repositoryUrl"
+      else -> "purl" to "pkg:maven/$groupId/$artifactId@$version" + (repositoryUrl?.let { "?repository_url=$it" } ?: "")
     }
     return document.createExternalRef(ReferenceCategory.PACKAGE_MANAGER,
                                       ReferenceType(SpdxConstants.SPDX_LISTED_REFERENCE_TYPES_PREFIX + refType),
@@ -811,9 +811,7 @@ class SoftwareBillOfMaterialsImpl(
       setDownloadLocation(library.downloadUrl ?: SpdxConstants.NOASSERTION_VALUE)
       setOrigin(spdxPackageBuilder = this, library = library, upstreamPackage = upstreamPackage)
       addChecksum(document.createChecksum(ChecksumAlgorithm.SHA256, library.sha256Checksum))
-      if (library.repositoryUrl != null) {
-        addExternalRef(library.coordinates.externalRef(document, library.repositoryUrl))
-      }
+      addExternalRef(library.coordinates.externalRef(document, library.repositoryUrl))
     }
     if (upstreamPackage != null) {
       libPackage.relatesTo(upstreamPackage, RelationshipType.VARIANT_OF)
@@ -946,10 +944,16 @@ class SoftwareBillOfMaterialsImpl(
   }
 
   private fun validate(modelObject: ModelObject) {
-    if (!STRICT_MODE) return
     val errors = modelObject.verify()
-    check(errors.none()) {
-      errors.joinToString(separator = "\n")
+    if (STRICT_MODE && errors.any()) {
+      throw Exception("Cannot validate $modelObject").apply {
+        errors.forEach { addSuppressed(Exception(it)) }
+      }
+    }
+    else {
+      errors.forEach {
+        context.messages.warning("Cannot validate $modelObject: $it")
+      }
     }
   }
 

@@ -61,11 +61,11 @@ jvm_library(
     "//java/idea-ui:ui",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
-    "@lib//:caffeine",
+    "//libraries/caffeine",
     "//platform/util/jdom",
     "//java/java-impl:impl",
     "@lib//:kotlinc-analysis-api-impl-base",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
   ]
 )
 
@@ -111,12 +111,12 @@ jvm_library(
     "//java/idea-ui:ui",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
-    "@lib//:caffeine",
+    "//libraries/caffeine",
     "//platform/util/jdom",
     "//java/java-impl:impl",
     "@lib//:junit4",
     "@lib//:kotlinc-analysis-api-impl-base",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
   ]
 )
 ### auto-generated section `build kotlin.base.project-structure` end

@@ -10,7 +10,7 @@
     <p>The plugin deals with the quality evaluation of IDE features based on artificial queries.</p>
   ]]></description>
   
-  <content>
+  <content namespace="jetbrains">
     <module name="intellij.evaluationPlugin.languages.java"/>
     <module name="intellij.evaluationPlugin.languages.python"/>
     <module name="intellij.evaluationPlugin.languages.kotlin"/>
@@ -45,6 +45,7 @@
     <module name="intellij.libraries.ktor.client"/>
     <module name="intellij.libraries.kotlinx.io"/>
     <module name="intellij.platform.warmup"/>
+    <module name="intellij.libraries.commons.text"/>
   </dependencies>
 
   <extensions defaultExtensionNs="com.intellij">

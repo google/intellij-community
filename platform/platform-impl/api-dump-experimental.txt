@@ -16,6 +16,9 @@
 *:com.intellij.execution.impl.EditorTextDecorationId
 - java.lang.Comparable
 - a:getValue():J
+*:com.intellij.execution.impl.FilterApplyResult
+- a:getFilterResult():com.intellij.execution.filters.Filter$Result
+- a:getLineNumber():I
 *:com.intellij.execution.impl.HighlightingBuilder
 - a:getLayer():I
 - a:setLayer(I):V
@@ -32,6 +35,12 @@
 - a:setLayer(I):V
 *:com.intellij.execution.impl.HyperlinkDecoration
 - com.intellij.execution.impl.EditorTextDecoration
+*f:com.intellij.execution.impl.HyperlinksKt
+- *sf:applyToLineRange(com.intellij.execution.filters.Filter,com.intellij.execution.impl.HypertextInput,I,I,kotlin.jvm.functions.Function1):V
+*:com.intellij.execution.impl.HypertextInput
+- a:getLineCount():I
+- a:getLineStartOffset(I):I
+- a:getLineText(I):java.lang.String
 *:com.intellij.execution.impl.InlayBuilder
 *:com.intellij.execution.impl.InlayDecoration
 - com.intellij.execution.impl.EditorTextDecoration
@@ -481,7 +490,7 @@ f:com.intellij.ui.dsl.builder.components.ValidationTooltipKt
 f:com.intellij.ui.render.RenderersKt
 - *sf:fontInfoRenderer(Z):javax.swing.ListCellRenderer
 f:com.intellij.util.SwingBindingsKt
-- *sf:bindSelectedTabIn(javax.swing.JTabbedPane,kotlinx.coroutines.flow.MutableStateFlow,kotlinx.coroutines.CoroutineScope):V
+- *sf:bindSelectedTabIn(javax.swing.JTabbedPane,kotlinx.coroutines.flow.MutableStateFlow,kotlinx.coroutines.CoroutineScope):kotlinx.coroutines.Job
 *f:com.intellij.util.ui.RestartDialogImpl
 - *sf:Companion:com.intellij.util.ui.RestartDialogImpl$Companion
 - <init>():V

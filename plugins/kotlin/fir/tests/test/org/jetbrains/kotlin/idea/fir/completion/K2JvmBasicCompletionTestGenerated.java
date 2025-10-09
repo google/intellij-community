@@ -4136,6 +4136,21 @@ public abstract class K2JvmBasicCompletionTestGenerated extends AbstractK2JvmBas
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
+            @TestMetadata("ContextParameter.kt")
+            public void testContextParameter() throws Exception {
+                runTest("../../completion/testData/basic/common/variableNameAndType/ContextParameter.kt");
+            }
+
+            @TestMetadata("ContextParameterOnProperty.kt")
+            public void testContextParameterOnProperty() throws Exception {
+                runTest("../../completion/testData/basic/common/variableNameAndType/ContextParameterOnProperty.kt");
+            }
+
+            @TestMetadata("ContextReceiver.kt")
+            public void testContextReceiver() throws Exception {
+                runTest("../../completion/testData/basic/common/variableNameAndType/ContextReceiver.kt");
+            }
+
             @TestMetadata("Lateinit.kt")
             public void testLateinit() throws Exception {
                 runTest("../../completion/testData/basic/common/variableNameAndType/Lateinit.kt");
@@ -4679,6 +4694,16 @@ public abstract class K2JvmBasicCompletionTestGenerated extends AbstractK2JvmBas
 
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("AliasedJavaClassFirstInvocation.kt")
+            public void testAliasedJavaClassFirstInvocation() throws Exception {
+                runTest("../../completion/testData/basic/java/AliasedJavaClassFirstInvocation.kt");
+            }
+
+            @TestMetadata("AliasedJavaClassSecondInvocation.kt")
+            public void testAliasedJavaClassSecondInvocation() throws Exception {
+                runTest("../../completion/testData/basic/java/AliasedJavaClassSecondInvocation.kt");
             }
 
             @TestMetadata("AutoForceCompletion.kt")

@@ -318,12 +318,15 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
       }
     });
     fix(VARARG_CSTYLE_DECLARATION, error -> new NormalizeBracketsFix(error.psi()));
+    fix(METHOD_MISSING_RETURN_TYPE_NOT_CONSTRUCTOR, error -> {
+      PsiMethod method = error.psi();
+      PsiType expectedType = HighlightFixUtil.determineReturnType(method);
+      return expectedType != null ? myFactory.createMethodReturnFix(method, expectedType, true, true) : null;
+    });
     fixes(METHOD_MISSING_RETURN_TYPE, (error, sink) -> {
       String className = error.context();
       PsiMethod method = error.psi();
-      if (className != null) {
-        sink.accept(myFactory.createRenameElementFix(method, className));
-      }
+      sink.accept(myFactory.createRenameElementFix(method, className));
       PsiType expectedType = HighlightFixUtil.determineReturnType(method);
       if (expectedType != null) {
         sink.accept(myFactory.createMethodReturnFix(method, expectedType, true, true));
@@ -536,16 +539,6 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
           }
           return null;
         });
-    fixes(NEW_EXPRESSION_ARGUMENTS_TO_DEFAULT_CONSTRUCTOR_CALL, (error, sink) -> {
-      PsiConstructorCall constructorCall = error.psi();
-      PsiJavaCodeReferenceElement classReference =
-        constructorCall instanceof PsiNewExpression newExpression ? newExpression.getClassOrAnonymousClassReference() : null;
-      if (classReference != null) {
-        ConstructorParametersFixer.registerFixActions(constructorCall, sink);
-      }
-      QuickFixFactory.getInstance().createCreateConstructorFromUsageFixes(constructorCall).forEach(sink);
-      RemoveRedundantArgumentsFix.registerIntentions(requireNonNull(constructorCall.getArgumentList()), sink);
-    });
     fixes(NEW_EXPRESSION_UNRESOLVED_CONSTRUCTOR, (error, sink) -> {
       PsiConstructorCall constructorCall = error.psi();
       PsiExpressionList list = constructorCall.getArgumentList();
@@ -1117,7 +1110,8 @@ public final class DefaultJavaErrorFixProvider extends AbstractJavaErrorFixProvi
       return myFactory.createUnwrapArrayInitializerMemberValueAction(error.psi());
     });
     multi(ANNOTATION_NOT_ALLOWED_ON_PACKAGE, error ->
-      List.of(myFactory.createDeleteFix(error.psi().getAnnotationList(), JavaAnalysisBundle.message("intention.text.remove.annotation")),
+      List.of(myFactory.createDeleteFix(requireNonNull(error.psi().getAnnotationList()),
+                                        JavaAnalysisBundle.message("intention.text.remove.annotation")),
               new MoveAnnotationToPackageInfoFileFix(error.psi())));
     fix(ANNOTATION_NOT_ALLOWED_ON_PACKAGE, error ->
       myFactory.createDeleteFix(error.psi(), JavaAnalysisBundle.message("intention.text.remove.annotation")));

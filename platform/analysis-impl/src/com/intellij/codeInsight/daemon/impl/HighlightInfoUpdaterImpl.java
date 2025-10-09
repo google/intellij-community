@@ -47,11 +47,9 @@ import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.ExceptionUtil;
-import com.intellij.util.ObjectUtils;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.util.containers.FreezableArrayList;
 import com.intellij.util.containers.HashingStrategy;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -274,12 +272,34 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     return "; progress=" + (indicator == original ? "" : "wrapped:")+
            (indicator == null ? "null\n" + ExceptionUtil.getThrowableText(new Throwable()) : indicator);
   }
+  private static int compareNaturalNullable(@Nullable String o1, @Nullable String o2) {
+    //noinspection StringEquality
+    return o1 == o2 ? 0 : o1 == null ? -1 : o2 == null ? 1 : o1.compareTo(o2);
+  }
+
+  @VisibleForTesting
+  public static final Comparator<HighlightInfo> BY_OFFSETS_AND_HASH_ERRORS_FIRST = (o1, o2) -> {
+    if (o1 == o2) return 0;
+    int r = Segment.BY_START_OFFSET_THEN_END_OFFSET.compare(o1, o2);
+    if (r != 0) return r;
+    r = o2.getSeverity().compareTo(o1.getSeverity()); // NB: reversed - errors first
+    if (r != 0) return r;
+    r = compareNaturalNullable(o1.getDescription(), o2.getDescription());
+    if (r != 0) return r;
+    // have to compare highlighters because we don't want to remove otherwise equal HighlightInfo except for its (recreated) highlighter
+    RangeHighlighterEx h1 = o1.getHighlighter();
+    RangeHighlighterEx h2 = o2.getHighlighter();
+    return Integer.compare(System.identityHashCode(h1), System.identityHashCode(h2));
+  };
 
   // remove `psis` from `data` in one batch for all infos in the list because there can be a lot of them
-  private static void removeFromDataAtomically(@NotNull Map<Object, ToolHighlights> data,
-                                               @NotNull @Unmodifiable Collection<InvalidPsi> psis,
-                                               @NotNull HighlightingSession session) {
-    if (psis.isEmpty()) return;
+  // return true if was removed
+  private static boolean removeFromDataAtomically(@NotNull Map<Object, ToolHighlights> data,
+                                                  @NotNull @Unmodifiable Collection<? extends InvalidPsi> psis,
+                                                  @NotNull HighlightingSession session) {
+    if (psis.isEmpty()) {
+      return true;
+    }
     Map<Object, Map<PsiElement, List<HighlightInfo>>> byPsiElement = new HashMap<>();
     for (InvalidPsi invalidPsi : psis) {
       Object toolId = invalidPsi.info().toolId;
@@ -288,29 +308,28 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                   .computeIfAbsent(invalidPsi.psiElement(), __ -> new ArrayList<>());
       infos.add(invalidPsi.info());
     }
+    boolean removed = true;
     for (Map.Entry<Object, Map<PsiElement, List<HighlightInfo>>> entry : byPsiElement.entrySet()) {
       Object toolId = entry.getKey();
       ToolHighlights toolHighlights = data.get(toolId);
-      if (toolHighlights == null) continue;
+      if (toolHighlights == null) {
+        removed = false;
+        continue;
+      }
       Map<PsiElement, List<HighlightInfo>> byPsiMap = entry.getValue();
       for (Map.Entry<PsiElement, List<HighlightInfo>> byPsiEntry : byPsiMap.entrySet()) {
         PsiElement psiElement = byPsiEntry.getKey();
-        List<? extends HighlightInfo> oldInfos = ObjectUtils.notNull(toolHighlights.elementHighlights.get(psiElement), List.of());
-        List<HighlightInfo> toRemove = ContainerUtil.sorted(byPsiEntry.getValue(), Segment.BY_START_OFFSET_THEN_END_OFFSET);
+        List<? extends HighlightInfo> oldL = toolHighlights.elementHighlights.get(psiElement);
+        List<? extends HighlightInfo> oldInfos = oldL == null ? List.of() : ContainerUtil.sorted(oldL, BY_OFFSETS_AND_HASH_ERRORS_FIRST); // need to-resort in case the range-highlighters invalidated and offsets are skewed
+        List<HighlightInfo> toRemove = ContainerUtil.sorted(byPsiEntry.getValue(), BY_OFFSETS_AND_HASH_ERRORS_FIRST);
         List<HighlightInfo> resultInfos = new ArrayList<>();
-        ContainerUtil.processSortedListsInOrder(oldInfos, toRemove, (o1, o2) -> {
-          int r = Segment.BY_START_OFFSET_THEN_END_OFFSET.compare(o1, o2);
-          if (r != 0) return r;
-          // have to compare highlighters because we don't want to remove otherwise equal HighlightInfo except for its (recreated) highlighter
-          RangeHighlighterEx h1 = o1.getHighlighter();
-          RangeHighlighterEx h2 = o2.getHighlighter();
-          return System.identityHashCode(h1)-System.identityHashCode(h2);
-        }, true, (info, result) -> {
+        ContainerUtil.processSortedListsInOrder(oldInfos, toRemove, BY_OFFSETS_AND_HASH_ERRORS_FIRST, true, (info, result) -> {
           if (result == ContainerUtil.MergeResult.COPIED_FROM_LIST1) {
             resultInfos.add(info);
           }
           // in other cases when the info is either from toRemove or both, skip it
         });
+        removed &= oldInfos.size() - toRemove.size() == resultInfos.size();
         if (resultInfos.isEmpty()) {
           toolHighlights.elementHighlights.remove(psiElement);
         }
@@ -324,6 +343,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
         }
       }
     }
+    return removed;
   }
 
   private synchronized void recycleInvalidPsiElements(@NotNull PsiFile psiFile,
@@ -344,8 +364,10 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
                       " for invalid " + psiElement + " from " + requestor +
                       " " +session.getProgressIndicator());
           }
-          invalidPsiRecycler.recycleHighlighter(psiElement, info);
-        }
+           if (info.getHighlighter() != null) {
+             invalidPsiRecycler.recycleHighlighter(psiElement, info);
+           }
+         }
     );
 
     if (LOG.isDebugEnabled()) {
@@ -523,7 +545,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
         //noinspection removal
         LOG.debug("psiElementVisited: " + visitedPsiElement + " in " + visitedPsiElement.getTextRange() +
                   (psiFile.getViewProvider() instanceof InjectedFileViewProvider ? " injected in " + InjectedLanguageManager.getInstance(project).injectedToHost(psiFile, psiFile.getTextRange()) : "") +
-                  "; tool:" + toolId + "; infos:" + newInfos + "; oldInfos:" + oldInfos + " " +session.getProgressIndicator());
+                  "; tool:" + toolId + "; infos:" + head(newInfos) + "; oldInfos:" + head(oldInfos) + " " + session.getProgressIndicator());
       }
       // execute in non-cancelable block. It should not throw PCE anyway, but just in case
       ProgressManager.getInstance().executeNonCancelableSection(() -> {
@@ -560,6 +582,10 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     Reference.reachabilityFence(visitedPsiElement); // ensure no psi is gced while in the middle of modifying soft-ref maps
   }
 
+  private static @NotNull Object head(@NotNull List<? extends HighlightInfo> infos) {
+    return infos.size() < 10 ? infos : "("+infos.size()+"):"+ContainerUtil.getFirstItems(infos, 10)+"...";
+  }
+
   private synchronized void assertNoDuplicates(@NotNull PsiFile psiFile, @NotNull Collection<? extends HighlightInfo> infos, @NotNull String cause) {
     if (!isAssertInvariants()) return;
     record HI(TextRange range, String desc, TextAttributes attributes){}
@@ -579,7 +605,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     }
   }
 
-  private synchronized PsiElement findPsiElement(HighlightInfo info, @NotNull PsiFile psiFile) {
+  private synchronized PsiElement findPsiElement(@NotNull HighlightInfo info, @NotNull PsiFile psiFile) {
     Map<Object, ToolHighlights> data = getData(psiFile);
     ToolHighlights highlights = data.get(info.toolId);
     for (Map.Entry<PsiElement, List<? extends HighlightInfo>> entry : highlights.elementHighlights.entrySet()) {
@@ -613,7 +639,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       .filter(Objects::nonNull)
       .filter(h->h.toolId != null)
       .filter(h->toolIdPredicate.matches(h.toolId))
-      .filter(h -> h.isFromInjection() == isInjected && hostRange.intersects(h.getHighlighter()))
+      .filter(h -> h.isFromInjection() == isInjected && h.getHighlighter() != null && hostRange.intersects(h.getHighlighter()))
       .collect(Collectors.toList());
   }
 
@@ -734,7 +760,7 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
           .filter(e -> isInspectionToolId(e.getKey())) // inspections only
           .flatMap(e -> e.getValue().elementHighlights.values().stream())
           .flatMap(l->l.stream())
-          .sorted(UpdateHighlightersUtil.BY_ACTUAL_START_OFFSET_NO_DUPS)
+          .sorted(BY_OFFSETS_AND_HASH_ERRORS_FIRST) // sort by errors first, so that when the warning appears, the overlapping errors are already in the 'overlappingIntervals' queue
           .toList();
         SweepProcessor.Generator<HighlightInfo> generator = processor -> ContainerUtil.process(sorted, processor);
         SeverityRegistrar severityRegistrar = SeverityRegistrar.getSeverityRegistrar(session.getProject());
@@ -846,11 +872,16 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     (e1, e2) -> {
       List<? extends HighlightInfo> infos1 = highlights.get(e1);
       List<? extends HighlightInfo> infos2 = highlights.get(e2);
-      if ((infos1 == null) != (infos2 == null)) {
-        return infos1 == null ? 1 : -1; // put fertile element first
-      }
-      if (infos1 == null) {
-        return Integer.compare(System.identityHashCode(e1), System.identityHashCode(e2)); // for consistency
+      if (infos1 == null || infos2 == null) {
+        if (infos1 != null) { // put fertile element first
+          return -1;
+        }
+        else if (infos2 != null) {
+          return 1;
+        }
+        else {
+          return Integer.compare(System.identityHashCode(e1), System.identityHashCode(e2)); // for consistency
+        }
       }
       // put error-generating element first
       return maxSeverity(infos2).compareTo(maxSeverity(infos1));
@@ -1213,13 +1244,12 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     SeverityRegistrar severityRegistrar = SeverityRegistrar.getSeverityRegistrar(session.getProject());
     Long2ObjectMap<RangeMarker> range2markerCache = new Long2ObjectOpenHashMap<>(10);
     // infos which highlighters are recycled from `invalidElementRecycler` and which need to be removed from `data` to avoid its highlighter to be registered in two places
-    // this list must be sorted by Segment.BY_START_OFFSET_THEN_END_OFFSET
-    List<InvalidPsi> recycledInvalidPsiHighlightersToBeRemovedFromData = new ArrayList<>(newInfos.size());
-    List<? extends HighlightInfo> sorted = ContainerUtil.sorted(newInfos, Segment.BY_START_OFFSET_THEN_END_OFFSET);
-    FreezableArrayList<HighlightInfo> newInfosToStore = new FreezableArrayList<>(sorted.size());
+    // this list must be sorted by BY_OFFSETS_AND_HASH
+    List<HighlightInfo> newInfosToStore = new ArrayList<>(newInfos.size());
+    List<InvalidPsi> toRemove = new ArrayList<>(newInfos.size());
     //noinspection ForLoopReplaceableByForEach
-    for (int i = 0; i < sorted.size(); i++) {
-      HighlightInfo newInfo = sorted.get(i);
+    for (int i = 0; i < newInfos.size(); i++) {
+      HighlightInfo newInfo = newInfos.get(i);
       assert toolId.equals(newInfo.toolId) : "HighlightInfo generated by "+toolId + "(" + toolId.getClass() + ") must have consistent toolId, but got:"+ newInfo;
       boolean isFileLevel = newInfo.isFileLevelAnnotation();
       long finalInfoRange = isFileLevel
@@ -1239,9 +1269,6 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       String from;
       if (recycled == null) {
         recycled = invalidElementRecycler.pickupHighlighterFromGarbageBin(infoStartOffset, infoEndOffset, layer, newInfo.getDescription());
-        if (recycled != null) {
-          recycledInvalidPsiHighlightersToBeRemovedFromData.add(recycled);
-        }
         from = "invalidElementRecycler";
       }
       else {
@@ -1251,14 +1278,18 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
         if (LOG.isDebugEnabled()) {
           LOG.debug("assignRangeHighlighters: pickedup " + recycled + " from " + from+ " "+session.getProgressIndicator());
         }
+        toRemove.add(recycled);
       }
-      changeRangeHighlighterAttributes(session, psiFile, markup, newInfo, range2markerCache, finalInfoRange, recycled, isFileLevel, infoStartOffset, infoEndOffset, layer,
-                                       severityRegistrar);
+      changeRangeHighlighterAttributes(session, psiFile, markup, newInfo, range2markerCache, finalInfoRange, recycled, isFileLevel, infoStartOffset, infoEndOffset, layer, severityRegistrar);
+      if (recycled != null) {
+        recycled.info().invalidate();
+      }
     }
-
-    // this list must be sorted by Segment.BY_START_OFFSET_THEN_END_OFFSET
-    for (int i = 0; i < newInfosToStore.size(); i++) {
-      HighlightInfo info = newInfosToStore.get(i);
+    removeFromDataAtomically(data, toRemove, session);
+    List<HighlightInfo> sorted = ContainerUtil.sorted(newInfosToStore, BY_OFFSETS_AND_HASH_ERRORS_FIRST);
+    // this list must be sorted by BY_OFFSETS_AND_HASH
+    for (int i = 0; i < sorted.size(); i++) {
+      HighlightInfo info = sorted.get(i);
       //todo fails because of ProblemDescriptorWithReporterName
       //assert toolId.equals(info.toolId) : info + "; " + toolId + "(" + toolId.getClass() + ")";
       assert info.getHighlighter() != null : info;
@@ -1266,11 +1297,11 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
       HighlightInfo assignedInfo = HighlightInfo.fromRangeHighlighter(info.getHighlighter());
       assert assignedInfo == info : "from RH: " + assignedInfo + "(" + System.identityHashCode(assignedInfo)+ "); but expected: " + info+ "(" + System.identityHashCode(info)+ ")";
       if (i>0) {
-        assert Segment.BY_START_OFFSET_THEN_END_OFFSET.compare(newInfosToStore.get(i-1), newInfosToStore.get(i)) <= 0 : "assignRangeHighlighters returned unsorted list: "+newInfosToStore;
+        int compare = BY_OFFSETS_AND_HASH_ERRORS_FIRST.compare(sorted.get(i - 1), sorted.get(i));
+        assert compare <= 0 : "assignRangeHighlighters returned unsorted list: " + sorted +"; "+compare;
       }
     }
-    removeFromDataAtomically(data, recycledInvalidPsiHighlightersToBeRemovedFromData, session);
-    return newInfosToStore.emptyOrFrozen();
+    return sorted;
   }
 
   private static void changeRangeHighlighterAttributes(@NotNull HighlightingSession session,
@@ -1356,14 +1387,4 @@ public final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater impleme
     return highlighter;
   }
 
-  private void assertNoInfoInMarkup(@NotNull HighlightInfo info, @NotNull MarkupModelEx markup, @NotNull ManagedHighlighterRecycler recycler, @NotNull ManagedHighlighterRecycler invalidPsiRecycler) {
-    if (!isAssertInvariants()) return;
-    if (ContainerUtil.mapNotNull(markup.getAllHighlighters(), m-> HighlightInfo.fromRangeHighlighter(m)).contains(info)
-      && !ContainerUtil.mapNotNull(recycler.forAllInGarbageBin(), i->i.info()).contains(info)
-      && !ContainerUtil.mapNotNull(invalidPsiRecycler.forAllInGarbageBin(), i->i.info()).contains(info)) {
-      throw new AssertionError("Info " + info + " found in markup among "+
-                               "\n   "+StringUtil.join(ContainerUtil.mapNotNull(markup.getAllHighlighters(), m-> HighlightInfo.fromRangeHighlighter(m)), Object::toString,"\n   ")+
-                               "   --, even though these recyclers do not contain it:\n "+recycler.forAllInGarbageBin()+";\n "+invalidPsiRecycler.forAllInGarbageBin());
-    }
-  }
 }

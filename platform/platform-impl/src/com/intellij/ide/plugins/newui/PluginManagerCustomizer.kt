@@ -51,9 +51,12 @@ interface PluginManagerCustomizer {
   @Nls
   fun getAdditionalTitleText(pluginModel: PluginUiModel): String?
 
+  @Nls
+  fun getUpdateSourceText(pluginModel: PluginUiModel): String?
+
   fun ensurePluginStatesLoaded()
 
-  fun customRepositoriesUpdated(repoUrls: List<String>)
+  fun updateCustomRepositories(repoUrls: List<String>, updateUi: () -> Unit)
 
   fun requestRestart(pluginModelFacade: PluginModelFacade, parentComponent: JComponent? = null)
 

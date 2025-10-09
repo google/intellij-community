@@ -16,8 +16,8 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
-    "@lib//:guava",
-    "@lib//:fastutil-min",
+    "//libraries/guava",
+    "//libraries/fastutil",
     "//platform/util/base",
     "//platform/util",
     "@lib//:jna",

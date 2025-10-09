@@ -9195,6 +9195,11 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             runTest("../../../idea/tests/testData/quickfix/kdocMissingDocumentation/funWithKDoc.kt");
         }
 
+        @TestMetadata("functionalParameter.kt")
+        public void testFunctionalParameter() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/kdocMissingDocumentation/functionalParameter.kt");
+        }
+
         @TestMetadata("internalFun.kt")
         public void testInternalFun() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/kdocMissingDocumentation/internalFun.kt");
@@ -11138,6 +11143,16 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         @TestMetadata("memberExtensionAddThis.kt")
         public void testMemberExtensionAddThis() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/receiverShadowedByContextParameter/memberExtensionAddThis.kt");
+        }
+
+        @TestMetadata("propertyAddThis.kt")
+        public void testPropertyAddThis() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/receiverShadowedByContextParameter/propertyAddThis.kt");
+        }
+
+        @TestMetadata("propertyWithoutOuterCall.kt")
+        public void testPropertyWithoutOuterCall() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/receiverShadowedByContextParameter/propertyWithoutOuterCall.kt");
         }
 
         @TestMetadata("simpleAddContextOf.kt")

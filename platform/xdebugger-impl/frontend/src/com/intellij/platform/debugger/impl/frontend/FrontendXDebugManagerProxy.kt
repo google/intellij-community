@@ -8,6 +8,7 @@ import com.intellij.platform.debugger.impl.frontend.evaluate.quick.FrontendXValu
 import com.intellij.platform.debugger.impl.frontend.frame.FrontendXExecutionStack
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XValue
+import com.intellij.xdebugger.impl.XDebuggerExecutionPointManager
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerProxy
 import com.intellij.xdebugger.impl.frame.XDebugManagerProxy
 import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
@@ -26,6 +27,9 @@ private class FrontendXDebugManagerProxy : XDebugManagerProxy {
     val valueId = FrontendXValue.asFrontendXValue(value).xValueDto.id
     return block(valueId)
   }
+
+  override fun getXValueId(value: XValue): XValueId? =
+    FrontendXValue.asFrontendXValueOrNull(value)?.xValueDto?.id
 
   override suspend fun <T> withId(stack: XExecutionStack, session: XDebugSessionProxy, block: suspend (XExecutionStackId) -> T): T {
     val executionStackId = (stack as FrontendXExecutionStack).id
@@ -46,6 +50,10 @@ private class FrontendXDebugManagerProxy : XDebugManagerProxy {
 
   override fun getBreakpointManagerProxy(project: Project): XBreakpointManagerProxy {
     return FrontendXDebuggerManager.getInstance(project).breakpointsManager
+  }
+
+  override fun getDebuggerExecutionPointManager(project: Project): XDebuggerExecutionPointManager? {
+    return XDebuggerExecutionPointManager.getInstance(project)
   }
 
   override fun hasBackendCounterpart(xValue: XValue): Boolean {

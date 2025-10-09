@@ -13,10 +13,11 @@ import org.jetbrains.intellij.build.kotlin.KotlinBinaries
 import java.nio.file.Path
 
 internal suspend fun createCommunityBuildContext(
-  options: BuildOptions = BuildOptions(),
+  options: BuildOptions,
   projectHome: Path = COMMUNITY_ROOT.communityRoot,
 ): BuildContext = BuildContextImpl.createContext(
-  projectHome, IdeaCommunityProperties(COMMUNITY_ROOT.communityRoot), setupTracer = true, options = options)
+  projectHome, IdeaCommunityProperties(COMMUNITY_ROOT.communityRoot), setupTracer = true, options = options
+)
 
 open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIdeaProperties() {
   companion object {
@@ -35,7 +36,8 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
     )
   }
 
-  override val baseFileName: String = "idea"
+  override val baseFileName: String
+    get() = "idea"
 
   init {
     platformPrefix = "Idea"
@@ -65,7 +67,7 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
       layout.withModule("intellij.platform.duplicates.analysis")
       layout.withModule("intellij.platform.structuralSearch")
     }
-    
+
     productLayout.skipUnresolvedContentModules = true
 
     mavenArtifacts.forIdeModules = true
@@ -109,7 +111,6 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
     @Suppress("SpellCheckingInspection")
     qodanaProductProperties = QodanaProductProperties("QDJVMC", "Qodana Community for JVM")
     additionalVmOptions = persistentListOf("-Dllm.show.ai.promotion.window.on.start=false")
-    enableKotlinPluginK2ByDefault()
   }
 
   override suspend fun copyAdditionalFiles(context: BuildContext, targetDir: Path) {
@@ -126,7 +127,7 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
     bundleExternalPlugins(context, targetDir)
   }
 
-  protected open suspend fun bundleExternalPlugins(context: BuildContext, targetDirectory: Path) { }
+  protected open suspend fun bundleExternalPlugins(context: BuildContext, targetDirectory: Path) {}
 
   override fun createWindowsCustomizer(projectHome: String): WindowsDistributionCustomizer = CommunityWindowsDistributionCustomizer()
   override fun createLinuxCustomizer(projectHome: String): LinuxDistributionCustomizer = CommunityLinuxDistributionCustomizer()
@@ -160,7 +161,12 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
 
     override fun getRootDirectoryName(appInfo: ApplicationInfoProperties, buildNumber: String): String = "idea-IC-$buildNumber"
 
-    override fun generateExecutableFilesPatterns(context: BuildContext, includeRuntime: Boolean, arch: JvmArchitecture, targetLibcImpl: LibcImpl): Sequence<String> =
+    override fun generateExecutableFilesPatterns(
+      context: BuildContext,
+      includeRuntime: Boolean,
+      arch: JvmArchitecture,
+      targetLibcImpl: LibcImpl,
+    ): Sequence<String> =
       super.generateExecutableFilesPatterns(context, includeRuntime, arch, targetLibcImpl)
         .plus(KotlinBinaries.kotlinCompilerExecutables)
         .filterNot { it == "plugins/**/*.sh" }

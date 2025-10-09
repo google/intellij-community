@@ -43,6 +43,10 @@ internal class PreferCurrentCoroutineContextToCoroutineContextInspection : Kotli
             else -> null
         } ?: return null
 
+        if (nameReferenceExpression.getQualifiedExpressionForSelector()?.parent is KtImportDirective) {
+            return null
+        }
+
         if (!isCoroutineContextFunctionAccess(nameReferenceExpression)) {
             return null
         }
@@ -60,7 +64,7 @@ internal class PreferCurrentCoroutineContextToCoroutineContextInspection : Kotli
     }
 
     private fun KaSession.isCurrentCoroutineContextFunctionPresent(): Boolean {
-        return CoroutinesIds.CURRENT_COROUTINE_CONTEXT_ID.canBeResolved()
+        return CoroutinesIds.currentCoroutineContext.canBeResolved()
     }
 
     override fun createQuickFix(
@@ -78,7 +82,7 @@ internal class PreferCurrentCoroutineContextToCoroutineContextInspection : Kotli
                 updater: ModPsiUpdater
             ) {
                 val currentCoroutineContextCall = KtPsiFactory(project).createExpression(
-                    "${CoroutinesIds.CURRENT_COROUTINE_CONTEXT_ID.asSingleFqName()}()"
+                    "${CoroutinesIds.currentCoroutineContext.asSingleFqName()}()"
                 )
 
                 val replaced = element.replaced(currentCoroutineContextCall)

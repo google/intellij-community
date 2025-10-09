@@ -17,6 +17,108 @@ import java.util.Map;
 
 public class Py3TypeTest extends PyTestCase {
   public static final String TEST_DIRECTORY = "/types/";
+  
+  // See PyReferenceExpressionImpl.getQualifiedReferenceType for explanations.
+  public void testQualifiedNameResolution() {
+    doTest("str", """
+      class C:
+          def m(self):
+              self.t = 5
+      
+      def f(self: C, x: float):
+          self.t = "foo"
+          expr = self.t
+      """);
+
+    doTest("int", """
+      class C:
+          def m(self):
+              self.t: int = 5
+      
+      def f(self: C, x: float):
+          self.t = "foo"
+          expr = self.t
+      """);
+
+    doTest("int", """
+      class C:
+          def __init__(self):
+              self.t: int = 5
+      
+      def f(self: C, x: float):
+          self.t = "foo"
+          expr = self.t
+      """);
+  }
+  
+  // PY-83047
+  public void testQualifiedReferenceTypeNarrowing() {
+    doTest("int | None", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+          def f(self, x: float):
+              if x < 0:
+                  self.t = None
+      
+              expr = self.t
+      """);
+
+    doTest("int", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+          def f(self, x: float):
+              if self.t is not None:
+                  expr = self.t
+      """);
+
+    doTest("None", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+          def f(self, x: float):
+              if self.t is None:
+                  expr = self.t
+      """);
+
+    // Same, but as a separate function
+    
+    doTest("int | None", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+      def f(self: C, x: float):
+          if x < 0:
+              self.t = None
+  
+          expr = self.t
+      """);
+
+    doTest("int", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+      def f(self: C, x: float):
+          if self.t is not None:
+              expr = self.t
+      """);
+
+    doTest("None", """
+      class C:
+          def __init__(self):
+              self.t: int | None = 5
+      
+      def f(self: C, x: float):
+          if self.t is None:
+              expr = self.t
+      """);
+  }
 
   /** 
   Overload signatures for dict.get and dict.pop in builtins.pyi differ slightly,
@@ -47,6 +149,44 @@ public class Py3TypeTest extends PyTestCase {
     doTest("Any", """
              d = {}
              expr = d.pop("abc", None)""");
+  }
+  
+  // PY-83351
+  public void testWhileStatementNarrowing() {
+    doTest("int",
+           """
+             def foo(x: int | None):
+                 while x:
+                     expr = x
+                     x = None
+             """);
+    doTest("int",
+           """
+             def foo(x: int | None):
+                 while not (not (((not (not x))))):
+                     expr = x
+                     x = None
+             """);
+  }
+  
+  // PY-83597
+  public void testAndExpressionNarrowing() {
+    doTest("int", """
+             def foo(x: int | None):
+                 x and (expr := x)
+             """);
+  }
+  
+  // PY-83348
+  public void testOrExpressionType() {
+    doTest("int | str", """
+             def foo(x: int | None):
+                 expr = x or "foo"
+             """);
+    doTest("str", """
+             def foo(x: None):
+                 expr = x or "foo"
+             """);
   }
 
   public void testYieldInsideLambda() {
@@ -4018,6 +4158,15 @@ public class Py3TypeTest extends PyTestCase {
             return "hello :)"
 
       expr = A() == 1
+      """);
+  }
+
+  @TestFor(issues="PY-84524")
+  public void testBuiltinsCallable() {
+    doTest("(...) -> object", """
+      a = object()
+      if callable(a):
+          expr = a
       """);
   }
 

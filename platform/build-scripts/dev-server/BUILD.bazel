@@ -24,13 +24,13 @@ jvm_library(
     "//platform/boot",
     "//platform/util-class-loader:util-classLoader",
     "//platform/util/rt-java8",
-    "@lib//:fastutil-min",
-    "@lib//:hash4j",
+    "//libraries/fastutil",
+    "//libraries/hash4j",
     "//platform/diagnostic/telemetry.exporters",
     "//platform/util/coroutines",
     "//platform/util/zip",
     "@lib//:kotlinx-serialization-protobuf",
   ],
-  runtime_deps = ["@lib//:xz"]
+  runtime_deps = ["//libraries/xz"]
 )
 ### auto-generated section `build intellij.platform.buildScripts.devBuildServer` end

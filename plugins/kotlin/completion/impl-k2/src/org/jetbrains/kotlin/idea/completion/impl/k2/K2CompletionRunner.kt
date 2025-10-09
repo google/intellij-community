@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.idea.completion.impl.k2.K2AccumulatingLookupElementS
 import org.jetbrains.kotlin.idea.completion.impl.k2.ParallelCompletionRunner.Companion.MAX_CONCURRENT_COMPLETION_THREADS
 import org.jetbrains.kotlin.idea.completion.impl.k2.checkers.KtCompletionExtensionCandidateChecker
 import org.jetbrains.kotlin.idea.completion.impl.k2.contributors.K2ChainCompletionContributor
-import org.jetbrains.kotlin.idea.completion.impl.k2.contributors.evaluateRuntimeKaType
 import org.jetbrains.kotlin.idea.completion.impl.k2.contributors.replaceTypeParametersWithStarProjections
 import org.jetbrains.kotlin.idea.completion.lookups.ImportStrategy
 import org.jetbrains.kotlin.idea.completion.lookups.factories.ClassifierLookupObject
@@ -127,26 +126,27 @@ internal interface K2CompletionRunner {
 
                     val sink = K2DelegatingLookupElementSink(completionResultSet)
 
-                    val lookupElements = chainCompletionContributors.asSequence()
-                        .flatMap { contributor ->
-                            // This cast is safe because the contributor is not used except for extracting the name when debugging
-                            @Suppress("UNCHECKED_CAST")
-                            val completionContributor =
-                                contributor as? K2CompletionContributor<KotlinExpressionNameReferencePositionContext>
-                                    ?: return@flatMap emptySequence()
-                            val sectionContext = K2CompletionSectionContext(
-                                commonData = commonData,
-                                sink = sink,
-                                contributor = completionContributor,
-                                addLaterSection = { section ->
-                                    error("Chain completion sections cannot add later sections yet")
-                                }
-                            )
-                            context(sectionContext) {
-                                contributor.createChainedLookupElements(receiverExpression, nameToImport)
+                    chainCompletionContributors.forEach { contributor ->
+                        // This cast is safe because the contributor is not used except for extracting the name when debugging
+                        @Suppress("UNCHECKED_CAST")
+                        val completionContributor =
+                            contributor as? K2CompletionContributor<KotlinExpressionNameReferencePositionContext>
+                                ?: return@forEach
+                        val sectionContext = K2CompletionSectionContext(
+                            commonData = commonData,
+                            sink = sink,
+                            contributor = completionContributor,
+                            addLaterSection = { section ->
+                                error("Chain completion sections cannot add later sections yet")
                             }
-                        }.asIterable()
-                    completionResultSet.addAllElements(lookupElements)
+                        )
+                        context(sectionContext) {
+                            contributor.createChainedLookupElements(receiverExpression, nameToImport)
+                                .forEach { lookupElement ->
+                                    completionResultSet.addElement(lookupElement)
+                                }
+                        }
+                    }
                 }
             }
         }
@@ -186,7 +186,7 @@ private fun createWeighingContext(
 
 @OptIn(KaExperimentalApi::class)
 context(_: KaSession)
-private fun createExtensionChecker(
+internal fun createExtensionChecker(
     positionContext: KotlinRawPositionContext,
     originalFile: KtFile,
     runtimeType: KaType?,
@@ -224,11 +224,6 @@ private fun <P : KotlinRawPositionContext> KaSession.createCommonSectionData(
     val visibilityChecker = CompletionVisibilityChecker(parameters)
     val symbolFromIndexProvider = KtSymbolFromIndexProvider(parameters.completionFile)
     val importStrategyDetector = ImportStrategyDetector(parameters.originalFile, parameters.originalFile.project)
-    val runtimeType = lazy {
-        val receiver = (positionContext as? KotlinSimpleNameReferencePositionContext)?.explicitReceiver
-        receiver?.evaluateRuntimeKaType()
-    }
-    val extensionChecker = lazy { createExtensionChecker(positionContext, parameters.originalFile, runtimeType.value) }
 
     return K2CompletionSectionCommonData(
         completionContext = completionContext,
@@ -237,8 +232,7 @@ private fun <P : KotlinRawPositionContext> KaSession.createCommonSectionData(
         visibilityChecker = visibilityChecker,
         symbolFromIndexProvider = symbolFromIndexProvider,
         importStrategyDetector = importStrategyDetector,
-        runtimeTypeProvider = runtimeType,
-        extensionCheckerProvider = extensionChecker,
+        session = this,
     )
 }
 

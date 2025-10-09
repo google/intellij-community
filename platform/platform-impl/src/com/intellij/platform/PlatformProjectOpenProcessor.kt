@@ -8,7 +8,6 @@ import com.intellij.ide.util.PsiNavigationSupport
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.components.serviceOrNull
@@ -21,15 +20,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.project.impl.checkTrustedState
 import com.intellij.openapi.project.impl.doCreateFakeModuleForDirectoryProjectConfigurators
-import com.intellij.openapi.roots.ModuleRootManager
-import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.startup.StartupManager
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
@@ -123,29 +119,28 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
       return doOpenProject(virtualFile.toNioPath(), openProjectOptions)
     }
 
+    private fun createTempProjectOpenTask(
+      options: OpenProjectTask,
+      dummyProjectName: String,
+      file: Path,
+    ): OpenProjectTask {
+      return options.copy(
+        isNewProject = true,
+        projectRootDir = file,
+        createModule = false,
+        projectName = dummyProjectName,
+        runConfigurators = true,
+        beforeOpen = { project ->
+          project.service<OpenProjectSettingsService>().state.isLocatedInTempDirectory = true
+          options.beforeOpen?.invoke(project) ?: true
+        }
+      )
+    }
+
     private fun createTempProjectAndOpenFile(file: Path, options: OpenProjectTask): Project? {
       val dummyProjectName = file.fileName.toString()
       val baseDir = FileUtilRt.createTempDirectory(dummyProjectName, null, true).toPath()
-      val copy = options.copy(
-        isNewProject = true,
-        projectName = dummyProjectName,
-        runConfigurators = true,
-        preparedToOpen = { module ->
-          // adding content root for chosen (single) file
-          ModuleRootModificationUtil.updateModel(module) { model ->
-            val entries = model.contentEntries
-            // remove custom content entry created for temp directory
-            if (entries.size == 1) {
-              model.removeContentEntry(entries[0])
-            }
-            model.addContentEntry(VfsUtilCore.pathToUrl(file.toString()))
-          }
-        },
-        beforeOpen = {
-          it.service<OpenProjectSettingsService>().state.isLocatedInTempDirectory = true
-          options.beforeOpen?.invoke(it) ?: true
-        },
-      )
+      val copy = createTempProjectOpenTask(options, dummyProjectName, file)
       TrustedPaths.getInstance().setProjectPathTrusted(baseDir, true)
       val project = ProjectManagerEx.getInstanceEx().openProject(baseDir, copy) ?: return null
       openFileFromCommandLine(project = project, file = file, line = copy.line, column = copy.column)
@@ -155,38 +150,7 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
     internal suspend fun createTempProjectAndOpenFileAsync(file: Path, options: OpenProjectTask): Project? {
       val dummyProjectName = file.fileName.toString()
       val baseDir = Files.createTempDirectory(dummyProjectName)
-      val copy = options.copy(
-        isNewProject = true,
-        projectName = dummyProjectName,
-        runConfigurators = true,
-        preparedToOpen = { module ->
-          // adding content root for chosen (single) file
-          val model = readAction { ModuleRootManager.getInstance(module).modifiableModel }
-          try {
-            val entries = model.contentEntries
-            // remove custom content entry created for temp directory
-            if (entries.size == 1) {
-              model.removeContentEntry(entries.first())
-            }
-            model.addContentEntry(VfsUtilCore.pathToUrl(file.toString()))
-
-            withContext(Dispatchers.EDT) {
-              if (!module.isDisposed) {
-                ApplicationManager.getApplication().runWriteAction(model::commit)
-              }
-            }
-          }
-          finally {
-            if (!model.isDisposed) {
-              model.dispose()
-            }
-          }
-        },
-        beforeOpen = {
-          it.service<OpenProjectSettingsService>().state.isLocatedInTempDirectory = true
-          options.beforeOpen?.invoke(it) ?: true
-        }
-      )
+      val copy = createTempProjectOpenTask(options, dummyProjectName, file)
       TrustedPaths.getInstance().setProjectPathTrusted(path = baseDir, value = true)
       val project = ProjectManagerEx.getInstanceEx().openProjectAsync(projectIdentityFile = baseDir, options = copy) ?: return null
       openFileFromCommandLine(project = project, file = file, line = copy.line, column = copy.column)
@@ -312,7 +276,13 @@ class PlatformProjectOpenProcessor : ProjectOpenProcessor(), CommandLineProjectO
       return project
     }
 
-    suspend fun runDirectoryProjectConfigurators(projectFile: Path, project: Project, newProject: Boolean, createModule: Boolean): Module? {
+    @JvmOverloads
+    suspend fun runDirectoryProjectConfigurators(
+      projectFile: Path,
+      project: Project,
+      newProject: Boolean,
+      createModule: Boolean = true
+    ): Module? {
       project.putUserData(PROJECT_CONFIGURED_BY_PLATFORM_PROCESSOR, true)
 
       val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(projectFile)!!

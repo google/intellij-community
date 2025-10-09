@@ -31,8 +31,8 @@ jvm_library(
     "//platform/statistics",
     "//platform/platform-impl:ide-impl",
     "//platform/macro",
-    "@lib//:miglayout-swing",
-    "@lib//:guava",
+    "//libraries/miglayout-swing",
+    "//libraries/guava",
     "//platform/refactoring",
     "//platform/ide-core-impl",
     "//platform/ide-core/plugins",
@@ -41,7 +41,7 @@ jvm_library(
     "//platform/observable",
     "//platform/util-ex",
     "//platform/projectModel-impl",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "//platform/core-ui",
     "//platform/platform-util-io-impl:ide-util-io-impl",
     "@lib//:jediterm-core",
@@ -53,7 +53,7 @@ jvm_library(
     "//platform/workspace/storage",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:jna",
-    "@lib//:hash4j",
+    "//libraries/hash4j",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//platform/diagnostic",
@@ -96,6 +96,9 @@ jvm_library(
     "//platform/util/concurrency",
     "//platform/util/concurrency:concurrency_test_lib",
     "@lib//:assert_j",
+    "//platform/core-ui",
+    "@lib//:jediterm-core",
+    "@lib//:jediterm-ui",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.tests` end

@@ -130,7 +130,10 @@
     },
 
     "Editor": {
-      "SearchField.background": "BackgroundDark",
+      "SearchField": {
+        "background": "#212224",
+        "borderColor": "#2A2B2E"
+      },
       "Toolbar.borderColor": "BorderDark",
       "ToolTip": {
         "background": "BackgroundLight",
@@ -264,6 +267,33 @@
     "RecentProject.MainToolbarGradient.width": 600,
     "RecentProject.MainToolbarGradient.height": 300,
 
+    "ProjectGradients": {
+      "Group1": {
+        "DiagonalGradient": {
+          "Color1": "#FF0000",
+          "Color2": "#4800FF",
+          "Color3": "#1FB6D4",
+          "Color4": "#FF0000",
+
+          "Fraction1": 0.0,
+          "Fraction2": 0.13,
+          "Fraction3": 0.3,
+          "Fraction4": 1.0
+        },
+        "RadialGradient": {
+          "Color1": "#E500FFFF",
+          "Color2": "#E500FF00"
+        },
+        "HorizontalGradient": {
+          "Color1": "#2B2D301A",
+          "Color2": "#2B2D3033"
+        },
+        "VerticalGradient": {
+          "Color1": "#2B2D301A",
+          "Color2": "#2B2D309A"
+        }
+      }
+    },
 
     "TrialWidget": {
       "Default.background": "#27282E",
@@ -354,7 +384,7 @@
         "hoverThumbColor": "#8080808C",
         "hoverTrackColor": "#8080801A",
         "thumbBorderColor": "#26262600",
-        "thumbColor": "#80808000",
+        "thumbColor": "#80808059",
         "trackColor": "#80808000"
       }
     },

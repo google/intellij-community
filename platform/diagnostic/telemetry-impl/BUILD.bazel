@@ -24,7 +24,7 @@ jvm_library(
   resources = [":telemetry-impl_resources"],
   kotlinc_opts = ":custom_telemetry-impl",
   deps = [
-    "@lib//:jackson",
+    "//libraries/jackson/jackson",
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
     "@lib//:kotlin-stdlib",
@@ -33,7 +33,7 @@ jvm_library(
     "//platform/core-api:core",
     "//platform/util",
     "@lib//:opentelemetry-exporter-otlp-common",
-    "@lib//:hdr_histogram",
+    "//libraries/hdr-histogram",
     "//platform/diagnostic/telemetry",
     "//platform/core-impl",
     "//platform/util/http",
@@ -43,7 +43,7 @@ jvm_library(
     "//platform/diagnostic/telemetry.exporters",
     "//platform/util/coroutines",
     "//platform/diagnostic/telemetry/rt",
-    "@lib//:guava",
+    "//libraries/guava",
   ],
   exports = [
     "//platform/diagnostic/telemetry.exporters",

@@ -1,14 +1,18 @@
-- name: lib/libthrift.jar
-  library: libthrift
-  files:
-  - name: $MAVEN_REPOSITORY$/org/apache/thrift/libthrift/0/libthrift-0.jar
-  reason: withProjectLibrary
+- name: lib/modules/intellij.platform.ide.nonModalWelcomeScreen.backend.jar
+  contentModules:
+  - name: intellij.platform.ide.nonModalWelcomeScreen.backend
+- name: lib/modules/intellij.platform.ide.nonModalWelcomeScreen.frontend.jar
+  contentModules:
+  - name: intellij.platform.ide.nonModalWelcomeScreen.frontend
 - name: lib/modules/intellij.platform.ide.nonModalWelcomeScreen.jar
   contentModules:
   - name: intellij.platform.ide.nonModalWelcomeScreen
 - name: lib/modules/intellij.python.ast.jar
   contentModules:
   - name: intellij.python.ast
+- name: lib/modules/intellij.python.common.jar
+  contentModules:
+  - name: intellij.python.common
 - name: lib/modules/intellij.python.community.aliasProvider.jar
   contentModules:
   - name: intellij.python.community.aliasProvider
@@ -35,14 +39,6 @@
   - name: intellij.python.community.impl.installer
 - name: lib/modules/intellij.python.community.impl.jar
   projectLibraries:
-  - name: io.github.z4kn4fein.semver.jvm
-    files:
-    - name: $MAVEN_REPOSITORY$/io/github/z4kn4fein/semver-jvm/2/semver-jvm-2.jar
-    reason: <- intellij.python.community.impl
-  - name: jackson-dataformat-yaml
-    files:
-    - name: $MAVEN_REPOSITORY$/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2/jackson-dataformat-yaml-2.jar
-    reason: <- intellij.python.community.impl
   - name: jsr305
     files:
     - name: $MAVEN_REPOSITORY$/com/google/code/findbugs/jsr305/3/jsr305-3.jar
@@ -53,10 +49,9 @@
     - name: $MAVEN_REPOSITORY$/it/krzeminski/snakeyaml-engine-kmp-jvm/3/snakeyaml-engine-kmp-jvm-3.jar
     - name: $MAVEN_REPOSITORY$/net/thauvin/erik/urlencoder/urlencoder-lib-jvm/1/urlencoder-lib-jvm-1.jar
     reason: <- intellij.python.community.impl
-  - name: tuweni-toml
+  - name: libthrift
     files:
-    - name: $MAVEN_REPOSITORY$/io/consensys/tuweni/tuweni-toml/2/tuweni-toml-2.jar
-    - name: $MAVEN_REPOSITORY$/org/antlr/antlr4-runtime/4/antlr4-runtime-4.jar
+    - name: $MAVEN_REPOSITORY$/org/apache/thrift/libthrift/0/libthrift-0.jar
     reason: <- intellij.python.community.impl
   contentModules:
   - name: intellij.python.community.impl
@@ -117,11 +112,20 @@
   contentModules:
   - name: intellij.python.markdown
 - name: lib/modules/intellij.python.ml.features.jar
+  projectLibraries:
+  - name: jetbrains.mlapi.catboost
+    files:
+    - name: $MAVEN_REPOSITORY$/com/jetbrains/mlapi/mlapi-catboost/0/mlapi-catboost-0.jar
+    reason: <- intellij.python.ml.features
+  - name: jetbrains.mlapi.catboost.shadow.need.slf4j
+    files:
+    - name: $MAVEN_REPOSITORY$/com/jetbrains/mlapi/catboost-shadow-need-slf4j/1/catboost-shadow-need-slf4j-1.jar
+    reason: <- intellij.python.ml.features
   contentModules:
   - name: intellij.python.ml.features
     libraries:
       jetbrains.ml.models.python.imports.ranking.model:
-      - name: $MAVEN_REPOSITORY$/com/jetbrains/ml/models/python-imports-ranking-model/coral-panda-republished-4/python-imports-ranking-model-coral-panda-republished-4.jar
+      - name: $MAVEN_REPOSITORY$/com/jetbrains/ml/models/python-imports-ranking-model/coral-panda-republished-6/python-imports-ranking-model-coral-panda-republished-6.jar
 - name: lib/modules/intellij.python.parser.jar
   contentModules:
   - name: intellij.python.parser
@@ -137,6 +141,11 @@
 - name: lib/modules/intellij.python.pyproject.jar
   contentModules:
   - name: intellij.python.pyproject
+  library: tuweni-toml
+  files:
+  - name: $MAVEN_REPOSITORY$/io/consensys/tuweni/tuweni-toml/2/tuweni-toml-2.jar
+  - name: $MAVEN_REPOSITORY$/org/antlr/antlr4-runtime/4/antlr4-runtime-4.jar
+  reason: <- intellij.python.pyproject
 - name: lib/modules/intellij.python.sdk.jar
   contentModules:
   - name: intellij.python.sdk
@@ -147,6 +156,15 @@
   files:
   - name: $MAVEN_REPOSITORY$/io/github/z4kn4fein/semver-jvm/2/semver-jvm-2.jar
   reason: <- intellij.python.sdk.ui
+- name: lib/modules/intellij.python.sdkConfigurator.backend.jar
+  contentModules:
+  - name: intellij.python.sdkConfigurator.backend
+- name: lib/modules/intellij.python.sdkConfigurator.common.jar
+  contentModules:
+  - name: intellij.python.sdkConfigurator.common
+- name: lib/modules/intellij.python.sdkConfigurator.frontend.jar
+  contentModules:
+  - name: intellij.python.sdkConfigurator.frontend
 - name: lib/modules/intellij.python.syntax.core.jar
   contentModules:
   - name: intellij.python.syntax.core
@@ -161,8 +179,3 @@
   - name: intellij.python.community.plugin
   contentModules:
   - name: intellij.commandInterface
-- name: lib/xmlrpc.jar
-  library: XmlRPC
-  files:
-  - name: $MAVEN_REPOSITORY$/org/apache/ws/xmlrpc/xmlrpc/2/xmlrpc-2.jar
-  reason: withProjectLibrary

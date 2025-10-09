@@ -4,10 +4,12 @@ package com.intellij.platform.searchEverywhere.providers
 import com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTriggerCollector
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
+import com.intellij.platform.searchEverywhere.providers.topHit.SeTopHitItemsProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -36,7 +38,7 @@ class SeLocalItemDataProvider(
 
   private val infoWithReportableId = mapOf(
     SeItemDataKeys.REPORTABLE_PROVIDER_ID to
-      (if (SearchEverywhereUsageTriggerCollector.isReportable(provider)) provider.id else SearchEverywhereUsageTriggerCollector.NOT_REPORTABLE_ID)
+      if (SearchEverywhereUsageTriggerCollector.isReportable(provider)) provider.id else SearchEverywhereUsageTriggerCollector.NOT_REPORTABLE_ID
   )
 
   @OptIn(ExperimentalAtomicApi::class)
@@ -99,6 +101,21 @@ class SeLocalItemDataProvider(
     return withContext(Dispatchers.EDT) {
       provider.performExtendedAction(item)
     }
+  }
+
+  suspend fun getPreviewInfo(itemData: SeItemData, project: Project): SePreviewInfo? {
+    val item = itemData.fetchItemIfExists() ?: return null
+
+    return (provider as? SeItemsPreviewProvider)?.getPreviewInfo(item, project)
+  }
+
+  fun isPreviewEnabled(): Boolean {
+    if (provider is SeTopHitItemsProvider) {
+      return provider.isPreviewProvider()
+    } else if (provider is SeAdaptedItemsProvider) {
+      return provider.isPreviewProvider()
+    }
+    return provider is SeItemsPreviewProvider
   }
 
   override fun dispose() {

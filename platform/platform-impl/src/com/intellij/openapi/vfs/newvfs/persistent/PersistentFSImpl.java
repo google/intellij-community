@@ -912,14 +912,11 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
       else {
         //just actualise the length:
         vfsPeer.updateRecordFields(fileId, record -> {
-          record.setLength(content.length);
+          boolean lengthChanged = record.setLength(content.length);
           int oldFlags = record.getFlags();
           int flags = oldFlags & ~Flags.MUST_RELOAD_LENGTH;
-
-          if (oldFlags != flags) {
-            record.setFlags(flags);
-          }
-          return true;
+          boolean flagsChanged = record.setFlags(flags);
+          return lengthChanged || flagsChanged;
         });
       }
 
@@ -1877,6 +1874,8 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
       return;
     }
     Ref<String> missedRootUrlRef = new Ref<>();
+    //TODO RC: according to Diogen, this roots lookup is responsible for ~50% of findFileById() freezes
+    //         maybe cache >1 roots per turn to amortise the cost?
     vfsPeer.forEachRoot((rootFileId, rootUrlId) -> {
       if (rootId == rootFileId) {
         missedRootUrlRef.set(getNameByNameId(rootUrlId));
@@ -1903,10 +1902,12 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
         //Diogen reports like 49432216: rootId is _found_ among existing roots, but somehow ensureRootCached(rootPath, rootUrl)
         // leads to insertion of a _new_ root.
         // I suspect this is a bug, and this check is to provide more diagnostics for it:
+        //TODO RC: according to Diogen reports, these errors are most likely connected to case-sensitivity, most likely to to WSL
         throw new IllegalStateException(
           "root[#" + rootId + "]{rootName: '" + missedRootName + "', rootPath: '" + missedRootPath + "'} cached to something else: " +
           "cached [#" + root.getId() + "]" +
-          "{rootName: '" + root.getName() + "', rootPath: '" + root.getPath() + "', rootUrl: '" + root.getUrl() + "'}"
+          "{rootName: '" + root.getName() + "', rootPath: '" + root.getPath() + "', rootUrl: '" + root.getUrl() + "'}, " +
+          "defaultCaseSensitivity: " + SystemInfoRt.isFileSystemCaseSensitive
         );
       }
     }
@@ -2435,13 +2436,17 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                                              @NotNull ChildInfo @Nullable [] children) {
     assert parentId > 0 : parentId; // 0 means it's root => should use .writeRootFields() instead
 
+    //VfsData.DirectoryData directoryData = ((VirtualDirectoryImpl)parentFile).directoryData;
+    //if(!Thread.holdsLock(directoryData)){
+    //  LOG.error("Don't hold .directoryData lock!");
+    //}
+
     FileAttributes attributes = childData.first;
     String symLinkTarget = childData.second;
 
     //MAYBE RC: .updateRecordFields(id=0, ...) also creates a new record, so .createRecord() could be dropped?
     int newChildId = vfsPeer.createRecord();
     int nameId = vfsPeer.updateRecordFields(newChildId, parentId, attributes, name.toString(), /* cleanAttributeRef: */ true);
-
     if (attributes.isDirectory()) {
       vfsPeer.loadDirectoryData(newChildId, parentFile, name, fs);
     }
@@ -2545,6 +2550,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   private void executeRename(@NotNull VirtualFile file, @NotNull String newName) {
     ((VirtualFileSystemEntry)file).setNewName(newName);
+    //TODO RC: update symlink?
   }
 
   private void executeSetWritable(@NotNull VirtualFile file, boolean writableFlag) {
@@ -2623,6 +2629,10 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     vfsPeer.moveChild(newParent::isCaseSensitive, oldParentId, newParentId, childToMoveId);
 
     ((VirtualFileSystemEntry)file).setParent(newParent);
+    //TODO RC: update symlink?
+    //if (fs instanceof LocalFileSystemImpl) {
+    //  ((LocalFileSystemImpl)fs).symlinkUpdated(id, file.getParent(), file.getNameSequence(), file.getPath(), target);
+    //}
   }
 
   @Override

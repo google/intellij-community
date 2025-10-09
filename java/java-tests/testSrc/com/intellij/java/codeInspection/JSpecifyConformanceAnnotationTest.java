@@ -92,16 +92,11 @@ public class JSpecifyConformanceAnnotationTest extends LightJavaCodeInsightFixtu
 
   private static boolean suppressWarning(@NotNull String message, String fileName, Integer offset) {
     Set<Pair<String, Integer>> suppressed = Set.of(
-      Pair.create("Irrelevant.java", 44), // see: IDEA-377761
-      Pair.create("Irrelevant.java", 46), // see: IDEA-377761
-
-      Pair.create("Other.java", 72), // see: IDEA-377763
-      Pair.create("Other.java", 70), // see: IDEA-377763
-
-      Pair.create("Other.java", 102), // see: IDEA-377764
-      Pair.create("Other.java", 106), // see: IDEA-377764
-      Pair.create("Other.java", 104), // see: IDEA-377764
-      Pair.create("Other.java", 108) // see: IDEA-377764
+      // These two exceptions are expected: unlike JSpecify, we don't assign NotNull nullness to non-final catch parameter
+      // Instead, we are doing the flow analysis and may change the nullness during the variable lifetime
+      // See IDEA-377763 for details
+      Pair.create("Other.java", 72),
+      Pair.create("Other.java", 70)
     );
     LineColumn column = StringUtil.offsetToLineColumn(message, offset);
     return suppressed.contains(Pair.create(fileName, column.line));
@@ -132,7 +127,7 @@ public class JSpecifyConformanceAnnotationTest extends LightJavaCodeInsightFixtu
     PsiFile file = myFixture.addFileToProject(relativeFile, stripped);
 
     Map<PsiElement, String> actual = new LinkedHashMap<>();
-    var dfaInspection = new JSpecifyAnnotationTest.JSpecifyDataFlowInspection(actual);
+    var dfaInspection = new JSpecifyFilteredAnnotationTest.JSpecifyDataFlowInspection(actual);
     dfaInspection.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true;
     var nullableStuffInspection = new JSpecifyNullableStuffInspection(actual);
     List<LocalInspectionTool> inspections = List.of(dfaInspection, nullableStuffInspection);
@@ -232,8 +227,10 @@ public class JSpecifyConformanceAnnotationTest extends LightJavaCodeInsightFixtu
                                  @NotNull String messageKey, Object... args) {
       switch (messageKey) {
         case "inspection.nullable.problems.primitive.type.annotation",
+             "inspection.nullable.problems.at.throws",
              "inspection.nullable.problems.at.type.parameter",
              "inspection.nullable.problems.Nullable.NotNull.conflict",
+             "conflicting.nullability.annotations",
              "inspection.nullable.problems.at.wildcard",
              "inspection.nullable.problems.at.local.variable" ->
           warnings.put(anchor, "test:irrelevant-annotation:" + getAnnotationShortName(((PsiAnnotationImpl)anchor).getQualifiedName()));

@@ -5,6 +5,7 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XValue
+import com.intellij.xdebugger.impl.XDebuggerExecutionPointManager
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerProxy
 import com.intellij.xdebugger.impl.rpc.XDebugSessionId
 import com.intellij.xdebugger.impl.rpc.XExecutionStackId
@@ -31,6 +32,8 @@ interface XDebugManagerProxy {
 
   fun getBreakpointManagerProxy(project: Project): XBreakpointManagerProxy
 
+  fun getDebuggerExecutionPointManager(project: Project): XDebuggerExecutionPointManager?
+
   /**
    * Returns `true` if the given [xValue] is presented on BE.
    * In monolith mode, this method always returns `true`;
@@ -49,6 +52,14 @@ interface XDebugManagerProxy {
   fun findSessionProxy(project: Project, sessionId: XDebugSessionId): XDebugSessionProxy? {
     return getSessions(project).firstOrNull { it.id == sessionId }
   }
+
+  /**
+   * Gets ID of the given [value].
+   *
+   * This method is used in split mode to pass the ID of the value from frontend to backend.
+   * It's not supported in monolith mode.
+   */
+  fun getXValueId(value: XValue): XValueId?
 
   companion object {
     private val EP_NAME = ExtensionPointName.create<XDebugManagerProxy>("com.intellij.xdebugger.managerProxy")

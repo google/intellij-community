@@ -36,7 +36,7 @@ jvm_library(
     "//platform/core-api:core",
     "@lib//:kotlinc-analysis-api",
     "@lib//:kotlinc-kotlin-compiler-common",
-    "@lib//:kotlin-reflect",
+    "//libraries/kotlin/reflect",
     "//platform/analysis-api:analysis",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/psi",
@@ -67,7 +67,7 @@ jvm_library(
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/code-insight/kotlin.code-insight.k2:kotlin-code-insight-k2",
     "//plugins/kotlin/kotlin.searching:searching-k2",
-    "@lib//:guava",
+    "//libraries/guava",
   ]
 )
 ### auto-generated section `build kotlin.code-insight.intentions.k2` end

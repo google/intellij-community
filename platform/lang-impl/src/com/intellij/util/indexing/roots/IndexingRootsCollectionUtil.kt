@@ -178,6 +178,7 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
   private val moduleRoots: MutableMap<Module, MutableIndexingUrlRootHolder> = mutableMapOf()
   private val descriptions: MutableCollection<IndexingRootsDescription> = mutableListOf()
   private val reincludedRoots: MutableCollection<VirtualFile> = HashSet()
+  private val nonIndexableRoots: MutableCollection<VirtualFile> = HashSet()
 
   fun <E : WorkspaceEntity> registerAddedEntity(entity: E,
                                                 contributor: WorkspaceFileIndexContributor<E>,
@@ -257,18 +258,6 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
       descriptions.add(EntityGenericContentRootsDescription(entry.key, entry.value))
     }
 
-    for ((libraryEntity, roots) in rootData.libraryRoots.entries) {
-      if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
-        descriptions.add(LibraryRootsDescription(libraryEntity, roots))
-      }
-    }
-
-    for ((libraryEntity, roots) in rootData.libraryUrlRoots.entries) {
-      if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
-        descriptions.add(LibraryUrlRootsDescription(libraryEntity, roots))
-      }
-    }
-
     for ((entityReference, roots) in rootData.externalRoots.entries) {
       descriptions.add(EntityExternalRootsDescription(entityReference, roots))
     }
@@ -276,12 +265,19 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
     for ((entityReference, roots) in rootData.customKindRoots.entries) {
       descriptions.add(EntityCustomKindRootsDescription(entityReference, roots))
     }
-    for ((sdkEntity, roots) in rootData.sdkRoots.entries) {
-      if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
+    if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) {
+      for ((sdkEntity, roots) in rootData.sdkRoots.entries) {
         descriptions.add(SdkRootsDescription(sdkEntity, roots))
+      }
+      for ((libraryEntity, roots) in rootData.libraryUrlRoots.entries) {
+        descriptions.add(LibraryUrlRootsDescription(libraryEntity, roots))
+      }
+      for ((libraryEntity, roots) in rootData.libraryRoots.entries) {
+        descriptions.add(LibraryRootsDescription(libraryEntity, roots))
       }
     }
     reincludedRoots.addAll(rootData.excludedRoots)
+    nonIndexableRoots.addAll(rootData.nonIndexableRoots)
   }
 
   fun createBuilders(project: Project): Collection<IndexableIteratorBuilder> {
@@ -364,6 +360,10 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
     }
   }
 
+  fun forEachNonIndexableRoots(consumer: Consumer<Collection<VirtualFile>>) {
+    consumer.accept(nonIndexableRoots)
+  }
+
   companion object {
     @JvmOverloads
     fun registerEntitiesFromContributors(entityStorage: EntityStorage,
@@ -409,13 +409,17 @@ private class RootData<E : WorkspaceEntity>(val contributor: WorkspaceFileIndexC
   val externalRoots = mutableMapOf<EntityPointer<E>, MutableIndexingUrlSourceRootHolder>()
   val customKindRoots = mutableMapOf<EntityPointer<E>, MutableIndexingUrlRootHolder>()
   val excludedRoots = mutableListOf<VirtualFile>()
+  val nonIndexableRoots = mutableListOf<VirtualFile>()
 
   fun registerFileSet(root: VirtualFileUrl,
                       kind: WorkspaceFileKind,
                       entity: E,
                       customData: WorkspaceFileSetData?,
                       recursive: Boolean) {
-    if (!kind.isIndexable) return
+    if (!kind.isIndexable) {
+      root.virtualFile?.let { nonIndexableRoots.add(it) }
+      return
+    }
 
     val entityReference = entity.createPointer<E>()
 
@@ -460,7 +464,10 @@ private class RootData<E : WorkspaceEntity>(val contributor: WorkspaceFileIndexC
                       kind: WorkspaceFileKind,
                       entity: WorkspaceEntity,
                       recursive: Boolean) {
-    if (!kind.isIndexable) return
+    if (!kind.isIndexable) {
+      nonIndexableRoots.add(root)
+      return
+    }
 
     thisLogger().assertTrue(contributor is LibraryRootFileIndexContributor,
                             "Registering VirtualFile roots is not supported, register VirtualFileUrl from $contributor instead")

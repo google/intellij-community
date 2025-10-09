@@ -5,14 +5,19 @@ import com.intellij.codeInsight.completion.PrefixMatcher
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementDecorator
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.UserDataHolder
+import com.intellij.openapi.util.UserDataHolderBase
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaCompletionExtensionCandidateChecker
+import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.KtSymbolFromIndexProvider
 import org.jetbrains.kotlin.idea.base.codeInsight.contributorClass
 import org.jetbrains.kotlin.idea.completion.KotlinFirCompletionParameters
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
+import org.jetbrains.kotlin.idea.completion.impl.k2.contributors.evaluateRuntimeKaType
 import org.jetbrains.kotlin.idea.completion.implCommon.handlers.CompletionCharInsertHandler
 import org.jetbrains.kotlin.idea.completion.implCommon.stringTemplates.InsertStringTemplateBracesInsertHandler
 import org.jetbrains.kotlin.idea.completion.isAtFunctionLiteralStart
@@ -20,6 +25,8 @@ import org.jetbrains.kotlin.idea.completion.suppressItemSelectionByCharsOnTyping
 import org.jetbrains.kotlin.idea.completion.weighers.CompletionContributorGroupWeigher.groupPriority
 import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext
 import org.jetbrains.kotlin.idea.util.positionContext.KotlinRawPositionContext
+import org.jetbrains.kotlin.idea.util.positionContext.KotlinSimpleNameReferencePositionContext
+import java.util.Optional
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
 
@@ -37,7 +44,7 @@ internal class K2CompletionSection<P : KotlinRawPositionContext>(
 )
 
 /**
- * This class contains data that is common for all contexts that run within the same analysis session.
+ * This class contains data that is common for all contexts that run within the same [KaSession].
  * This means we do not have to recreate them per section and can reuse them for all sections run in the session.
  */
 internal class K2CompletionSectionCommonData<P : KotlinRawPositionContext>(
@@ -47,14 +54,11 @@ internal class K2CompletionSectionCommonData<P : KotlinRawPositionContext>(
     val visibilityChecker: CompletionVisibilityChecker,
     val importStrategyDetector: ImportStrategyDetector,
     val symbolFromIndexProvider: KtSymbolFromIndexProvider,
-    val runtimeTypeProvider: Lazy<KaType?>,
-    val extensionCheckerProvider: Lazy<KaCompletionExtensionCandidateChecker?>,
+    val session: KaSession,
 ) {
-    val sessionStorage: K2CompletionSectionSessionStorage = K2CompletionSectionSessionStorage()
-}
-
-internal class K2CompletionSectionSessionStorage {
-    internal val variables: MutableMap<KProperty<*>, Any?> = mutableMapOf()
+    // This needs to be stored in the common data because the storage should be the same for all sections executed
+    // within the same analysis session to avoid unnecessary computations.
+    val sessionStorage = UserDataHolderBase()
 }
 
 /**
@@ -66,7 +70,14 @@ internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
     private val contributor: K2CompletionContributor<P>,
     val sink: K2LookupElementSink,
     private val addLaterSection: (K2CompletionSection<P>) -> Unit,
-) {
+) : UserDataHolder by commonData.sessionStorage {
+    companion object {
+        // We need these keys because the LazyCompletionSessionProperty in this class are different property instances per context.
+        // For extension properties, this will not be relevant and we can use anonymous keys.
+        private val RUNTIME_TYPE_KEY: Key<Optional<KaType?>> = Key.create("RUNTIME_TYPE_KEY")
+        private val EXTENSION_CHECKER_KEY: Key<Optional<KaCompletionExtensionCandidateChecker?>> = Key.create("EXTENSION_CHECKER_KEY")
+    }
+
     val completionContext: K2CompletionContext<P> = commonData.completionContext
 
     val positionContext: P = completionContext.positionContext
@@ -85,19 +96,22 @@ internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
 
     val symbolFromIndexProvider: KtSymbolFromIndexProvider = commonData.symbolFromIndexProvider
 
-    val runtimeType: KaType? by commonData.runtimeTypeProvider
+    val runtimeType: KaType? by LazyCompletionSessionProperty(RUNTIME_TYPE_KEY) {
+        val positionContext = contextOf<K2CompletionSectionContext<P>>().positionContext
+        val receiver = (positionContext as? KotlinSimpleNameReferencePositionContext)?.explicitReceiver
+        receiver?.evaluateRuntimeKaType()
+    }
 
-    val extensionChecker: KaCompletionExtensionCandidateChecker? by commonData.extensionCheckerProvider
+    val extensionChecker: KaCompletionExtensionCandidateChecker? by LazyCompletionSessionProperty(EXTENSION_CHECKER_KEY) {
+        val sectionContext = contextOf<K2CompletionSectionContext<P>>()
 
-    private val sessionStorage: K2CompletionSectionSessionStorage = commonData.sessionStorage
+        createExtensionChecker(sectionContext.positionContext, sectionContext.parameters.originalFile, sectionContext.runtimeType)
+    }
 
-    internal class CompletionSessionProperty<T : Any> {
-        @Suppress("UNCHECKED_CAST")
-        operator fun getValue(thisRef: K2CompletionSectionContext<*>, desc: KProperty<*>): T? =
-            thisRef.sessionStorage.variables[desc] as? T?
+    private val session = commonData.session
 
-        operator fun setValue(thisRef: K2CompletionSectionContext<*>, desc: KProperty<*>, value: T?) =
-            thisRef.sessionStorage.variables.put(desc, value)
+    inline fun <T> runWithSession(f: context(KaSession, K2CompletionSectionContext<P>) () -> T): T {
+        return session.withValidityAssertion { f(session, this) }
     }
 
     fun completeLaterInSameSession(
@@ -118,9 +132,39 @@ internal class K2CompletionSectionContext<out P : KotlinRawPositionContext>(
 
 /**
  * Creates a property that stores the value and is shared between all sections that run in the same analysis session.
+ * It uses [initializer] to initialize its value for the current context when accessed for the first time.
+ *
+ * This is usually a good idea to use for expensive computations that should only be done once per analysis session.
+ *
+ * This class uses Optionals internally to distinguish between a non-initialized property and a property initialized
+ * with a null value.
  */
-internal fun <T: Any> completionSessionProperty(): K2CompletionSectionContext.CompletionSessionProperty<T> {
-    return K2CompletionSectionContext.CompletionSessionProperty()
+internal class LazyCompletionSessionProperty<T, P: KotlinRawPositionContext>(
+    // We use an anonymous key by default because the name does not matter to us.
+    // Different instances of a key with the same name are distinct.
+    private val userDataKey: Key<Optional<T>> = Key.create(""),
+    private val initializer: context(KaSession, K2CompletionSectionContext<P>) () -> T
+) {
+
+    operator fun getValue(thisRef: K2CompletionSectionContext<P>, property: KProperty<*>): T {
+        val existingValue = thisRef.getUserData(userDataKey)
+        // The .orElse here is technically a hack to trick the Kotlin type system by using a flexible type.
+        // This allows us allowing for lazy nullable and non-nullable properties by using Optionals as a
+        // way of differentiating between null and not initialized.
+        if (existingValue != null) return existingValue.orElse(null)
+
+        return thisRef.runWithSession {
+            val newValue = initializer()
+            @Suppress("UNCHECKED_CAST")
+            thisRef.putUserData(userDataKey, Optional.ofNullable(newValue) as Optional<T>)
+            newValue
+        }
+    }
+
+    operator fun setValue(thisRef: K2CompletionSectionContext<P>, property: KProperty<*>, value: T?) {
+        @Suppress("UNCHECKED_CAST")
+        thisRef.putUserData(userDataKey, Optional.ofNullable(value) as Optional<T>)
+    }
 }
 
 internal typealias K2CompletionSectionRunnable<P> = context(KaSession, K2CompletionSectionContext<P>) () -> Unit

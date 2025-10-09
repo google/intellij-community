@@ -35,9 +35,10 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/util/concurrency",
     "//platform/vcs-api/shared",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "//platform/util/jdom",
     "//platform/ide-core-impl",
+    "//platform/diagnostic/telemetry",
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.impl.shared` end

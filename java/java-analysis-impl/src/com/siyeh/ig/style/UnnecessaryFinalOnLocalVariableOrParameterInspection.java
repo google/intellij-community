@@ -35,9 +35,6 @@ import static com.intellij.codeInspection.options.OptPane.pane;
 public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends BaseInspection implements CleanupLocalInspectionTool {
 
   @SuppressWarnings("PublicField")
-  public boolean onlyWarnOnAbstractMethods = false;
-
-  @SuppressWarnings("PublicField")
   public boolean reportLocalVariables = true;
 
   @SuppressWarnings("PublicField")
@@ -45,6 +42,15 @@ public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends 
 
   @SuppressWarnings("PublicField")
   public boolean reportParameters = true;
+
+  @SuppressWarnings("PublicField")
+  public boolean onlyWarnOnAbstractMethods = false;
+
+  @SuppressWarnings("PublicField")
+  public boolean reportCatchParameters = true;
+
+  @SuppressWarnings("PublicField")
+  public boolean reportForeachParameters = true;
 
   @Override
   public @NotNull String buildErrorString(Object... infos) {
@@ -63,8 +69,12 @@ public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends 
     return pane(
       checkbox("reportLocalVariables", InspectionGadgetsBundle.message("unnecessary.final.report.local.variables.option")),
       checkbox("reportPatternVariables", InspectionGadgetsBundle.message("unnecessary.final.report.pattern.variables.option")),
-      checkbox("reportParameters", InspectionGadgetsBundle.message("unnecessary.final.report.parameters.option"),
-               checkbox("onlyWarnOnAbstractMethods", InspectionGadgetsBundle.message("unnecessary.final.on.parameter.only.interface.option"))));
+      checkbox("reportParameters", InspectionGadgetsBundle.message("unnecessary.final.report.method.parameters.option"),
+               checkbox("onlyWarnOnAbstractMethods",InspectionGadgetsBundle.message("unnecessary.final.on.parameter.only.interface.option"))
+      ),
+      checkbox("reportCatchParameters", InspectionGadgetsBundle.message("unnecessary.final.report.catch.parameters.option")),
+      checkbox("reportForeachParameters", InspectionGadgetsBundle.message("unnecessary.final.report.foreach.parameters.option"))
+    );
   }
 
 
@@ -154,7 +164,7 @@ public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends 
           }
         }
       }
-      if (onlyWarnOnAbstractMethods || !reportParameters) {
+      if (onlyWarnOnAbstractMethods || !reportCatchParameters) {
         return;
       }
       final PsiCatchSection[] catchSections = statement.getCatchSections();
@@ -176,7 +186,7 @@ public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends 
     @Override
     public void visitForeachStatement(@NotNull PsiForeachStatement statement) {
       super.visitForeachStatement(statement);
-      if (onlyWarnOnAbstractMethods || !reportParameters) {
+      if (!reportForeachParameters) {
         return;
       }
       PsiParameter parameter = statement.getIterationParameter();
@@ -188,7 +198,8 @@ public final class UnnecessaryFinalOnLocalVariableOrParameterInspection extends 
 
     private static boolean isNecessaryFinal(PsiVariable variable, PsiElement context) {
       return PsiUtil.isConstantExpression(variable.getInitializer()) ||
-             !PsiUtil.isAvailable(JavaFeature.EFFECTIVELY_FINAL, variable) && VariableAccessUtils.variableIsUsedInInnerClass(variable, context);
+             !PsiUtil.isAvailable(JavaFeature.EFFECTIVELY_FINAL, variable) &&
+             VariableAccessUtils.variableIsUsedInInnerClass(variable, context);
     }
 
     private void check(PsiParameter parameter) {

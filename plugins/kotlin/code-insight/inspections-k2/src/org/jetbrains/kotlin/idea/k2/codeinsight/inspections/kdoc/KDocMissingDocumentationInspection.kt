@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.allOverriddenSymbols
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
+import org.jetbrains.kotlin.idea.codeinsight.api.applicable.asUnit
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinApplicableInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.applicators.ApplicabilityRanges
@@ -21,6 +22,7 @@ import org.jetbrains.kotlin.idea.kdoc.findKDocByPsi
 import org.jetbrains.kotlin.kdoc.psi.impl.KDocSection
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
+import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtVisitor
 import org.jetbrains.kotlin.psi.namedDeclarationVisitor
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
@@ -35,17 +37,17 @@ internal class KDocMissingDocumentationInspection : KotlinApplicableInspectionBa
         visitTargetElement(it, holder, isOnTheFly)
     }
 
-    override fun isApplicableByPsi(element: KtNamedDeclaration): Boolean =
-        !TestUtils.isInTestSourceContent(element) && element.findKDocByPsi() == null
+    override fun isApplicableByPsi(element: KtNamedDeclaration): Boolean {
+        if (element is KtParameter && element.isFunctionTypeParameter) return false
+        return !TestUtils.isInTestSourceContent(element) && element.findKDocByPsi() == null
+    }
 
     override fun getApplicableRanges(element: KtNamedDeclaration): List<TextRange> =
         ApplicabilityRanges.declarationName(element)
 
     override fun KaSession.prepareContext(element: KtNamedDeclaration): Unit? {
         val symbol = element.symbol.takeIf { isPublicApi(it) } ?: return null
-        if (symbol is KaCallableSymbol && symbol.hasInheritedKDoc()) return null
-
-        return Unit
+        return (symbol is KaCallableSymbol && symbol.hasInheritedKDoc()).not().asUnit
     }
 
     override fun getProblemDescription(

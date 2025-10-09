@@ -32,6 +32,7 @@ class LocalEventsFlow : EventsFlow {
       unsubscribeNoLock(eventClass, subscriber)
     }
   }
+
   private fun <EventType : Event> unsubscribeNoLock(eventClass: Class<EventType>, subscriber: Any) {
     val eventClassName = eventClass.simpleName
     val subscriberName = getSubscriberObject(subscriber)
@@ -84,53 +85,54 @@ class LocalEventsFlow : EventsFlow {
         }
       }
     }
+    if (subscribersForEvent.isNullOrEmpty()) {
+      return
+    }
+
     val exceptions = CopyOnWriteArrayList<Throwable>()
-    (subscribersForEvent as? List<Subscriber<T>>)
-      ?.map { subscriber ->
-        // In case the job is interrupted (e.g. due to timeout), the coroutine may enter Cancelling state
-        // and finish before the 'catch' block is executed. Using CompletableDeferred ensures we wait
-        // until either successful completion or proper exception handling has occurred.
-        val result = CompletableDeferred<Unit>()
-        LOG.debug("Post event $eventClassName for $subscriber.")
-        // Launching a new coroutine for each subscriber
-        scope.launch {
-          LOG.debug("Start execution $eventClassName for $subscriber")
-          // Blocking the current coroutine to enforce timeout and interruptibility
-          runBlocking {
-            // Enforces a timeout for the entire subscriber execution
-            withTimeout(subscriber.timeout) {
-              // Ensures the operation inside is interruptible — if the thread is blocked,
-              // it will be interrupted when the coroutine is cancelled (e.g. by timeout)
-              runInterruptible {
-                runBlocking {
-                  // Switch to IO dispatcher for potentially blocking I/O operations and for more workers
-                  withContext(Dispatchers.IO) {
-                    try {
-                      subscriber.callback(event)
-                      result.complete(Unit)
-                    }
-                    catch (e: Throwable) {
-                      exceptions.add(e)
-                      result.complete(Unit)
-                    }
-                  }
-                }
+    val tasks = (subscribersForEvent as List<Subscriber<T>>).map { subscriber ->
+      // In case the job is interrupted (e.g. due to timeout), the coroutine may enter Cancelling state
+      // and finish before the 'catch' block is executed. Using CompletableDeferred ensures we wait
+      // until either successful completion or proper exception handling has occurred.
+      val result = CompletableDeferred<Unit>()
+      LOG.debug("Post event $eventClassName for $subscriber.")
+      // Launching a new coroutine for each subscriber
+      scope.launch(Dispatchers.IO) {
+        LOG.debug("Start execution $eventClassName for $subscriber")
+        // Enforces a timeout for the entire subscriber execution
+        withTimeout(subscriber.timeout) {
+          // Ensures the operation inside is interruptible — if the thread is blocked,
+          // it will be interrupted when the coroutine is cancelled (e.g. by timeout)
+          runInterruptible {
+            try {
+              runBlocking {
+                subscriber.callback(event)
               }
+              result.complete(Unit)
+            }
+            catch (e: Throwable) {
+              exceptions.add(e)
+              result.complete(Unit)
             }
           }
-          LOG.debug("Finished execution $eventClassName for $subscriber")
         }
-        return@map result
+        LOG.debug("Finished execution $eventClassName for $subscriber")
       }
-      ?.forEach {
+      return@map result
+    }
+
+    runBlocking {
+      // awaitAll shouldn't be used as it would stop after the first exception from any coroutine
+      tasks.forEach {
         try {
-          runBlocking { it.await() }
+          it.await()
         }
         catch (e: Throwable) {
           LOG.info("Exception occurred while processing $e")
           exceptions.add(e)
         }
       }
+    }
 
     LOG.debug("All exceptions: $exceptions")
     if (exceptions.isNotEmpty()) {

@@ -17,7 +17,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-jps-common",
-    "@lib//:gson",
+    "//libraries/gson",
     "//platform/analysis-api:analysis",
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-api:indexing",
@@ -51,6 +51,8 @@ jvm_library(
     "//platform/core-api:core",
     "//platform/workspace/jps",
     "//platform/backend/observation",
+    "//platform/util/progress",
+    "//platform/vcs-api/vcs-api-core:vcs-core",
   ]
 )
 ### auto-generated section `build kotlin.maven` end

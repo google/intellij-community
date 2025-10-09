@@ -1,13 +1,13 @@
 package com.intellij.grazie.grammar
 
 import com.intellij.grazie.GrazieBundle
+import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.GraziePlugin
-import com.intellij.grazie.detection.LangDetector
+import com.intellij.grazie.detection.toAvailableLang
 import com.intellij.grazie.ide.ui.components.utils.html
 import com.intellij.grazie.jlanguage.Lang
 import com.intellij.grazie.jlanguage.LangTool
 import com.intellij.grazie.text.*
-import com.intellij.grazie.utils.NaturalTextDetector
 import com.intellij.grazie.utils.TextStyleDomain
 import com.intellij.grazie.utils.getTextDomain
 import com.intellij.grazie.utils.trimToNull
@@ -23,7 +23,7 @@ import com.intellij.util.ExceptionUtil
 import com.intellij.util.containers.Interner
 import com.intellij.util.io.computeDetached
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.html.p
 import kotlinx.html.style
 import org.jetbrains.annotations.ApiStatus
@@ -50,18 +50,12 @@ open class LanguageToolChecker : ExternalTextChecker() {
   }
 
   @OptIn(DelicateCoroutinesApi::class)
-  override suspend fun checkExternally(content: TextContent): List<Problem> {
-    val text = content.toString()
-    if (text.isBlank() || !NaturalTextDetector.seemsNatural(text)) {
-      return emptyList()
-    }
-
-    val domain = content.getTextDomain()
-    val language = LangDetector.getLang(text) ?: return emptyList()
-    return computeDetached(currentCoroutineContext()) {
+  override suspend fun checkExternally(context: ProofreadingContext): List<Problem> {
+    val domain = context.text.getTextDomain()
+    return computeDetached(Dispatchers.Default) {
       try {
         computeWithClassLoader<List<Problem>, Throwable>(GraziePlugin.classLoader) {
-          collectLanguageToolProblems(content, text, language, domain)
+          collectLanguageToolProblems(context.text, context.language.toAvailableLang(), domain)
         }
       }
       catch (exception: Throwable) {
@@ -74,15 +68,17 @@ open class LanguageToolChecker : ExternalTextChecker() {
     }
   }
 
-  private fun collectLanguageToolProblems(extracted: TextContent, text: String, lang: Lang, domain: TextStyleDomain): List<Problem> {
+  private fun collectLanguageToolProblems(extracted: TextContent, lang: Lang, domain: TextStyleDomain): List<Problem> {
     val tool = LangTool.getTool(lang, domain)
-    val sentences = tool.sentenceTokenize(text)
+    val sentences = tool.sentenceTokenize(extracted.toString())
     if (sentences.any { it.length > 1000 }) {
       return emptyList()
     }
-    val matches = runLT(tool, text)
+    val matches = runLT(tool, extracted.toString())
     val disappearsAfterAddingQuotes by lazy { checkQuotedText(extracted, tool) }
+    val state = GrazieConfig.get()
     return matches.asSequence()
+      .filter { LanguageToolRule(lang, it.rule, isEnabledByLanguageTool = true).isEnabledInState(state, domain) }
       .filterNot { possiblyMarkupDependent(it) && disappearsAfterAddingQuotes.test(it) }
       .map { Problem(it, lang, extracted, this is TestChecker) }
       .filterNot { isGitCherryPickedFrom(it.match, extracted) }
@@ -137,13 +133,22 @@ open class LanguageToolChecker : ExternalTextChecker() {
     override fun getShortMessage(): String =
       match.shortMessage.trimToNull() ?: match.rule.description.trimToNull() ?: match.rule.category.name
 
+    @Suppress("HardCodedStringLiteral")
     override fun getDescriptionTemplate(isOnTheFly: Boolean): String =
       if (testDescription) match.rule.id
-      else match.messageSanitized
+      else {
+        when (match.rule.id) {
+          "EN_PLAIN_ENGLISH_REPLACE" -> "'there are' is a wordy or complex expression. In some cases, it might be preferable to remove it entirely."
+          else -> match.messageSanitized
+        }
+      }
 
-    override fun getTooltipTemplate(): String = toTooltipTemplate(match)
+    override fun getTooltipTemplate(): String = toTooltipTemplate(this)
 
-    override fun getSuggestions(): List<Suggestion> = match.suggestedReplacements.map { Suggestion.replace(highlightRanges[0], it) }
+    override fun getSuggestions(): List<Suggestion> = when (match.rule.id) {
+      "EN_PLAIN_ENGLISH_REPLACE" -> listOf(Suggestion.replace(highlightRanges[0], ""))
+      else -> match.suggestedReplacements.map { Suggestion.replace(highlightRanges[0], it) }
+    }
 
     override fun getPatternRange() = TextRange(match.patternFromPos, match.patternToPos)
 
@@ -174,6 +179,7 @@ open class LanguageToolChecker : ExternalTextChecker() {
       return LanguageToolRule.isStyleLike(match.rule)
     }
   }
+
 }
 
 private val logger = LoggerFactory.getLogger(LanguageToolChecker::class.java)
@@ -277,10 +283,10 @@ private fun isPathPart(startOffset: Int, endOffset: Int, text: TextContent): Boo
 }
 
 @NlsSafe
-private fun toTooltipTemplate(match: RuleMatch): String {
+private fun toTooltipTemplate(problem: TextProblem): String {
   val html = html {
     p {
-      +match.messageSanitized
+      +problem.getDescriptionTemplate(true)
     }
 
     p {

@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.util.Disposer
+import com.intellij.platform.searchEverywhere.SePreviewInfo
 import com.intellij.platform.searchEverywhere.*
 import com.intellij.platform.searchEverywhere.frontend.SeEmptyResultInfo
 import com.intellij.platform.searchEverywhere.frontend.SeFilterEditor
@@ -19,8 +20,7 @@ import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 class SeTextTab(private val delegate: SeTabDelegate, registerShortcut: (AnAction) -> Unit) : SeTab {
-  override val name: String get() = FindBundle.message("search.everywhere.group.name")
-  override val shortName: String get() = name
+  override val name: String get() = NAME
   override val id: String get() = ID
   private val filterEditorDisposable = Disposer.newDisposable()
   private val filterEditor: SuspendLazyProperty<SeTextFilterEditor> = initAsync(delegate.scope) {
@@ -60,6 +60,14 @@ class SeTextTab(private val delegate: SeTabDelegate, registerShortcut: (AnAction
     return delegate.performExtendedAction(item)
   }
 
+  override suspend fun isPreviewEnabled(): Boolean {
+    return delegate.isPreviewEnabled()
+  }
+
+  override suspend fun getPreviewInfo(itemData: SeItemData): SePreviewInfo? {
+    return delegate.getPreviewInfo(itemData, false)
+  }
+
   override fun dispose() {
     Disposer.dispose(filterEditorDisposable)
     Disposer.dispose(delegate)
@@ -68,5 +76,7 @@ class SeTextTab(private val delegate: SeTabDelegate, registerShortcut: (AnAction
   companion object {
     @ApiStatus.Internal
     const val ID: String = "TextSearchContributor"
+    @ApiStatus.Internal
+    val NAME: String = FindBundle.message("search.everywhere.group.name")
   }
 }

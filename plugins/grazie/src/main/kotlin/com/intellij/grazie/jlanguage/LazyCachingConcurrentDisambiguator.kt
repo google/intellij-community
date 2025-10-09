@@ -5,9 +5,10 @@ import com.intellij.openapi.util.ClassLoaderUtil.runWithClassLoader
 import com.intellij.util.containers.ContainerUtil.createConcurrentSoftKeySoftValueMap
 import com.intellij.util.io.computeDetached
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
 import org.languagetool.AnalyzedSentence
 import org.languagetool.AnalyzedTokenReadings
+import org.languagetool.JLanguageTool
 import org.languagetool.Language
 import org.languagetool.tagging.disambiguation.AbstractDisambiguator
 import org.languagetool.tagging.disambiguation.Disambiguator
@@ -20,9 +21,11 @@ internal class LazyCachingConcurrentDisambiguator(private val jLanguage: Languag
   private var disambiguator: Disambiguator? = null
   private val lock = Any()
 
-  override fun disambiguate(input: AnalyzedSentence): AnalyzedSentence {
+  override fun disambiguate(input: AnalyzedSentence): AnalyzedSentence = disambiguate(input, null)
+
+  override fun disambiguate(input: AnalyzedSentence, checkCanceled: JLanguageTool.CheckCancelledCallback?): AnalyzedSentence {
     ensureInitialized()
-    return cache.computeIfAbsent(copy(input.tokens)) { disambiguator!!.disambiguate(input) }
+    return cache.computeIfAbsent(copy(input.tokens)) { disambiguator!!.disambiguate(input, checkCanceled) }
   }
 
   private fun ensureInitialized() {
@@ -38,7 +41,7 @@ internal class LazyCachingConcurrentDisambiguator(private val jLanguage: Languag
   @OptIn(DelicateCoroutinesApi::class)
   suspend fun ensureInitializedAsync() {
     if (disambiguator == null) {
-      computeDetached(currentCoroutineContext()) {
+      computeDetached(Dispatchers.Default) {
         runWithClassLoader<Throwable>(GraziePlugin.classLoader) {
           ensureInitialized()
         }

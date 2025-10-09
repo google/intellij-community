@@ -6,10 +6,13 @@ import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.grazie.GrazieConfig;
+import com.intellij.grazie.spellcheck.diacritic.Diacritics;
+import com.intellij.grazie.spellcheck.engine.GrazieSpellCheckerEngine;
 import com.intellij.lang.LanguageNamesValidation;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.lang.refactoring.NamesValidator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.registry.Registry;
@@ -20,8 +23,6 @@ import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.refactoring.rename.RenameUtil;
 import com.intellij.spellchecker.SpellCheckerManager;
 import com.intellij.spellchecker.SpellCheckerSeveritiesProvider;
-import com.intellij.spellchecker.grazie.GrazieSpellCheckerEngine;
-import com.intellij.spellchecker.grazie.diacritic.Diacritics;
 import com.intellij.spellchecker.inspections.SpellCheckingInspection;
 import com.intellij.spellchecker.inspections.Splitter;
 import com.intellij.spellchecker.settings.SpellCheckerSettings;
@@ -148,14 +149,14 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
   }
 
   private static void addRegularDescriptor(@NotNull PsiElement element, @NotNull TextRange textRange, @NotNull ProblemsHolder holder,
-                                           boolean useRename, String wordWithTypo) {
+                                           boolean useRename, String wordWithTypo, Set<String> suggestions) {
     SpellcheckingStrategy strategy = getSpellcheckingStrategy(element);
 
     LocalQuickFix[] fixes = strategy != null
-                            ? strategy.getRegularFixes(element, textRange, useRename, wordWithTypo)
-                            : SpellcheckingStrategy.getDefaultRegularFixes(useRename, wordWithTypo, element, textRange);
+                            ? strategy.getRegularFixes(element, textRange, useRename, wordWithTypo, suggestions)
+                            : SpellcheckingStrategy.getDefaultRegularFixes(useRename, wordWithTypo, element, textRange, suggestions);
 
-    final ProblemDescriptor problemDescriptor = createProblemDescriptor(element, textRange, fixes, true);
+    ProblemDescriptor problemDescriptor = createProblemDescriptor(element, textRange, fixes, true);
     holder.registerProblem(problemDescriptor);
   }
 
@@ -302,7 +303,7 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
 
       List<String> paths = SpellCheckerSettings.getInstance(project).getCustomDictionariesPaths();
       if (paths != null && !paths.isEmpty()) {
-        GrazieSpellCheckerEngine engine = project.getService(GrazieSpellCheckerEngine.class);
+        GrazieSpellCheckerEngine engine = GrazieSpellCheckerEngine.getInstance(project);
         return !ContainerUtil.exists(paths, dictionaryName -> engine.isDictionaryLoad(dictionaryName));
       }
       return true;
@@ -322,6 +323,19 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
   private static boolean hasSameNamedReferencesInFile(String word, PsiFile file) {
     int[] occurrences = new StringSearcher(word, true, true).findAllOccurrences(file.getText());
     if (occurrences.length <= 1) {
+      return false;
+    }
+
+    if (DumbService.isDumb(file.getProject())) {
+      for (int occurrence : occurrences) {
+        PsiElement element = file.findElementAt(occurrence);
+        if (element != null) {
+          SpellcheckingStrategy strategy = getSpellcheckingStrategy(element);
+          if (strategy != null && !strategy.elementFitsScope(element, Set.of(SpellCheckingScope.Comments))) {
+            return true;
+          }
+        }
+      }
       return false;
     }
 
@@ -348,7 +362,7 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
   }
 
   private static void registerProblem(@NotNull SpellingTypo typo, @NotNull ProblemsHolder holder) {
-    registerProblem(holder, typo.getElement(), typo.getRange(), false, typo.getWord());
+    registerProblem(holder, typo.getElement(), typo.getRange(), false, typo.getWord(), typo.getFixes());
   }
 
   private static void registerProblem(@NotNull ProblemsHolder holder,
@@ -356,8 +370,17 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
                                       @NotNull TextRange range,
                                       boolean useRename,
                                       String word) {
+    registerProblem(holder, element, range, useRename, word, null);
+  }
+
+  private static void registerProblem(@NotNull ProblemsHolder holder,
+                                      @NotNull PsiElement element,
+                                      @NotNull TextRange range,
+                                      boolean useRename,
+                                      String word,
+                                      Set<String> suggestions) {
     if (holder.isOnTheFly()) {
-      addRegularDescriptor(element, range, holder, useRename, word);
+      addRegularDescriptor(element, range, holder, useRename, word, suggestions);
     }
     else {
       addBatchDescriptor(element, range, word, holder);

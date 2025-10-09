@@ -28,7 +28,7 @@ jvm_library(
     "@lib//:io-modelcontextprotocol-kotlin-sdk",
     "//platform/core-api:core",
     "//platform/project/shared:project",
-    "@lib//:kotlin-reflect",
+    "//libraries/kotlin/reflect",
     "//platform/util",
     "@lib//:io-github-oshai-kotlin-logging-jvm",
     "@lib//:ktor-server-sse-jvm",
@@ -57,7 +57,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//platform/dvcs-impl:vcs-dvcs-impl",
     "//platform/vcs-log/impl",
-    "@lib//:gson",
+    "//libraries/gson",
     "@lib//:jediterm-ui",
     "@lib//:jediterm-core",
     "//platform/indexing-api:indexing",
@@ -70,9 +70,11 @@ jvm_library(
     "//plugins/sh/core",
     "//platform/util/jdom",
     "//libraries/io",
-    "//libraries/ktor-client",
-    "//libraries/ktor-client-cio",
+    "//libraries/ktor/client",
+    "//libraries/ktor/client-cio:libraries-ktor-client-cio",
+    "//libraries/ktor/network-tls:libraries-ktor-network-tls",
     "@lib//:mcpserver-ktor-server-cio-internal",
+    "//libraries/ktor/io",
   ]
 )
 
@@ -91,7 +93,7 @@ jvm_library(
     "@lib//:io-modelcontextprotocol-kotlin-sdk",
     "//platform/core-api:core",
     "//platform/project/shared:project",
-    "@lib//:kotlin-reflect",
+    "//libraries/kotlin/reflect",
     "//platform/util",
     "@lib//:io-github-oshai-kotlin-logging-jvm",
     "@lib//:ktor-server-sse-jvm",
@@ -126,7 +128,7 @@ jvm_library(
     "//platform/dvcs-impl:vcs-dvcs-impl_test_lib",
     "//platform/vcs-log/impl",
     "//platform/vcs-log/impl:impl_test_lib",
-    "@lib//:gson",
+    "//libraries/gson",
     "@lib//:jediterm-ui",
     "@lib//:jediterm-core",
     "//platform/indexing-api:indexing",
@@ -151,9 +153,11 @@ jvm_library(
     "//plugins/sh/core",
     "//platform/util/jdom",
     "//libraries/io",
-    "//libraries/ktor-client",
-    "//libraries/ktor-client-cio",
+    "//libraries/ktor/client",
+    "//libraries/ktor/client-cio:libraries-ktor-client-cio",
+    "//libraries/ktor/network-tls:libraries-ktor-network-tls",
     "@lib//:mcpserver-ktor-server-cio-internal",
+    "//libraries/ktor/io",
   ]
 )
 ### auto-generated section `build intellij.mcpserver` end

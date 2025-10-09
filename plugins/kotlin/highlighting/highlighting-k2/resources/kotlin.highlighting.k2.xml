@@ -1,4 +1,4 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.highlighting">
+<idea-plugin visibility="internal" package="org.jetbrains.kotlin.idea.highlighting">
   <dependencies>
     <module name="kotlin.searching.k2"/>
     <module name="kotlin.base.scripting.k2"/>
@@ -19,6 +19,7 @@
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinDslSemanticHighlightingVisitor"/>
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinDiagnosticHighlightVisitor"/>
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinUnusedDeclarationHighlightingVisitor"/>
+    <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinUnresolvedKDocHighlightVisitor"/>
 
     <highlightUsagesHandlerFactory implementation="org.jetbrains.kotlin.idea.highlighting.KotlinHighlightExitPointsHandlerFactory"/>
 

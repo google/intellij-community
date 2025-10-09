@@ -7,14 +7,14 @@ import com.intellij.ide.structureView.impl.common.PsiTreeElementBase
 import com.intellij.ide.structureView.logical.impl.LogicalStructureViewService
 import com.intellij.ide.structureView.newStructureView.StructureViewComponent
 import com.intellij.ide.util.treeView.PresentableNodeDescriptor
+import com.intellij.pom.PomTargetPsiElement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiTarget
 import com.intellij.ui.SimpleTextAttributes
 import junit.framework.AssertionFailedError
 import junit.framework.ComparisonFailure
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertNotNull
-import junit.framework.TestCase.assertTrue
+import junit.framework.TestCase.*
 import javax.swing.Icon
 
 private const val MAX_DEPTH = 20
@@ -146,6 +146,10 @@ class LogicalStructureNode(
     subNodes.add(subNode)
   }
 
+  fun emptyNode() {
+    node(null, "<empty>" to SimpleTextAttributes.GRAY_SMALL_ATTRIBUTES)
+  }
+
   fun anyNodes() {
     childrenDontMatter = true
   }
@@ -192,10 +196,12 @@ class LogicalStructureNode(
       } else {
         if (icon != other.icon || name != other.name || location != other.location) return false
       }
-      if (navigationElementSupplier != null && navigationElementSupplier!!.invoke() != other.navigationElementSupplier?.invoke()) return false
+      if (navigationElementSupplier != null &&
+          getNavigationElement()?.textOffset != other.getNavigationElement()?.textOffset) return false
     }
     if (!childrenDontMatter) {
-      if (subNodes.size != other.subNodes.size) return false
+      if (subNodes.size != other.subNodes.size)
+        return false
       if (childrenOrderDontMatter) {
         return subNodes.all {
           other.subNodes.any { otherSubNode -> it.isEqualTo(otherSubNode, true, availableDepth - 1) }
@@ -247,4 +253,10 @@ class LogicalStructureNode(
     return emptyList()
   }
 
+  private fun getNavigationElement(): PsiElement? {
+    val element = navigationElementSupplier?.invoke()
+    ((element as? PomTargetPsiElement)?.target as? PsiTarget).let {
+      return it?.navigationElement ?: element
+    }
+  }
 }

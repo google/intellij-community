@@ -42,19 +42,13 @@ import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.SystemProperties
 import com.intellij.util.ui.accessibility.AccessibleAnnouncerUtil
 import com.intellij.xml.util.XmlStringUtil
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.Component
 import java.awt.Window
+import java.lang.Runnable
+import java.lang.ref.WeakReference
 import java.util.*
 import java.util.function.Consumer
 import javax.swing.Icon
@@ -75,7 +69,7 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
   @JvmField
   var createShutdownCallback: Boolean = true
 
-  private val myStatusBar: StatusBarEx?
+  private val myInitialWindow: WeakReference<Window>
 
   private var myPluginUpdatesService: PluginUpdatesService? = null
 
@@ -279,12 +273,13 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     actionDescriptor: PluginUiModel,
   ): InstallPluginResult {
     prepareToInstall(installPluginInfo, installationScope)
-    val result = controller.installOrUpdatePlugin(sessionId, parentComponent, descriptor, updateDescriptor, myInstallSource, modalityState, null)
+    val customPlugins = customRepoPlugins.toList()
+    val result = controller.installOrUpdatePlugin(sessionId, parentComponent, descriptor, updateDescriptor, myInstallSource, modalityState, null, customPlugins)
     if (result.disabledPlugins.isEmpty() && result.disabledDependants.isEmpty()) {
       return result
     }
     val enableDependencies = withContext(Dispatchers.EDT + modalityState.asContextElement()) { PluginManagerMain.askToEnableDependencies(1, result.disabledPlugins, result.disabledDependants) }
-    return controller.continueInstallation(sessionId, actionDescriptor.pluginId, enableDependencies, result.allowInstallWithoutRestart, null, modalityState, parentComponent)
+    return controller.continueInstallation(sessionId, actionDescriptor.pluginId, enableDependencies, result.allowInstallWithoutRestart, null, modalityState, parentComponent, customPlugins)
   }
 
   suspend fun applyInstallResult(result: InstallPluginResult, info: InstallPluginInfo, descriptor: PluginUiModel, controller: UiPluginManagerController): InstallPluginResult {
@@ -317,8 +312,13 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
 
 
   fun toBackground(): Boolean {
+    val initialWindow = myInitialWindow.get()
+    val statusBar = getStatusBar(initialWindow)
+                    ?: getStatusBar(initialWindow?.owner)
+                    ?: getStatusBar(getActiveFrameOrWelcomeScreen())
+
     for (info in myInstallingInfos.values) {
-      info.toBackground(myStatusBar)
+      info.toBackground(statusBar)
     }
 
     if (FINISH_DYNAMIC_INSTALLATION_WITHOUT_UI) {
@@ -1018,15 +1018,15 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     return getErrors(response)
   }
 
-  protected open val customRepoPlugins: MutableCollection<PluginUiModel?>
+  protected open val customRepoPlugins: Collection<PluginUiModel>
     get() = CustomPluginRepositoryService.getInstance().getCustomRepositoryPlugins()
 
   private val myIcons: MutableMap<String?, Icon?> = HashMap<String?, Icon?>() // local cache for PluginLogo WeakValueMap
 
   init {
     val window = getActiveFrameOrWelcomeScreen()
-    val statusBar: StatusBarEx? = getStatusBar(window)
-    myStatusBar = if (statusBar != null || window == null) statusBar else getStatusBar(window.owner)
+    myInitialWindow = WeakReference(window)
+
     myPluginManagerCustomizer = PluginManagerCustomizer.getInstance()
   }
 
@@ -1055,7 +1055,11 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     internal val myInstallingInfos: MutableMap<PluginId, InstallPluginInfo> = mutableMapOf()
 
     private fun getStatusBar(frame: Window?): StatusBarEx? {
-      return if (frame is IdeFrame && frame !is WelcomeFrame) (frame as IdeFrame).getStatusBar() as StatusBarEx? else null
+      if (frame is WelcomeFrame) return null
+      if (frame is IdeFrame) {
+        return frame.statusBar as? StatusBarEx
+      }
+      return null
     }
 
     fun isInstallingOrUpdate(pluginId: PluginId?): Boolean {

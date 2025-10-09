@@ -380,8 +380,11 @@ public class NullableNotNullManagerImpl extends NullableNotNullManager implement
       if (packageFile instanceof PsiJavaFile javaFile) {
         PsiPackageStatement stmt = javaFile.getPackageStatement();
         if (stmt != null) {
-          for (PsiAnnotation annotation : stmt.getAnnotationList().getAnnotations()) {
-            info = info.orElse(checkNullityDefault(annotation, placeTargetTypes, superPackage));
+          PsiModifierList modifierList = stmt.getAnnotationList();
+          if (modifierList != null) {
+            for (PsiAnnotation annotation : modifierList.getAnnotations()) {
+              info = info.orElse(checkNullityDefault(annotation, placeTargetTypes, superPackage));
+            }
           }
         }
       }
@@ -415,6 +418,18 @@ public class NullableNotNullManagerImpl extends NullableNotNullManager implement
       info = info.orElse(support.getNullabilityByContainerAnnotation(annotation, placeTargetTypes, superPackage));
     }
     return info;
+  }
+  
+  @Override
+  public @NotNull List<@NotNull PsiAnnotation> getConflictingContainerAnnotations(@NotNull PsiModifierList owner) {
+    if (!owner.hasAnnotations()) return List.of();
+    for (AnnotationPackageSupport support : myAnnotationSupports) {
+      List<@NotNull PsiAnnotation> annotations = support.getConflictingContainerAnnotations(owner);
+      if (!annotations.isEmpty()) {
+        return annotations;
+      }
+    }
+    return List.of();
   }
 
   private @Unmodifiable @NotNull List<String> filterNickNames(@NotNull Nullability nullability) {

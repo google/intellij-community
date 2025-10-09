@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl.analysis;
 
 import com.intellij.codeInsight.daemon.QuickFixBundle;
@@ -437,7 +437,7 @@ public final class HighlightFixUtil {
     }
 
     PsiResolveHelper resolveHelper = PsiResolveHelper.getInstance(methodCall.getProject());
-    CandidateInfo[] methodCandidates = resolveHelper.getReferencedMethodCandidates(methodCall, false);
+    CandidateInfo[] methodCandidates = resolveHelper.getReferencedMethodCandidates(methodCall, true);
     IntentionAction action2 = QuickFixFactory.getInstance().createSurroundWithArrayFix(methodCall, null);
     info.accept(action2);
 
@@ -754,7 +754,6 @@ public final class HighlightFixUtil {
                                          @NotNull JavaResolveResult @NotNull [] resolveResults) {
     PsiExpressionList list = methodCall.getArgumentList();
     MethodCandidateInfo[] candidates = toMethodCandidates(resolveResults);
-    CastMethodArgumentFix.REGISTRAR.registerCastActions(candidates, methodCall, sink);
     WrapWithAdapterMethodCallFix.registerCastActions(candidates, methodCall, sink);
     WrapObjectWithOptionalOfNullableFix.REGISTAR.registerCastActions(candidates, methodCall, sink);
     WrapExpressionFix.registerWrapAction(candidates, list.getExpressions(), sink);

@@ -9,10 +9,8 @@ resourcegroup(
 
 jvm_library(
   name = "jshell",
-  module_name = "intellij.java.jshell",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":jshell_resources"],
-  deps = ["@lib//:kotlin-stdlib"]
+  srcs = glob([], allow_empty = True),
+  resources = [":jshell_resources"]
 )
 ### auto-generated section `build intellij.java.jshell` end

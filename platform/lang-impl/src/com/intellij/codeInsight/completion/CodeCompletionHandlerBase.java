@@ -52,8 +52,6 @@ import io.opentelemetry.context.Context;
 import kotlinx.coroutines.Deferred;
 import org.jetbrains.annotations.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -118,12 +116,11 @@ public class CodeCompletionHandlerBase {
     this.autopopup = autopopup;
     this.synchronous = synchronous;
 
-    if (autopopup) {
-      assert !invokedExplicitly;
-    }
+    assert !(autopopup && invokedExplicitly): "autopopup and invokedExplicitly can't be both true as they are mutually exclusive";
   }
 
   public void handleCompletionElementSelected(@NotNull LookupElement item,
+                                              @NotNull List<LookupElement> lookupElements,
                                               char completionChar,
                                               @NotNull OffsetMap offsetMap,
                                               @NotNull OffsetsInFile hostOffsets,
@@ -132,8 +129,7 @@ public class CodeCompletionHandlerBase {
     WatchingInsertionContext context = null;
     try {
       StatisticsUpdate update = StatisticsUpdate.collectStatisticChanges(item);
-      //todo pass all relevant items
-      context = insertItemHonorBlockSelection(new ArrayList<>(), item, completionChar, offsetMap, hostOffsets, editor, initialOffset);
+      context = insertItemHonorBlockSelection(lookupElements, item, completionChar, offsetMap, hostOffsets, editor, initialOffset);
       update.trackStatistics(context);
     }
     finally {
@@ -402,7 +398,7 @@ public class CodeCompletionHandlerBase {
           indicator.registerChildDisposable(finalOffsets::getOffsets);
 
           CompletionParameters parameters = CompletionInitializationUtil.createCompletionParameters(initContext, indicator, finalOffsets);
-          parameters.setIsTestingMode(isTestingMode());
+          parameters.setTestingMode(isTestingMode());
           indicator.setParameters(parameters);
 
           indicator.runContributors(initContext);
@@ -417,9 +413,9 @@ public class CodeCompletionHandlerBase {
     }
   }
 
-  private AutoCompletionDecision shouldAutoComplete(@NotNull CompletionProgressIndicator indicator,
-                                                    @NotNull List<? extends LookupElement> items,
-                                                    @NotNull CompletionParameters parameters) {
+  private @NotNull AutoCompletionDecision shouldAutoComplete(@NotNull CompletionProgressIndicator indicator,
+                                                             @NotNull List<? extends LookupElement> items,
+                                                             @NotNull CompletionParameters parameters) {
     if (!invokedExplicitly) {
       return AutoCompletionDecision.SHOW_LOOKUP;
     }
@@ -532,10 +528,10 @@ public class CodeCompletionHandlerBase {
     try {
       StatisticsUpdate update = StatisticsUpdate.collectStatisticChanges(item);
       if (item.getUserData(DIRECT_INSERTION) != null) {
-        context = callHandleInsert(indicator, item, completionChar);
+        context = callHandleInsert(indicator, item, items, completionChar);
       }
       else {
-        context = insertItemHonorBlockSelection(indicator, item, completionChar, update);
+        context = insertItemHonorBlockSelection(indicator, item, items, completionChar, update);
       }
       update.trackStatistics(context);
     }
@@ -573,30 +569,32 @@ public class CodeCompletionHandlerBase {
     return context;
   }
 
-  private static WatchingInsertionContext insertItemHonorBlockSelection(CompletionProcessEx indicator,
-                                                                        LookupElement item,
-                                                                        char completionChar,
-                                                                        StatisticsUpdate update) {
+  private static @NotNull WatchingInsertionContext insertItemHonorBlockSelection(@NotNull CompletionProcessEx indicator,
+                                                                                 @NotNull LookupElement item,
+                                                                                 @NotNull List<LookupElement> items,
+                                                                                 char completionChar,
+                                                                                 @NotNull StatisticsUpdate update) {
     Editor editor = indicator.getEditor();
     int caretOffset = indicator.getCaret().getOffset();
     OffsetMap offsetMap = indicator.getOffsetMap();
 
     Lookup lookup = indicator.getLookup();
-    List<LookupElement> items = lookup != null ? lookup.getItems() : Collections.emptyList();
 
     int idEndOffset = CompletionUtil.calcIdEndOffset(offsetMap, editor, caretOffset);
     int idEndOffsetDelta = idEndOffset - caretOffset;
 
-    WatchingInsertionContext context = doInsertItem(indicator.getHostOffsets(),
+    WatchingInsertionContext context = doInsertItem(
+      indicator.getHostOffsets(),
       item,
       completionChar,
-                                                    editor,
+      editor,
       indicator.getProject(),
       caretOffset,
       offsetMap,
       items,
       idEndOffset,
-      idEndOffsetDelta);
+      idEndOffsetDelta
+    );
 
     if (lookup != null) {
       update.addSparedChars(lookup, item, context);
@@ -627,13 +625,7 @@ public class CodeCompletionHandlerBase {
       boolean wasInjected = hostEditor != editor;
       PsiDocumentManager.getInstance(project).commitDocument(hostEditor.getDocument());
       hostEditor.getCaretModel().runForEachCaret(caret -> {
-        OffsetsInFile targetOffsets;
-        if (!wasInjected) {
-          targetOffsets = topLevelOffsets;
-        }
-        else {
-          targetOffsets = topLevelOffsets.toInjectedIfAny(caret.getOffset());
-        }
+        OffsetsInFile targetOffsets = wasInjected ? topLevelOffsets.toInjectedIfAny(caret.getOffset()) : topLevelOffsets;
         lastContext.set(doInsertItemForSingleCaret(item, completionChar, items, idEndOffsetDelta, hostEditor, targetOffsets));
       });
       context = lastContext.get();
@@ -666,7 +658,7 @@ public class CodeCompletionHandlerBase {
     return currentContext;
   }
 
-  private static void checkPsiTextConsistency(CompletionProcessEx indicator) {
+  private static void checkPsiTextConsistency(@NotNull CompletionProcessEx indicator) {
     PsiFile psiFile = PsiUtilBase.getPsiFileInEditor(InjectedLanguageEditorUtil.getTopLevelEditor(indicator.getEditor()), indicator.getProject());
     if (psiFile != null) {
       if (Registry.is("ide.check.stub.text.consistency") ||
@@ -745,8 +737,9 @@ public class CodeCompletionHandlerBase {
     return context;
   }
 
-  private static @NotNull WatchingInsertionContext callHandleInsert(@NotNull CompletionProgressIndicator indicator,
+  private static @NotNull WatchingInsertionContext callHandleInsert(@NotNull CompletionProcessEx indicator,
                                                                     @NotNull LookupElement item,
+                                                                    @NotNull List<LookupElement> items,
                                                                     char completionChar) {
     Editor editor = indicator.getEditor();
 
@@ -754,7 +747,7 @@ public class CodeCompletionHandlerBase {
     int idEndOffset = CompletionUtil.calcIdEndOffset(indicator.getOffsetMap(), editor, indicator.getCaret().getOffset());
     PsiFile psiFile = PsiUtilBase.getPsiFileInEditor(editor, indicator.getProject());
 
-    WatchingInsertionContext context = CompletionUtil.createInsertionContext(indicator.getLookup().getItems(), item, completionChar, editor, psiFile,
+    WatchingInsertionContext context = CompletionUtil.createInsertionContext(items, item, completionChar, editor, psiFile,
                                                                              caretOffset, idEndOffset, indicator.getOffsetMap());
     try {
       item.handleInsert(context);
@@ -836,7 +829,7 @@ public class CodeCompletionHandlerBase {
     caret.putUserData(CARET_PROCESSED, Boolean.TRUE);
   }
 
-  private static Caret getNextCaretToProcess(@NotNull Editor editor) {
+  private static @Nullable Caret getNextCaretToProcess(@NotNull Editor editor) {
     for (Caret caret : editor.getCaretModel().getAllCarets()) {
       if (caret.getUserData(CARET_PROCESSED) == null) {
         return caret;

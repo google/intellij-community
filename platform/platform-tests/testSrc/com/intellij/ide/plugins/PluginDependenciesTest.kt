@@ -207,7 +207,7 @@ internal class PluginDependenciesTest {
   private fun assertFirstErrorContains(vararg messagePart: String) {
     val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
     assertThat(errors).isNotEmpty
-    assertThat(errors.first().get().toString()).contains(*messagePart)
+    assertThat(errors.first().htmlMessage.toString()).contains(*messagePart)
   }
 
   @Test
@@ -529,14 +529,6 @@ internal class PluginDependenciesTest {
     `foo module-dependency bar`()
     val pluginSet = buildPluginSet()
     assertThat(pluginSet).hasExactlyEnabledPlugins("bar")
-  }
-
-  @Test
-  fun `plugin is loaded if it has a module dependency on a plugin with package prefix`() {
-    plugin("bar") { packagePrefix = "idk" }.buildDir(pluginDirPath.resolve("bar"))
-    `foo module-dependency bar`()
-    val pluginSet = buildPluginSet()
-    assertThat(pluginSet).hasExactlyEnabledPlugins("foo", "bar")
   }
 
   @Test

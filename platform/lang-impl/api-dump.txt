@@ -50,6 +50,8 @@ com.intellij.application.options.GeneralCodeStyleOptionsProvider
 - a:apply(com.intellij.psi.codeStyle.CodeStyleSettings):V
 - a:isModified(com.intellij.psi.codeStyle.CodeStyleSettings):Z
 - a:reset(com.intellij.psi.codeStyle.CodeStyleSettings):V
+c:com.intellij.application.options.ModuleListCellRenderer
+- installSpeedSearch(com.intellij.openapi.ui.popup.IPopupChooserBuilder):com.intellij.openapi.ui.popup.IPopupChooserBuilder
 com.intellij.application.options.ModulesCombo
 - a:allowEmptySelection(java.lang.String):V
 - a:getSelectedModule():com.intellij.openapi.module.Module
@@ -79,6 +81,15 @@ com.intellij.codeInsight.actions.ReformatFilesOptions
 com.intellij.codeInsight.actions.onSave.FormatOnSaveOptionsBase$DefaultsProvider
 - getFileTypesFormattedOnSaveByDefault():java.util.Collection
 - getFileTypesWithOptimizeImportsOnSaveByDefault():java.util.Collection
+f:com.intellij.codeInsight.codeVision.AppCodeVisionInitializationHost
+- sf:Companion:com.intellij.codeInsight.codeVision.AppCodeVisionInitializationHost$Companion
+- <init>():V
+- sf:getInstance():com.intellij.codeInsight.codeVision.AppCodeVisionInitializationHost
+- sf:getInstanceSuspending(kotlin.coroutines.Continuation):java.lang.Object
+- f:runForProjectIfNotInitialized(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
+f:com.intellij.codeInsight.codeVision.AppCodeVisionInitializationHost$Companion
+- f:getInstance():com.intellij.codeInsight.codeVision.AppCodeVisionInitializationHost
+- f:getInstanceSuspending(kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.codeInsight.codeVision.CodeVisionBundle
 - com.intellij.DynamicBundle
 - sf:Companion:com.intellij.codeInsight.codeVision.CodeVisionBundle$Companion
@@ -86,6 +97,9 @@ f:com.intellij.codeInsight.codeVision.CodeVisionBundle
 f:com.intellij.codeInsight.codeVision.CodeVisionBundle$Companion
 - f:message(java.lang.String,java.lang.Object[]):java.lang.String
 - f:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
+c:com.intellij.codeInsight.codeVision.CodeVisionHost
+- f:finishInitialisation():V
+- f:isInitialised():Z
 com.intellij.codeInsight.codeVision.CodeVisionProviderFactory
 - sf:Companion:com.intellij.codeInsight.codeVision.CodeVisionProviderFactory$Companion
 - sf:EP_NAME:java.lang.String
@@ -585,6 +599,7 @@ com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager
 - a:setSelectedTabID(java.lang.String):V
 - a:show(java.lang.String,java.lang.String,com.intellij.openapi.actionSystem.AnActionEvent):V
 - a:toggleEverywhereFilter():V
+f:com.intellij.ide.actions.searcheverywhere.SearchEverywhereManagerImpl
 com.intellij.ide.actions.searcheverywhere.SearchEverywherePreviewProvider
 com.intellij.ide.fileTemplates.CreateFromTemplateActionReplacer
 - sf:CREATE_FROM_TEMPLATE_REPLACER:com.intellij.openapi.extensions.ExtensionPointName
@@ -779,6 +794,10 @@ com.intellij.openapi.module.ModuleTypeWithWebFeatures
 com.intellij.openapi.paths.DynamicContextProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:getOffset(com.intellij.psi.PsiElement,I,java.lang.String):I
+a:com.intellij.openapi.projectRoots.impl.DependentSdkType
+- ps:createSdkOfType(com.intellij.openapi.projectRoots.SdkModel,com.intellij.openapi.projectRoots.SdkType,java.util.function.Consumer):com.intellij.openapi.projectRoots.Sdk
+- p:fixDependency(com.intellij.openapi.projectRoots.SdkModel,java.util.function.Consumer):com.intellij.openapi.projectRoots.Sdk
+- showCustomCreateUI(com.intellij.openapi.projectRoots.SdkModel,javax.swing.JComponent,com.intellij.openapi.projectRoots.Sdk,java.util.function.Consumer):V
 com.intellij.openapi.projectRoots.impl.UnknownSdkContributor
 - contributeKnownSdks(com.intellij.openapi.project.Project):java.util.List
 - a:contributeUnknownSdks(com.intellij.openapi.project.Project):java.util.List
