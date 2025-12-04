@@ -4,7 +4,6 @@ package org.jetbrains.intellij.build.pycharm
 import kotlinx.collections.immutable.plus
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.JetBrainsProductProperties
-import org.jetbrains.intellij.build.TEST_FRAMEWORK_WITH_JAVA_RT
 import org.jetbrains.intellij.build.impl.copyDirWithFileFilter
 import org.jetbrains.intellij.build.zipSourcesOfModules
 import java.nio.file.Path
@@ -23,7 +22,6 @@ abstract class PyCharmPropertiesBase(enlargeWelcomeScreen: Boolean) : JetBrainsP
     }
     reassignAltClickToMultipleCarets = true
     useSplash = true
-    productLayout.addPlatformSpec(TEST_FRAMEWORK_WITH_JAVA_RT)
     buildCrossPlatformDistribution = true
     mavenArtifacts.additionalModules = mavenArtifacts.additionalModules.addAll(listOf(
       "intellij.java.compiler.antTasks",
@@ -34,7 +32,7 @@ abstract class PyCharmPropertiesBase(enlargeWelcomeScreen: Boolean) : JetBrainsP
     ))
   }
 
-  override suspend fun copyAdditionalFiles(context: BuildContext, targetDir: Path) {
+  override suspend fun copyAdditionalFiles(targetDir: Path, context: BuildContext) {
     zipSourcesOfModules(
       modules = listOf("intellij.python.community", "intellij.python.psi"),
       targetFile = Path.of("$targetDir/lib/src/pycharm-openapi-src.zip"),

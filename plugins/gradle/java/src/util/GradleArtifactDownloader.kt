@@ -14,6 +14,7 @@ import com.intellij.platform.eel.getOrThrow
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.toEelApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.future.asCompletableFuture
@@ -29,12 +30,22 @@ import kotlin.io.path.readText
 
 object GradleArtifactDownloader {
 
+  @JvmStatic
+  fun downloadArtifact(
+    project: Project,
+    executionName: @Nls String,
+    artifactNotation: String,
+    projectPath: String,
+  ): CompletableFuture<Path?> =
+    downloadArtifact(project, executionName, artifactNotation, projectPath, DefaultGradleDependencySourceDownloaderErrorHandler)
+
   /**
    * Download a Jar file with specified artifact coordinates by using the Gradle task executed on a specific Gradle module.
    * @param project associated project.
    * @param executionName execution name.
    * @param artifactNotation artifact coordinates in standard artifact format like `group:artifactId:version:classifier:anything:else`.
    * @param projectPath path to the directory with the Gradle module that should be used to execute the task.
+   * @param errorHandler an instance of GradleDependencySourceDownloaderErrorHandler responsible for handling errors during artifact download
    */
   @JvmStatic
   fun downloadArtifact(
@@ -42,9 +53,10 @@ object GradleArtifactDownloader {
     executionName: @Nls String,
     artifactNotation: String,
     projectPath: String,
+    errorHandler: GradleDependencySourceDownloaderErrorHandler,
   ): CompletableFuture<Path?> {
     return project.gradleCoroutineScope.async {
-      downloadArtifactImpl(project, executionName, artifactNotation, projectPath)
+      downloadArtifactImpl(project, executionName, artifactNotation, projectPath, errorHandler)
     }.asCompletableFuture()
   }
 
@@ -53,6 +65,7 @@ object GradleArtifactDownloader {
     executionName: @Nls String,
     artifactNotation: String,
     projectPath: String,
+    errorHandler: GradleDependencySourceDownloaderErrorHandler,
   ): Path? {
     val eel = project.getEelDescriptor().toEelApi()
     val taskOutputEelPath = createTaskOutputFile(eel)
@@ -78,6 +91,7 @@ object GradleArtifactDownloader {
           })
           .withActivateToolWindowBeforeRun(false)
           .withActivateToolWindowOnFailure(false)
+          .dontNavigateToError()
       )
 
       val downloadedArtifactPath = taskOutputPath.readText().toEelPath(eel).asNioPath()
@@ -90,13 +104,14 @@ object GradleArtifactDownloader {
       throw ce
     }
     catch (e: Exception) {
-      GradleDependencySourceDownloaderErrorHandler.handle(project, projectPath, artifactNotation, e)
+      errorHandler.handle(project, projectPath, artifactNotation, e)
       return null
     }
     finally {
       taskOutputPath.deleteIfExists()
     }
   }
+
   private suspend fun createTaskOutputFile(eel: EelApi): EelPath {
     return eel.fs.createTemporaryFile()
       .prefix("ijDownloadArtifactOut")

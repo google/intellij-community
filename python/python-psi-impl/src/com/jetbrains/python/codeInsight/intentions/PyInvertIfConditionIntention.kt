@@ -56,7 +56,8 @@ class PyInvertIfConditionIntention : PsiUpdateModCommandAction<PsiElement>(PsiEl
 
     return if (ifStatement != null && ifStatement.elifParts.isEmpty() &&
                isAvailableForIfStatement(element, ifStatement) &&
-                ifStatement.ifPart.condition?.let(::isValidConditionExpression) != false) super.getPresentation(context, element) else null
+               ifStatement.ifPart.condition?.let(::isValidConditionExpression) != false) super.getPresentation(context, element)
+    else null
   }
 
 
@@ -188,7 +189,8 @@ class PyInvertIfConditionIntention : PsiUpdateModCommandAction<PsiElement>(PsiEl
   }
 
   private fun invertIfStatementFollowup(
-    project: Project, file: PsiFile, statement: PyIfStatement, terminableStatement: PyStatementListContainer) {
+    project: Project, file: PsiFile, statement: PyIfStatement, terminableStatement: PyStatementListContainer,
+  ) {
     statement.ifPart.condition?.let { it.replace(getInvertedConditionExpression(project, file, it)) }
 
     val ifStatements = statement.ifPart.statementList
@@ -272,15 +274,18 @@ class PyInvertIfConditionIntention : PsiUpdateModCommandAction<PsiElement>(PsiEl
   private val PyStatementList.isTerminated: Boolean
     get() {
       val controlFlow = ControlFlowCache.getControlFlow(parentsOfType<ScopeOwner>().first())
-      val currentElement = this
-      val currentInstruction = controlFlow.instructions.first { it.element == currentElement }
+      val currentInstruction = controlFlow.instructions.first { it.element == this }
       var result = true
       ControlFlowUtil.iterate(currentInstruction.num(), controlFlow.instructions, { instruction ->
         when {
+          instruction.allSucc().isEmpty() -> {
+            result = false
+            ControlFlowUtil.Operation.BREAK
+          }
           instruction == currentInstruction -> ControlFlowUtil.Operation.NEXT
           instruction is ReadWriteInstruction -> ControlFlowUtil.Operation.NEXT
           instruction.element == null -> ControlFlowUtil.Operation.NEXT
-          !instruction.element!!.parents(false).contains(currentElement) -> {
+          !instruction.element!!.parents(false).contains(this) -> {
             result = false
             ControlFlowUtil.Operation.BREAK
           }

@@ -955,7 +955,8 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
     String longRunningTaskId = longRunningTaskInput.getLongRunningTaskId();
     MavenServerOpenTelemetry telemetry = MavenServerOpenTelemetry.from(longRunningTaskInput.getTelemetryContext());
     String mavenVersion = System.getProperty(MAVEN_EMBEDDER_VERSION);
-    boolean runInParallel = canResolveDependenciesInParallel() && VersionComparatorUtil.compare(mavenVersion, "3.6.0") >= 0;
+    boolean noProxy = myMavenSettings.getProxies().isEmpty();
+    boolean runInParallel = canResolveDependenciesInParallel() && noProxy && VersionComparatorUtil.compare(mavenVersion, "3.6.0") >= 0;
     try (LongRunningTask task = newLongRunningTask(longRunningTaskId, pluginResolutionRequests.size(), myConsoleWrapper)) {
       MavenExecutionRequest request = createRequest(null, null, null);
       request.setTransferListener(new Maven3TransferListenerAdapter(task.getIndicator()));

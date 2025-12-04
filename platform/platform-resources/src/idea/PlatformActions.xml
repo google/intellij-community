@@ -38,18 +38,30 @@
     </group>
 
     <group id="TableActions">
-      <action id="Table-selectFirstRow" class="com.intellij.ui.TableActions$CtrlHome" use-shortcut-of="EditorTextStart"/>
+      <action id="Table-selectFirstRow" class="com.intellij.ui.TableActions$CtrlHome" use-shortcut-of="EditorTextStart">
+        <keyboard-shortcut first-keystroke="control UP" keymap="$default"/>
+      </action>
       <action id="Table-selectFirstRowExtendSelection" class="com.intellij.ui.TableActions$CtrlShiftHome"
-              use-shortcut-of="EditorTextStartWithSelection"/>
-      <action id="Table-selectLastRow" class="com.intellij.ui.TableActions$CtrlEnd" use-shortcut-of="EditorTextEnd"/>
+              use-shortcut-of="EditorTextStartWithSelection">
+        <keyboard-shortcut first-keystroke="control shift UP" keymap="$default"/>
+      </action>
+      <action id="Table-selectLastRow" class="com.intellij.ui.TableActions$CtrlEnd" use-shortcut-of="EditorTextEnd">
+        <keyboard-shortcut first-keystroke="control DOWN" keymap="$default"/>
+      </action>
       <action id="Table-selectLastRowExtendSelection" class="com.intellij.ui.TableActions$CtrlShiftEnd"
-              use-shortcut-of="EditorTextEndWithSelection"/>
+              use-shortcut-of="EditorTextEndWithSelection">
+        <keyboard-shortcut first-keystroke="control shift DOWN" keymap="$default"/>
+      </action>
       <action id="Table-selectPreviousRow" class="com.intellij.ui.TableActions$Up" use-shortcut-of="EditorUp"/>
       <action id="Table-selectPreviousRowExtendSelection" class="com.intellij.ui.TableActions$ShiftUp"
               use-shortcut-of="EditorUpWithSelection"/>
       <action id="Table-selectNextRow" class="com.intellij.ui.TableActions$Down" use-shortcut-of="EditorDown"/>
       <action id="Table-selectNextRowExtendSelection" class="com.intellij.ui.TableActions$ShiftDown"
               use-shortcut-of="EditorDownWithSelection"/>
+      <action id="Table-selectFirstColumn" class="com.intellij.ui.TableActions$CtrlLeft" use-shortcut-of="EditorPreviousWord"/>
+      <action id="Table-selectLastColumn" class="com.intellij.ui.TableActions$CtrlRight" use-shortcut-of="EditorNextWord"/>
+      <action id="Table-selectFirstColumnExtendSelection" class="com.intellij.ui.TableActions$CtrlShiftLeft" use-shortcut-of="EditorPreviousWordWithSelection"/>
+      <action id="Table-selectLastColumnExtendSelection" class="com.intellij.ui.TableActions$CtrlShiftRight" use-shortcut-of="EditorNextWordWithSelection"/>
       <action id="Table-selectPreviousColumn" class="com.intellij.ui.TableActions$Left" use-shortcut-of="EditorLeft"/>
       <action id="Table-selectPreviousColumnExtendSelection" class="com.intellij.ui.TableActions$ShiftLeft"
               use-shortcut-of="EditorLeftWithSelection"/>
@@ -470,6 +482,8 @@
           <action id="CloseOtherProjects" class="com.intellij.ide.actions.CloseOtherProjectsAction"/>
         </group>
         <separator/>
+        <group id="FileMenu.RemoteDevelopmentActions"/>
+        <separator/>
         <group id="FileMainSettingsGroup">
           <action id="ShowSettings" class="com.intellij.ide.actions.ShowSettingsAction"/>
         </group>
@@ -502,7 +516,7 @@
           <action id="ImportSettings" class="com.intellij.configurationStore.ImportSettingsAction"/>
           <action id="ExportSettings" class="com.intellij.configurationStore.ExportSettingsAction"/>
           <separator/>
-          <action id="RestoreDefaultSettings" class="com.intellij.configurationStore.RestoreDefaultSettingsAction"/>
+          <action id="RestoreDefaultSettings" class="com.intellij.configurationStore.defaults.RestoreDefaultSettingsAction"/>
         </group>
         <group id="FileOtherSettingsGroup" class="com.intellij.ide.actions.SmartPopupActionGroup">
           <action id="TemplateProjectProperties" class="com.intellij.ide.actions.TemplateProjectPropertiesAction"/>
@@ -933,7 +947,6 @@
           <synonym key="action.ShowLog.Explorer.text"/>
         </action>
         <action id="CollectZippedLogs" class="com.intellij.ide.actions.CollectZippedLogsAction"/>
-        <action id="DeleteOldAppDirs" class="com.intellij.ide.actions.DeleteOldAppDirectoriesAction"/>
         <separator/>
         <group id="HelpDiagnosticTools" popup="true">
           <action id="Performance.ActivityMonitor" class="com.intellij.ide.actions.ActivityMonitorAction"/>
@@ -944,11 +957,13 @@
           <action id="BrowseSpecialPaths" class="com.intellij.diagnostic.specialPaths.BrowseSpecialPathsAction"/>
           <action id="CollectTroubleshootingInformation" class="com.intellij.troubleshooting.ui.CollectTroubleshootingInformationAction"
                   internal="true"/>
+          <action class="com.intellij.diagnostic.ResetWindowsDefenderNotification" id="ResetWindowsDefenderNotification"/>
         </group>
 
         <action id="performancePlugin.ShowMemoryDialogAction" class="com.intellij.diagnostic.ShowMemoryDialogAction"/>
         <action id="EditCustomProperties" class="com.intellij.ide.actions.EditCustomPropertiesAction"/>
         <action id="EditCustomVmOptions" class="com.intellij.ide.actions.EditCustomVmOptionsAction"/>
+        <action id="DeleteOldAppDirs" class="com.intellij.ide.actions.DeleteOldAppDirectoriesAction"/>
         <separator/>
         <action id="CheckForUpdate" class="com.intellij.openapi.updateSettings.impl.CheckForUpdateAction">
           <override-text place="WelcomeScreen"/>
@@ -973,6 +988,8 @@
     <action id="ResetIdeScaleAction" class="com.intellij.ide.actions.ResetIdeScaleAction">
       <synonym key="action.ResetIdeScaleAction.text"/>
     </action>
+
+    <action id="ShowSettingsChangesLogFile" class="com.intellij.ide.actions.ShowSettingsChangesLogFile" internal="true"/>
 
     <group id="MainToolbarPopupActions" searchable="false">
       <reference ref="ViewToolBar"/>
@@ -1131,6 +1148,9 @@
     </group>
 
     <group id="WelcomeScreen.QuickStart.ProjectsState">
+    </group>
+
+    <group id="NonModalWelcomeScreen.RemoteDevelopmentActions">
     </group>
 
     <group id="WelcomeScreen.QuickStart">
@@ -1449,6 +1469,9 @@
         <action id="EnableMetalRendering" internal="true" class="com.intellij.ui.EnableMetalRenderingAction">
           <abbreviation value="metal"/>
         </action>
+        <action id="EnableWayland" internal="true" class="com.intellij.ui.EnableWaylandAction">
+          <abbreviation value="wayland"/>
+        </action>
         <action id="RulerGuide" internal="true" class="com.intellij.internal.rulerguide.RulerGuideAction"/>
         <action id="ShowHideDebugInfoInUi" internal="true" class="com.intellij.ide.actions.ShowHideDebugInfoInUiAction"/>
         <separator/>
@@ -1742,8 +1765,6 @@
       <action id="ActivateFindToolWindow" class="com.intellij.find.actions.ActivateFindToolWindowAction"/>
       <action id="ActivateMeetNewUIToolWindow" class="com.intellij.ide.ui.experimental.meetNewUi.ActivateMeetNewUIToolWindowAction"/>
     </group>
-
-    <action class="com.intellij.diagnostic.ResetWindowsDefenderNotification" id="ResetWindowsDefenderNotification"/>
 
     <group id="UpdateEntryPointGroup"/>
     <group id="SettingsEntryPointGroup" class="com.intellij.ide.actions.SettingsEntryPointGroup">

@@ -275,6 +275,9 @@ class StyleConfigurable : BoundConfigurable(GrazieBundle.message("grazie.setting
       }
       return ShowSettingsUtil.getInstance().editConfigurable(project, configurable)
     }
+
+    @JvmStatic
+    fun open(project: Project?): Boolean = ShowSettingsUtil.getInstance().editConfigurable(project, StyleConfigurable())
   }
 
   private fun focusFeaturedSetting(styleConfigurable: StyleConfigurable, setting: Setting, style: TextStyle, language: Language, project: Project) {
@@ -543,11 +546,11 @@ private fun createLinkLabel(@NlsContexts.LinkLabel text: String, onClick: Runnab
   return link
 }
 
-private fun Row.writingStyleComboBox() = comboBox(
+fun Row.writingStyleComboBox() = comboBox(
   CollectionComboBoxModel(getOtherDomainStyles()),
   SimpleListCellRenderer.create { label, value, _ ->
     label.text = GrazieBundle.messageOrNull("grazie.settings.style.profile.display.${value.id}")
-                 ?: NameUtil.splitNameIntoWords(value.id).joinToString(" ")
+                 ?: NameUtil.splitNameIntoWordList(value.id).joinToString(" ")
   }
 )
 

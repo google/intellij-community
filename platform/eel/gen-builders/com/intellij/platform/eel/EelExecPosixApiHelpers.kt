@@ -6,8 +6,8 @@ package com.intellij.platform.eel
 
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.EelExecApi.ExecuteProcessOptions
-import com.intellij.platform.eel.EelExecApi.InteractionOptions
-import com.intellij.platform.eel.EelExecApi.PtyOrStdErrSettings
+import com.intellij.platform.eel.EelExecPosixApi.PosixEnvironmentVariablesOptions
+import com.intellij.platform.eel.channels.EelDelicateApi
 import com.intellij.platform.eel.path.EelPath
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.ApiStatus
@@ -30,6 +30,13 @@ fun EelExecPosixApi.spawnProcess(
     exe = exe,
   )
 
+@GeneratedBuilder.Result
+@ApiStatus.Experimental
+fun EelExecPosixApi.environmentVariables(): EelExecPosixApiHelpers.EnvironmentVariables =
+  EelExecPosixApiHelpers.EnvironmentVariables(
+    owner = this,
+  )
+
 @ApiStatus.Experimental
 object EelExecPosixApiHelpers {
   /**
@@ -45,9 +52,9 @@ object EelExecPosixApiHelpers {
 
     private var env: Map<String, String> = mapOf()
 
-    private var interactionOptions: InteractionOptions? = null
+    private var interactionOptions: EelExecApi.InteractionOptions? = null
 
-    private var ptyOrStdErrSettings: PtyOrStdErrSettings? = interactionOptions
+    private var ptyOrStdErrSettings: EelExecApi.PtyOrStdErrSettings? = interactionOptions
 
     private var scope: CoroutineScope? = null
 
@@ -92,13 +99,13 @@ object EelExecPosixApiHelpers {
      * See `termcap(2)`, `terminfo(2)`, `ncurses(3X)` and ISBN `0937175226`.
      */
     @ApiStatus.Experimental
-    fun interactionOptions(arg: InteractionOptions?): SpawnProcess = apply {
+    fun interactionOptions(arg: EelExecApi.InteractionOptions?): SpawnProcess = apply {
       this.interactionOptions = arg
     }
 
     @Deprecated("Switch to interactionOptions", replaceWith = ReplaceWith("interactionOptions"))
     @ApiStatus.Internal
-    fun ptyOrStdErrSettings(arg: PtyOrStdErrSettings?): SpawnProcess = apply {
+    fun ptyOrStdErrSettings(arg: EelExecApi.PtyOrStdErrSettings?): SpawnProcess = apply {
       this.ptyOrStdErrSettings = arg
     }
 
@@ -133,6 +140,106 @@ object EelExecPosixApiHelpers {
           ptyOrStdErrSettings = ptyOrStdErrSettings,
           scope = scope,
           workingDirectory = workingDirectory,
+        )
+      )
+  }
+
+  /**
+   * Create it via [com.intellij.platform.eel.EelExecPosixApi.environmentVariables].
+   */
+  @GeneratedBuilder.Result
+  @ApiStatus.Experimental
+  class EnvironmentVariables(
+    private val owner: EelExecPosixApi,
+  ) : OwnedBuilder<EelExecApi.EnvironmentVariablesDeferred> {
+    private var mode: PosixEnvironmentVariablesOptions.Mode = PosixEnvironmentVariablesOptions.Mode.DEFAULT
+
+    private var onlyActual: Boolean = false
+
+    fun mode(arg: PosixEnvironmentVariablesOptions.Mode): EnvironmentVariables = apply {
+      this.mode = arg
+    }
+
+    /**
+     * * On remote Eel it works like [LOGIN_NON_INTERACTIVE], but in case of an error it returns [MINIMAL] instead of throwing an exception.
+     * * On local Windows and Linux it always works like [MINIMAL]
+     *   because historically the IDE haven't called the shell for environment variables in most cases.
+     * * On local macOS it works like [LOGIN_NON_INTERACTIVE] + [MINIMAL], but it returns values cached at start
+     *   with no effect from the [onlyActual] option. This is the historical behaviour too.
+     *
+     * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
+     */
+    fun default(): EnvironmentVariables =
+      mode(PosixEnvironmentVariablesOptions.Mode.DEFAULT)
+
+    /**
+     *  **Use with caution, avoid when possible.**
+     *
+     * This mode executes a shell process supposed to load various profile scripts:
+     * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
+     *
+     * The implementation launches an interactive shell session, so it reads all environment variables unlike [LOGIN_NON_INTERACTIVE].
+     *
+     * However, it's not conventional to run interactive shells without having an actual user interaction.
+     * And no way for user interaction is provided.
+     *
+     * Here are some real cases reported by our users. They're not exceptional cases but rather usual things.
+     * In these cases this mode led to inability to fetch environment variables or high CPU consumption:
+     * * `ssh-add` in `~/.bashrc` waits for a key passphrase, and the shell process hangs forever, IDE becomes unusable.
+     * * `~/.bashrc` starts `screen` or `tmux`, the shell process hangs forever.
+     * * `~/.bashrc` starts `ssh-agent`, and the operating system quickly becomes polluted with lots of unused SSH agents.
+     * * `~/.bashrc` calls `curl` to write the current weather, news, jokes, etc. CPU consumption grows, IDE works slower.
+     *
+     * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
+     */
+    @EelDelicateApi
+    fun loginInteractive(): EnvironmentVariables =
+      mode(PosixEnvironmentVariablesOptions.Mode.LOGIN_INTERACTIVE)
+
+    /**
+     * This mode executes a shell process supposed to load various profile scripts:
+     * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
+     *
+     * This mode may load not all environment variables, depending on what's written in user's configs
+     * because default `~/.bashrc` files in some distros like Debian and Ubuntu contain strings like `[ -z "$PS1" ] && return`.
+     * Often people put their adjustments at the bottom of the profile file, and therefore their code is not executed in the non-interactive mode.
+     *
+     * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
+     */
+    fun loginNonInteractive(): EnvironmentVariables =
+      mode(PosixEnvironmentVariablesOptions.Mode.LOGIN_NON_INTERACTIVE)
+
+    /**
+     * The fastest way to get environment variables. It doesn't call shell scripts written by users.
+     * At least, the environment variable `PATH` exists, but it may differ from what the user has in their `~/.profile` written.
+     * No guarantee for other environment variables.
+     *
+     * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
+     */
+    fun minimal(): EnvironmentVariables =
+      mode(PosixEnvironmentVariablesOptions.Mode.MINIMAL)
+
+    /**
+     * The implementation MAY cache the environment variables by default because they rarely change in real life.
+     * By setting this value to `true`, the cache will be refreshed, and the result will contain the freshest environment variables.
+     *
+     * Makes sense only for remote Eels (via IJent)
+     * or with such [EelExecPosixApi.PosixEnvironmentVariablesOptions.mode] that invoke a shell.
+     * In other cases this option has no effect.
+     */
+    fun onlyActual(arg: Boolean): EnvironmentVariables = apply {
+      this.onlyActual = arg
+    }
+
+    /**
+     * Complete the builder and call [com.intellij.platform.eel.EelExecPosixApi.environmentVariables]
+     * with an instance of [com.intellij.platform.eel.EelExecPosixApi.PosixEnvironmentVariablesOptions].
+     */
+    override suspend fun eelIt(): EelExecApi.EnvironmentVariablesDeferred =
+      owner.environmentVariables(
+        PosixEnvironmentVariablesOptionsImpl(
+          mode = mode,
+          onlyActual = onlyActual,
         )
       )
   }

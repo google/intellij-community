@@ -17,15 +17,17 @@ jvm_library(
     "//platform/lang-impl",
     "//plugins/kotlin/base/fe10/analysis",
     "//plugins/kotlin/base/fe10/code-insight",
+    "//platform/core-impl",
     "//plugins/kotlin/base/kdoc",
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/base/util",
-    "//plugins/kotlin/code-insight/impl-base",
+    "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
     "//plugins/kotlin/code-insight/override-implement-shared:kotlin-code-insight-override-implement-shared",
     "//plugins/kotlin/core",
     "//plugins/kotlin/frontend-independent",
+    "//platform/lang-api:lang",
   ]
 )
 ### auto-generated section `build kotlin.code-insight.override-implement.k1` end

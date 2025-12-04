@@ -14,7 +14,6 @@ import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
 import com.intellij.openapi.application.*
-import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.PathManager.getSystemDir
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.application.impl.LaterInvocator
@@ -111,7 +110,9 @@ import java.util.stream.Stream
 import java.util.zip.CRC32
 import javax.xml.parsers.ParserConfigurationException
 import javax.xml.parsers.SAXParserFactory
-import kotlin.io.path.exists
+import javax.xml.stream.XMLInputFactory
+import javax.xml.stream.XMLStreamException
+import javax.xml.stream.XMLStreamReader
 import kotlin.io.path.isDirectory
 
 object MavenUtil {
@@ -349,24 +350,73 @@ object MavenUtil {
     return ContainerUtil.groupBy<String, MavenProject>(projects, NullableFunction { getBaseDir(tree.findRootProject(it).directoryFile).toString() })
   }
 
+
+  private fun isDotMvnRoot(dir: VirtualFile): Boolean {
+    val child = dir.findChild(".mvn")
+    if (child != null && child.isDirectory()) {
+      if (MavenLog.LOG.isTraceEnabled) {
+        MavenLog.LOG.trace("found .mvn in " + child)
+      }
+      return true
+    }
+    return false
+  }
+
+  private fun isRootPomXmlMvnRoot(dir: VirtualFile): Boolean {
+    val child = dir.findChild("pom.xml")
+    if (child != null && child.isFile) {
+      if (MavenLog.LOG.isTraceEnabled) {
+        MavenLog.LOG.trace("found pom.xml in $child, checking for root")
+      }
+      try {
+        child.inputStream.use {
+          val parser = XMLInputFactory.newFactory().createXMLStreamReader(it)
+          if (parser.nextTag() != XMLStreamReader.START_ELEMENT
+              || parser.getLocalName() != "project") {
+            if (MavenLog.LOG.isTraceEnabled) {
+              MavenLog.LOG.trace("pom.xml in $child, is invalid pom xml")
+            }
+            return false
+          }
+          for (i in 0 until parser.getAttributeCount()) {
+            if ("root" == parser.getAttributeLocalName(i)) {
+              val value = parser.getAttributeValue(i).toBoolean()
+              if (MavenLog.LOG.isTraceEnabled) {
+                MavenLog.LOG.trace("pom.xml in $child root=$value")
+              }
+              return value
+            }
+          }
+          if (MavenLog.LOG.isTraceEnabled) {
+            MavenLog.LOG.trace("pom.xml in $child does not contain root tag")
+          }
+          return false
+
+        }
+      }
+      catch (_: IOException) {
+        return false
+      }
+      catch (_: XMLStreamException) {
+        return false
+      }
+    }
+    return false
+  }
+
   @JvmStatic
   fun getVFileBaseDir(file: VirtualFile): VirtualFile {
     var baseDir = if (file.isDirectory() || file.getParent() == null) file else file.getParent()
     var dir = baseDir
     do {
-      val child = dir.findChild(".mvn")
-
-      if (child != null && child.isDirectory()) {
-        if (MavenLog.LOG.isTraceEnabled()) {
-          MavenLog.LOG.trace("found .mvn in " + child)
-        }
+      if (isDotMvnRoot(dir) || isRootPomXmlMvnRoot(dir)) {
         baseDir = dir
         break
       }
     }
     while ((dir.getParent().also { dir = it }) != null)
     if (MavenLog.LOG.isTraceEnabled()) {
-      MavenLog.LOG.trace("return " + baseDir + " as baseDir")
+      MavenLog.LOG.trace("return $baseDir as baseDir")
     }
     return baseDir
   }
@@ -1925,6 +1975,7 @@ object MavenUtil {
     return !shouldResetDependenciesAndFolders(readingProblems)
   }
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("use MavenUtil.resolveSuperPomFile")
   fun getEffectiveSuperPom(project: Project, workingDir: String): VirtualFile? {
     val distribution = MavenDistributionsCache.getInstance(project).getMavenDistribution(workingDir)
@@ -1981,16 +2032,15 @@ object MavenUtil {
     return path != null && (path.endsWith("production") || path.parent.endsWith("production"))
   }
 
+  @RequiresBackgroundThread
   fun isMaven410(xmlns: String?, schemaLocation: String?): Boolean {
     if (xmlns == null || schemaLocation == null) return false
-    val schemaLocations = schemaLocation.split(' ')
-    return (xmlns == MAVEN_4_XLMNS || xmlns == MAVEN_4_XLMNS_HTTPS)
-           && schemaLocations.all {
-      it == MAVEN_4_XLMNS ||
-      it == MAVEN_4_XLMNS_HTTPS ||
-      it == MAVEN_4_XSD ||
-      it == MAVEN_4_XSD_HTTPS
+    val xmlns410 = xmlns == MAVEN_4_XMLNS || xmlns == MAVEN_4_XMLNS_HTTPS
+    if (!xmlns410) return false
+    val schemaLocations = schemaLocation.split("\\s+".toRegex())
+      .filter { it.isNotBlank() }
+    return schemaLocations.all {
+      Maven4SchemaVersionChecker.is410Xsd(it)
     }
-
   }
 }

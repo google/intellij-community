@@ -17,7 +17,7 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.packaging.PyPackageName
 import com.jetbrains.python.packaging.management.PythonPackageManager
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import com.jetbrains.python.sdk.findAmongRoots
 import org.toml.lang.psi.TomlKeyValue
 import org.toml.lang.psi.TomlTable
@@ -48,6 +48,8 @@ internal class PoetryPackageVersionsInspection : LocalInspectionTool() {
     @RequiresBackgroundThread
     private fun Module.pyProjectTomlBlocking(): VirtualFile? = findAmongRoots(this, PY_PROJECT_TOML)
 
+    val poetryGroupRegex = Regex("""^tool\.poetry\.group\.[^.]*\.dependencies$""")
+
     @RequiresBackgroundThread
     override fun visitFile(psiFile: PsiFile) {
       val module = guessModule(psiFile) ?: return
@@ -56,7 +58,10 @@ internal class PoetryPackageVersionsInspection : LocalInspectionTool() {
       if (psiFile.virtualFile != module.pyProjectTomlBlocking()) return
       psiFile.children
         .filter { element ->
-          (element as? TomlTable)?.header?.key?.text in listOf("tool.poetry.dependencies", "tool.poetry.dev-dependencies")
+          (element as? TomlTable)?.header?.key?.text?.let { key ->
+            key in listOf("tool.poetry.dependencies", "tool.poetry.dev-dependencies") ||
+            poetryGroupRegex matches key
+          } ?: false
         }.flatMap {
           it.children.mapNotNull { line -> line as? TomlKeyValue }
         }.forEach { keyValue ->

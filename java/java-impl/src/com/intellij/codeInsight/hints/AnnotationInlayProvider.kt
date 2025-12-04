@@ -1,10 +1,11 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.hints
 
 import com.intellij.codeInsight.AnnotationUtil
 import com.intellij.codeInsight.ExternalAnnotationsManager
 import com.intellij.codeInsight.InferredAnnotationsManager
 import com.intellij.codeInsight.MakeInferredAnnotationExplicit
+import com.intellij.codeInsight.NullableNotNullManager
 import com.intellij.codeInsight.hints.declarative.*
 import com.intellij.codeInsight.hints.declarative.InlayHintsCollector
 import com.intellij.codeInsight.hints.declarative.InlayHintsProvider
@@ -20,9 +21,12 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.BlockInlayPriority
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.pom.java.JavaFeature
 import com.intellij.psi.*
+import com.intellij.psi.impl.source.PsiClassReferenceType
 import com.intellij.psi.tree.TokenSet
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.intellij.psi.util.createSmartPointer
 import org.jetbrains.annotations.PropertyKey
@@ -36,13 +40,13 @@ private val EXTERNAL_AND_INFERRED_TOGGLES_PAYLOAD =
 private val TYPE_ANNOTATION_PAYLOADS = listOf(InlayPayload(TOGGLES_TO_SHOW, StringInlayActionPayload(SHOW_EXTERNAL_TOGGLE_TAG)))
 
 private val ARRAY_TYPE_START = TokenSet.create(JavaTokenType.LBRACKET, JavaTokenType.ELLIPSIS)
+private val ARRAY_TYPE_END = TokenSet.create(JavaTokenType.RBRACKET, JavaTokenType.ELLIPSIS)
 
 private val HINT_FORMAT = HintFormat(
   HintColorKind.Default,
   HintFontSize.ABitSmallerThanInEditor,
   HintMarginPadding.OnlyPadding,
 )
-
 public class AnnotationInlayProvider : InlayHintsProvider {
   public companion object {
     public const val PROVIDER_ID: String = "java.annotation.hints"
@@ -55,18 +59,51 @@ public class AnnotationInlayProvider : InlayHintsProvider {
     if (project.isDefault) return null
     return object : SharedBypassCollector {
       override fun collectFromElement(element: PsiElement, sink: InlayTreeSink) {
+        if (element is PsiTypeParameterListOwner) {
+          sink.whenOptionEnabled(SHOW_EXTERNAL) {
+            val originalOwner = element.originalElement
+            if (originalOwner !is PsiCompiledElement || originalOwner !is PsiTypeParameterListOwner) {
+              return@whenOptionEnabled
+            }
+            val typeParameterList = originalOwner.typeParameterList ?: return@whenOptionEnabled
+            for ((index, originalParameter) in typeParameterList.typeParameters.withIndex()) {
+              val parameter = element.typeParameters.getOrNull(index) ?: return@whenOptionEnabled
+              val manager = ExternalAnnotationsManager.getInstance(project)
+              processTypeParameterRecursively(parameter, originalParameter, sink)
+              parameter.extendsList.referenceElements.zip(originalParameter.extendsList.referencedTypes)
+                .forEach { pair: Pair<PsiJavaCodeReferenceElement?, PsiClassType?> ->
+                  val referenceElement = pair.first
+                  val classType = pair.second
+                  if (referenceElement == null || classType == null) {
+                    return@forEach
+                  }
+                  classType.annotations
+                    .filter(manager::isExternalAnnotation)
+                    .forEach {
+                      showAnnotationInlay(sink, it, project, referenceElement)
+                    }
+                }
+              if (originalParameter.superTypes.size == 1 && parameter.extendsList.referenceElements.isEmpty()) {
+                if (originalParameter.superTypes[0].equalsToText(CommonClassNames.JAVA_LANG_OBJECT)) {
+                  manager.findExternalAnnotations(originalParameter)
+                    .forEach {
+                      // it is not really correct, because
+                      // annotations should be applied to object, like: `T extends @NotNull Object`
+                      // but it is too long, so let's apply it to type parameters
+                      showAnnotationInlay(sink, it, project, parameter)
+                    }
+                }
+              }
+            }
+          }
+        }
         if (element is PsiTypeElement) {
           sink.whenOptionEnabled(SHOW_EXTERNAL) {
             val originalElement = element.originalElement
+            val typeParameter = PsiTreeUtil.getParentOfType(element, PsiTypeParameter::class.java)
+            if (typeParameter != null) return@whenOptionEnabled
             if (originalElement is PsiTypeElement && originalElement is PsiCompiledElement) {
-              val type = originalElement.type
-              val offset = element.textRange.startOffset
-              val manager = ExternalAnnotationsManager.getInstance(project)
-              type.annotations
-                .filter(manager::isExternalAnnotation)
-                .forEach {
-                  sink.addAnnotationPresentation(it, project, InlineInlayPosition(offset, false), HINT_FORMAT, TYPE_ANNOTATION_PAYLOADS)
-                }
+              showPsiTypeElement(originalElement, element, sink)
             }
           }
         }
@@ -85,7 +122,17 @@ public class AnnotationInlayProvider : InlayHintsProvider {
                 element.modifierList != null &&
                 (shownAnnotations.add(nameReferenceElement.qualifiedName) || JavaDocInfoGenerator.isRepeatableAnnotationType(annotation))) {
               val hintPos = (if (isTypeAnno(annotation)) typeHintPos else modifierListHintPos) ?: return
-              addAnnotationPresentation(annotation, project, hintPos, HINT_FORMAT, inlayPayloads)
+              val suffixText = getTypeSuffixText(annotation)
+              if (suffixText != null && Registry.`is`("java.exclamation.mark.inlay.for.inferred.and.external.notnull.annotations")) {
+                if (!shownAnnotations.add(suffixText)) return // to prevent duplicates when external and inferred annotations use different @NotNull classes
+                val suffixOffset = calculateSuffixOffset(element)
+                sink.addPresentation(InlineInlayPosition(suffixOffset, false), TYPE_ANNOTATION_PAYLOADS, hintFormat = HINT_FORMAT) {
+                  text(suffixText)
+                }
+              }
+              else {
+                addAnnotationPresentation(annotation, project, hintPos, HINT_FORMAT, inlayPayloads)
+              }
             }
           }
 
@@ -101,7 +148,116 @@ public class AnnotationInlayProvider : InlayHintsProvider {
           }
         }
       }
+
+      private fun showPsiTypeElement(
+        originalElement: PsiTypeElement,
+        element: PsiTypeElement,
+        sink: InlayTreeSink,
+      ) {
+        val type = originalElement.type
+        val manager = ExternalAnnotationsManager.getInstance(project)
+        type.annotations
+          .filter(manager::isExternalAnnotation)
+          .forEach {
+            showAnnotationInlay(sink, it, project, element)
+          }
+      }
+
+      private fun processTypeParameterRecursively(parameter: PsiTypeParameter, originalParameter: PsiTypeParameter, sink: InlayTreeSink) {
+        fun recursiveProcessTypeElement(element: PsiElement, originalElement: PsiElement) {
+          if (element is PsiTypeElement && originalElement is PsiTypeElement) {
+            showPsiTypeElement(originalElement, element, sink)
+          }
+          element.children
+            .filter {
+              it is PsiTypeElement ||
+              it is PsiJavaCodeReferenceElement ||
+              it is PsiReferenceParameterList
+            }.zip(
+              originalElement.children
+                .filter {
+                  it is PsiTypeElement ||
+                  it is PsiJavaCodeReferenceElement
+                })
+            .forEach {
+              val nestedElement = it.first
+              val nestedOriginalElement = it.second
+              if (nestedElement is PsiTypeElement && nestedOriginalElement is PsiTypeElement) {
+                recursiveProcessTypeElement(nestedElement, nestedOriginalElement)
+              }
+              if (nestedElement is PsiReferenceParameterList && nestedOriginalElement is PsiReferenceParameterList) {
+                nestedElement.typeParameterElements.zip(nestedOriginalElement.typeParameterElements).forEach { nested ->
+                  recursiveProcessTypeElement(nested.first, nested.second)
+                }
+              }
+              if (nestedElement is PsiJavaCodeReferenceElement && nestedOriginalElement is PsiJavaCodeReferenceElement) {
+                val originalTypeParameterElements = nestedOriginalElement.parameterList?.typeParameterElements
+                val typeParameterElements = nestedElement.parameterList?.typeParameterElements
+                if (typeParameterElements != null && originalTypeParameterElements != null) {
+                  typeParameterElements.zip(originalTypeParameterElements).forEach { nested ->
+                    recursiveProcessTypeElement(nested.first, nested.second)
+                  }
+                }
+              }
+            }
+        }
+
+        parameter.extendsList.referenceElements.zip(originalParameter.superTypes)
+          .forEach {
+            val referenceElement = it.first
+            val originalType = it.second
+            if (referenceElement == null || originalType !is PsiClassReferenceType) return@forEach
+            val parameterList = referenceElement.parameterList
+            val originalParameterList = originalType.reference.parameterList
+            if (parameterList == null || originalParameterList == null) return@forEach
+            parameterList.typeParameterElements.zip(originalParameterList.typeParameterElements)
+              .forEach { pair ->
+                val parameter = pair.first
+                val originalParameter = pair.second
+                if (parameter == null || originalParameter == null) return@forEach
+                recursiveProcessTypeElement(parameter, originalParameter)
+              }
+          }
+      }
     }
+  }
+
+  private fun showAnnotationInlay(
+    sink: InlayTreeSink,
+    annotation: PsiAnnotation,
+    project: Project,
+    anchor: PsiElement,
+  ) {
+    val suffixText = getTypeSuffixText(annotation)
+    if (suffixText != null && Registry.`is`("java.exclamation.mark.inlay.for.inferred.and.external.notnull.annotations")) {
+      val offset = calculateSuffixOffset(anchor)
+      sink.addPresentation(InlineInlayPosition(offset, false), TYPE_ANNOTATION_PAYLOADS, hintFormat = HINT_FORMAT) {
+        text(suffixText)
+      }
+    }
+    else {
+      val offset = anchor.textRange.startOffset
+      sink.addAnnotationPresentation(annotation, project, InlineInlayPosition(offset, false), HINT_FORMAT, TYPE_ANNOTATION_PAYLOADS)
+    }
+  }
+
+  private fun calculateSuffixOffset(element: PsiElement?): Int {
+    return when (element) {
+      is PsiTypeElement -> {
+        element.children.firstOrNull { PsiUtil.isJavaToken(it, ARRAY_TYPE_END) }?.textRange?.endOffset 
+        ?: calculateSuffixOffset(element.firstChild)
+      }
+      is PsiJavaCodeReferenceElement -> element.parameterList?.textRange?.startOffset ?: element.textRange.endOffset
+      is PsiMethod -> calculateSuffixOffset(element.returnTypeElement)
+      is PsiVariable -> calculateSuffixOffset(element.typeElement)
+      is PsiTypeParameter -> element.textRange.endOffset
+      else -> 0
+    }
+  }
+  
+  private fun getTypeSuffixText(annotation: PsiAnnotation) : String? {
+    val notNulls = HashSet(NullableNotNullManager.getInstance(annotation.project).notNulls)
+    return if (notNulls.contains(annotation.nameReferenceElement?.qualifiedName)) "!" else null
   }
 }
 
@@ -189,7 +345,7 @@ private fun <T> Array<T>.joinPresentations(separator: () -> Unit, transform: (T)
   }
 }
 
-public class InsertAnnotationAction() : AnAction() {
+public class InsertAnnotationAction : AnAction() {
   override fun update(e: AnActionEvent) {
     if (e.hasAnnotationProviderId()) {
       e.presentation.isEnabledAndVisible = e.psiFile?.virtualFile?.isInLocalFileSystem == true

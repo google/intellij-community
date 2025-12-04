@@ -3,14 +3,18 @@ package com.intellij.platform.debugger.impl.frontend.frame
 
 import com.intellij.ide.ui.icons.icon
 import com.intellij.openapi.project.Project
+import com.intellij.platform.debugger.impl.frontend.storage.findStackFrame
 import com.intellij.platform.debugger.impl.frontend.storage.getOrCreateStackFrame
+import com.intellij.platform.debugger.impl.rpc.ComputeFramesConfig
 import com.intellij.platform.debugger.impl.rpc.XExecutionStackApi
 import com.intellij.platform.debugger.impl.rpc.XExecutionStackDto
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackId
 import com.intellij.platform.debugger.impl.rpc.XStackFramesEvent
 import com.intellij.xdebugger.frame.XDescriptor
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
-import com.intellij.xdebugger.impl.rpc.XExecutionStackId
+import com.intellij.xdebugger.settings.XDebuggerSettingsManager
+import fleet.util.logging.logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.launch
@@ -23,14 +27,24 @@ internal class FrontendXExecutionStack(
 ) : XExecutionStack(stackDto.displayName, stackDto.icon?.icon()) {
   val id: XExecutionStackId = stackDto.executionStackId
 
+  private val topValue: CompletableFuture<XStackFrame?> = stackDto.topFrame.asCompletableFuture().thenApply<XStackFrame> { frameDto ->
+    if (frameDto == null) return@thenApply null
+    suspendContextLifetimeScope.getOrCreateStackFrame(frameDto, project)
+  }.exceptionally {
+    null
+  }
+
   override fun getTopFrame(): XStackFrame? {
-    // TODO[IJPL-177087]
-    return null
+    return topValue.getNow(null)
+  }
+
+  override fun getTopFrameAsync(): CompletableFuture<XStackFrame?> {
+    return topValue
   }
 
   override fun computeStackFrames(firstFrameIndex: Int, container: XStackFrameContainer) {
     suspendContextLifetimeScope.launch {
-      XExecutionStackApi.getInstance().computeStackFrames(id, firstFrameIndex).collect { event ->
+      XExecutionStackApi.getInstance().computeStackFrames(id, firstFrameIndex, createComputeFramesConfig()).collect { event ->
         when (event) {
           is XStackFramesEvent.ErrorOccurred -> {
             container.errorOccurred(event.errorMessage)
@@ -43,10 +57,22 @@ internal class FrontendXExecutionStack(
             val feFrames = event.frames.map { suspendContextLifetimeScope.getOrCreateStackFrame(it, project) }
             container.addStackFrames(feFrames, event.last)
           }
+          is XStackFramesEvent.NewPresentation -> {
+            val frame = suspendContextLifetimeScope.findStackFrame(event.stackFrameId)
+            if (frame == null) {
+              logger.warn("Frame with id ${event.stackFrameId} not found. Probably presentation event was received earlier than stack frame")
+              return@collect
+            }
+            frame.newUiPresentation(event.presentation)
+          }
         }
       }
     }
   }
+
+  private fun createComputeFramesConfig(): ComputeFramesConfig = ComputeFramesConfig(
+    XDebuggerSettingsManager.getInstance().dataViewSettings.isShowLibraryStackFrames,
+  )
 
   override fun equals(other: Any?): Boolean {
     return other is FrontendXExecutionStack && other.id == id
@@ -58,5 +84,9 @@ internal class FrontendXExecutionStack(
 
   override fun hashCode(): Int {
     return id.hashCode()
+  }
+
+  companion object {
+    private val logger = logger<FrontendXExecutionStack>()
   }
 }

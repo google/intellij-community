@@ -4,11 +4,12 @@ package com.intellij.xdebugger.impl.rpc
 import com.intellij.execution.RunContentDescriptorIdImpl
 import com.intellij.execution.rpc.ExecutionEnvironmentProxyDto
 import com.intellij.ide.ui.icons.IconId
-import com.intellij.platform.debugger.impl.rpc.XDebuggerSessionAdditionalTabEvent
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.rpc.UID
 import com.intellij.xdebugger.impl.ui.XDebugSessionTab
+import com.intellij.xdebugger.ui.XDebugTabLayouter
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.core.DeferredSerializer
@@ -31,6 +32,7 @@ interface XDebugSessionTabApi : RemoteApi<Unit> {
   suspend fun onTabInitialized(sessionId: XDebugSessionId, tabInfo: XDebuggerSessionTabInfoCallback)
 
   suspend fun additionalTabEvents(tabComponentsManagerId: XDebugSessionAdditionalTabComponentManagerId): Flow<XDebuggerSessionAdditionalTabEvent>
+  suspend fun tabLayouterEvents(tabLayouterId: XDebugTabLayouterId): Flow<XDebugTabLayouterEvent>
 
   companion object {
     @JvmStatic
@@ -80,7 +82,16 @@ data class XDebuggerSessionTabInfo(
   val additionalTabsComponentManagerId: XDebugSessionAdditionalTabComponentManagerId,
   @Serializable(with = SendChannelSerializer::class) val tabClosedCallback: SendChannel<Unit>,
   @Serializable(with = DeferredSerializer::class) val backendRunContendDescriptorId: Deferred<RunContentDescriptorIdImpl>,
+  @Serializable(with = DeferredSerializer::class) val showTab: Deferred<Unit>,
+  @Serializable(with = DeferredSerializer::class) val tabLayouterDto: Deferred<XDebugTabLayouterDto>,
 ) : XDebuggerSessionTabAbstractInfo
+
+@ApiStatus.Internal
+@Serializable
+data class XDebugTabLayouterDto(
+  val id: XDebugTabLayouterId,
+  @Transient val localLayouter: XDebugTabLayouter? = null,
+)
 
 @ApiStatus.Internal
 @Serializable

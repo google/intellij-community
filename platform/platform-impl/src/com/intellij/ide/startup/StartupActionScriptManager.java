@@ -17,6 +17,12 @@ import java.util.List;
 import java.util.function.Predicate;
 
 public final class StartupActionScriptManager {
+  /**
+   * Currently is only used for marketplace plugin installation because it is required very early in the startup flow.
+   * For anything else, use {@link #ACTION_SCRIPT_FILE} instead.
+   */
+  @ApiStatus.Internal
+  public static final String EARLY_ACTION_SCRIPT_FILE = "early.action.script";
   @ApiStatus.Internal
   public static final String ACTION_SCRIPT_FILE = "action.script";
 
@@ -24,7 +30,15 @@ public final class StartupActionScriptManager {
 
   @ApiStatus.Internal
   public static synchronized void executeActionScript() throws IOException {
-    var scriptFile = getActionScriptFile();
+    executeActionScriptImpl(getActionScriptFile());
+  }
+
+  @ApiStatus.Internal
+  public static synchronized void executeEarlyActionScript() throws IOException {
+    executeActionScriptImpl(getEarlyActionScriptFile());
+  }
+
+  private static void executeActionScriptImpl(@NotNull Path scriptFile) throws IOException {
     try {
       var commands = loadActionScript(scriptFile);
       for (var command : commands) {
@@ -57,17 +71,25 @@ public final class StartupActionScriptManager {
   }
 
   public static synchronized void addActionCommands(@NotNull List<? extends ActionCommand> commands) throws IOException {
-    addActionCommands(commands, true);
+    addActionCommands(getActionScriptFile(), commands, true);
   }
 
   @ApiStatus.Experimental
   public static synchronized void addActionCommandsToBeginning(@NotNull List<? extends ActionCommand> commands) throws IOException {
-    addActionCommands(commands, false);
+    addActionCommands(getActionScriptFile(), commands, false);
   }
 
-  private static synchronized void addActionCommands(@NotNull List<? extends ActionCommand> commands, boolean toEndOfScript) throws IOException {
+  /**
+   * Special method for a special use case, do not use unless you know that it is exactly what you need.
+   * @see #EARLY_ACTION_SCRIPT_FILE
+   */
+  @ApiStatus.Internal
+  public static synchronized void setMarketplacePluginUpdateActionScript(@NotNull List<? extends ActionCommand> commands) throws IOException {
+    saveActionScript(commands, getEarlyActionScriptFile());
+  }
+
+  private static synchronized void addActionCommands(@NotNull Path scriptFile, @NotNull List<? extends ActionCommand> commands, boolean toEndOfScript) throws IOException {
     List<ActionCommand> script = new ArrayList<>(), originalScript = null;
-    var scriptFile = getActionScriptFile();
     if (Files.exists(scriptFile)) {
       originalScript = loadActionScript(scriptFile);
       script.addAll(originalScript);
@@ -99,6 +121,10 @@ public final class StartupActionScriptManager {
     return PathManager.getStartupScriptDir().resolve(ACTION_SCRIPT_FILE);
   }
 
+  private static Path getEarlyActionScriptFile() {
+    return PathManager.getStartupScriptDir().resolve(EARLY_ACTION_SCRIPT_FILE);
+  }
+
   @ApiStatus.Internal
   public static @NotNull List<ActionCommand> loadActionScript(@NotNull Path scriptFile) throws IOException {
     try (var ois = new ObjectInputStream(Files.newInputStream(scriptFile))) {
@@ -119,7 +145,7 @@ public final class StartupActionScriptManager {
   }
 
   @ApiStatus.Internal
-  public static void saveActionScript(@NotNull List<ActionCommand> commands, @NotNull Path scriptFile) throws IOException {
+  public static void saveActionScript(@NotNull List<? extends ActionCommand> commands, @NotNull Path scriptFile) throws IOException {
     Files.createDirectories(scriptFile.getParent());
     try (var oos = new ObjectOutputStream(Files.newOutputStream(scriptFile))) {
       oos.writeObject(commands.toArray(new ActionCommand[0]));

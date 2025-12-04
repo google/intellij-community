@@ -324,7 +324,7 @@ public final class RedundantCastUtil {
           if (!newResult.isValidResult() || !oldMember.equals(newResult.getElement())) return false;
           PsiType expected = ExpectedTypeUtils.findExpectedType(refExpression, false);
           PsiType actual = newExpression.getType();
-          if (expected == null || actual == null || !TypeConversionUtil.isAssignable(expected, actual)) return false;
+          if (expected != null && (actual == null || !TypeConversionUtil.isAssignable(expected, actual))) return false;
           if (parent instanceof PsiReferenceExpression parentRef && !newResult.getSubstitutor().equals(resolveResult.getSubstitutor())) {
             return isCastInReferenceQualifierRedundant(parentRef);
           }

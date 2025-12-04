@@ -2874,6 +2874,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithoutElse.kt");
                 }
 
+                @TestMetadata("ifsWithoutElse.kt")
+                public void testIfsWithoutElse() throws Exception {
+                    runTest("testData/intentions/branched/ifWhen/ifToWhen/ifsWithoutElse.kt");
+                }
+
                 @TestMetadata("lambdaExpression.kt")
                 public void testLambdaExpression() throws Exception {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/lambdaExpression.kt");
@@ -5015,6 +5020,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("backtickedEnum.kt")
+        public void testBacktickedEnum() throws Exception {
+            runTest("testData/intentions/convertEnumToSealedClass/backtickedEnum.kt");
+        }
+
         @TestMetadata("entriesAndMembers.kt")
         public void testEntriesAndMembers() throws Exception {
             runTest("testData/intentions/convertEnumToSealedClass/entriesAndMembers.kt");
@@ -5733,6 +5743,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("annotationLineBreak.kt")
         public void testAnnotationLineBreak() throws Exception {
             runTest("testData/intentions/convertFunctionToProperty/annotationLineBreak.kt");
+        }
+
+        @TestMetadata("backticks.kt")
+        public void testBackticks() throws Exception {
+            runTest("testData/intentions/convertFunctionToProperty/backticks.kt");
         }
 
         @TestMetadata("blockBody.kt")
@@ -8368,6 +8383,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("funWithCustomUnitClass.kt")
         public void testFunWithCustomUnitClass() throws Exception {
             runTest("testData/intentions/convertToBlockBody/funWithCustomUnitClass.kt");
+        }
+
+        @TestMetadata("funWithReturnStmt.kt")
+        public void testFunWithReturnStmt() throws Exception {
+            runTest("testData/intentions/convertToBlockBody/funWithReturnStmt.kt");
         }
 
         @TestMetadata("funWithThrow.kt")
@@ -11324,6 +11344,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/importMember/ClassCallChain3.kt");
         }
 
+        @TestMetadata("CompanionObjectImplicitReference.kt")
+        public void testCompanionObjectImplicitReference() throws Exception {
+            runTest("testData/intentions/importMember/CompanionObjectImplicitReference.kt");
+        }
+
         @TestMetadata("EnumMember.kt")
         public void testEnumMember() throws Exception {
             runTest("testData/intentions/importMember/EnumMember.kt");
@@ -11756,6 +11781,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/introduceImportAlias/conflictPackage.kt");
         }
 
+        @TestMetadata("constructorWithConflictingUsage.kt")
+        public void testConstructorWithConflictingUsage() throws Exception {
+            runTest("testData/intentions/introduceImportAlias/constructorWithConflictingUsage.kt");
+        }
+
         @TestMetadata("function.kt")
         public void testFunction() throws Exception {
             runTest("testData/intentions/introduceImportAlias/function.kt");
@@ -11789,6 +11819,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("notApplicableLocalVariable.kt")
         public void testNotApplicableLocalVariable() throws Exception {
             runTest("testData/intentions/introduceImportAlias/notApplicableLocalVariable.kt");
+        }
+
+        @TestMetadata("notApplicableOnImport.kt")
+        public void testNotApplicableOnImport() throws Exception {
+            runTest("testData/intentions/introduceImportAlias/notApplicableOnImport.kt");
         }
 
         @TestMetadata("notApplicablePackage.kt")
@@ -17824,6 +17859,21 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("variableWithoutInitializer.kt")
         public void testVariableWithoutInitializer() throws Exception {
             runTest("testData/intentions/specifyTypeExplicitly/variableWithoutInitializer.kt");
+        }
+
+        @TestMetadata("withReturnInExpressionBody.kt")
+        public void testWithReturnInExpressionBody() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/withReturnInExpressionBody.kt");
+        }
+
+        @TestMetadata("withReturnInExpressionBodyProperty.kt")
+        public void testWithReturnInExpressionBodyProperty() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/withReturnInExpressionBodyProperty.kt");
+        }
+
+        @TestMetadata("withReturnInExpressionBodyPropertyAccessor.kt")
+        public void testWithReturnInExpressionBodyPropertyAccessor() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/withReturnInExpressionBodyPropertyAccessor.kt");
         }
     }
 

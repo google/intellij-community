@@ -3,23 +3,36 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "monorepo",
+  module_name = "intellij.platform.testFramework.monorepo",
   visibility = ["//visibility:public"],
-  srcs = glob([], allow_empty = True)
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  deps = [
+    "@lib//:junit5Jupiter",
+    "@lib//:kotlin-stdlib",
+    "//platform/util/coroutines",
+    "//libraries/kotlinx/coroutines/core",
+    "//jps/model-api:model",
+    "//tools/apiDump",
+    "//platform/util-ex",
+    "//platform/util",
+    "//jps/model-serialization",
+    "//platform/testFramework",
+  ]
 )
 
 jvm_library(
   name = "monorepo_test_lib",
-  module_name = "intellij.platform.testFramework.monorepo",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
+  associates = [":monorepo"],
   deps = [
     "@lib//:junit5Jupiter",
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
     "@lib//:kotlin-stdlib",
     "//platform/util/coroutines",
-    "@lib//:kotlinx-coroutines-core",
-    "@lib//:kotlinx-coroutines-test",
+    "//libraries/kotlinx/coroutines/core",
+    "//libraries/kotlinx/coroutines/test",
     "@lib//:jetbrains-annotations",
     "//jps/model-api:model",
     "//tools/apiDump",

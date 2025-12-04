@@ -169,17 +169,34 @@ class CodeFloatingToolbar(
   override fun createActionGroup(): ActionGroup? {
     val contextAwareActionGroupId = getContextAwareGroupId(editor) ?: return null
     val mainActionGroup = CustomActionsSchema.getInstance().getCorrectedAction(contextAwareActionGroupId) ?: error("Can't find groupId action")
-    val configurationGroup = createConfigureGroup(contextAwareActionGroupId)
-    val showIntentionAction = CustomActionsSchema.getInstance().getCorrectedAction("ShowIntentionActions")
-                              ?: error("Can't find ShowIntentionActions action")
-    return DefaultActionGroup(showIntentionAction, mainActionGroup, configurationGroup)
+
+    val project = editor.project ?: return null
+    val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.document) ?: return null
+
+    val actionList = buildList {
+      if (!isIntentionsGroupHidden(psiFile.language)) {
+        val showIntentionAction = CustomActionsSchema.getInstance().getCorrectedAction("ShowIntentionActions")
+                                  ?: error("Can't find ShowIntentionActions action")
+        add(showIntentionAction)
+      }
+
+      add(mainActionGroup)
+
+      if (!isConfigurationsGroupHidden(psiFile.language)) {
+        add(createConfigureGroup(contextAwareActionGroupId))
+      }
+    }
+
+    return DefaultActionGroup(actionList)
   }
 
   override suspend fun createHint(): LightweightHint {
     val hint = super.createHint()
     val buttons = UIUtil.findComponentsOfType(hint.component, ActionButton::class.java)
     buttons.forEach { button ->
-      button.presentation.putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
+      if (button.presentation.getClientProperty(ActionUtil.HIDE_DROPDOWN_ICON) == null) {
+        button.presentation.putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
+      }
       showMenuPopupOnMouseHover(button)
     }
     return hint

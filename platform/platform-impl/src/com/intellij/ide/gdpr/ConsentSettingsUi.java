@@ -2,6 +2,7 @@
 package com.intellij.ide.gdpr;
 
 import com.intellij.ide.BrowserUtil;
+import com.intellij.ide.gdpr.localConsents.LocalConsentOptions;
 import com.intellij.ide.gdpr.ui.consents.*;
 import com.intellij.openapi.options.ConfigurableUi;
 import com.intellij.openapi.util.NlsSafe;
@@ -11,14 +12,12 @@ import com.intellij.ui.HyperlinkAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.scale.JBUIScale;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.SwingHelper;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.event.HyperlinkEvent;
@@ -32,7 +31,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Supplier;
 
-import static com.intellij.ide.gdpr.ui.consents.ConsentGroup.DATA_COLLECTION_GROUP_ID;
 import static javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED;
 import static javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED;
 
@@ -107,19 +105,14 @@ public class ConsentSettingsUi extends JPanel implements ConfigurableUi<List<Con
     if (ConsentOptions.condUsageStatsConsent().test(consent)) {
       return new UsageStatisticsConsentUi(consent);
     }
-    if (ConsentOptions.condTraceDataCollectionComConsent().test(consent) ||
-        ConsentOptions.condTraceDataCollectionNonComConsent().test(consent)) {
+    if (ConsentOptions.condAiDataCollectionConsent().test(consent)) {
+      return new AiDataCollectionConsentUi(consent);
+    }
+    if (LocalConsentOptions.condTraceDataCollectionComLocalConsent().test(consent) ||
+        LocalConsentOptions.condTraceDataCollectionNonComLocalConsent().test(consent)) {
       return new TraceDataCollectionConsentUI(consent);
     }
     return new DefaultConsentUi(consent);
-  }
-
-  @ApiStatus.Internal
-  public static @Nullable ConsentGroupUi getConsentGroupUi(ConsentGroup consentGroup) {
-    if (DATA_COLLECTION_GROUP_ID.equals(consentGroup.getId())) {
-      return new DataCollectionConsentGroupUI(ContainerUtil.map(consentGroup.getConsents(), ConsentSettingsUi::getConsentUi));
-    }
-    return null;
   }
 
   @Contract(pure = true)

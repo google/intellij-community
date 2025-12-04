@@ -7,9 +7,9 @@ import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunCo
 import com.intellij.openapi.externalSystem.service.execution.TargetEnvironmentConfigurationProvider
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.toEelApi
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gradle.service.execution.BuildLayoutParameters
 import org.jetbrains.plugins.gradle.service.execution.GradleExecutionAware
@@ -30,9 +30,14 @@ class EelGradleExecutionAware : GradleExecutionAware {
     // nothing to do
   }
 
-  override fun isRemoteRun(runConfiguration: ExternalSystemRunConfiguration, project: Project): Boolean {
-    return project.getEelDescriptor() !is LocalEelDescriptor
-  }
+  /**
+   * This method is used ONLY for Gradle debugging purposes.
+   * We are using proxy to proxy all debugger requests to the debugging agent, so, we're always dealing with the local environment.
+   * Inside a container/WSL, the target address is always 127.0.0.1:%any free WSL/Docker port%.
+   * On the local side the target address is always 127.0.0.1:%proxied port to the remote%.
+   * So, [isRemoteRun] should always return `false`.
+   */
+  override fun isRemoteRun(runConfiguration: ExternalSystemRunConfiguration, project: Project): Boolean = false
 
   override fun getEnvironmentConfigurationProvider(
     projectPath: String,
@@ -76,8 +81,6 @@ class EelGradleExecutionAware : GradleExecutionAware {
   }
 
   private fun Project.isEelSyncAvailable(): Boolean {
-    return Registry.`is`("gradle.sync.use.eel.for.wsl", false)
-           && projectFilePath != null
-           && getEelDescriptor() !is LocalEelDescriptor
+    return projectFilePath != null && getEelDescriptor() !is LocalEelDescriptor
   }
 }

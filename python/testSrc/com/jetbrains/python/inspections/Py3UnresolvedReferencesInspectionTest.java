@@ -491,4 +491,57 @@ public class Py3UnresolvedReferencesInspectionTest extends PyInspectionTestCase 
   public void testStrictUnionMemberExtendingAny() {
     doTest();
   }
+
+  // PY-50642
+  public void testTypeChecking() {
+    doTestByText("""
+                   import typing
+                   
+                   if not typing.TYPE_CHECKING:
+                       x: str = 'ab'
+                   
+                   class A:
+                       if not typing.TYPE_CHECKING:
+                           foo: int = -1
+                       ...
+                   
+                   if not typing.TYPE_CHECKING:
+                       _ = x
+                       _ = A.foo
+                   """);
+  }
+
+  // PY-83529
+  public void testPackageAttributeInPresenceOfBinarySkeleton() {
+    runWithAdditionalClassEntryInSdkRoots(getTestDirectoryPath() + "/site-packages", () -> {
+      runWithAdditionalClassEntryInSdkRoots(getTestDirectoryPath() + "/python_stubs", () -> {
+        final PsiFile currentFile = myFixture.configureByFile(getTestDirectoryPath() + "/main.py");
+        configureInspection();
+        assertSdkRootsNotParsed(currentFile);
+      });
+    });
+  }
+
+  // PY-85880
+  public void testLiteralUnionInTuple() {
+    doTestByText("""
+                   from typing import Literal
+                   
+                   
+                   def f(e: Literal[1, 2]):
+                       _ = e in ()
+                   """);
+  }
+
+  // PY-85880
+  public void testLiteralInUnionTupleNone() {
+    doTestByText("""
+                   from typing import Literal
+                   
+                   
+                   def f(e: Literal[1, 2]):
+                       a: tuple | None = None
+                       _ = e <weak_warning descr="Member 'None' of 'tuple | None' does not have attribute '__contains__'">in</weak_warning> a
+                   """);
+  }
 }

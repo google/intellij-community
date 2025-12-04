@@ -16,6 +16,8 @@ jvm_library(
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
+    "//platform/projectModel-impl",
+    "//platform/core-impl",
     "//platform/lang-impl",
     "//platform/analysis-api:analysis",
     "//platform/indexing-api:indexing",
@@ -23,6 +25,7 @@ jvm_library(
     "//platform/refactoring",
     "//platform/editor-ui-api:editor-ui",
     "//platform/core-ui",
+    "//platform/lang-api:lang",
   ]
 )
 ### auto-generated section `build intellij.platform.polySymbols.backend` end

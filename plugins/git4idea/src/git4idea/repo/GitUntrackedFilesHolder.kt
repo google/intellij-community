@@ -69,7 +69,7 @@ class GitUntrackedFilesHolder internal constructor(
     get() = untrackedFiles.initialized
 
   init {
-    updateRunner = SingleTaskRunner(cs, 500.milliseconds, ::update)
+    updateRunner = SingleTaskRunner.delayedTaskRunner(cs, 500.milliseconds, ::update)
     cs.launch(start = CoroutineStart.UNDISPATCHED) {
       try {
         project.serviceAsync<InitialVfsRefreshService>().awaitInitialVfsRefreshFinished()
@@ -159,6 +159,7 @@ class GitUntrackedFilesHolder internal constructor(
    * @return untracked files.
    * @throws VcsException if there is an unexpected error during Git execution.
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("use {@link #retrieveUntrackedFilePaths} instead")
   @Throws(VcsException::class)
   fun retrieveUntrackedFiles(): Collection<VirtualFile?> = retrieveUntrackedFilePaths().mapNotNull { it.getVirtualFile() }

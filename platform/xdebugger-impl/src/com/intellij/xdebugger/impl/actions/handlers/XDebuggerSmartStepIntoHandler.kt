@@ -9,6 +9,7 @@ import com.intellij.codeInsight.hint.HintUtil
 import com.intellij.codeInsight.unwrap.ScopeHighlighter
 import com.intellij.execution.filters.HyperlinkInfo
 import com.intellij.execution.impl.EditorHyperlinkSupport
+import com.intellij.ide.rpc.util.textRange
 import com.intellij.ide.ui.icons.icon
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.idea.AppMode
@@ -52,7 +53,7 @@ import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.impl.actions.XDebuggerActions
 import com.intellij.xdebugger.impl.actions.XDebuggerProxySuspendedActionHandler
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy
 import com.intellij.xdebugger.impl.performDebuggerActionAsync
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 import com.intellij.xdebugger.stepping.XSmartStepIntoVariant
@@ -84,10 +85,7 @@ private fun XSmartStepIntoTargetDto.target(): XSmartStepIntoTarget {
     override fun getText(): @NlsSafe String? = this@target.text
     override fun getDescription(): @Nls String? = this@target.description
     override fun getIcon(): Icon? = this@target.iconId?.icon()
-    override fun getHighlightRange(): TextRange? {
-      val (start, end) = this@target.textRange ?: return null
-      return TextRange(start, end)
-    }
+    override fun getHighlightRange(): TextRange? = this@target.textRange?.textRange()
   })
 }
 
@@ -131,8 +129,8 @@ internal open class XDebuggerSmartStepIntoHandler : XDebuggerProxySuspendedActio
       catch (ce: CancellationException) {
         throw ce
       }
-      catch (e: Throwable) {
-        LOG.error("Exception while smart step into, falling back to step into", e)
+      catch (_: Throwable) {
+        // TODO: need to show some error notification here, but currently we don't have a proper error handling mechanism
         session.stepInto(ignoreBreakpoints = false)
       }
     }

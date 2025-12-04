@@ -8,7 +8,6 @@ import org.jetbrains.jps.dependency.GraphDataOutput;
 import org.jetbrains.jps.dependency.NodeSource;
 import org.jetbrains.jps.dependency.NodeSourcePathMapper;
 import org.jetbrains.jps.dependency.impl.*;
-import org.jetbrains.jps.util.Iterators;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -18,6 +17,9 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -25,9 +27,13 @@ import java.util.zip.InflaterInputStream;
 import static org.jetbrains.jps.util.Iterators.*;
 
 public class ConfigurationState {
+  private static final Logger LOG = Logger.getLogger("com.intellij.tools.build.bazel.jvmIncBuilder.impl.ConfigurationState");
   // Update the version value whenever a serialization format changes.
   // This will help to avoid multiple "failed to load configuration" error messages
-  private static final int VERSION = 2;
+  // Also consider advancing the version when
+  //  - ABI generation logic changed (e.g. changes in ordering, filtering, etc)
+  //  - Any changes in builder's logic implemented, that might affect sources processing
+  private static final int VERSION = 3;
 
   private static final ConfigurationState EMPTY = new ConfigurationState(
     new PathSourceMapper(), NodeSourceSnapshot.EMPTY, List.of(), NodeSourceSnapshot.EMPTY, Map.of()
@@ -98,6 +104,7 @@ public class ConfigurationState {
       out.writeLong(myFlagsDigest);
     }
     catch (Throwable e) {
+      LOG.log(Level.SEVERE, "Error saving build configuration state " + context.getTargetName(), e);
       context.report(Message.create(null, e));
     }
   }
@@ -136,7 +143,7 @@ public class ConfigurationState {
     NodeSourceSnapshot deps = getLibraries();
 
     // digest name, count and order of classpath entries as well as content digests of all non-abi deps
-    Iterators.Function<@NotNull NodeSource, Iterable<String>> digestMapper =
+    Function<@NotNull NodeSource, Iterable<String>> digestMapper =
       src -> {
         Path path = myPathMapper.toPath(src);
         return DataPaths.isLibraryTracked(path)? List.of(DataPaths.getLibraryName(path)) : List.of(DataPaths.getLibraryName(path), deps.getDigest(src));
@@ -163,7 +170,7 @@ public class ConfigurationState {
     };
 
     return Utils.digest(
-      flat(map(filter(Arrays.asList(CLFlags.values()), flg -> flags.containsKey(flg) && !ourIgnoredFlags.contains(flg)), flg -> flat(asIterable(flg.name()), sorted.fun(flags.get(flg)))))
+      flat(map(filter(Arrays.asList(CLFlags.values()), flg -> flags.containsKey(flg) && !ourIgnoredFlags.contains(flg)), flg -> flat(asIterable(flg.name()), sorted.apply(flags.get(flg)))))
     );
   }
 

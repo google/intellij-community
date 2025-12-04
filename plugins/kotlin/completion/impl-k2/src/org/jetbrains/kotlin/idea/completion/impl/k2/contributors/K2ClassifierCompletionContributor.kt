@@ -5,6 +5,7 @@ import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.lookup.LookupElementPresentation
 import com.intellij.codeInsight.lookup.SuspendingLookupElementRenderer
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -24,6 +25,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.symbol
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.collectPossibleReferenceShorteningsForIde
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.FirClassifierProvider.getAvailableClassifiers
 import org.jetbrains.kotlin.idea.completion.contributors.helpers.FirClassifierProvider.getAvailableClassifiersFromIndex
@@ -77,8 +79,13 @@ internal open class K2ClassifierCompletionContributor : K2CompletionContributor<
     private fun getImportingStrategy(
         context: K2CompletionContext<KotlinNameReferencePositionContext>,
         importStrategyDetector: ImportStrategyDetector,
-        classifierSymbol: KaClassifierSymbol
+        classifierSymbol: KaClassifierSymbol,
+        aliasName: Name?,
     ): ImportStrategy {
+        if (aliasName != null) {
+            // If we are using the alias, then we do not need to import anything
+            return ImportStrategy.DoNothing
+        }
         return if (context.positionContext is KotlinCallableReferencePositionContext) {
             when (classifierSymbol) {
                 is KaTypeParameterSymbol -> ImportStrategy.DoNothing
@@ -162,9 +169,10 @@ internal open class K2ClassifierCompletionContributor : K2CompletionContributor<
                     classifierSymbol = classifierSymbol,
                     expectedType = context.expectedType,
                     importingStrategy = getImportingStrategy(
-                        sectionContext.completionContext,
-                        sectionContext.importStrategyDetector,
-                        classifierSymbol
+                        context = sectionContext.completionContext,
+                        importStrategyDetector = sectionContext.importStrategyDetector,
+                        classifierSymbol = classifierSymbol,
+                        aliasName = aliasName,
                     ),
                     aliasName = aliasName,
                     positionContext = positionContext,
@@ -194,9 +202,10 @@ internal open class K2ClassifierCompletionContributor : K2CompletionContributor<
                         classifierSymbol = classifierSymbol,
                         expectedType = weighingContext.expectedType,
                         importingStrategy = getImportingStrategy(
-                            sectionContext.completionContext,
-                            sectionContext.importStrategyDetector,
-                            classifierSymbol
+                            context = sectionContext.completionContext,
+                            importStrategyDetector = sectionContext.importStrategyDetector,
+                            classifierSymbol = classifierSymbol,
+                            aliasName = null,
                         ),
                         positionContext = sectionContext.positionContext,
                         visibilityChecker = sectionContext.visibilityChecker,
@@ -207,6 +216,9 @@ internal open class K2ClassifierCompletionContributor : K2CompletionContributor<
                     }
                 }
         } else {
+            // We do not show items from index when there is no prefix because there would be too many.
+            // That means if the prefix changes at all (the only option is for it to grow in size), we must restart completion.
+            sectionContext.sink.restartCompletionOnAnyPrefixChange()
             emptySequence()
         }
 
@@ -272,6 +284,8 @@ internal open class K2ClassifierCompletionContributor : K2CompletionContributor<
         importingStrategy: ImportStrategy = ImportStrategy.DoNothing,
     ): Sequence<LookupElementBuilder> = sequence {
         if (classifierSymbol is KaNamedClassSymbol &&
+            classifierSymbol.classKind != KaClassKind.OBJECT &&
+            classifierSymbol.classKind != KaClassKind.ENUM_CLASS &&
             classifierSymbol.modality != KaSymbolModality.SEALED &&
             classifierSymbol.modality != KaSymbolModality.ABSTRACT &&
             expectedType != null &&
@@ -373,7 +387,7 @@ private class K2ClassifierLookupElementRenderer(
             .commitDocument(document)
 
         return analyze(file) {
-            collectPossibleReferenceShortenings(file, selection = rangeMarker.textRange)
+            collectPossibleReferenceShorteningsForIde(file, selection = rangeMarker.textRange)
         }
     }
 }

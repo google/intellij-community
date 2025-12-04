@@ -3,11 +3,11 @@ package org.jetbrains.plugins.terminal.block.reworked.hyperlinks
 
 import com.intellij.openapi.diagnostic.logger
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.plugins.terminal.block.reworked.TerminalOffset
-import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
-import org.jetbrains.plugins.terminal.session.TerminalFilterResultInfo
-import org.jetbrains.plugins.terminal.session.TerminalHyperlinkId
-import org.jetbrains.plugins.terminal.session.TerminalHyperlinksModelState
+import org.jetbrains.plugins.terminal.session.impl.TerminalFilterResultInfo
+import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkId
+import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinksModelState
+import org.jetbrains.plugins.terminal.view.TerminalOffset
+import org.jetbrains.plugins.terminal.view.TerminalOutputModel
 
 @ApiStatus.Internal
 class TerminalHyperlinksModel(private val debugName: String, private val outputModel: TerminalOutputModel) {
@@ -120,7 +120,7 @@ class TerminalHyperlinksModel(private val debugName: String, private val outputM
       maxOfOrNull { it.id.value },
     )
 
-  private fun Long.toTerminalOffset(): TerminalOffset = outputModel.absoluteOffset(this)
+  private fun Long.toTerminalOffset(): TerminalOffset = TerminalOffset.of(this)
 
 }
 

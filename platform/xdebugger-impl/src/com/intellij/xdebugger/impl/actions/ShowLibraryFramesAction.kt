@@ -1,16 +1,13 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.actions
 
+import com.intellij.configurationStore.saveSettingsForRemoteDevelopment
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.Presentation
-import com.intellij.openapi.actionSystem.ToggleAction
-import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.platform.debugger.impl.rpc.XDebuggerManagerApi
+import com.intellij.platform.debugger.impl.shared.SplitDebuggerAction
 import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl
@@ -22,7 +19,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
-internal class ShowLibraryFramesAction : ToggleAction(), FrontendOtherwiseBackend {
+internal class ShowLibraryFramesAction : ToggleAction(), SplitDebuggerAction {
 
   init {
     templatePresentation.apply {
@@ -60,7 +57,8 @@ internal class ShowLibraryFramesAction : ToggleAction(), FrontendOtherwiseBacken
   override fun setSelected(e: AnActionEvent, enabled: Boolean) {
     // update on frontend optimistically
     XDebuggerSettingManagerImpl.getInstanceImpl().dataViewSettings.isShowLibraryStackFrames = !enabled
-
+    val project = e.project ?: return
+    saveSettingsForRemoteDevelopment(e.coroutineScope, project)
     e.project?.service<ShowLibraryFramesActionCoroutineScope>()?.toggle(!enabled)
   }
 
@@ -95,8 +93,7 @@ internal class ShowLibraryFramesActionCoroutineScope(private val project: Projec
 
   init {
     cs.launch {
-      toggleFlow.debounce(30.milliseconds).collectLatest { show ->
-        XDebuggerManagerApi.getInstance().showLibraryFrames(show)
+      toggleFlow.debounce(30.milliseconds).collectLatest {
         XDebuggerUtilImpl.rebuildAllSessionsViews(project)
       }
     }

@@ -2,14 +2,14 @@
 package org.jetbrains.plugins.gradle.model.projectModel
 
 import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.annotations.Parent
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Experimental
 interface GradleProjectEntity : WorkspaceEntityWithSymbolicId {
-  // TODO Once IJPL-204027 is fixed, add a relation with GradleBuildEntity
-  // Currently, it's needed to use `buildId` to find a build for a project. It would be easier to have a relation with GradleBuildEntity,
-  // but saving entities with this relation causes "Key 10 is missing in the map" error. Also, IJPL-193757 might be related.
+  @Parent
+  val build: GradleBuildEntity
   val buildId: GradleBuildEntityId
 
   val name: String
@@ -25,54 +25,5 @@ interface GradleProjectEntity : WorkspaceEntityWithSymbolicId {
   val linkedProjectId: String
 
   override val symbolicId: GradleProjectEntityId
-    get() = GradleProjectEntityId(buildId, url)
-
-  //region generated code
-  @GeneratedCodeApiVersion(3)
-  interface Builder : WorkspaceEntity.Builder<GradleProjectEntity> {
-    override var entitySource: EntitySource
-    var buildId: GradleBuildEntityId
-    var name: String
-    var path: String
-    var identityPath: String
-    var url: VirtualFileUrl
-    var linkedProjectId: String
-  }
-
-  companion object : EntityType<GradleProjectEntity, Builder>() {
-    @JvmOverloads
-    @JvmStatic
-    @JvmName("create")
-    operator fun invoke(
-      buildId: GradleBuildEntityId,
-      name: String,
-      path: String,
-      identityPath: String,
-      url: VirtualFileUrl,
-      linkedProjectId: String,
-      entitySource: EntitySource,
-      init: (Builder.() -> Unit)? = null,
-    ): Builder {
-      val builder = builder()
-      builder.buildId = buildId
-      builder.name = name
-      builder.path = path
-      builder.identityPath = identityPath
-      builder.url = url
-      builder.linkedProjectId = linkedProjectId
-      builder.entitySource = entitySource
-      init?.invoke(builder)
-      return builder
-    }
-  }
-  //endregion
+    get() = GradleProjectEntityId(buildId, identityPath)
 }
-
-//region generated code
-fun MutableEntityStorage.modifyGradleProjectEntity(
-  entity: GradleProjectEntity,
-  modification: GradleProjectEntity.Builder.() -> Unit,
-): GradleProjectEntity {
-  return modifyEntity(GradleProjectEntity.Builder::class.java, entity, modification)
-}
-//endregion

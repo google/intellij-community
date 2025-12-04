@@ -49,6 +49,7 @@ class GitRepositoryImpl private constructor(
   private val untrackedFilesHolder: GitUntrackedFilesHolder
   private val resolvedFilesHolder: GitResolvedMergeConflictsFilesHolder
   private val tagHolder: GitTagHolder
+  private val workingTreeHolder: GitWorkingTreeHolder
 
   @Volatile
   private var repoInfo: GitRepoInfo
@@ -71,6 +72,7 @@ class GitRepositoryImpl private constructor(
     Disposer.register(this, resolvedFilesHolder)
 
     tagHolder = GitTagHolder(this)
+    workingTreeHolder = GitWorkingTreeHolder(this)
     repoInfo = readRepoInfo()
   }
 
@@ -101,6 +103,10 @@ class GitRepositoryImpl private constructor(
 
   override fun getTagHolder(): GitTagHolder {
     return tagHolder
+  }
+
+  override fun getWorkingTreeHolder(): GitWorkingTreeHolder {
+    return workingTreeHolder
   }
 
   override fun getCoroutineScope(): CoroutineScope {
@@ -176,8 +182,7 @@ class GitRepositoryImpl private constructor(
     return getInstance().getTracer(VcsScope).spanBuilder(GitBackendTelemetrySpan.Repository.ReadGitRepositoryInfo.getName()).use { span ->
       span.setAttribute("repository", DvcsUtil.getShortRepositoryName(this))
 
-      val configFile = repositoryFiles.configFile
-      val config = GitConfig.read(configFile)
+      val config = GitConfig.read(project, repositoryFiles.rootDir.toNioPath())
       repositoryFiles.updateCustomPaths(config.parseCore())
 
       val remotes = config.parseRemotes()
@@ -251,6 +256,7 @@ class GitRepositoryImpl private constructor(
         updater.installListeners()
         notifyIfRepoChanged(this, null, initialRepoInfo)
         tagHolder.reload()
+        workingTreeHolder.reload()
         this.untrackedFilesHolder.invalidate()
         this.resolvedConflictsFilesHolder.invalidate()
       }

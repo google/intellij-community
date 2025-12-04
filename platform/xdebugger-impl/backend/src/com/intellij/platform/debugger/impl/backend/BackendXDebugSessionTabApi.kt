@@ -2,9 +2,12 @@
 package com.intellij.platform.debugger.impl.backend
 
 import com.intellij.openapi.application.EDT
-import com.intellij.platform.debugger.impl.rpc.XDebuggerSessionAdditionalTabEvent
+import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.xdebugger.impl.findValue
-import com.intellij.xdebugger.impl.rpc.*
+import com.intellij.xdebugger.impl.rpc.XDebugSessionAdditionalTabComponentManagerId
+import com.intellij.xdebugger.impl.rpc.XDebugSessionTabApi
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabDto
+import com.intellij.xdebugger.impl.rpc.XDebuggerSessionTabInfoCallback
 import com.intellij.xdebugger.impl.rpc.models.findValue
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.Dispatchers
@@ -33,4 +36,14 @@ internal class BackendXDebugSessionTabApi : XDebugSessionTabApi {
     val manager = tabComponentsManagerId.findValue() ?: return emptyFlow()
     return manager.tabComponentEvents
   }
+
+  override suspend fun tabLayouterEvents(tabLayouterId: XDebugTabLayouterId): Flow<XDebugTabLayouterEvent> {
+    val layouterModel = tabLayouterId.findValue() ?: return emptyFlow()
+    // TODO Support XDebugTabLayouter.registerConsoleContent
+    withContext(Dispatchers.EDT) {
+      layouterModel.layouter.registerAdditionalContent(layouterModel.ui)
+    }
+    return layouterModel.events
+  }
 }
+

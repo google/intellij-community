@@ -33,7 +33,8 @@ jvm_library(
     "//platform/util/jdom",
     "//libraries/fastutil",
     "//platform/code-style-impl:codeStyle-impl",
-    "@lib//:stream_ex",
+    "//libraries/stream",
+    "//platform/util-ex",
   ]
 )
 
@@ -64,7 +65,8 @@ jvm_library(
     "//platform/util/jdom",
     "//libraries/fastutil",
     "//platform/code-style-impl:codeStyle-impl",
-    "@lib//:stream_ex",
+    "//libraries/stream",
+    "//platform/util-ex",
   ]
 )
 ### auto-generated section `build intellij.yaml` end

@@ -10,15 +10,19 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.debugger.impl.frontend.FrontendBreakpointRequestCounter.Companion.REQUEST_IS_NOT_NEEDED
 import com.intellij.platform.debugger.impl.rpc.*
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointTypeProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointTypeProxy
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.pom.Navigatable
 import com.intellij.xdebugger.XExpression
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.breakpoints.SuspendPolicy
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider
-import com.intellij.xdebugger.impl.breakpoints.*
+import com.intellij.xdebugger.impl.breakpoints.BreakpointGutterIconRenderer
+import com.intellij.xdebugger.impl.breakpoints.CustomizedBreakpointPresentation
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase.calculateIcon
-import com.intellij.xdebugger.impl.rpc.XBreakpointId
+import com.intellij.xdebugger.impl.rpc.sourcePosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,13 +38,12 @@ internal fun createXBreakpointProxy(
   dto: XBreakpointDto,
   type: XBreakpointTypeProxy,
   manager: FrontendXBreakpointManager,
-  onBreakpointChange: (XBreakpointProxy) -> Unit,
-): XBreakpointProxy {
+): FrontendXBreakpointProxy {
   return if (type is XLineBreakpointTypeProxy) {
-    FrontendXLineBreakpointProxy(project, parentCs, dto, type, manager, onBreakpointChange)
+    FrontendXLineBreakpointProxy(project, parentCs, dto, type, manager)
   }
   else {
-    FrontendXBreakpointProxy(project, parentCs, dto, type, manager.breakpointRequestCounter, onBreakpointChange)
+    FrontendXBreakpointProxy(project, parentCs, dto, type, manager.breakpointRequestCounter)
   }
 }
 
@@ -50,7 +53,6 @@ internal open class FrontendXBreakpointProxy(
   dto: XBreakpointDto,
   override val type: XBreakpointTypeProxy,
   private val breakpointRequestCounter: FrontendBreakpointRequestCounter,
-  private val _onBreakpointChange: (XBreakpointProxy) -> Unit,
 ) : XBreakpointProxy {
   override val id: XBreakpointId = dto.id
 
@@ -68,6 +70,9 @@ internal open class FrontendXBreakpointProxy(
   }
 
   protected val currentState: XBreakpointDtoState get() = _state.value
+
+  @Volatile
+  private var listener: (() -> Unit)? = null
 
   /**
    * Updates breakpoint state if needed.
@@ -130,8 +135,13 @@ internal open class FrontendXBreakpointProxy(
     }
   }
 
+  internal fun installListener(listener: () -> Unit) {
+    assert(this.listener == null) { "Listener is already installed" }
+    this.listener = listener
+  }
+
   private fun onBreakpointChange() {
-    _onBreakpointChange(this)
+    listener?.invoke()
   }
 
   override fun getDisplayText(): String = currentState.displayText
@@ -335,6 +345,7 @@ internal open class FrontendXBreakpointProxy(
 
   override fun dispose() {
     cs.cancel()
+    listener = null
   }
 
   override fun createBreakpointDraggableObject(): GutterDraggableObject? {

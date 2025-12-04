@@ -521,7 +521,7 @@ public final class JBUI {
 
     public static final class CustomFrameDecorations {
       public static @NotNull Color separatorForeground() {
-        return JBColor.namedColor("Separator.separatorColor", new JBColor(0xcdcdcd, 0x515151));
+        return Separator.color();
       }
 
       public static @NotNull Color titlePaneButtonHoverBackground() {
@@ -972,6 +972,10 @@ public final class JBUI {
         return Widget.HOVER_BACKGROUND;
       }
 
+      public static @NotNull Insets hoverInsets() {
+        return insets("StatusBar.Widget.hoverInsets", insets(3, 4, 1, 4));
+      }
+
       public static @NotNull Font font() {
         return getFontWithSizeOffset(fontSizeOffsetKey(), defaultFont());
       }
@@ -1321,28 +1325,28 @@ public final class JBUI {
         return 20;
       }
 
-      public static @NotNull Insets stripeToolbarButtonIconPadding(boolean compactMode, boolean showNames) {
-        return insets(stripeToolbarButtonIconPaddingKey(), showNames
-                                                           ? compactMode
-                                                             ? defaultStripeToolbarButtonIconPaddingForCompactMode()
-                                                             : defaultStripeToolbarButtonIconPaddingForNames()
-                                                           : defaultStripeToolbarButtonIconPadding());
+      public static @NotNull Insets stripeToolbarButtonIconPadding(boolean left, boolean showNames) {
+        return insets(stripeToolbarButtonIconPaddingKey(left, showNames), defaultStripeToolbarButtonIconPadding());
       }
 
-      public static @NotNull String stripeToolbarButtonIconPaddingKey() {
-        return "StripeToolbar.Button.iconPadding";
+      private static @NotNull String stripeToolbarButtonIconPaddingKey(boolean left, boolean showNames) {
+        return "StripeToolbar.Button." + (left ? "left" : "right") + "StripeIcon" + (showNames ? "WithName" : "") + ".padding";
       }
 
-      public static @NotNull JBInsets defaultStripeToolbarButtonIconPadding() {
+      private static @NotNull JBInsets defaultStripeToolbarButtonIconPadding() {
         return insets(5);
       }
 
-      public static @NotNull JBInsets defaultStripeToolbarButtonIconPaddingForNames() {
-        return insets(4);
+      public static int stripeToolbarTextOffset(boolean left) {
+        return getInt(stripeToolbarTextOffsetKey(left), 0);
       }
 
-      public static @NotNull JBInsets defaultStripeToolbarButtonIconPaddingForCompactMode() {
-        return insets(3);
+      private static @NotNull String stripeToolbarTextOffsetKey(boolean left) {
+        return "StripeToolbar.Button." + (left ? "left" : "right") + "StripeTextOffset";
+      }
+
+      public static @NotNull JBValue stripeButtonArc(boolean compact) {
+        return new JBValue.UIInteger("Button.ToolWindow.arc", compact ? 8 : 12);
       }
     }
 
@@ -1663,6 +1667,13 @@ public final class JBUI {
       }
     }
 
+    public static final class Separator {
+      private Separator() { }
+      public static @NotNull Color color() {
+        return JBColor.namedColor("Separator.separatorColor", new JBColor(0xcdcdcd, 0x515151));
+      }
+    }
+
     public static final class Focus {
       private static final Color GRAPHITE_COLOR = new JBColor(new Color(0x8099979d, true), new Color(0x676869));
 
@@ -1759,6 +1770,15 @@ public final class JBUI {
 
       public static final @NotNull Color LIST_SETTINGS_BACKGROUND =
         JBColor.namedColor("SearchEverywhere.List.settingsBackground", LightColors.SLIGHTLY_GRAY);
+
+      @ApiStatus.Internal
+      public static @NotNull Color getListSettingsBackground() {
+        // For custom UI themes we need to keep the old behavior
+        if (StartupUiUtil.isUnderDarcula() && UIManager.get("SearchEverywhere.List.settingsBackground") == null) {
+          return ColorUtil.brighter(UIUtil.getListBackground(), 1);
+        }
+        return LIST_SETTINGS_BACKGROUND;
+      }
 
       public static @NotNull Color listTitleLabelForeground() {
         return JBColor.namedColor("SearchEverywhere.List.separatorForeground", UIUtil.getLabelDisabledForeground());
@@ -2574,6 +2594,14 @@ public final class JBUI {
 
       public static @NotNull String buttonPreferredSizeKey() {
         return "TitlePane.Button.preferredSize";
+      }
+
+      public static int dialogButtonPreferredWidth() {
+        return getInt("TitlePane.Dialog.Button.preferredWidth", 40);
+      }
+
+      public static @NotNull Insets dialogButtonInsets() {
+        return insets("TitlePane.Dialog.Button.insets", JBInsets.emptyInsets());
       }
     }
 

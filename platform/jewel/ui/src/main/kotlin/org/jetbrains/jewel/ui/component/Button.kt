@@ -16,9 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -43,9 +44,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import org.jetbrains.jewel.foundation.Stroke
 import org.jetbrains.jewel.foundation.modifier.border
 import org.jetbrains.jewel.foundation.modifier.thenIf
@@ -62,6 +65,7 @@ import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.styling.ButtonStyle
 import org.jetbrains.jewel.ui.component.styling.MenuStyle
 import org.jetbrains.jewel.ui.component.styling.SplitButtonStyle
+import org.jetbrains.jewel.ui.disabledAppearance
 import org.jetbrains.jewel.ui.focusOutline
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Stroke as PainterHintStroke
@@ -178,6 +182,70 @@ public fun OutlinedButton(
  * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
  *
  * @param onClick Will be called when the user clicks the main button area
+ * @param menuContent The content builder for defining menu items in the dropdown
+ * @param modifier Modifier to be applied to the button
+ * @param popupModifier Modifier to be applied to the dropdown menu container
+ * @param maxPopupHeight The maximum height of the popup
+ * @param maxPopupWidth The maximum width of the popup. If it's unspecified, it will allow the content to grow as needed
+ * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
+ * @param interactionSource An optional [MutableInteractionSource] for observing and emitting [Interaction]s for this
+ *   button
+ * @param style The visual styling configuration for the split button including colors, metrics and layout parameters
+ * @param textStyle The typography style to be applied to the button's text content
+ * @param menuStyle The visual styling configuration for the dropdown menu
+ * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
+ * @param content The content to be displayed in the main button area
+ * @see com.intellij.ui.components.JBOptionButton
+ */
+@Composable
+public fun OutlinedSplitButton(
+    onClick: () -> Unit,
+    menuContent: MenuScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    popupModifier: Modifier = Modifier,
+    maxPopupHeight: Dp = Dp.Unspecified,
+    maxPopupWidth: Dp = Dp.Unspecified,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    style: SplitButtonStyle = JewelTheme.outlinedSplitButtonStyle,
+    textStyle: TextStyle = JewelTheme.defaultTextStyle,
+    menuStyle: MenuStyle = JewelTheme.menuStyle,
+    secondaryOnClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    SplitButtonImpl(
+        onClick = onClick,
+        secondaryOnClick = secondaryOnClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        style = style,
+        textStyle = textStyle,
+        menuStyle = menuStyle,
+        isDefault = false,
+        modifier = modifier,
+        popupModifier = popupModifier,
+        maxPopupHeight = maxPopupHeight,
+        maxPopupWidth = maxPopupWidth,
+        secondaryContentMenu = menuContent,
+        content = content,
+    )
+}
+
+/**
+ * A split button combining a primary action with a dropdown menu, using an outlined visual style.
+ *
+ * Similar to [DefaultSplitButton] but with an outlined visual treatment. Provides two interactive areas: the main
+ * button area for the primary action and a chevron section that opens a dropdown menu.
+ *
+ * **Guidelines:** [on IJP SDK webhelp](https://plugins.jetbrains.com/docs/intellij/split-button.html)
+ *
+ * **Usage example:**
+ * [`Buttons.kt`](https://github.com/JetBrains/intellij-community/blob/master/platform/jewel/samples/standalone/src/main/kotlin/org/jetbrains/jewel/samples/standalone/view/component/Buttons.kt)
+ *
+ * **Swing equivalent:**
+ * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
+ *
+ * @param onClick Will be called when the user clicks the main button area
  * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
  * @param modifier Modifier to be applied to the button
  * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
@@ -192,6 +260,10 @@ public fun OutlinedButton(
  */
 @Suppress("ComposableParamOrder", "ContentTrailingLambda") // To fix in JEWEL-925
 @Composable
+@Deprecated(
+    "Deprecated in favor of the method with 'popupModifier', 'maxPopupHeight, and 'maxPopupWidth' parameters",
+    level = DeprecationLevel.HIDDEN,
+)
 public fun OutlinedSplitButton(
     onClick: () -> Unit,
     secondaryOnClick: () -> Unit,
@@ -234,6 +306,70 @@ public fun OutlinedSplitButton(
  * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
  *
  * @param onClick Will be called when the user clicks the main button area
+ * @param modifier Modifier to be applied to the button
+ * @param popupModifier Modifier to be applied to the dropdown menu container
+ * @param maxPopupHeight The maximum height of the popup
+ * @param maxPopupWidth The maximum width of the popup. If it's unspecified, it will allow the content to grow as needed
+ * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
+ * @param interactionSource An optional [MutableInteractionSource] for observing and emitting [Interaction]s for this
+ *   button
+ * @param style The visual styling configuration for the split button including colors, metrics and layout parameters
+ * @param textStyle The typography style to be applied to the button's text content
+ * @param menuStyle The visual styling configuration for the dropdown menu
+ * @param content The content to be displayed in the main button area
+ * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
+ * @param popupContainer A generic container for the popup content
+ * @see com.intellij.ui.components.JBOptionButton
+ */
+@Composable
+public fun OutlinedSplitButton(
+    onClick: () -> Unit,
+    popupContainer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    popupModifier: Modifier = Modifier,
+    maxPopupHeight: Dp = Dp.Unspecified,
+    maxPopupWidth: Dp = Dp.Unspecified,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    style: SplitButtonStyle = JewelTheme.outlinedSplitButtonStyle,
+    textStyle: TextStyle = JewelTheme.defaultTextStyle,
+    menuStyle: MenuStyle = JewelTheme.menuStyle,
+    secondaryOnClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    SplitButtonImpl(
+        onClick = onClick,
+        secondaryOnClick = secondaryOnClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        style = style,
+        textStyle = textStyle,
+        menuStyle = menuStyle,
+        isDefault = false,
+        modifier = modifier,
+        popupModifier = popupModifier,
+        maxPopupHeight = maxPopupHeight,
+        maxPopupWidth = maxPopupWidth,
+        secondaryContent = popupContainer,
+        content = content,
+    )
+}
+
+/**
+ * A split button combining a primary action with a dropdown menu, using an outlined visual style.
+ *
+ * Similar to [DefaultSplitButton] but with an outlined visual treatment. Provides two interactive areas: the main
+ * button area for the primary action and a chevron section that opens a dropdown menu.
+ *
+ * **Guidelines:** [on IJP SDK webhelp](https://plugins.jetbrains.com/docs/intellij/split-button.html)
+ *
+ * **Usage example:**
+ * [`Buttons.kt`](https://github.com/JetBrains/intellij-community/blob/master/platform/jewel/samples/standalone/src/main/kotlin/org/jetbrains/jewel/samples/standalone/view/component/Buttons.kt)
+ *
+ * **Swing equivalent:**
+ * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
+ *
+ * @param onClick Will be called when the user clicks the main button area
  * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
  * @param modifier Modifier to be applied to the button
  * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
@@ -248,6 +384,10 @@ public fun OutlinedSplitButton(
  */
 @Suppress("ComposableParamOrder", "ContentTrailingLambda") // To fix in JEWEL-925
 @Composable
+@Deprecated(
+    "Deprecated in favor of the method with 'popupModifier', 'maxPopupHeight, and 'maxPopupWidth' parameters",
+    level = DeprecationLevel.HIDDEN,
+)
 public fun OutlinedSplitButton(
     onClick: () -> Unit,
     secondaryOnClick: () -> Unit,
@@ -290,6 +430,70 @@ public fun OutlinedSplitButton(
  * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
  *
  * @param onClick Will be called when the user clicks the main button area
+ * @param menuContent The content builder for defining menu items in the dropdown
+ * @param modifier Modifier to be applied to the button
+ * @param popupModifier Modifier to be applied to the dropdown menu container
+ * @param maxPopupHeight The maximum height of the popup
+ * @param maxPopupWidth The maximum width of the popup. If it's unspecified, it will allow the content to grow as needed
+ * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
+ * @param interactionSource An optional [MutableInteractionSource] for observing and emitting [Interaction]s for this
+ *   button
+ * @param style The visual styling configuration for the split button including colors, metrics and layout parameters
+ * @param textStyle The typography style to be applied to the button's text content
+ * @param menuStyle The visual styling configuration for the dropdown menu
+ * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
+ * @param content The content to be displayed in the main button area
+ * @see com.intellij.ui.components.JBOptionButton
+ */
+@Composable
+public fun DefaultSplitButton(
+    onClick: () -> Unit,
+    menuContent: MenuScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    popupModifier: Modifier = Modifier,
+    maxPopupHeight: Dp = Dp.Unspecified,
+    maxPopupWidth: Dp = Dp.Unspecified,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    style: SplitButtonStyle = JewelTheme.defaultSplitButtonStyle,
+    textStyle: TextStyle = JewelTheme.defaultTextStyle,
+    menuStyle: MenuStyle = JewelTheme.menuStyle,
+    secondaryOnClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    SplitButtonImpl(
+        onClick = onClick,
+        secondaryOnClick = secondaryOnClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        style = style,
+        textStyle = textStyle,
+        menuStyle = menuStyle,
+        isDefault = true,
+        modifier = modifier,
+        popupModifier = popupModifier,
+        maxPopupHeight = maxPopupHeight,
+        maxPopupWidth = maxPopupWidth,
+        secondaryContentMenu = menuContent,
+        content = content,
+    )
+}
+
+/**
+ * A split button combining a primary action with a dropdown menu, using the default visual style.
+ *
+ * Provides two interactive areas: the main button area for the primary action and a chevron section that opens a
+ * dropdown menu with additional options.
+ *
+ * **Guidelines:** [on IJP SDK webhelp](https://plugins.jetbrains.com/docs/intellij/split-button.html)
+ *
+ * **Usage example:**
+ * [`Buttons.kt`](https://github.com/JetBrains/intellij-community/blob/master/platform/jewel/samples/standalone/src/main/kotlin/org/jetbrains/jewel/samples/standalone/view/component/Buttons.kt)
+ *
+ * **Swing equivalent:**
+ * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
+ *
+ * @param onClick Will be called when the user clicks the main button area
  * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
  * @param modifier Modifier to be applied to the button
  * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
@@ -304,6 +508,10 @@ public fun OutlinedSplitButton(
  */
 @Suppress("ComposableParamOrder", "ContentTrailingLambda") // To fix in JEWEL-925
 @Composable
+@Deprecated(
+    "Deprecated in favor of the method with 'popupModifier', 'maxPopupHeight, and 'maxPopupWidth' parameters",
+    level = DeprecationLevel.HIDDEN,
+)
 public fun DefaultSplitButton(
     onClick: () -> Unit,
     secondaryOnClick: () -> Unit,
@@ -346,6 +554,71 @@ public fun DefaultSplitButton(
  * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
  *
  * @param onClick Will be called when the user clicks the main button area
+ * @param popupContainer A generic container for the popup content
+ * @param modifier Modifier to be applied to the button
+ * @param popupModifier Modifier to be applied to the dropdown menu container
+ * @param maxPopupHeight The maximum height of the popup
+ * @param maxPopupWidth The maximum width of the popup. If it's unspecified, it will allow the content to grow as needed
+ * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
+ * @param interactionSource An optional [MutableInteractionSource] for observing and emitting [Interaction]s for this
+ *   button
+ * @param style The visual styling configuration for the split button including colors, metrics and layout parameters
+ * @param textStyle The typography style to be applied to the button's text content
+ * @param menuStyle The visual styling configuration for the dropdown menu
+ * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
+ * @param content The content to be displayed in the main button area
+ * @see com.intellij.ui.components.JBOptionButton
+ */
+@Suppress("ComposableParamOrder", "ContentTrailingLambda") // To fix in JEWEL-925
+@Composable
+public fun DefaultSplitButton(
+    onClick: () -> Unit,
+    popupContainer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    popupModifier: Modifier = Modifier,
+    maxPopupHeight: Dp = Dp.Unspecified,
+    maxPopupWidth: Dp = Dp.Unspecified,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    style: SplitButtonStyle = JewelTheme.defaultSplitButtonStyle,
+    textStyle: TextStyle = JewelTheme.defaultTextStyle,
+    menuStyle: MenuStyle = JewelTheme.menuStyle,
+    secondaryOnClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    SplitButtonImpl(
+        onClick = onClick,
+        secondaryOnClick = secondaryOnClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        style = style,
+        textStyle = textStyle,
+        menuStyle = menuStyle,
+        isDefault = true,
+        modifier = modifier,
+        popupModifier = popupModifier,
+        maxPopupHeight = maxPopupHeight,
+        maxPopupWidth = maxPopupWidth,
+        secondaryContent = popupContainer,
+        content = content,
+    )
+}
+
+/**
+ * A split button combining a primary action with a dropdown menu, using the default visual style.
+ *
+ * Provides two interactive areas: the main button area for the primary action and a chevron section that opens a
+ * dropdown menu with additional options.
+ *
+ * **Guidelines:** [on IJP SDK webhelp](https://plugins.jetbrains.com/docs/intellij/split-button.html)
+ *
+ * **Usage example:**
+ * [`Buttons.kt`](https://github.com/JetBrains/intellij-community/blob/master/platform/jewel/samples/standalone/src/main/kotlin/org/jetbrains/jewel/samples/standalone/view/component/Buttons.kt)
+ *
+ * **Swing equivalent:**
+ * [`JBOptionButton`](https://github.com/JetBrains/intellij-community/tree/idea/243.22562.145/platform/platform-api/src/com/intellij/ui/components/JBOptionButton.kt)
+ *
+ * @param onClick Will be called when the user clicks the main button area
  * @param secondaryOnClick Will be called when the user clicks the dropdown/chevron section
  * @param modifier Modifier to be applied to the button
  * @param enabled Controls the enabled state of the button. When false, the button will not be clickable
@@ -360,6 +633,10 @@ public fun DefaultSplitButton(
  */
 @Suppress("ComposableParamOrder", "ContentTrailingLambda") // To fix in JEWEL-925
 @Composable
+@Deprecated(
+    "Deprecated in favor of the method with 'popupModifier', 'maxPopupHeight, and 'maxPopupWidth' parameters",
+    level = DeprecationLevel.HIDDEN,
+)
 public fun DefaultSplitButton(
     onClick: () -> Unit,
     secondaryOnClick: () -> Unit,
@@ -398,6 +675,9 @@ private fun SplitButtonImpl(
     menuStyle: MenuStyle,
     isDefault: Boolean,
     modifier: Modifier = Modifier,
+    popupModifier: Modifier = Modifier,
+    maxPopupHeight: Dp = Dp.Unspecified,
+    maxPopupWidth: Dp = Dp.Unspecified,
     secondaryContent: @Composable (() -> Unit)? = null,
     secondaryContentMenu: (MenuScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
@@ -409,31 +689,32 @@ private fun SplitButtonImpl(
     var buttonState by remember(interactionSource) { mutableStateOf(ButtonState.of(enabled = enabled)) }
     val focusRequester = remember { FocusRequester() }
 
-    Box(
-        modifier
-            .onSizeChanged { buttonWidth = with(density) { it.width.toDp() } }
-            .onFocusChanged {
-                if (!it.isFocused) {
-                    popupVisible = false
-                }
-            }
-            .thenIf(enabled) {
-                onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when {
-                        keyEvent.key == Key.DirectionDown -> {
-                            popupVisible = true
-                            true
-                        }
-
-                        else -> false
-                    }
-                }
-            }
-    ) {
+    Box {
+        @Suppress("ModifierNotUsedAtRoot") // This is the "true" root, the box is only for the popup
         ButtonImpl(
             onClick = { if (enabled) onClick() },
-            modifier = Modifier.focusRequester(focusRequester),
+            modifier =
+                modifier
+                    .onSizeChanged { buttonWidth = with(density) { it.width.toDp() } }
+                    .onFocusChanged {
+                        if (!it.isFocused) {
+                            popupVisible = false
+                        }
+                    }
+                    .thenIf(enabled) {
+                        onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when {
+                                keyEvent.key == Key.DirectionDown -> {
+                                    popupVisible = true
+                                    true
+                                }
+
+                                else -> false
+                            }
+                        }
+                    }
+                    .focusRequester(focusRequester),
             enabled = enabled,
             forceFocused = popupVisible,
             onStateChange = { state -> buttonState = state },
@@ -451,30 +732,40 @@ private fun SplitButtonImpl(
                         popupVisible = !popupVisible
                         if (!buttonState.isFocused) focusRequester.requestFocus()
                     },
+                    modifier = Modifier.testTag("Jewel.SplitButton.SecondaryAction"),
                 )
             },
         )
 
         if (popupVisible && enabled) {
-            if (secondaryContentMenu != null) {
-                PopupMenu(
-                    modifier = Modifier.width(buttonWidth).onClick { popupVisible = false },
-                    onDismissRequest = {
-                        popupVisible = false
-                        true
-                    },
-                    horizontalAlignment = Alignment.Start,
-                    style = menuStyle,
-                    content = secondaryContentMenu,
-                )
-            }
-            if (secondaryContent != null) {
-                PopupContainer(
-                    modifier = Modifier.width(buttonWidth).onClick { popupVisible = false },
-                    onDismissRequest = { popupVisible = false },
-                    horizontalAlignment = Alignment.Start,
-                    content = secondaryContent,
-                )
+            val splitButtonPopupModifier =
+                Modifier.heightIn(max = maxPopupHeight)
+                    .widthIn(min = buttonWidth, max = maxPopupWidth.coerceAtLeast(buttonWidth))
+                    .testTag("Jewel.SplitButton.Popup")
+                    .then(popupModifier)
+                    .onClick { popupVisible = false }
+
+            when {
+                secondaryContentMenu != null -> {
+                    PopupMenu(
+                        modifier = splitButtonPopupModifier,
+                        onDismissRequest = {
+                            popupVisible = false
+                            true
+                        },
+                        horizontalAlignment = Alignment.Start,
+                        style = menuStyle,
+                        content = secondaryContentMenu,
+                    )
+                }
+                secondaryContent != null -> {
+                    PopupContainer(
+                        modifier = splitButtonPopupModifier,
+                        onDismissRequest = { popupVisible = false },
+                        horizontalAlignment = Alignment.Start,
+                        content = secondaryContent,
+                    )
+                }
             }
         }
     }
@@ -486,9 +777,11 @@ private fun SplitButtonChevron(
     enabled: Boolean,
     isDefault: Boolean,
     onChevronClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        Modifier.size(style.button.metrics.minSize.height)
+        modifier
+            .width(style.button.metrics.minSize.height)
             .focusable(false)
             .focusProperties { canFocus = false }
             .clickable(
@@ -496,6 +789,7 @@ private fun SplitButtonChevron(
                 onClick = onChevronClick,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                role = Role.Button,
             )
     ) {
         Divider(
@@ -508,7 +802,7 @@ private fun SplitButtonChevron(
         Icon(
             key = AllIconsKeys.General.ChevronDown,
             contentDescription = "Chevron",
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier.align(Alignment.Center).thenIf(!enabled) { disabledAppearance() },
             hints =
                 if (isDefault && enabled) {
                     arrayOf(PainterHintStroke(style.colors.chevronColor))
@@ -604,7 +898,13 @@ private fun ButtonImpl(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.padding(style.metrics.padding)) { content() }
+                Box(
+                    Modifier.padding(style.metrics.padding).thenIf(secondaryContent != null) {
+                        weight(1f, fill = false)
+                    }
+                ) {
+                    content()
+                }
                 secondaryContent?.invoke()
             }
         }

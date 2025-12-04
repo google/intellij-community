@@ -7,6 +7,10 @@ import com.intellij.codeInspection.util.InspectionMessage
 import com.intellij.codeInspection.util.IntentionFamilyName
 import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiComment
+import com.intellij.psi.PsiElement
+import com.intellij.psi.util.childrenOfType
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
@@ -17,6 +21,7 @@ import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinApplicableInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
+import org.jetbrains.kotlin.idea.codeinsights.impl.base.applicators.ApplicabilityRanges
 import org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ReplaceIsEmptyWithIfEmptyInspection.Replacement
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.CallableId
@@ -100,6 +105,9 @@ internal class ReplaceIsEmptyWithIfEmptyInspection : KotlinApplicableInspectionB
         context: Replacement
     ): KotlinModCommandQuickFix<KtIfExpression> = ReplaceFix(context)
 
+    override fun getApplicableRanges(element: KtIfExpression): List<TextRange> =
+        ApplicabilityRanges.ifKeyword(element)
+
     override fun KaSession.prepareContext(element: KtIfExpression): Replacement? {
         if (element.languageVersionSettings.languageVersion < LanguageVersion.KOTLIN_1_3) return null
         if (element.node.elementType == KtNodeTypes.ELSE) return null
@@ -165,7 +173,7 @@ internal class ReplaceIsEmptyWithIfEmptyInspection : KotlinApplicableInspectionB
             val condition = element.condition ?: return
             val thenExpression = element.then ?: return
             val elseExpression = element.`else` ?: return
-            val defaultValueExpression = (if (replacement.negativeCondition) elseExpression else thenExpression)
+            val defaultValueExpression = if (replacement.negativeCondition) elseExpression else thenExpression
 
             val psiFactory = KtPsiFactory(project)
             val receiverText = (condition as? KtDotQualifiedExpression)?.receiverExpression?.text?.let { "$it." } ?: ""
@@ -175,7 +183,23 @@ internal class ReplaceIsEmptyWithIfEmptyInspection : KotlinApplicableInspectionB
             } else {
                 psiFactory.createExpressionByPattern("${receiverText}$replacementFunctionName { $0 }", defaultValueExpression)
             }
+            element.collectOptionalCommentsAndAddBeforeElement(psiFactory, if (replacement.negativeCondition) thenExpression else elseExpression)
             element.replace(newExpression)
         }
+
+        private fun PsiElement.collectOptionalCommentsAndAddBeforeElement(
+            psiFactory: KtPsiFactory,
+            fallOutBranch: PsiElement
+        ) {
+            val commentsBetweenTheBlocks = childrenOfType<PsiComment>().toList()
+            //We preserve comments between the blocks and those from the branch that is falling out due to this inspection
+            val commentsBetween = commentsBetweenTheBlocks + fallOutBranch.collectDescendantsOfType<PsiComment>()
+
+            for (comment in commentsBetween) {
+                parent.addBefore(comment, this)
+                parent.addBefore(psiFactory.createNewLine(), this)
+            }
+        }
+
     }
 }

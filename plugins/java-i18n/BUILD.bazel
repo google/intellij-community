@@ -25,6 +25,7 @@ jvm_library(
     "//platform/lang-api:lang",
     "//java/openapi:java",
     "//platform/projectModel-api:projectModel",
+    "//platform/forms_rt:java-guiForms-rt",
     "//platform/refactoring",
     "//platform/usageView-impl",
     "//plugins/properties:properties-backend",
@@ -40,7 +41,7 @@ jvm_library(
     "//plugins/properties/properties-psi-api:psi",
     "//plugins/properties/properties-psi-impl:backend-psi",
     "//jvm/jvm-analysis-api:analysis",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/core-ui",
     "//libraries/icu4j",
     "//libraries/fastutil",
@@ -73,6 +74,7 @@ jvm_library(
     "//platform/lang-api:lang",
     "//java/openapi:java",
     "//platform/projectModel-api:projectModel",
+    "//platform/forms_rt:java-guiForms-rt",
     "//platform/refactoring",
     "//platform/usageView-impl",
     "//plugins/properties:properties-backend",
@@ -87,6 +89,7 @@ jvm_library(
     "//plugins/grazie/src:core",
     "//plugins/grazie",
     "//java/java-impl:impl",
+    "//java/java-impl:impl_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/usageView",
@@ -96,7 +99,7 @@ jvm_library(
     "//plugins/properties/properties-psi-api:psi",
     "//plugins/properties/properties-psi-impl:backend-psi",
     "//jvm/jvm-analysis-api:analysis",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/core-ui",
     "//libraries/icu4j",
     "//libraries/fastutil",
@@ -109,6 +112,7 @@ jvm_library(
   exports = [
     "//plugins/properties:properties-backend",
     "//java/java-impl:impl",
+    "//java/java-impl:impl_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.i18n` end

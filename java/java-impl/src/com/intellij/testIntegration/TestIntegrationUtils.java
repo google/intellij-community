@@ -21,6 +21,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.InheritanceUtil;
+import com.intellij.psi.util.PsiSuperMethodUtil;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.util.classMembers.MemberInfo;
 import com.intellij.util.SmartList;
@@ -122,25 +123,32 @@ public final class TestIntegrationUtils {
   }
 
   public static List<MemberInfo> extractClassMethods(PsiClass clazz, boolean includeInherited) {
-    List<MemberInfo> result = new ArrayList<>();
-    Set<PsiClass> classes;
+    List<PsiClass> classes = new ArrayList<>();
+    classes.add(clazz);
     if (includeInherited) {
-      classes = InheritanceUtil.getSuperClasses(clazz);
-      classes.add(clazz);
+      classes.addAll(InheritanceUtil.getSuperClasses(clazz).reversed());
     }
-    else {
-      classes = Collections.singleton(clazz);
-    }
+
+    List<MemberInfo> result = new ArrayList<>();
+    Map<String, List<PsiMethod>> methodsByName = new HashMap<>();
     for (PsiClass aClass : classes) {
       if (CommonClassNames.JAVA_LANG_OBJECT.equals(aClass.getQualifiedName())) continue;
       MemberInfo.extractClassMembers(aClass, result, new MemberInfo.Filter<>() {
         @Override
         public boolean includeMember(PsiMember member) {
-          if (!(member instanceof PsiMethod)) return false;
-          if (member.hasModifierProperty(PsiModifier.PRIVATE) ||
-              (member.hasModifierProperty(PsiModifier.ABSTRACT) && member.getContainingClass() != clazz)) {
-            return false;
+          if (!(member instanceof PsiMethod method)) return false;
+          if (member.hasModifierProperty(PsiModifier.PRIVATE)) return false;
+
+          String name = method.getName();
+          List<PsiMethod> methods = methodsByName.computeIfAbsent(name, __ -> new ArrayList<>());
+          for (PsiMethod psiMethod : methods) {
+            // rely on the order of collected classes: from descendant to ancestors
+            if (PsiSuperMethodUtil.isSuperMethod(psiMethod, method)) {
+              return false;
+            }
           }
+          methods.add(method);
+
           return true;
         }
       }, false);

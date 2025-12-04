@@ -48,6 +48,7 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.impl.IdeGlassPaneImpl
+import com.intellij.openapi.wm.impl.ToolWindowManagerImpl
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.ui.*
@@ -66,11 +67,7 @@ import com.intellij.util.IJSwingUtilities
 import com.intellij.util.SVGLoader.colorPatcherProvider
 import com.intellij.util.concurrency.SynchronizedClearableLazy
 import com.intellij.util.ui.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.jdom.Element
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
@@ -513,8 +510,6 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   }
 
   override fun getLookAndFeelCellRenderer(component: JComponent): ListCellRenderer<LafReference> {
-    val themeManager = UiThemeProviderListManager.getInstance()
-    val islandThemes = themeManager.getBundledThemeListForTargetUI(TargetUIType.ISLANDS)
     val welcomeMode = WelcomeFrame.getInstance() != null
 
     return listCellRenderer {
@@ -537,9 +532,6 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
             else if (!welcomeMode && value.themeId != currentTheme?.id && currentTheme?.isRestartRequired() == true) {
               icon(getDisabledIcon(AllIcons.Actions.Restart, null))
               toolTipText = IdeBundle.message("ide.restart.required.comment")
-            }
-            else if (islandThemes.contains(theme)) {
-              icon(AllIcons.General.Beta)
             }
             break
           }
@@ -748,6 +740,13 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
     }
   }
 
+  @Internal
+  override fun applyAltColors() {
+    setCurrentLookAndFeel(currentTheme!!, true)
+    updateUI()
+    ToolWindowManagerImpl.applyAltColors()
+  }
+
   /**
    * Updates LAF of all windows. The method also updates font of components as it's configured in `UISettings`.
    */
@@ -765,6 +764,7 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
 
     if (ExperimentalUI.isNewUI()) {
       applyDensityOnUpdateUi(uiDefaults)
+      applyAltColors(uiDefaults)
     }
 
     // should be called last because this method modifies uiDefault values
@@ -1406,6 +1406,18 @@ private fun applyDensityOnUpdateUi(uiDefaults: UIDefaults) {
   }
 }
 
+private fun applyAltColors(uiDefaults: UIDefaults) {
+  if (UISettings.getInstance().differentToolwindowBackground) {
+    val altValues = mutableMapOf<String, Any>()
+    uiDefaults.forEach { key, value ->
+      if ((key as? String?)?.startsWith("alt.") == true) {
+        altValues[key.substring(4)] = value
+      }
+    }
+    uiDefaults.putAll(altValues)
+  }
+}
+
 @JvmField
 internal val patchableFontResources: Array<String> = arrayOf("Button.font", "ToggleButton.font", "RadioButton.font",
                                                              "CheckBox.font", "ColorChooser.font", "ComboBox.font", "Label.font",
@@ -1477,7 +1489,7 @@ private sealed interface DefaultThemeStrategy {
 }
 
 private data object DefaultNewUiThemeStrategy : DefaultThemeStrategy {
-  override fun getPlatformDefaultId(isDark: Boolean) = if (isDark) "ExperimentalDark" else "ExperimentalLight"
+  override fun getPlatformDefaultId(isDark: Boolean) = if (isDark) "Islands Dark" else "Islands Light"
 
   override fun getProductDefaultId(isDark: Boolean, appInfo: ApplicationInfoEx): String? {
     return if (isDark) appInfo.defaultDarkLaf else appInfo.defaultLightLaf

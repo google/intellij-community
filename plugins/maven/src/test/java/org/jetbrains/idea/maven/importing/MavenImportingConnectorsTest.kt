@@ -23,6 +23,7 @@ import java.nio.file.Files.createDirectories
 import java.nio.file.Path.of
 
 class MavenImportingConnectorsTest : MavenMultiVersionImportingTestCase() {
+  override fun skipPluginResolution() = false
 
   private lateinit var myAnotherProjectRoot: VirtualFile
 
@@ -294,7 +295,7 @@ class MavenImportingConnectorsTest : MavenMultiVersionImportingTestCase() {
     assertThrows(UnsupportedOperationException::class.java) {
       runBlockingMaybeCancellable {
         val mavenEmbedderWrappers = project.service<MavenEmbedderWrappersManager>().createMavenEmbedderWrappers()
-        mavenEmbedderWrappers.getEmbedder(projectRoot.path).getEmbedder()
+        mavenEmbedderWrappers.getEmbedder(projectRoot.toNioPath()).getEmbedder()
       }
     }
     assertNotNull(settingsRef.get())

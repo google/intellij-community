@@ -8,7 +8,6 @@ import com.intellij.ide.ui.icons.IconId
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.ThreeState
-import com.intellij.xdebugger.impl.rpc.XStackFrameId
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 
@@ -21,6 +20,10 @@ sealed interface XStackFramesEvent {
 
   @Serializable
   data class ErrorOccurred(val errorMessage: @NlsContexts.DialogMessage String) : XStackFramesEvent
+
+  @ApiStatus.Internal
+  @Serializable
+  data class NewPresentation(val stackFrameId: XStackFrameId, val presentation: XStackFramePresentation) : XStackFramesEvent
 }
 
 @ApiStatus.Internal
@@ -32,7 +35,7 @@ data class XStackFrameDto(
   val evaluator: XDebuggerEvaluatorDto,
   val textPresentation: XStackFramePresentation,
   val captionInfo: XStackFrameCaptionInfo = XStackFrameCaptionInfo.noInfo,
-  val customBackgroundInfo: XStackFrameCustomBackgroundInfo? = null,
+  val backgroundColor: XStackFrameBackgroundColor? = null,
   val canDrop: ThreeState,
 )
 
@@ -49,8 +52,8 @@ data class XStackFrameCaptionInfo(
 
 @ApiStatus.Internal
 @Serializable
-data class XStackFrameCustomBackgroundInfo(
-  val backgroundColor: ColorId? = null,
+data class XStackFrameBackgroundColor(
+  val colorId: ColorId? = null,
 )
 
 @ApiStatus.Internal

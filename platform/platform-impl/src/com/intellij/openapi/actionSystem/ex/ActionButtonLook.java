@@ -2,10 +2,12 @@
 package com.intellij.openapi.actionSystem.ex;
 
 import com.intellij.openapi.actionSystem.ActionButtonComponent;
+import com.intellij.openapi.actionSystem.impl.ActionButton;
 import com.intellij.openapi.actionSystem.impl.IdeaActionButtonLook;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.util.ui.JBInsets;
 import com.intellij.util.ui.JBUI;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -138,6 +140,7 @@ public abstract class ActionButtonLook {
     paintIconImpl(g, actionButton, icon, x, y);
   }
 
+  @ApiStatus.Internal
   protected static void paintIconImpl(Graphics g, ActionButtonComponent actionButton, Icon icon, int x, int y) {
     icon.paintIcon(actionButton instanceof Component ? (Component)actionButton : null, g, x, y);
   }
@@ -177,13 +180,15 @@ public abstract class ActionButtonLook {
     }
   }
 
-  protected static Point getIconPosition(ActionButtonComponent actionButton, Icon icon) {
+  protected Point getIconPosition(ActionButtonComponent actionButton, Icon icon) {
     Rectangle rect = new Rectangle(actionButton.getWidth(), actionButton.getHeight());
-    Insets i = actionButton.getInsets();
-    JBInsets.removeFrom(rect, i);
+    JBInsets.removeFrom(rect, actionButton.getInsets());
+    if (actionButton instanceof ActionButton realButton) {
+      JBInsets.removeFrom(rect, realButton.getIconInsets());
+    }
 
-    int x = i.left + (rect.width - icon.getIconWidth()) / 2;
-    int y = i.top + (rect.height - icon.getIconHeight()) / 2;
+    int x = rect.x + (rect.width - icon.getIconWidth()) / 2;
+    int y = rect.y + (rect.height - icon.getIconHeight()) / 2;
     return new Point(x, y);
   }
 }

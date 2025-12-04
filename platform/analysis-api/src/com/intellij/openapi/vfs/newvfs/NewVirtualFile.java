@@ -56,8 +56,10 @@ public abstract class NewVirtualFile extends VirtualFile implements VirtualFileW
   @Override
   public abstract void setWritable(boolean writable) throws IOException;
 
+  /** Marks this file, and all it's parents up to the root, as 'needed a refresh' */
   public abstract void markDirty();
 
+  /** {@link #markDirty()} starting from this file, and down the hierarchy -- skipping circular symlinks, if met any */
   public abstract void markDirtyRecursively();
 
   public abstract boolean isDirty();
@@ -104,6 +106,19 @@ public abstract class NewVirtualFile extends VirtualFile implements VirtualFileW
   @ApiStatus.Experimental
   public boolean allChildrenLoaded() {
     return false;//= safe, but not good for performance
+  }
+
+  /**
+   * @return true if VFS _thinks_ it already knows all the children of this file, false otherwise.
+   * It doesn't mean there are no yet-uncached children in the actual underlying FS: VFS may catch up changes
+   * in the underlying FS with delay -- it just means VFS _thinks_ it knows all the children, i.e., it _was_
+   * all the children in the folder at some moment.
+   * It also doesn't mean all those children are now loaded in memory -- they could be in VFS persistent
+   * storage yet.
+   */
+  @ApiStatus.Experimental
+  public boolean allChildrenCached() {
+    return false;
   }
 
   /**

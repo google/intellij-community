@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing;
 
 import com.intellij.find.ngrams.TrigramIndex;
@@ -75,7 +75,6 @@ import com.intellij.util.io.EnumeratorStringDescriptor;
 import com.intellij.util.io.PersistentMapImpl;
 import com.intellij.util.ref.GCUtil;
 import com.intellij.util.ref.GCWatcher;
-import com.intellij.util.ui.UIUtil;
 import com.intellij.workspaceModel.ide.impl.WorkspaceEntityLifecycleSupporterUtils;
 import com.siyeh.ig.JavaOverridingMethodUtil;
 import kotlin.Unit;
@@ -519,8 +518,9 @@ public class IndexTest extends JavaCodeInsightFixtureTestCase {
     //Let's help GC, even in interpreter mode
     //noinspection UnusedAssignment
     psiFile = null;
+
     GCWatcher.tracking(getPsiManager().getFileManager().getCachedPsiFile(vFile))
-      .ensureCollected(() -> UIUtil.dispatchAllInvocationEvents());
+      .ensureCollectedWithinTimeout(5_000, PlatformTestUtil::dispatchAllInvocationEventsInIdeEventQueue); // wait for document commit queue
     assertNull(getPsiManager().getFileManager().getCachedPsiFile(vFile));
 
     WriteAction.run(() -> VfsUtil.saveText(vFile, "class Foo3 {}"));
@@ -807,6 +807,19 @@ public class IndexTest extends JavaCodeInsightFixtureTestCase {
     assertNotNull(testFile);
   }
 
+  //TODO RC: Test fails, even though .ensureUpToDate() allows null project, and it is indeed called with project=null
+  public void ignore_test_ensureUpToDateWithNullProject() throws Throwable {
+    final GlobalSearchScope allScope = new EverythingGlobalScope();
+    // create file to be indexed
+    final VirtualFile testFile = myFixture.addFileToProject("test.txt", "test").getVirtualFile();
+
+    UsefulTestCase.assertNoException(IllegalArgumentException.class, (ThrowableRunnable<Throwable>)() -> {
+      //force to index new file with null project scope
+      FileBasedIndex.getInstance().ensureUpToDate(IdIndex.NAME, /*project: */null, allScope);
+    });
+    assertNotNull(testFile);
+  }
+
   public static class RecordingVfsListener extends IndexedFilesListener {
     @Override
     protected void iterateIndexableFiles(@NotNull VirtualFile file, @NotNull ContentIterator iterator) {
@@ -838,21 +851,21 @@ public class IndexTest extends JavaCodeInsightFixtureTestCase {
     final VirtualFile testFile = myFixture.addFileToProject("test.txt", "test").getVirtualFile();
     final int testFileId = ((VirtualFileWithId)testFile).getId();
 
-    assertEquals(("file: " + testFileId + "; operation: CONTENT_CHANGE ADD"), listener.indexingOperation(testFile));
+    assertEquals(("[file: " + testFileId + ", operation: {CONTENT_CHANGE ADD }]"), listener.indexingOperation(testFile));
 
     FileContentUtilCore.reparseFiles(Collections.singletonList(testFile));
 
-    assertEquals(("file: " + testFileId + "; operation: ADD"), listener.indexingOperation(testFile));
+    assertEquals(("[file: " + testFileId + ", operation: {ADD }]"), listener.indexingOperation(testFile));
 
     WriteAction.run(() -> VfsUtil.saveText(testFile, "foo"));
     WriteAction.run(() -> VfsUtil.saveText(testFile, "bar"));
 
-    assertEquals(("file: " + testFileId + "; operation: CONTENT_CHANGE"), listener.indexingOperation(testFile));
+    assertEquals(("[file: " + testFileId + ", operation: {CONTENT_CHANGE }]"), listener.indexingOperation(testFile));
 
     WriteAction.run(() -> VfsUtil.saveText(testFile, "baz"));
     WriteAction.run(() -> testFile.delete(null));
 
-    assertEquals(("file: " + testFileId + "; operation: REMOVE"), listener.indexingOperation(testFile));
+    assertEquals(("[file: " + testFileId + ", operation: {REMOVE }]"), listener.indexingOperation(testFile));
   }
 
   public void test_files_inside_copied_directory_are_indexed() throws IOException {

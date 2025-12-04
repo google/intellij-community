@@ -34,6 +34,7 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//plugins/kotlin/base/util",
@@ -60,6 +61,8 @@ jvm_library(
     "//plugins/kotlin/jsr223",
     "//plugins/kotlin/base/scripting/scripting.k1",
     "//plugins/kotlin/base/scripting/scripting.shared",
+    "//platform/execution",
+    "//platform/lang-api:lang",
   ]
 )
 ### auto-generated section `build kotlin.repl` end

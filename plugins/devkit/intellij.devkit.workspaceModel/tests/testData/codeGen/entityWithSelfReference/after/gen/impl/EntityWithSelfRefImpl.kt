@@ -6,6 +6,7 @@ import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.annotations.Parent
 import com.intellij.platform.workspace.storage.impl.EntityLink
@@ -21,6 +22,7 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.EntityWithSelfRef
+import com.intellij.workspaceModel.test.api.EntityWithSelfRefBuilder
 
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
@@ -28,15 +30,10 @@ import com.intellij.workspaceModel.test.api.EntityWithSelfRef
 internal class EntityWithSelfRefImpl(private val dataSource: EntityWithSelfRefData) : EntityWithSelfRef, WorkspaceEntityBase(dataSource) {
 
   private companion object {
-    internal val PARENTREF_CONNECTION_ID: ConnectionId =
-      ConnectionId.create(EntityWithSelfRef::class.java, EntityWithSelfRef::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, true)
-    internal val CHILDREN_CONNECTION_ID: ConnectionId =
-      ConnectionId.create(EntityWithSelfRef::class.java, EntityWithSelfRef::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, true)
+    internal val PARENTREF_CONNECTION_ID: ConnectionId = ConnectionId.create(EntityWithSelfRef::class.java, EntityWithSelfRef::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, true)
+    internal val CHILDREN_CONNECTION_ID: ConnectionId = ConnectionId.create(EntityWithSelfRef::class.java, EntityWithSelfRef::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, true)
 
-    private val connections = listOf<ConnectionId>(
-      PARENTREF_CONNECTION_ID,
-      CHILDREN_CONNECTION_ID,
-    )
+    private val connections = listOf<ConnectionId>(PARENTREF_CONNECTION_ID, CHILDREN_CONNECTION_ID)
 
   }
 
@@ -63,8 +60,7 @@ internal class EntityWithSelfRefImpl(private val dataSource: EntityWithSelfRefDa
   }
 
 
-  internal class Builder(result: EntityWithSelfRefData?) : ModifiableWorkspaceEntityBase<EntityWithSelfRef, EntityWithSelfRefData>(result),
-                                                           EntityWithSelfRef.Builder {
+  internal class Builder(result: EntityWithSelfRefData?) : ModifiableWorkspaceEntityBase<EntityWithSelfRef, EntityWithSelfRefData>(result), EntityWithSelfRefBuilder {
     internal constructor() : this(EntityWithSelfRefData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -141,16 +137,15 @@ internal class EntityWithSelfRefImpl(private val dataSource: EntityWithSelfRefDa
         changedProperty.add("name")
       }
 
-    override var parentRef: EntityWithSelfRef.Builder?
+    override var parentRef: EntityWithSelfRefBuilder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
-          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTREF_CONNECTION_ID, this) as? EntityWithSelfRef.Builder)
-          ?: (this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRef.Builder)
+          @OptIn(EntityStorageInstrumentationApi::class) 
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTREF_CONNECTION_ID, this) as? EntityWithSelfRefBuilder) ?: (this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRefBuilder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRef.Builder
+          this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRefBuilder
         }
       }
       set(value) {
@@ -183,18 +178,16 @@ internal class EntityWithSelfRefImpl(private val dataSource: EntityWithSelfRefDa
 
     // List of non-abstract referenced types
     var _children: List<EntityWithSelfRef>? = emptyList()
-    override var children: List<EntityWithSelfRef.Builder>
+    override var children: List<EntityWithSelfRefBuilder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
-          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this)!!
-            .toList() as List<EntityWithSelfRef.Builder>) +
-          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRef.Builder> ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class) 
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this)!!.toList() as List<EntityWithSelfRefBuilder>) + (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRefBuilder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRef.Builder> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRefBuilder> ?: emptyList()
         }
       }
       set(value) {
@@ -220,7 +213,7 @@ internal class EntityWithSelfRefImpl(private val dataSource: EntityWithSelfRefDa
             if (item_value is ModifiableWorkspaceEntityBase<*, *>) {
               item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
             }
-            // else you're attaching a new entity to an existing entity that is not modifiable
+          // else you're attaching a new entity to an existing entity that is not modifiable
           }
 
           this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] = value
@@ -238,7 +231,7 @@ internal class EntityWithSelfRefData : WorkspaceEntityData<EntityWithSelfRef>() 
 
   internal fun isNameInitialized(): Boolean = ::name.isInitialized
 
-  override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<EntityWithSelfRef> {
+  override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntityBuilder<EntityWithSelfRef> {
     val modifiable = EntityWithSelfRefImpl.Builder(null)
     modifiable.diff = diff
     modifiable.id = createEntityId()
@@ -264,9 +257,9 @@ internal class EntityWithSelfRefData : WorkspaceEntityData<EntityWithSelfRef>() 
     return EntityWithSelfRef::class.java
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
+  override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
     return EntityWithSelfRef(name, entitySource) {
-      this.parentRef = parents.filterIsInstance<EntityWithSelfRef.Builder>().singleOrNull()
+      this.parentRef = parents.filterIsInstance<EntityWithSelfRefBuilder>().singleOrNull()
     }
   }
 

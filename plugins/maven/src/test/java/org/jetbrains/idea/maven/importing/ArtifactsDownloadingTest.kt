@@ -15,7 +15,7 @@
  */
 package org.jetbrains.idea.maven.importing
 
-import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.VfsUtilCore
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.idea.maven.model.MavenId
@@ -24,7 +24,8 @@ import org.junit.Test
 import kotlin.io.path.exists
 
 class ArtifactsDownloadingTest : ArtifactsDownloadingTestCase() {
-    
+  override fun skipPluginResolution() = false
+
   @Test
   fun JavadocsAndSources() = runBlocking {
     importProjectAsync("""
@@ -45,6 +46,8 @@ class ArtifactsDownloadingTest : ArtifactsDownloadingTestCase() {
 
     assertFalse(sources.exists())
     assertFalse(javadoc.exists())
+
+    mavenGeneralSettings.isWorkOffline = false
 
     downloadArtifacts()
 
@@ -70,24 +73,21 @@ class ArtifactsDownloadingTest : ArtifactsDownloadingTestCase() {
     val sources = repositoryPath.resolve("junit/junit/4.0/junit-4.0-sources.jar")
     val javadoc = repositoryPath.resolve("junit/junit/4.0/junit-4.0-javadoc.jar")
 
-    assertFalse(sources.exists())
-    assertFalse(javadoc.exists())
-
-    mavenGeneralSettings.isWorkOffline = false
-    downloadArtifacts()
-
-    assertTrue(sources.exists())
-    assertTrue(javadoc.exists())
-
-    FileUtil.delete(sources)
-    FileUtil.delete(javadoc)
+    assertFalse("Sources folder should not exist at test start", sources.exists())
+    assertFalse("Javadoc folder should not exist at test start", javadoc.exists())
 
     mavenGeneralSettings.isWorkOffline = true
 
-    downloadArtifacts()
+    val downloadResult = downloadArtifacts()
 
-    assertTrue(sources.exists())
-    assertTrue(javadoc.exists())
+    val expectedResult = setOf(MavenId("junit", "junit", "4.0"))
+    assertEquals("Resolved sources", expectedResult, downloadResult.resolvedSources)
+    assertEquals("Resolved javadocs", expectedResult, downloadResult.resolvedDocs)
+    assertEquals("Unresolved sources", emptySet<MavenId>(), downloadResult.unresolvedSources)
+    assertEquals("Unresolved javadocs", emptySet<MavenId>(), downloadResult.unresolvedDocs)
+
+    assertTrue("Sources folder should exist",sources.exists())
+    assertTrue("Javadoc folder should exist",javadoc.exists())
   }
 
   @Test
@@ -184,7 +184,7 @@ class ArtifactsDownloadingTest : ArtifactsDownloadingTestCase() {
   @Test
   @Throws(Exception::class)
   fun JavadocsAndSourcesForDepsWithClassifiersAndType() = runBlocking {
-    val remoteRepo = FileUtil.toSystemIndependentName(dir.resolve("repo").toString())
+    val remoteRepo = FileUtilRt.toSystemIndependentName(dir.resolve("repo").toString())
     updateSettingsXmlFully("""<settings>
 <mirrors>
   <mirror>

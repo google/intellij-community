@@ -1,9 +1,9 @@
-### auto-generated section `build kotlin.refactorings.move.k2` start
+### auto-generated section `build intellij.kotlin.refactorings.move` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 create_kotlinc_options(
-  name = "custom_kotlin-refactorings-move-k2",
+  name = "custom_kotlin-refactorings-move",
   opt_in = [
     "com.intellij.openapi.util.IntellijInternalApi",
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
@@ -14,18 +14,18 @@ create_kotlinc_options(
 )
 
 resourcegroup(
-  name = "kotlin-refactorings-move-k2_resources",
+  name = "kotlin-refactorings-move_resources",
   srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
 
 jvm_library(
-  name = "kotlin-refactorings-move-k2",
-  module_name = "kotlin.refactorings.move.k2",
+  name = "kotlin-refactorings-move",
+  module_name = "intellij.kotlin.refactorings.move",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-refactorings-move-k2_resources"],
-  kotlinc_opts = ":custom_kotlin-refactorings-move-k2",
+  resources = [":kotlin-refactorings-move_resources"],
+  kotlinc_opts = ":custom_kotlin-refactorings-move",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -50,23 +50,26 @@ jvm_library(
     "//java/java-impl-refactorings:impl-refactorings",
     "//plugins/kotlin/code-insight/utils",
     "//plugins/kotlin/base/analysis",
-    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-api-utils",
+    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils",
     "//platform/platform-api:ide",
     "//platform/usageView",
     "//plugins/kotlin/base/project-structure",
-    "//plugins/kotlin/kotlin.searching:searching-k2",
+    "//plugins/kotlin/kotlin.searching",
     "//plugins/kotlin/base/facet",
     "//platform/observable",
     "//java/openapi:java",
+    "@lib//:kotlinc-analysis-api-platform-interface",
+    "//plugins/kotlin/base/external-build-system:kotlin-base-externalSystem",
+    "//platform/util/jdom",
   ]
 )
 
 jvm_library(
-  name = "kotlin-refactorings-move-k2_test_lib",
+  name = "kotlin-refactorings-move_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  kotlinc_opts = ":custom_kotlin-refactorings-move-k2",
-  associates = [":kotlin-refactorings-move-k2"],
+  kotlinc_opts = ":custom_kotlin-refactorings-move",
+  associates = [":kotlin-refactorings-move"],
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -86,6 +89,7 @@ jvm_library(
     "//platform/core-ui",
     "//platform/core-api:core",
     "//java/java-impl:impl",
+    "//java/java-impl:impl_test_lib",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//java/testFramework",
@@ -98,7 +102,7 @@ jvm_library(
     "//java/java-impl-refactorings:impl-refactorings",
     "//plugins/kotlin/code-insight/utils",
     "//plugins/kotlin/base/analysis",
-    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-api-utils",
+    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils",
     "//platform/platform-api:ide",
     "//platform/usageView",
     "//plugins/kotlin/base/project-structure",
@@ -110,20 +114,23 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
-    "//plugins/kotlin/kotlin.searching:searching-k2",
+    "//plugins/kotlin/kotlin.searching",
     "//plugins/kotlin/base/indices",
     "//plugins/kotlin/base/facet",
     "//platform/observable",
     "//java/openapi:java",
+    "@lib//:kotlinc-analysis-api-platform-interface",
+    "//plugins/kotlin/base/external-build-system:kotlin-base-externalSystem",
+    "//platform/util/jdom",
   ]
 )
-### auto-generated section `build kotlin.refactorings.move.k2` end
+### auto-generated section `build intellij.kotlin.refactorings.move` end
 
-### auto-generated section `test kotlin.refactorings.move.k2` start
+### auto-generated section `test intellij.kotlin.refactorings.move` start
 load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
-  name = "kotlin-refactorings-move-k2_test",
-  runtime_deps = [":kotlin-refactorings-move-k2_test_lib"]
+  name = "kotlin-refactorings-move_test",
+  runtime_deps = [":kotlin-refactorings-move_test_lib"]
 )
-### auto-generated section `test kotlin.refactorings.move.k2` end
+### auto-generated section `test intellij.kotlin.refactorings.move` end

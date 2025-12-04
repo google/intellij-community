@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeElement {
+
   public PsiTypeElementImpl() {
     this(JavaElementType.TYPE);
   }
@@ -84,7 +85,8 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
       else if (PsiUtil.isJavaToken(child, ElementType.PRIMITIVE_TYPE_BIT_SET)) {
         assert type == null : this;
         String text = child.getText();
-        type = annotations.isEmpty() ? PsiJavaParserFacadeImpl.getPrimitiveType(text) : new PsiPrimitiveType(text, createProvider(annotations));
+        type =
+          annotations.isEmpty() ? PsiJavaParserFacadeImpl.getPrimitiveType(text) : new PsiPrimitiveType(text, createProvider(annotations));
       }
       else if (PsiUtil.isJavaToken(child, JavaTokenType.VAR_KEYWORD)) {
         assert type == null : this;
@@ -153,12 +155,14 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
 
     return type;
   }
-  
-  private static PsiType createArray(PsiType elementType, List<TypeAnnotationProvider> providers, boolean ellipsis) {
+
+  private PsiType createArray(PsiType elementType, List<TypeAnnotationProvider> providers, boolean ellipsis) {
     PsiType result = elementType;
     for (int i = providers.size() - 1; i >= 0; i--) {
       TypeAnnotationProvider provider = providers.get(i);
-      result = ellipsis && i == 0 ? new PsiEllipsisType(result, provider) : new PsiArrayType(result, provider);
+      result = ellipsis && i == 0 ?
+               new PsiEllipsisType(result, provider).withContainerNullability(findContainerNullabilityContext(this)) :
+               new PsiArrayType(result, provider).withContainerNullability(findContainerNullabilityContext(this));
     }
     providers.clear();
     return result;
@@ -212,15 +216,11 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
   @Override
   public boolean isInferredType() {
     return PsiUtil.isJavaToken(getFirstChild(), JavaTokenType.VAR_KEYWORD) ||
-            PsiAugmentProvider.isInferredType(this);
+           PsiAugmentProvider.isInferredType(this);
   }
 
   private static @NotNull ClassReferencePointer getReferenceComputable(@NotNull PsiJavaCodeReferenceElement ref) {
-    PsiElement root = SyntaxTraverser.psiApi()
-      .parents(ref.getParent())
-      .takeWhile(it -> it instanceof PsiTypeElement || it instanceof PsiReferenceParameterList || it instanceof PsiJavaCodeReferenceElement)
-      .last();
-    PsiElement parent = root instanceof PsiTypeElement ? root.getParent() : null;
+    PsiElement parent = getAnchorParent(ref);
     if (parent instanceof PsiMethod || parent instanceof PsiVariable) {
       PsiModifierListOwner owner = (PsiModifierListOwner)parent;
       int[] pathFromRoot = getPathFromRoot(ref);
@@ -228,12 +228,21 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
     }
     return ClassReferencePointer.constant(ref);
   }
-  
+
+  private static @Nullable PsiElement getAnchorParent(@NotNull PsiElement ref) {
+    PsiElement root = SyntaxTraverser.psiApi()
+      .parents(ref)
+      .takeWhile(it -> it instanceof PsiTypeElement || it instanceof PsiReferenceParameterList || it instanceof PsiJavaCodeReferenceElement)
+      .last();
+    PsiElement parent = root instanceof PsiTypeElement ? root.getParent() : null;
+    return parent;
+  }
+
   // n = -1 => go to qualifier
   // n >= 0 => go to type parameter #n
   private static int[] getPathFromRoot(@NotNull PsiJavaCodeReferenceElement ref) {
     IntList result = null;
-    while(true) {
+    while (true) {
       PsiElement parent = ref.getParent();
       if (parent instanceof PsiJavaCodeReferenceElement) {
         PsiJavaCodeReferenceElement parentRef = (PsiJavaCodeReferenceElement)parent;
@@ -241,10 +250,12 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
           if (result == null) result = new IntArrayList();
           result.add(0, -1);
           ref = parentRef;
-        } else {
+        }
+        else {
           throw new IllegalStateException("Unexpected parent (going not from qualifier): " + parent.getText());
         }
-      } else if (parent instanceof PsiTypeElement) {
+      }
+      else if (parent instanceof PsiTypeElement) {
         PsiElement nextParent = parent.getParent();
         while (nextParent instanceof PsiTypeElement) {
           parent = nextParent;
@@ -260,10 +271,12 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
           ref = (PsiJavaCodeReferenceElement)nextRef;
           if (result == null) result = new IntArrayList();
           result.add(0, index);
-        } else {
+        }
+        else {
           return result == null ? ArrayUtil.EMPTY_INT_ARRAY : result.toIntArray();
         }
-      } else {
+      }
+      else {
         throw new IllegalStateException("Unexpected parent: " + parent.getText());
       }
     }
@@ -442,7 +455,8 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
     if (parent instanceof PsiModifierListOwner) {
       PsiModifierList modifierList = ((PsiModifierListOwner)parent).getModifierList();
       if (modifierList != null) {
-        PsiTypeParameterList list = parent instanceof PsiTypeParameterListOwner ? ((PsiTypeParameterListOwner)parent).getTypeParameterList() : null;
+        PsiTypeParameterList list =
+          parent instanceof PsiTypeParameterListOwner ? ((PsiTypeParameterListOwner)parent).getTypeParameterList() : null;
         if (list == null || list.textMatches("")) {
           return (PsiAnnotation)modifierList.add(annotation);
         }
@@ -497,5 +511,18 @@ public class PsiTypeElementImpl extends CompositePsiElement implements PsiTypeEl
   @Override
   public String toString() {
     return "PsiTypeElement:" + getText();
+  }
+
+  @ApiStatus.Experimental
+  @Nullable
+  public static PsiModifierListOwner findContainerNullabilityContext(@NotNull PsiTypeElement typeElement) {
+    PsiElement parent = typeElement.getContext();
+    while (parent != null) {
+      if(parent instanceof PsiModifierListOwner) {
+        return (PsiModifierListOwner)parent;
+      }
+      parent = parent.getContext();
+    }
+    return null;
   }
 }

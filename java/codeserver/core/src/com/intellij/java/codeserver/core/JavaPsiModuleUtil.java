@@ -23,6 +23,7 @@ import com.intellij.psi.search.ProjectScope;
 import com.intellij.psi.search.searches.JavaModuleSearch;
 import com.intellij.psi.util.*;
 import com.intellij.util.ArrayUtil;
+import com.intellij.util.SmartList;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.MultiMap;
 import com.intellij.util.graph.DFSTBuilder;
@@ -259,7 +260,8 @@ public final class JavaPsiModuleUtil {
     return requireNonNullElse(ContainerUtil.find(cycles, set -> set.contains(module)), Collections.emptyList());
   }
 
-  private static @Nullable VirtualFile getVirtualFile(@NotNull PsiJavaModule module) {
+  private static @Nullable VirtualFile getVirtualFile(@Nullable PsiJavaModule module) {
+    if (module == null) return null;
     if (module instanceof LightJavaModule light) {
       return light.getRootVirtualFile();
     }
@@ -385,23 +387,19 @@ public final class JavaPsiModuleUtil {
    * The resulting graph is used for tracing readability and checking package conflicts.
    */
   private static @NotNull RequiresGraph buildRequiresGraph(@NotNull Project project) {
+    MultiMap<String, PsiJavaModule> allModules = MultiMap.create();
     MultiMap<PsiJavaModule, PsiJavaModule> relations = MultiMap.create();
     Set<String> transitiveEdges = new HashSet<>();
 
-    Queue<PsiJavaModule> queue = new ArrayDeque<>();
     GlobalSearchScope scope = ProjectScope.getAllScope(project);
     JavaModuleSearch.allModules(project, scope).forEach(module -> {
-      queue.add(module);
+      allModules.putValue(module.getName(), module);
       return true;
     });
 
-    Set<PsiJavaModule> visited = new HashSet<>();
-    while (!queue.isEmpty()) {
-      PsiJavaModule module = queue.poll();
-      if (!(module instanceof LightJavaModule) && visited.add(module)) {
-        Set<PsiJavaModule> shouldBeVisited = visit(module, relations, transitiveEdges);
-        shouldBeVisited.removeAll(visited);
-        queue.addAll(shouldBeVisited);
+    for (PsiJavaModule module : allModules.values()) {
+      if (!(module instanceof LightJavaModule)) {
+        visit(module, relations, transitiveEdges, allModules);
       }
     }
 
@@ -414,40 +412,50 @@ public final class JavaPsiModuleUtil {
    * the relations between modules, and the set of transitive edges based on the requires statements within
    * the module.
    *
-   * @param module the module to be visited
-   * @param relations a mapping that represents module dependencies
+   * @param module          the module to be visited
+   * @param relations       a mapping that represents module dependencies
    * @param transitiveEdges a set of transitive edges representing transitive dependencies
-   * @return a set of modules that should be visited next
+   * @param allModules      a map of module names to PsiJavaModule instances
    */
-  private static @NotNull Set<PsiJavaModule> visit(@NotNull PsiJavaModule module,
-                                                    @NotNull MultiMap<PsiJavaModule, PsiJavaModule> relations,
-                                                    @NotNull Set<String> transitiveEdges) {
-    Set<PsiJavaModule> shouldBeVisited = new HashSet<>();
-
+  private static void visit(@NotNull PsiJavaModule module,
+                            @NotNull MultiMap<PsiJavaModule, PsiJavaModule> relations,
+                            @NotNull Set<String> transitiveEdges,
+                            @NotNull MultiMap<String, PsiJavaModule> allModules) {
     relations.putValues(module, Collections.emptyList());
     boolean explicitJavaBase = false;
 
+    GlobalSearchScope scope = GlobalSearchScope.allScope(module.getProject());
     for (PsiRequiresStatement statement : module.getRequires()) {
       PsiJavaModuleReference ref = statement.getModuleReference();
       if (ref != null) {
-        if (JAVA_BASE.equals(ref.getCanonicalText())) explicitJavaBase = true;
-        for (ResolveResult result : ref.multiResolve(false)) {
-          PsiJavaModule dependency = (PsiJavaModule)result.getElement();
-          assert dependency != null : result;
+        String moduleName = ref.getCanonicalText();
+        if (JAVA_BASE.equals(moduleName)) explicitJavaBase = true;
+        for (PsiJavaModule dependency : filterModules(allModules.get(moduleName), scope)) {
           relations.putValue(module, dependency);
           if (statement.hasModifierProperty(PsiModifier.TRANSITIVE)) {
             transitiveEdges.add(RequiresGraph.key(dependency, module));
           }
-          shouldBeVisited.add(dependency);
         }
       }
     }
 
     if (!explicitJavaBase) {
-      PsiJavaModule javaBase = JavaPsiFacade.getInstance(module.getProject()).findModule(JAVA_BASE, module.getResolveScope());
-      if (javaBase != null) relations.putValue(module, javaBase);
+      Collection<PsiJavaModule> modules = filterModules(allModules.get(JAVA_BASE), module.getResolveScope());
+      if (modules.size() == 1) {
+        relations.putValue(module, modules.iterator().next());
+      }
     }
-    return shouldBeVisited;
+  }
+
+  private static @NotNull List<PsiJavaModule> filterModules(@NotNull Collection<PsiJavaModule> modules, @NotNull GlobalSearchScope scope) {
+    SmartList<PsiJavaModule> filtered = new SmartList<>();
+    for (PsiJavaModule candidate : modules) {
+      VirtualFile candidateFile = getVirtualFile(candidate);
+      if (candidateFile != null && scope.contains(candidateFile)) {
+        filtered.add(candidate);
+      }
+    }
+    return filtered;
   }
   
   private static final class ChameleonGraph<N> implements Graph<N> {
@@ -491,13 +499,23 @@ public final class JavaPsiModuleUtil {
     }
 
     public boolean reads(PsiJavaModule source, PsiJavaModule destination) {
+      source = getPhysicalModule(source);
+      destination = getPhysicalModule(destination);
       Collection<PsiJavaModule> nodes = myGraph.getNodes();
-      if (nodes.contains(destination) && nodes.contains(source)) {
+      if (!nodes.contains(destination) || !nodes.contains(source)) {
+        return false;
+      }
+
+      UniqueBuffer<PsiJavaModule> buffer = new UniqueBuffer<>();
+      buffer.add(destination);
+      while (!buffer.isEmpty()) {
+        destination = buffer.poll();
         Iterator<PsiJavaModule> directReaders = myGraph.getOut(destination);
         while (directReaders.hasNext()) {
           PsiJavaModule next = directReaders.next();
-          if (source.equals(next) || myTransitiveEdges.contains(key(destination, next)) && reads(source, next)) {
-            return true;
+          if (source.equals(next)) return true;
+          if (myTransitiveEdges.contains(key(destination, next)) && !next.equals(destination)) {
+            buffer.add(next);
           }
         }
       }
@@ -505,6 +523,7 @@ public final class JavaPsiModuleUtil {
     }
 
     private @Nullable ModulePackageConflict findConflict(@NotNull PsiJavaModule source) {
+      source = getPhysicalModule(source);
       Map<String, PsiJavaModule> exports = new HashMap<>();
       return processExports(source, (pkg, m) -> {
         PsiJavaModule found = exports.put(pkg, m);
@@ -516,10 +535,11 @@ public final class JavaPsiModuleUtil {
     }
 
     private @Nullable PsiJavaModule findOrigin(@NotNull PsiJavaModule module, @NotNull String packageName) {
-      return processExports(module, (pkg, m) -> packageName.equals(pkg) ? m : null);
+      return processExports(getPhysicalModule(module), (pkg, m) -> packageName.equals(pkg) ? m : null);
     }
 
     private <T> @Nullable T processExports(@NotNull PsiJavaModule start, @NotNull BiFunction<? super String, ? super PsiJavaModule, ? extends T> processor) {
+      start = getPhysicalModule(start);
       return myGraph.getNodes().contains(start) ? processExports(start.getName(), start, true, new HashSet<>(), processor) : null;
     }
 
@@ -528,6 +548,7 @@ public final class JavaPsiModuleUtil {
                                            boolean direct,
                                            @NotNull Set<? super PsiJavaModule> visited,
                                            @NotNull BiFunction<? super String, ? super PsiJavaModule, ? extends T> processor) {
+      module = getPhysicalModule(module);
       if (visited.add(module)) {
         if (!direct) {
           for (PsiPackageAccessibilityStatement statement : module.getExports()) {
@@ -556,17 +577,49 @@ public final class JavaPsiModuleUtil {
 
     public @NotNull Set<PsiJavaModule> getAllDependencies(@NotNull PsiJavaModule module, boolean transitive) {
       Set<PsiJavaModule> requires = new HashSet<>();
-      collectDependencies(module, requires, transitive);
+      collectDependencies(getPhysicalModule(module), requires, transitive);
       return requires;
     }
 
     private void collectDependencies(@NotNull PsiJavaModule module, @NotNull Set<PsiJavaModule> dependencies, boolean transitive) {
+      module = getPhysicalModule(module);
       for (Iterator<PsiJavaModule> iterator = myGraph.getIn(module); iterator.hasNext();) {
         PsiJavaModule dependency = iterator.next();
         if (!dependencies.contains(dependency) && (!transitive || myTransitiveEdges.contains(key(dependency, module)))) {
           dependencies.add(dependency);
           collectDependencies(dependency, dependencies, transitive);
         }
+      }
+    }
+
+    private static @NotNull PsiJavaModule getPhysicalModule(@NotNull PsiJavaModule from) {
+      if (from.isPhysical()) return from;
+      if (!(from.getContainingFile() instanceof PsiJavaFile file)) return from;
+      if (!(file.getOriginalFile() instanceof PsiJavaFile origin)) return from;
+      if (origin.getModuleDeclaration() instanceof PsiJavaModule result) return result;
+      return from;
+    }
+
+    /**
+     * FIFO queue that prevents duplicate additions.
+     * Once added, an element cannot be added again even after being polled.
+     */
+    private static class UniqueBuffer<T> {
+      private final Set<T> myUnique = new HashSet<>();
+      private final Queue<T> myBuffer = new ArrayDeque<>();
+
+      public void add(T value) {
+        if (myUnique.add(value)) {
+          myBuffer.add(value);
+        }
+      }
+
+      public T poll() {
+        return myBuffer.poll();
+      }
+
+      public boolean isEmpty() {
+        return myBuffer.isEmpty();
       }
     }
   }

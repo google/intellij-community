@@ -28,7 +28,6 @@ f:com.intellij.internal.statistic.eventLog.EventLogConfigOptionsService
 - <init>():V
 - s:getInstance():com.intellij.internal.statistic.eventLog.EventLogConfigOptionsService
 - getOptions(java.lang.String):com.intellij.internal.statistic.config.EventLogOptions
-- updateOptions(java.lang.String,com.intellij.internal.statistic.eventLog.validator.storage.EventLogMetadataLoader):V
 a:com.intellij.internal.statistic.eventLog.EventLogConfigOptionsService$EventLogThresholdConfigOptionsListener
 - com.intellij.internal.statistic.eventLog.EventLogConfigOptionsListener
 - p:<init>(java.lang.String):V
@@ -57,9 +56,7 @@ c:com.intellij.internal.statistic.eventLog.EventLogGroup
 - <init>(java.lang.String,I,java.lang.String,java.lang.String):V
 - <init>(java.lang.String,I,java.lang.String,java.lang.String,java.util.List):V
 - b:<init>(java.lang.String,I,java.lang.String,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:getDescription():java.lang.String
 - f:getEvents():java.util.List
-- f:getGroupData():java.util.List
 - f:getId():java.lang.String
 - f:getRecorder():java.lang.String
 - f:getVersion():I
@@ -71,10 +68,6 @@ c:com.intellij.internal.statistic.eventLog.EventLogGroup
 - f:registerEvent(java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField,com.intellij.internal.statistic.eventLog.events.EventField,java.lang.String):com.intellij.internal.statistic.eventLog.events.EventId2
 - f:registerEvent(java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField,java.lang.String):com.intellij.internal.statistic.eventLog.events.EventId1
 - f:registerEvent(java.lang.String,java.lang.String):com.intellij.internal.statistic.eventLog.events.EventId
-- bs:registerEvent$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField,com.intellij.internal.statistic.eventLog.events.EventField,com.intellij.internal.statistic.eventLog.events.EventField,java.lang.String,I,java.lang.Object):com.intellij.internal.statistic.eventLog.events.EventId3
-- bs:registerEvent$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField,com.intellij.internal.statistic.eventLog.events.EventField,java.lang.String,I,java.lang.Object):com.intellij.internal.statistic.eventLog.events.EventId2
-- bs:registerEvent$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField,java.lang.String,I,java.lang.Object):com.intellij.internal.statistic.eventLog.events.EventId1
-- bs:registerEvent$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,java.lang.String,I,java.lang.Object):com.intellij.internal.statistic.eventLog.events.EventId
 - f:registerIdeActivity(java.lang.String):com.intellij.internal.statistic.IdeActivityDefinition
 - f:registerIdeActivity(java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[]):com.intellij.internal.statistic.IdeActivityDefinition
 - f:registerIdeActivity(java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[],com.intellij.internal.statistic.eventLog.events.EventField[]):com.intellij.internal.statistic.IdeActivityDefinition
@@ -83,7 +76,6 @@ c:com.intellij.internal.statistic.eventLog.EventLogGroup
 - bs:registerIdeActivity$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[],com.intellij.internal.statistic.eventLog.events.EventField[],com.intellij.internal.statistic.IdeActivityDefinition,Z,I,java.lang.Object):com.intellij.internal.statistic.IdeActivityDefinition
 - f:registerVarargEvent(java.lang.String,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[]):com.intellij.internal.statistic.eventLog.events.VarargEventId
 - f:registerVarargEvent(java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[]):com.intellij.internal.statistic.eventLog.events.VarargEventId
-- bs:registerVarargEvent$default(com.intellij.internal.statistic.eventLog.EventLogGroup,java.lang.String,java.lang.String,com.intellij.internal.statistic.eventLog.events.EventField[],I,java.lang.Object):com.intellij.internal.statistic.eventLog.events.VarargEventId
 a:com.intellij.internal.statistic.eventLog.EventLogRecorderConfigOptionsListener
 - com.intellij.internal.statistic.eventLog.EventLogConfigOptionsListener
 - p:<init>(java.lang.String):V

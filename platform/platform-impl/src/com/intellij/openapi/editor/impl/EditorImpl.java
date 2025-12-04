@@ -127,6 +127,8 @@ import java.text.AttributedString;
 import java.text.CharacterIterator;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -252,6 +254,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private int myMouseSelectionState;
   private @Nullable FoldRegion myMouseSelectedRegion;
   private PanelWithFloatingToolbar myLayeredPane;
+  private EditorFloatingToolbar editorFloatingToolbar;
 
   @MagicConstant(intValues = {MOUSE_SELECTION_STATE_NONE, MOUSE_SELECTION_STATE_LINE_SELECTED, MOUSE_SELECTION_STATE_WORD_SELECTED})
   private @interface MouseSelectionState {
@@ -663,9 +666,12 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     return myFocusModeModel;
   }
 
+  private final AtomicBoolean gainedFocus = new AtomicBoolean(false);
+
   @Override
   public void focusGained(@NotNull FocusEvent e) {
     myCaretCursor.activate();
+    gainedFocus.set(true);
     for (Caret caret : myCaretModel.getAllCarets()) {
       int caretLine = caret.getLogicalPosition().line;
       repaintLines(caretLine, caretLine);
@@ -1082,6 +1088,19 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     reinitSettings(true, true);
   }
 
+  @ApiStatus.Internal
+  public void refreshEditorFloatingToolbar() {
+    if (this.editorFloatingToolbar != null && mayShowToolbar()) {
+      Disposer.dispose(this.editorFloatingToolbar);
+      myLayeredPane.remove(this.editorFloatingToolbar);
+      UiNotifyConnector.doWhenFirstShown(myPanel, () -> {
+        var editorFLoatingToolbar = new EditorFloatingToolbar(this);
+        myLayeredPane.add(editorFLoatingToolbar, FLOATING_TOOLBAR_LAYER);
+        this.editorFloatingToolbar = editorFLoatingToolbar;
+      }, getDisposable());
+    }
+  }
+
   @RequiresEdt
   void reinitSettings(boolean updateGutterSize, boolean reinitSettings) {
     myScheme.updateGlobalScheme();
@@ -1241,7 +1260,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myLayeredPane.add(myScrollPane, SCROLL_PANE_LAYER);
     UiNotifyConnector.doWhenFirstShown(myPanel, () -> {
       if (mayShowToolbar()) {
-        myLayeredPane.add(new EditorFloatingToolbar(this), FLOATING_TOOLBAR_LAYER);
+        var editorFLoatingToolbar = new EditorFloatingToolbar(this);
+        myLayeredPane.add(editorFLoatingToolbar, FLOATING_TOOLBAR_LAYER);
+        this.editorFloatingToolbar = editorFLoatingToolbar;
       }
     }, getDisposable());
     myPanel.add(myLayeredPane, BorderLayout.CENTER);
@@ -1266,7 +1287,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         if (event.isConsumed()) {
           return;
         }
-        if (processKeyTyped(event)) {
+        if (WriteIntentReadAction.compute(() -> processKeyTyped(event))) {
           event.consume();
         }
       }
@@ -1477,7 +1498,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @ApiStatus.Internal
   public void processKeyTypedNormally(char c, @NotNull DataContext dataContext) {
     EditorActionManager.getInstance();
-    TypedAction.getInstance().actionPerformed(this, c, dataContext);
+    WriteIntentReadAction.run( () -> {
+      TypedAction.getInstance().actionPerformed(this, c, dataContext);
+    });
   }
 
   private void fireFocusLost(@NotNull FocusEvent event) {
@@ -1500,7 +1523,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
 
     assertIsDispatchThread();
-    WriteIntentReadAction.run((Runnable)() -> {
+    WriteIntentReadAction.run(() -> {
       Document document = getDocument();
       Disposer.dispose(myHighlighterDisposable);
 
@@ -2774,8 +2797,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (myCommandProcessor == null || e.isConsumed() || myMousePressedEvent != null && myMousePressedEvent.isConsumed()) {
       return;
     }
-    myCommandProcessor.executeCommand(myProject, () -> mouseDragHandler.mouseDragged(e), "", MOUSE_DRAGGED_COMMAND_GROUP,
-                                      UndoConfirmationPolicy.DEFAULT, getDocument());
+    WriteIntentReadAction.run(() -> {
+      myCommandProcessor.executeCommand(myProject, () -> mouseDragHandler.mouseDragged(e), "",
+                                        MOUSE_DRAGGED_COMMAND_GROUP,
+                                        UndoConfirmationPolicy.DEFAULT, getDocument());
+    });
   }
 
   private void processMouseDragged(@NotNull MouseEvent e) {
@@ -3157,21 +3183,19 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 
+  @ApiStatus.Internal
+  final ConcurrentHashMap<Caret, Point2D> lastPosMap = new ConcurrentHashMap<>();
+
+  private final @NotNull EditorCaretMoveService caretMoveService = EditorCaretMoveService.getInstance();
+
   private void setCursorPosition() {
-    List<CaretRectangle> caretPoints = new ArrayList<>();
-    for (Caret caret : getCaretModel().getAllCarets()) {
-      boolean isRtl = caret.isAtRtlLocation();
-      VisualPosition caretPosition = caret.getVisualPosition();
-      Point2D pos1 = visualPositionToPoint2D(caretPosition.leanRight(!isRtl));
-      Point2D pos2 = visualPositionToPoint2D(new VisualPosition(caretPosition.line,
-                                                                Math.max(0, caretPosition.column + (isRtl ? -1 : 1)), isRtl));
-      float width = (float)Math.abs(pos2.getX() - pos1.getX());
-      if (!isRtl && myInlayModel.hasInlineElementAt(caretPosition)) {
-        width = Math.min(width, (float)Math.ceil(myView.getPlainSpaceWidth()));
+    synchronized (caretMoveService) {
+      if (!getSettings().isAnimatedCaret() || gainedFocus.getAndSet(false)) {
+        caretMoveService.setCursorPositionImmediately(this);
+      } else {
+        caretMoveService.setCursorPosition(this);
       }
-      caretPoints.add(new CaretRectangle(pos1, width, caret, isRtl));
     }
-    myCaretCursor.setPositions(caretPoints.toArray(new CaretRectangle[0]));
   }
 
   @Override
@@ -3272,11 +3296,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     public final @Nullable Caret myCaret;
     public final boolean myIsRtl;
 
-    private CaretRectangle(@NotNull Point2D point, float width, @Nullable Caret caret, boolean isRtl) {
+    CaretRectangle(@NotNull Point2D point, float width, @Nullable Caret caret, boolean isRtl) {
       myPoint = point;
       myWidth = Math.max(width, 2);
       myCaret = caret;
       myIsRtl = isRtl;
+    }
+
+    Point2D getPoint() {
+      return myPoint;
     }
   }
 
@@ -3331,7 +3359,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
     }
 
-    private void setPositions(CaretRectangle @NotNull [] locations) {
+    void setPositions(CaretRectangle @NotNull [] locations) {
       myStartTime = System.currentTimeMillis();
       myLocations = locations;
     }
@@ -3452,7 +3480,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
             mySelectionModel.setSelection(oldSelectionStart, getCaretModel().getOffset());
           }
         };
-        WriteIntentReadAction.run((Runnable)() ->
+        WriteIntentReadAction.run(() ->
           myCommandProcessor.executeCommand(myProject, command, EditorBundle.message("move.cursor.command.name"),
                                             DocCommandGroupId.noneGroupId(getDocument()), UndoConfirmationPolicy.DEFAULT, getDocument())
         );
@@ -3747,7 +3775,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     mouseSelectionStateAlarm.cancel();
     if (myMouseSelectionState != MOUSE_SELECTION_STATE_NONE) {
       if (mouseSelectionStateResetRunnable == null) {
-        mouseSelectionStateResetRunnable = () -> WriteIntentReadAction.run((Runnable)() -> resetMouseSelectionState(null, null));
+        mouseSelectionStateResetRunnable = () -> WriteIntentReadAction.run(() -> resetMouseSelectionState(null, null));
       }
       mouseSelectionStateAlarm.request(Registry.intValue("editor.mouseSelectionStateResetTimeout"),
                                        ModalityState.stateForComponent(myEditorComponent),
@@ -4265,7 +4293,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         EVENT_LOG.debug(e.toString());
       }
       requestFocus();
-      runMousePressedCommand(e);
+      WriteIntentReadAction.run(() -> runMousePressedCommand(e));
       myInitialMouseEvent = e.isConsumed() ? e : null;
     }
 
@@ -4276,12 +4304,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
       myMousePressArea = null;
       myLastMousePressedLocation = null;
-      runMouseReleasedCommand(e);
-      if (!e.isConsumed() && myMousePressedEvent != null && !myMousePressedEvent.isConsumed() &&
-          Math.abs(e.getX() - myMousePressedEvent.getX()) < EditorUtil.getSpaceWidth(Font.PLAIN, EditorImpl.this) &&
-          Math.abs(e.getY() - myMousePressedEvent.getY()) < getLineHeight()) {
-        runMouseClickedCommand(e);
-      }
+      WriteIntentReadAction.run( () -> {
+        runMouseReleasedCommand(e);
+        if (!e.isConsumed() && myMousePressedEvent != null && !myMousePressedEvent.isConsumed() &&
+            Math.abs(e.getX() - myMousePressedEvent.getX()) < EditorUtil.getSpaceWidth(Font.PLAIN, EditorImpl.this) &&
+            Math.abs(e.getY() - myMousePressedEvent.getY()) < getLineHeight()) {
+          runMouseClickedCommand(e);
+        }
+      });
     }
 
     @Override

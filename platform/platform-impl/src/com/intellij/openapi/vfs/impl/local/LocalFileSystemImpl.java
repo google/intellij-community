@@ -23,7 +23,10 @@ import com.intellij.util.io.PlatformNioHelper;
 import org.jetbrains.annotations.*;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
@@ -366,17 +369,22 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     return myChildrenAttrGetter.accessDiskWithCheckCanceled(new Pair<>(dir, childrenNames));
   }
 
-  protected static Map<String, FileAttributes> listWithAttributesImpl(@NotNull VirtualFile dir,
-                                                                      @Nullable Set<String> filter) {
+  private static Map<String, FileAttributes> listWithAttributesImpl(@NotNull VirtualFile dir,
+                                                                    @Nullable Set<String> filter) {
     if (!dir.isDirectory()) {
       return Collections.emptyMap();
     }
+    return listWithAttributesImpl(Path.of(toIoPath(dir)), filter);
+  }
+
+  protected static Map<String, FileAttributes> listWithAttributesImpl(@NotNull Path dir,
+                                                                      @Nullable Set<String> filter) {
     try {
       int expectedSize = (filter == null) ? 10 : filter.size();
       //We must return a 'normal' (=case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
       Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(expectedSize, /*caseSensitive: */true);
 
-      PlatformNioHelper.visitDirectory(Path.of(toIoPath(dir)), filter, (file, ioAttributesHolder) -> {
+      PlatformNioHelper.visitDirectory(dir, filter, (file, ioAttributesHolder) -> {
         try {
           var attributes = amendAttributes(file, FileAttributes.fromNio(file, ioAttributesHolder.get()));
           childrenWithAttributes.put(file.getFileName().toString(), attributes);
@@ -408,7 +416,8 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
       FileAttributes attributes = readAttributesUsingEel(nioFile);
       return amendAttributes(nioFile, attributes);
     }
-    catch (AccessDeniedException | NoSuchFileException e) { LOG.debug(e); }
+    catch (NoSuchFileException e) { LOG.debug("File doesn't exist: " + e.getMessage()); }
+    catch (AccessDeniedException e) { LOG.debug(e); }
     catch (IOException | RuntimeException e) { LOG.warn(e); }
     return null;
   }

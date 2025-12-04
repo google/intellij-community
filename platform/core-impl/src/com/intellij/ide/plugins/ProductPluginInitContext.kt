@@ -1,12 +1,14 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins
 
+import com.intellij.ide.plugins.PluginInitializationContext.EnvironmentConfiguredModuleData
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.util.PlatformUtils
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 
 @ApiStatus.Internal
 class ProductPluginInitContext(
@@ -62,4 +64,34 @@ class ProductPluginInitContext(
 
   override val currentProductModeId: String
     get() = ProductLoadingStrategy.strategy.currentModeId
+
+  override val environmentConfiguredModules: Map<PluginModuleId, EnvironmentConfiguredModuleData> by lazy {
+    buildMap {
+      configureProductModeModules(currentProductModeId)
+    }
+  }
+
+  companion object {
+    @VisibleForTesting
+    internal fun MutableMap<PluginModuleId, EnvironmentConfiguredModuleData>.configureProductModeModules(productModeId: String) {
+      val frontendSplit = PluginModuleId("intellij.platform.frontend.split", PluginModuleId.JETBRAINS_NAMESPACE)
+      val frontend = PluginModuleId("intellij.platform.frontend", PluginModuleId.JETBRAINS_NAMESPACE)
+      val backend = PluginModuleId("intellij.platform.backend", PluginModuleId.JETBRAINS_NAMESPACE)
+
+      for (moduleId in listOf(frontend, backend, frontendSplit)) {
+        val isAvailable = when (productModeId) {
+          /** intellij.platform.backend.split is currently available in 'monolith' mode because it's used as a backend in CodeWithMe */
+          "monolith" -> moduleId != frontendSplit
+          "backend" -> moduleId != frontend && moduleId != frontendSplit
+          "frontend" -> moduleId != backend
+          else -> true
+        }
+        val unavailabilityReason =
+          if (isAvailable) null
+          else UnsuitableProductModeModuleUnavailabilityReason(moduleId, productModeId)
+        val replaced = put(moduleId, EnvironmentConfiguredModuleData(unavailabilityReason))
+        check(replaced == null) { "$moduleId is already registered as environment-configured module" }
+      }
+    }
+  }
 }

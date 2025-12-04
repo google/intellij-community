@@ -25,7 +25,7 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/vcs-impl",
     "//platform/projectModel-impl",
-    "@lib//:jzlib",
+    "//libraries/jzlib",
     "@lib//:kotlin-stdlib",
     "@lib//:slf4j-api",
     "@lib//:slf4j-jdk14",
@@ -35,7 +35,7 @@ jvm_library(
     "//platform/core-impl",
     "//libraries/jackson/jackson",
     "//libraries/jackson/databind",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//platform/vcs-api:vcs",
     "//platform/statistics",
     "//platform/core-ui",
@@ -49,13 +49,17 @@ jvm_library(
     "@lib//:jetbrains-intellij-deps-eclipse-jgit",
     "@lib//:settings_repository-eclipse-jgit-ssh-apache-agent",
     "@lib//:settings_repository-eclipse-jgit-ssh-apache",
-    "@lib//:jzlib",
-    "@lib//:apache-sshd-osgi",
   ]
 )
 ### auto-generated section `build intellij.settingsRepository` end
 
 ### auto-generated section `build intellij.settingsRepository.tests` start
+jvm_library(
+  name = "settingsRepository-tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
 jvm_library(
   name = "settingsRepository-tests_test_lib",
   module_name = "intellij.settingsRepository.tests",
@@ -84,7 +88,7 @@ jvm_library(
     "//platform/credential-store-ui:credentialStore-ui",
     "//platform/testFramework/extensions:testExtensions",
     "//platform/configuration-store-impl:configurationStore-tests_test_lib",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//libraries/fastutil",
     "//platform/util/jdom",
     "//platform/workspace/jps",

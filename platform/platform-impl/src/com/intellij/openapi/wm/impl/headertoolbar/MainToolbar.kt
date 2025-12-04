@@ -27,12 +27,14 @@ import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.UiWithModelAccess
+import com.intellij.openapi.application.impl.BorderPainterHolder
 import com.intellij.openapi.application.impl.InternalUICustomization
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.keymap.impl.ui.ActionsTreeUtil
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.impl.IdeBackgroundUtil
 import com.intellij.openapi.wm.impl.ToolbarComboButton
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil
@@ -46,6 +48,7 @@ import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.mac.touchbar.TouchbarSupport
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.JBInsets
+import com.intellij.util.ui.JBSwingUtilities
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBUI.CurrentTheme.Toolbar.mainToolbarButtonInsets
 import com.intellij.util.ui.showingScope
@@ -111,12 +114,12 @@ class MainToolbar(
   isOpaque: Boolean = false,
   background: Color? = null,
   private val isFullScreen: () -> Boolean,
-) : JPanel(HorizontalLayout(layoutGap)) {
+) : JPanel(HorizontalLayout(layoutGap)), BorderPainterHolder {
   private val flavor: MainToolbarFlavor
   private val widthCalculationListeners = mutableSetOf<ToolbarWidthCalculationListener>()
   private val cachedWidths by lazy { ConcurrentHashMap<String, Int>() }
 
-  internal var borderPainter: BorderPainter = DefaultBorderPainter()
+  override var borderPainter: BorderPainter = DefaultBorderPainter()
 
   init {
     this.background = background
@@ -127,7 +130,6 @@ class MainToolbar(
     else {
       DefaultMainToolbarFlavor
     }
-    ClientProperty.put(this, IdeBackgroundUtil.NO_BACKGROUND, true)
     showingScope("Main toolbar update") {
       ApplicationManager.getApplication().messageBus.connect(this).subscribe(LafManagerListener.TOPIC, LafManagerListener {
         updateToolbarActions()
@@ -179,7 +181,7 @@ class MainToolbar(
     }
   }
 
-  override fun getComponentGraphics(g: Graphics): Graphics = super.getComponentGraphics(IdeBackgroundUtil.getOriginalGraphics(g))
+  override fun getComponentGraphics(g: Graphics): Graphics = JBSwingUtilities.runGlobalCGTransform(this, g)
 
   suspend fun init(customTitleBar: WindowDecorations.CustomTitleBar? = null) {
     val schema = CustomActionsSchema.getInstanceAsync()
@@ -295,7 +297,7 @@ class MainToolbar(
     super.paintComponent(g)
     if (!CustomWindowHeaderUtil.isToolbarInHeader(UISettings.getInstance(), isFullScreen())) {
       ProjectWindowCustomizerService.getInstance().paint(frame, this, g as Graphics2D)
-      InternalUICustomization.getInstance()?.paintFrameBackground(frame, this, g)
+      InternalUICustomization.getInstance()?.paintFrameBackground(frame as IdeFrame, this, g)
     }
   }
 

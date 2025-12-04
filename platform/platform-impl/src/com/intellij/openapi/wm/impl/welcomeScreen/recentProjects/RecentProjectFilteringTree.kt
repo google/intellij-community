@@ -67,6 +67,7 @@ class RecentProjectFilteringTree(
   treeComponent: Tree,
   parentDisposable: Disposable,
   collectors: List<() -> List<RecentProjectTreeItem>>,
+  val disableSearchFieldBorder: Boolean
 ) : FilteringTree<DefaultMutableTreeNode, RecentProjectTreeItem>(treeComponent, DefaultMutableTreeNode(RootItem(collectors))) {
   init {
     val projectActionButtonViewModel = ProjectActionButtonViewModel()
@@ -139,7 +140,9 @@ class RecentProjectFilteringTree(
 
       textEditor.apply {
         isOpaque = false
-        border = JBUI.Borders.empty()
+        if (disableSearchFieldBorder) {
+          border = JBUI.Borders.empty()
+        }
         emptyText.text = IdeBundle.message("welcome.screen.search.projects.empty.text")
         accessibleContext.accessibleName = IdeBundle.message("welcome.screen.search.projects.empty.text")
         TextComponentEmptyText.setupPlaceholderVisibility(this)
@@ -189,9 +192,12 @@ class RecentProjectFilteringTree(
     }
   }
 
-  fun selectLastOpenedProject() {
+  /**
+   * @return true if the last opened project was selected
+   */
+  fun selectLastOpenedProject(): Boolean {
     val recentProjectsManager = RecentProjectsManagerBase.getInstanceEx()
-    val projectPath = recentProjectsManager.getLastOpenedProject() ?: return
+    val projectPath = recentProjectsManager.getLastOpenedProject() ?: return false
 
     val node = TreeUtil.findNode(root, Condition {
       when (val item = TreeUtil.getUserObject(RecentProjectTreeItem::class.java, it)) {
@@ -203,7 +209,26 @@ class RecentProjectFilteringTree(
 
     if (node != null) {
       TreeUtil.selectNode(tree, node)
+      return true
     }
+    return false
+  }
+
+  @ApiStatus.Internal
+  fun selectLastOpenedProjectOrTheFirstInTree(): Boolean {
+    if (selectLastOpenedProject()) {
+      return true
+    }
+
+    if (root.childCount <= 0) {
+      return false
+    }
+    val firstChild = root.firstChild
+    if (firstChild != null) {
+      TreeUtil.selectNode(tree, firstChild)
+      return true
+    }
+    return false
   }
 
   private class ProjectActionMouseListener(

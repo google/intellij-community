@@ -83,4 +83,48 @@ class JavaTestMethodWithoutAssertionInspectionTest : TestMethodWithoutAssertionI
       }
     """.trimIndent(), "TestMethodWithoutAssertion")
   }
+
+  fun `test no highlighting on @BeforeEach`() {
+    myFixture.testHighlighting(JvmLanguage.JAVA, """
+      import org.junit.jupiter.api.BeforeEach;
+      import org.junit.runner.Description;
+      import org.junit.runner.RunWith;
+      import org.junit.runner.notification.RunNotifier;
+
+      class CustomRunner extends org.junit.runner.Runner {
+          @Override
+          public Description getDescription() { return null; }
+      
+          @Override
+          public void run(RunNotifier runNotifier) { }
+      }
+      
+      @RunWith(CustomRunner.class)
+      abstract class UnitTestBase { }
+      
+      public class SimpleTest extends UnitTestBase {
+          @BeforeEach
+          public void setUp() { }
+      }
+    """.trimIndent(), "SimpleTest")
+  }
+
+  fun `test no highlighting on before and after suite`() {
+    myFixture.testHighlighting(JvmLanguage.JAVA, """
+      import org.junit.platform.suite.api.AfterSuite;
+      import org.junit.platform.suite.api.BeforeSuite;
+      import org.junit.platform.suite.api.SelectPackages;
+      import org.junit.platform.suite.api.Suite;
+      
+      @Suite
+      @SelectPackages("example")
+      class BeforeAndAfterSuiteDemo {
+          @BeforeSuite
+          static void beforeSuite() { }
+
+          @AfterSuite
+          static void afterSuite() { }
+      }
+    """.trimIndent(), "SimpleTest")
+  }
 }

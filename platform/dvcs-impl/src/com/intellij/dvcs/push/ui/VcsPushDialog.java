@@ -7,10 +7,7 @@ import com.intellij.dvcs.repo.Repository;
 import com.intellij.dvcs.repo.VcsRepositoryManager;
 import com.intellij.dvcs.ui.DvcsBundle;
 import com.intellij.ide.IdeBundle;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.DataSink;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
-import com.intellij.openapi.actionSystem.UiDataProvider;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -22,6 +19,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.OptionAction;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.ui.components.JBOptionButton;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBDimension;
@@ -85,7 +83,7 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     myTopPanel = myController.createTopPanel();
 
     myPushActions = collectPushActions();
-    myMainAction = new ComplexPushAction(myPushActions.get(0), myPushActions.subList(1, myPushActions.size()));
+    myMainAction = new ComplexPushAction(myPushActions.subList(0, myPushActions.size()));
     myMainAction.putValue(DEFAULT_ACTION, Boolean.TRUE);
 
     myController.startLoadingCommits();
@@ -104,7 +102,7 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     List<PushActionBase> pushActions = new ArrayList<>(
       ContainerUtil.findAll(group.getChildren(actionManager), PushActionBase.class));
 
-    customizeDialog(ContainerUtil.findInstance(pushActions, SimplePushAction.class));
+    customizeDialog(this, ContainerUtil.findInstance(pushActions, SimplePushAction.class));
 
     List<PushDialogActionsProvider> actionProviders = PUSH_DIALOG_ACTIONS_PROVIDER_EP.getExtensionList();
     for (PushDialogActionsProvider actionProvider : ContainerUtil.reverse(actionProviders)) {
@@ -119,12 +117,12 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     return ContainerUtil.map(pushActions, action -> new ActionWrapper(myProject, this, action));
   }
 
-  private void customizeDialog(@NotNull SimplePushAction simplePushAction) {
+  private static void customizeDialog(@NotNull VcsPushDialog dialog, @NotNull SimplePushAction simplePushAction) {
     List<PushDialogCustomizer> customizers = PUSH_DIALOG_CUSTOMIZER_EP.getExtensionList();
     if (!customizers.isEmpty()) {
       if (customizers.size() == 1) {
         PushDialogCustomizer customizer = customizers.get(0);
-        customizeDialog(customizer, simplePushAction);
+        customizeDialog(dialog, customizer, simplePushAction);
       }
       else {
         LOG.warn("There can be only one push actions customizer, found: " + customizers);
@@ -132,8 +130,10 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     }
   }
 
-  private void customizeDialog(@NotNull PushDialogCustomizer customizer, @NotNull SimplePushAction simplePushAction) {
-    simplePushAction.getTemplatePresentation().setText(customizer.getNameForSimplePushAction(this));
+  private static void customizeDialog(@NotNull VcsPushDialog dialog,
+                                      @NotNull PushDialogCustomizer customizer,
+                                      @NotNull SimplePushAction simplePushAction) {
+    simplePushAction.getTemplatePresentation().setText(customizer.getNameForSimplePushAction(dialog));
     simplePushAction.setCondition(customizer.getCondition());
   }
 
@@ -343,9 +343,14 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
   }
 
   public void updateOkActions() {
-    myMainAction.update();
     for (ActionWrapper wrapper : myPushActions) {
       wrapper.update();
+    }
+    myMainAction.update();
+    if (getButton(myMainAction) instanceof JBOptionButton o) {
+      if (!Arrays.equals(myMainAction.getOptions(), o.getOptions())) {
+        o.setOptions(myMainAction.getOptions());
+      }
     }
   }
 
@@ -359,9 +364,14 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     return panel == null ? null : panel.getValue();
   }
 
+  @ApiStatus.Experimental
+  public @Nullable VcsPushOptionsPanel getCustomPanel(@NotNull String id) {
+    return myCustomPanels.get(id);
+  }
+
   @Override
   public void uiDataSnapshot(@NotNull DataSink sink) {
-    sink.set(VcsPushUi.VCS_PUSH_DIALOG, this);
+    sink.set(VCS_PUSH_DIALOG, this);
   }
 
   @ApiStatus.Experimental
@@ -375,13 +385,16 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
   }
 
   private static final class ComplexPushAction extends AbstractAction implements OptionAction {
-    private final ActionWrapper myDefaultAction;
-    private final List<? extends ActionWrapper> myOptions;
+    private final List<ActionWrapper> myActions;
 
-    private ComplexPushAction(@NotNull ActionWrapper defaultAction, @NotNull List<? extends ActionWrapper> additionalActions) {
-      super(defaultAction.getName());
-      myDefaultAction = defaultAction;
-      myOptions = additionalActions;
+    private ActionWrapper myDefaultAction;
+    private List<ActionWrapper> myOptions;
+
+    private ComplexPushAction(@NotNull List<ActionWrapper> actions) {
+      super(actions.getFirst().getName());
+      myActions = actions;
+      myDefaultAction = actions.getFirst();
+      myOptions = actions.subList(1, actions.size());
     }
 
     @Override
@@ -392,18 +405,28 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     @Override
     public void setEnabled(boolean isEnabled) {
       super.setEnabled(isEnabled);
-      for (Action optionAction : myOptions) {
+      for (Action optionAction : myActions) {
         optionAction.setEnabled(isEnabled);
       }
     }
 
     public void update() {
-      VcsPushUi dialog = myDefaultAction.myDialog;
-      PushActionBase realAction = myDefaultAction.myRealAction;
+      int firstEnabled = ContainerUtil.indexOf(myActions, it -> it.isEnabled());
+      if (firstEnabled >= 0) {
+        myDefaultAction = myActions.get(firstEnabled);
+        myOptions = new ArrayList<>();
+        myOptions.addAll(myActions.subList(0, firstEnabled));
+        myOptions.addAll(myActions.subList(firstEnabled + 1, myActions.size()));
+      }
+      setEnabled(myDefaultAction.myDialog.canPush());
 
-      setEnabled(dialog.canPush());
-      putValue(Action.NAME, realAction.getText(dialog, enabled));
-      putValue(Action.SHORT_DESCRIPTION, realAction.getDescription(dialog, enabled));
+      var presentation = buildActionPresentation(myDefaultAction.myRealAction, myDefaultAction.myProject, myDefaultAction.myDialog);
+      var textWithMnemonic = presentation.getTextWithPossibleMnemonic().get();
+      putValue(NAME, textWithMnemonic.getText());
+      putValue(MNEMONIC_KEY, textWithMnemonic.getMnemonicCode());
+      putValue(DISPLAYED_MNEMONIC_INDEX_KEY, textWithMnemonic.getMnemonicIndex());
+
+      putValue(SHORT_DESCRIPTION, presentation.getDescription());
     }
 
     @Override
@@ -415,14 +438,14 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
   private static class ActionWrapper extends AbstractAction {
 
     private final @NotNull Project myProject;
-    private final @NotNull VcsPushUi myDialog;
+    private final @NotNull VcsPushDialog myDialog;
     private final @NotNull PushActionBase myRealAction;
 
-    ActionWrapper(@NotNull Project project, @NotNull VcsPushUi dialog, @NotNull PushActionBase realAction) {
+    ActionWrapper(@NotNull Project project, @NotNull VcsPushDialog dialog, @NotNull PushActionBase realAction) {
       myProject = project;
       myDialog = dialog;
       myRealAction = realAction;
-      putValue(Action.NAME, myRealAction.getText(myDialog, true));
+      putValue(NAME, myRealAction.getText(myDialog, true));
       putValue(OptionAction.AN_ACTION, realAction);
     }
 
@@ -432,15 +455,43 @@ public class VcsPushDialog extends DialogWrapper implements VcsPushUi, UiDataPro
     }
 
     public void update() {
-      boolean enabled = myRealAction.isEnabled(myDialog);
-      setEnabled(enabled);
-      putValue(Action.NAME, myRealAction.getText(myDialog, enabled));
-      putValue(Action.SHORT_DESCRIPTION, myRealAction.getDescription(myDialog, enabled));
+      var presentation = buildActionPresentation(myRealAction, myProject, myDialog);
+      setEnabled(presentation.isEnabled());
+
+      var textWithMnemonic = presentation.getTextWithPossibleMnemonic().get();
+      putValue(NAME, textWithMnemonic.getText());
+      putValue(MNEMONIC_KEY, textWithMnemonic.getMnemonicCode());
+      putValue(DISPLAYED_MNEMONIC_INDEX_KEY, textWithMnemonic.getMnemonicIndex());
+
+      putValue(SHORT_DESCRIPTION, presentation.getDescription());
     }
 
     public @Nls @NotNull String getName() {
       return requireNonNull(myRealAction.getTemplatePresentation().getTextWithMnemonic());
     }
+  }
+
+  private static Presentation buildActionPresentation(@NotNull AnAction action, @NotNull Project project, @NotNull VcsPushDialog dialog) {
+    var dataContext = new DataContext() {
+      @Override
+      public @Nullable Object getData(@NotNull String dataId) {
+        if (VCS_PUSH_DIALOG.is(dataId)) {
+          return dialog;
+        }
+        else if (CommonDataKeys.PROJECT.is(dataId)) {
+          return project;
+        }
+        else {
+          return null;
+        }
+      }
+    };
+    var presentation = new Presentation();
+    if (action instanceof SimplePushAction simplePushAction) {
+      customizeDialog(dialog, simplePushAction);
+    }
+    action.update(AnActionEvent.createEvent(dataContext, presentation, "VcsPushDialog", ActionUiKind.NONE, null));
+    return presentation;
   }
 
   private static class OptionsPanel extends JPanel {

@@ -407,7 +407,7 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     showErrors: Boolean,
     restartRequired: Boolean,
   ) {
-    val info: InstallPluginInfo = finishInstall(descriptor)
+    val info: InstallPluginInfo? = finishInstall(descriptor)
 
     if (myInstallingWithUpdatesPlugins.isEmpty()) {
       myTopController!!.showProgress(false)
@@ -446,7 +446,7 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     }
 
     val installing = myInstalling
-    if (info.install) {
+    if (info?.install == true) {
       if (installing != null && installing.ui != null) {
         clearInstallingProgress(descriptor)
         if (installingPlugins.isEmpty()) {
@@ -480,7 +480,7 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
       myPluginUpdatesService!!.finishUpdate()
     }
 
-    info.indicator.cancel()
+    info?.indicator?.cancel()
 
     if (AccessibleAnnouncerUtil.isAnnouncingAvailable()) {
       val frame = WindowManager.getInstance().findVisibleFrame()
@@ -670,9 +670,8 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
 
   val installedDescriptors: MutableList<PluginUiModel>
     get() {
-      checkNotNull(myInstalledPanel)
-
-      return myInstalledPanel!!
+      val panel = myInstalledPanel ?: return mutableListOf()
+      return panel
         .groups
         .filterNot { it.excluded }
         .flatMap { it.plugins }
@@ -841,24 +840,26 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
   }
 
   private suspend fun updateButtons(applyResult: ApplyPluginsStateResult) {
-    for (component in myInstalledPluginComponents) {
-      val pluginId = component.pluginModel.pluginId
-      val installedPlugin = applyResult.visiblePlugins.firstOrNull { it.pluginId == pluginId } ?: continue
-      val installationState = applyResult.installationStates[pluginId] ?: continue
-      component.updateButtons(installedPlugin, installationState)
-    }
-    for (plugins in myMarketplacePluginComponentMap.values) {
-      for (plugin in plugins) {
-        if (plugin.myInstalledDescriptorForMarketplace != null) {
-          val pluginId = plugin.pluginModel.pluginId
-          val installedPlugin = applyResult.visiblePlugins.firstOrNull { it.pluginId == pluginId } ?: continue
-          val installationState = applyResult.installationStates[pluginId] ?: continue
-          plugin.updateButtons(installedPlugin, installationState)
+    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+      for (component in myInstalledPluginComponents) {
+        val pluginId = component.pluginModel.pluginId
+        val installedPlugin = applyResult.visiblePlugins.firstOrNull { it.pluginId == pluginId } ?: continue
+        val installationState = applyResult.installationStates[pluginId] ?: continue
+        component.updateButtons(installedPlugin, installationState)
+      }
+      for (plugins in myMarketplacePluginComponentMap.values) {
+        for (plugin in plugins) {
+          if (plugin.myInstalledDescriptorForMarketplace != null) {
+            val pluginId = plugin.pluginModel.pluginId
+            val installedPlugin = applyResult.visiblePlugins.firstOrNull { it.pluginId == pluginId } ?: continue
+            val installationState = applyResult.installationStates[pluginId] ?: continue
+            plugin.updateButtons(installedPlugin, installationState)
+          }
         }
       }
-    }
-    for (detailPanel in myDetailPanels) {
-      detailPanel.updateAll()
+      for (detailPanel in myDetailPanels) {
+        detailPanel.updateAll()
+      }
     }
   }
 
@@ -869,6 +870,9 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
   }
 
   open fun runRestartButton(component: Component) {
+    if (LOG.isDebugEnabled) {
+      LOG.warn(Throwable("Restart button clicked"))
+    }
     service<CoreUiCoroutineScopeHolder>().coroutineScope.launch(Dispatchers.EDT + ModalityState.stateForComponent(component).asContextElement()) {
       if (myPluginManagerCustomizer != null && component is JComponent) {
         myPluginManagerCustomizer.requestRestart(PluginModelFacade(this@MyPluginModel), component)
@@ -878,18 +882,21 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     }
   }
 
+  @OptIn(DelicateCoroutinesApi::class)
   private suspend fun doRestart(component: Component) {
     if (PluginManagerConfigurable.showRestartDialog() == Messages.YES) {
       needRestart = true
       createShutdownCallback = false
       closeDialogAndApplyIfNeeded(component)
-      ApplicationManagerEx.getApplicationEx().restart(true)
+      GlobalScope.launch(CoroutineName("Plugin Manager restart")) {
+        ApplicationManagerEx.getApplicationEx().restart(true)
+      }
     }
   }
 
   suspend fun closeDialogAndApplyIfNeeded(component: Component? = null) {
     if (component == null) return
-    val settings = DialogWrapper.findInstance(component) ?: return
+    val settings = DialogWrapper.findInstance(component)
     if (settings is SettingsDialog) {
       if (component is JComponent) {
         applyAsync(component)
@@ -1067,13 +1074,11 @@ open class MyPluginModel(project: Project?) : InstalledPluginsTableModel(project
     }
 
     @JvmStatic
-    private fun finishInstall(descriptor: PluginUiModel): InstallPluginInfo {
-      val info = myInstallingInfos.remove(descriptor.pluginId)!!
-      info.close()
+    private fun finishInstall(descriptor: PluginUiModel): InstallPluginInfo? {
+      val info = myInstallingInfos.remove(descriptor.pluginId)
+      info?.close()
       myInstallingWithUpdatesPlugins.remove(descriptor.pluginId)
-      if (info.install) {
-        installingPlugins.remove(descriptor)
-      }
+      installingPlugins.remove(descriptor)
       return info
     }
 

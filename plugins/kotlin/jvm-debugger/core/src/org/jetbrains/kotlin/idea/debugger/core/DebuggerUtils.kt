@@ -12,6 +12,7 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.psi.PsiManager
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.concurrency.annotations.RequiresReadLock
@@ -112,6 +113,14 @@ object DebuggerUtils {
             }
 
             if (!hasLocation || files.size == 1 && !forceRanking) {
+                if (files.size > 1) {
+                    val psiManager = PsiManager.getInstance(project)
+                    val fromProject = files.find { psiManager.isInProject(it) }
+                    if (fromProject != null) {
+                        return listOf(fromProject)
+                    }
+                }
+
                 return listOf(files.first())
             }
 
@@ -189,13 +198,10 @@ object DebuggerUtils {
         return extension in KOTLIN_FILE_EXTENSIONS
     }
 
-    fun String.trimIfMangledInBytecode(isMangledInBytecode: Boolean): String =
-        if (isMangledInBytecode)
-            getMethodNameWithoutMangling()
-        else
-            this
-
-    private fun String.getMethodNameWithoutMangling() =
+    /**
+     * Remove mangling suffix (e.g., functions with value class parameters have it).
+     */
+    fun String.trimMethodNameMangling(): String =
         substringBefore('-')
 
     fun String.isGeneratedIrBackendLambdaMethodName() =

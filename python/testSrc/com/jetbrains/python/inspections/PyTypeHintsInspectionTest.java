@@ -3156,6 +3156,43 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
     doMultiFileTest();
   }
 
+  // PY-76832
+  public void testTypeSelfAsTypeArg() {
+    doTestByText("""
+                   from typing import TypeAlias, Self
+                   TupleSelf: TypeAlias = tuple[<warning descr="Cannot use 'Self' outside class">Self</warning>]  # E
+                   class A[T]: ...
+                   a = A[<warning descr="Cannot use 'Self' outside class">Self</warning>]()  # E
+                   class B:
+                      def __init__(self):
+                          self.l: List[Self] = []  # OK
+                   """);
+  }
+
+  // PY-76832
+  public void testTypeSelfInBaseClassTypeArgs() {
+    doTestByText("""
+                   from typing import Self
+                   
+                   class Bar[T]: ...
+                   class Baz(Bar[<warning descr="Cannot use 'Self' in this context">Self</warning>]): ... # E
+                   """);
+  }
+
+  // PY-76832
+  public void testTypeSelfInMetaclass() {
+    doTestByText("""
+                   from typing import Self, Any
+                   
+                   class MyMetaclass(type):
+                       def __new__(cls, *args: Any) -> <warning descr="Type 'Self' cannot be used in a metaclass">Self</warning>:  # E
+                           ...
+                   
+                       def __mul__(cls, count: int) -> list[<warning descr="Type 'Self' cannot be used in a metaclass">Self</warning>]:  # E
+                           ...
+                   """);
+  }
+
 
   // PY-84289
   public void testExponentialAnalysisTimeWhenMapLookupKeyEqualsVariableName() {
@@ -3167,6 +3204,36 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
     if (diff > 5000) {
       fail("Took too long to analyze main.py: " + diff + " ms");
     }
+  }
+
+  // PY-84570
+  public void testListLiteralIsNotConsideredTypeAlias() {
+    doTestByText("""
+                   from enum import Enum
+                   from typing import TypeAlias
+                   
+                   class Direction(Enum):
+                       NORTH = "N"
+                       SOUTH = "S"
+                       EAST = "E"
+                       WEST = "W"
+                   
+                   CARTESIAN = [Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST]
+                   print(CARTESIAN[0])
+                   
+                   type Alias = <warning descr="Type hint is invalid or refers to the expression which is not a correct type">[int, str]</warning>
+                   myAlias: TypeAlias = <warning descr="Assigned value of type alias must be a correct type">[int, str]</warning>
+                   """);
+  }
+
+  // PY-85120
+  public void testTargetExpressionWithAnnotationNotConsideredTypeAlias() {
+    doTestByText("""
+                   a: list[int] | None = None  # Not a type alias
+                   
+                   if a:
+                       _ = a[1]  # No error expected
+                   """);
   }
 
   @NotNull

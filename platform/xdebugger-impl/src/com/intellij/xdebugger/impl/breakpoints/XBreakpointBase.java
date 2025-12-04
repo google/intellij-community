@@ -12,6 +12,11 @@ import com.intellij.openapi.util.JDOMUtil;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.platform.debugger.impl.rpc.XBreakpointId;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointTypeProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointProxy;
 import com.intellij.pom.Navigatable;
 import com.intellij.ui.ColorUtil;
 import com.intellij.ui.ExperimentalUI;
@@ -28,9 +33,8 @@ import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl;
-import com.intellij.xdebugger.impl.frame.XDebugManagerProxy;
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
-import com.intellij.xdebugger.impl.rpc.XBreakpointId;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xml.CommonXmlStrings;
 import com.intellij.xml.util.XmlStringUtil;
 import kotlin.Unit;
@@ -48,8 +52,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.intellij.platform.util.coroutines.CoroutineScopeKt.childScope;
-import static com.intellij.xdebugger.impl.CoroutineUtilsKt.createMutableSharedFlow;
-import static com.intellij.xdebugger.impl.breakpoints.XBreakpointProxyKt.asProxy;
+import static com.intellij.platform.debugger.impl.shared.CoroutineUtilsKt.createMutableSharedFlow;
+import static com.intellij.xdebugger.impl.proxy.MonolithBreakpointProxyKt.asProxy;
 import static com.intellij.xdebugger.impl.rpc.models.XBreakpointValueIdKt.storeGlobally;
 import static kotlinx.coroutines.CoroutineScopeKt.cancel;
 
@@ -102,7 +106,8 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
     return myBreakpointManager.getProject();
   }
 
-  protected XBreakpointManagerImpl getBreakpointManager() {
+  @ApiStatus.Internal
+  public XBreakpointManagerImpl getBreakpointManager() {
     return myBreakpointManager;
   }
 
@@ -519,7 +524,8 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
     return builder.toString();
   }
 
-  protected void updateIcon() {
+  @ApiStatus.Internal
+  public void updateIcon() {
     myIcon = calculateIcon(asProxy(this));
   }
 

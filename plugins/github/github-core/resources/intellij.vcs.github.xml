@@ -95,12 +95,9 @@
     <registryKey defaultValue="30"
                  description="Seconds between checking the ETag for the PR list"
                  key="github.pr.list.automatic.refresh.seconds"/>
-    <advancedSetting
-      id="show.review.threads.with.increased.margins"
-      default="true"
-      bundle="messages.CollaborationToolsBundle"
-      groupKey="advanced.settings.collab.tools"
-    />
+    <registryKey defaultValue="true"
+                 description="Disable new ways of adding multiline comments in unified diff"
+                 key="github.pr.new.multiline.comments.disabled"/>"/>
 
     <vcs.github.gistContentsCollector
       implementation="org.jetbrains.plugins.github.DefaultGithubGistContentsCollector"
@@ -125,14 +122,9 @@
   </extensions>
 
   <actions>
-    <action id="GitHub.Diff.Review.PreviousComment"
-            class="org.jetbrains.plugins.github.pullrequest.comment.action.GHPRDiffReviewPreviousCommentAction"
-            icon="com.intellij.icons.AllIcons.Actions.PreviousOccurence"
-            use-shortcut-of="PreviousOccurence"/>
-    <action id="GitHub.Diff.Review.NextComment"
-            class="org.jetbrains.plugins.github.pullrequest.comment.action.GHPRDiffReviewNextCommentAction"
-            icon="com.intellij.icons.AllIcons.Actions.NextOccurence"
-            use-shortcut-of="NextOccurence"/>
+    <action id="GitHub.Timeline.DeleteMergedBranch"
+            class="org.jetbrains.plugins.github.pullrequest.action.GHPRDeleteMergedHeadAction"
+            icon="AllIcons.General.Delete"/>
 
     <action id="Github.Sync.Fork"
             class="org.jetbrains.plugins.github.GithubSyncForkAction"
@@ -153,6 +145,7 @@
       <synonym key="action.Github.Add.Account.synonym"/>
     </action>
     <group id="Github.Open.In.Browser" class="org.jetbrains.plugins.github.GHOpenInBrowserActionGroup">
+      <override-text place="GoToAction"/>
       <override-text place="EditorTabPopup"/>
       <override-text place="ProjectViewPopup" use-text-of-place="EditorTabPopup"/>
       <override-text place="EditorPopup" use-text-of-place="EditorTabPopup"/>
@@ -203,7 +196,9 @@
 
     <action id="Github.PullRequest.Open.Link"
             class="org.jetbrains.plugins.github.pullrequest.action.GHPullRequestOpenURLAction"
-            icon="AllIcons.Vcs.Vendors.Github"/>
+            icon="AllIcons.Vcs.Vendors.Github">
+      <synonym key="action.Github.PullRequest.Open.Link.synonym"/>
+    </action>
     <action id="Github.PullRequest.Copy.Link"
             class="org.jetbrains.plugins.github.pullrequest.action.GHPullRequestCopyURLAction"
             icon="AllIcons.Vcs.Vendors.Github"/>

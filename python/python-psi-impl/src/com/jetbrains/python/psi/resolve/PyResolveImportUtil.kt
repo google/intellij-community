@@ -34,7 +34,8 @@ import com.jetbrains.python.psi.impl.PyBuiltinCache
 import com.jetbrains.python.psi.impl.PyImportResolver
 import com.jetbrains.python.pyi.PyiFile
 import com.jetbrains.python.pyi.PyiUtil
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
+import org.jetbrains.annotations.ApiStatus
 import java.util.*
 
 /**
@@ -68,7 +69,7 @@ fun resolveQualifiedName(name: QualifiedName, context: PyQualifiedNameResolveCon
   val key = cachePrefix(context).append(name)
 
   if (mayCache) {
-    val cachedResults = cache?.get(key)
+    val cachedResults = cache.get(key)
     if (cachedResults != null) {
       return (relativeResults + cachedResults).distinct()
     }
@@ -87,15 +88,19 @@ fun resolveQualifiedName(name: QualifiedName, context: PyQualifiedNameResolveCon
     }
   }
 
-  val results = if (relativeDirectory != null && PyUtil.isExplicitPackage(relativeDirectory)) {
+  val allResults = if (relativeDirectory != null && PyUtil.isExplicitPackage(relativeDirectory)) {
     filterTopPriorityResultsWithFallback(notSameDirectoryPython3Results, sameDirectoryPython3Results, foreignResults, name, context)
   }
   else {
     filterTopPriorityResultsWithFallback(sameDirectoryPython3Results, notSameDirectoryPython3Results, foreignResults, name, context)
   }
 
+  val results = allResults
+    .filterNot { it is PsiFileSystemItem && isInSkeletons(it) }
+    .ifEmpty { allResults }
+
   if (mayCache) {
-    cache?.put(key, results)
+    cache.put(key, results)
   }
 
   return results
@@ -273,16 +278,19 @@ private fun resultsFromRoots(name: QualifiedName, context: PyQualifiedNameResolv
     val results = if (isModuleSource) moduleResults else sdkResults
     val effectiveSdk = sdk ?: context.effectiveSdk
     if (!root.isValid ||
-        effectiveSdk != null && PyTypeShed.isInside(root) && !PyTypeShed.maySearchForStubInRoot(name, root, effectiveSdk)) {
+        effectiveSdk != null && PyTypeShed.isInside(root) && !PyTypeShed.maySearchForStubInRoot(name, root, effectiveSdk)
+    ) {
       return@RootVisitor true
     }
     if (withoutStubs && (PyTypeShed.isInside(root) ||
-                         PsiManager.getInstance(context.project).findDirectory(root)?.let { isInStubPackage(it) } == true)) {
+                         PsiManager.getInstance(context.project).findDirectory(root)?.let { isInStubPackage(it) } == true)
+    ) {
       return@RootVisitor true
     }
     results.addAll(resolveInRoot(name, root, context))
     if (isAcceptRootAsTopLevelPackage(context) && name.matchesPrefix(
-        QualifiedName.fromDottedString(root.name))) {
+        QualifiedName.fromDottedString(root.name))
+    ) {
       //TODO[akniazev]: resolving from parent root. Is it still a thing for Django?
       results.addAll(resolveInRoot(name, root.parent, context))
     }
@@ -330,11 +338,18 @@ private fun isAcceptRootAsTopLevelPackage(context: PyQualifiedNameResolveContext
   return false
 }
 
-private fun resolveInRoot(name: QualifiedName, root: VirtualFile, context: PyQualifiedNameResolveContext): List<PsiElement> {
-  return if (root.isDirectory) resolveModuleAt(name, context.psiManager.findDirectory(root), context) else emptyList()
+@ApiStatus.Internal
+fun resolveInRoot(name: QualifiedName, root: VirtualFile, context: PyQualifiedNameResolveContext): List<PsiElement> {
+  return if (root.isDirectory) {
+    resolveModuleAt(name, context.psiManager.findDirectory(root), context)
+  }
+  else {
+    emptyList()
+  }
 }
 
-private fun findCache(context: PyQualifiedNameResolveContext): PythonPathCache? {
+@ApiStatus.Internal
+fun findCache(context: PyQualifiedNameResolveContext): PythonPathCache? {
   return when {
     context.visitAllModules -> null
     context.module != null ->
@@ -361,8 +376,10 @@ private fun isSameDirectoryResult(element: PsiElement, context: PyQualifiedNameR
   }
 }
 
-private fun isSameDirectoryOrRelativeImportResult(name: QualifiedName, directory: PsiDirectory, result: PsiElement,
-                                                  context: PyQualifiedNameResolveContext): Boolean {
+private fun isSameDirectoryOrRelativeImportResult(
+  name: QualifiedName, directory: PsiDirectory, result: PsiElement,
+  context: PyQualifiedNameResolveContext,
+): Boolean {
   if (context.relativeLevel > 0) {
     return true
   }
@@ -375,9 +392,11 @@ private fun checkAccess() {
   Preconditions.checkState(ApplicationManager.getApplication().isReadAccessAllowed, "This method requires read access")
 }
 
-private fun filterTopPriorityResultsWithFallback(primaryResults: List<PsiElement>, fallbackResults: List<PsiElement>,
-                                                 foreignResults: List<PsiElement>, name: QualifiedName,
-                                                 context: PyQualifiedNameResolveContext): List<PsiElement> {
+private fun filterTopPriorityResultsWithFallback(
+  primaryResults: List<PsiElement>, fallbackResults: List<PsiElement>,
+  foreignResults: List<PsiElement>, name: QualifiedName,
+  context: PyQualifiedNameResolveContext,
+): List<PsiElement> {
   val allResults = primaryResults + fallbackResults + foreignResults
   if (name.componentCount <= 0) return allResults
   val filteredPrimaryResults = filterTopPriorityResults(primaryResults, context.module)
@@ -398,7 +417,7 @@ private fun filterTopPriorityResults(resolved: List<PsiElement>, module: Module?
   if (groupedResults.topResultIs(Priority.NAMESPACE_PACKAGE)) return groupedResults[Priority.NAMESPACE_PACKAGE]!! + skeletons
   groupedResults.remove(Priority.NAMESPACE_PACKAGE)
 
-  val priorityResults =  when {
+  val priorityResults = when {
     groupedResults.isEmpty() -> emptyList()
     // stub packages can be partial
     groupedResults.topResultIs(Priority.STUB_PACKAGE) -> firstResultWithFallback(groupedResults, Priority.STUB_PACKAGE)

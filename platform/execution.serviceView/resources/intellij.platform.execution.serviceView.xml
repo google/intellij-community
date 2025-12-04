@@ -1,5 +1,6 @@
 <idea-plugin visibility="internal">
   <dependencies>
+    <module name="intellij.platform.rpc"/>
     <module name="intellij.platform.navbar.frontend"/>
   </dependencies>
   <extensionPoints>
@@ -11,10 +12,11 @@
                     dynamic="true"/>
   </extensionPoints>
   <extensions defaultExtensionNs="com.intellij">
-    <registryKey defaultValue="true" description="Enable monolith services toolwindow on backend"
-                 key="services.view.monolith.enabled" restartRequired="true"/>
-    <registryKey defaultValue="false" description="Enable split services toolwindow on frontend"
+    <registryKey defaultValue="true" description="Enable split services toolwindow in split mode for IDE explicitly listed in `services.view.split.products`"
                  key="services.view.split.enabled" restartRequired="true"/>
+    <registryKey defaultValue="IU"
+                 description="Comma separated list of IDE product codes where split service view toolwindow implementation is eligible to work"
+                 key="services.view.split.products" restartRequired="true"/>
 
     <actionPromoter implementation="com.intellij.platform.execution.serviceView.ServiceViewActionPromoter"/>
     <navbar implementation="com.intellij.platform.execution.serviceView.ServiceViewNavBarExtension"/>

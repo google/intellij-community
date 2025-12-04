@@ -17,6 +17,7 @@ import com.intellij.driver.sdk.waitAny
 import com.intellij.driver.sdk.waitFor
 import com.intellij.driver.sdk.waitForOne
 import com.intellij.openapi.diagnostic.logger
+import org.intellij.lang.annotations.Language
 import java.awt.Color
 import java.awt.IllegalComponentStateException
 import java.awt.Point
@@ -407,6 +408,15 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
                                      data.parentSearchContext, parent))
   }
 
+  fun findInParentContext(@Language("XPath") xpath: String): UiComponent? {
+    val parentSearchContext = data.parentSearchContext
+    val foundComponent = parentSearchContext.findAll(xpath).firstOrNull() ?: return null
+    val componentPath = "${parentSearchContext.contextAsString}/$xpath"
+
+    return UiComponent(ComponentData(componentPath, driver, searchService, robotProvider,
+                                     parentSearchContext, foundComponent))
+  }
+
   fun getColor(point: Point?, moveMouse: Boolean = true): Color {
     if (moveMouse) moveMouse(point)
     return withComponent {
@@ -457,10 +467,22 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
   fun rightClick(point: Point? = null) {
     LOG.info("Right click at $this${point?.let { ": $it" } ?: ""}")
     if (point != null) {
-      withComponent { robot.click(it, point, RemoteMouseButton.RIGHT, 1) }
+      withComponent { robot.click(it, point, RemoteMouseButton.RIGHT) }
     }
     else {
-      withComponent { robot.rightClick(it) }
+      withComponent { robot.click(it, RemoteMouseButton.RIGHT) }
+    }
+  }
+
+  fun mouseWheelClick(point: Point? = null) {
+    LOG.info("Mouse wheel click at $this${point?.let { ": $it" } ?: ""}")
+    withComponent {
+      if (point != null) {
+        robot.click(it, point, RemoteMouseButton.MIDDLE)
+      }
+      else {
+        robot.click(it, RemoteMouseButton.MIDDLE)
+      }
     }
   }
 

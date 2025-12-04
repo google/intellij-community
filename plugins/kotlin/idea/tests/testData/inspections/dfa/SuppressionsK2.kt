@@ -6,6 +6,15 @@ fun doNotWarnAtZero(x: Int) {
     if (x > ZERO) return
     assert(x == ZERO)
 }
+
+object Constants {
+    const val FALSE = false
+}
+
+fun doNotWarnAtFalse(flag: Boolean?): Boolean {
+    return flag ?: Constants.FALSE
+}
+
 fun returnInReturn(a: Boolean, b: Boolean): Boolean {
     // KTIJ-23768
     return a || return b
@@ -51,7 +60,7 @@ fun compilerWarningDuplicateWhen(x : X) {
     // Reported as a compiler warning: suppress
     when (x) {
         // Difference with K1: error messages text is different
-        is X -> {}
+        <warning descr="[USELESS_IS_CHECK] Check for instance is always 'true'.">is X</warning> -> {}
     }
 }
 fun nothingOrNull(s: String?): String? {

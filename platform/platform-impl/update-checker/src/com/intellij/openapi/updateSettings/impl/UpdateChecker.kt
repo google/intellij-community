@@ -7,6 +7,7 @@ import com.intellij.ide.externalComponents.ExternalComponentManager
 import com.intellij.ide.externalComponents.ExternalComponentSource
 import com.intellij.ide.plugins.*
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests
+import com.intellij.ide.plugins.marketplace.PluginUpdateActivity
 import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.ide.plugins.newui.UiPluginManager
 import com.intellij.ide.util.PropertiesComponent
@@ -19,10 +20,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
-import com.intellij.openapi.progress.EmptyProgressIndicator
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
+import com.intellij.openapi.progress.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.*
@@ -104,9 +102,10 @@ private class UpdateCheckerFacadeImpl() : UpdateCheckerFacade {
     buildNumber: BuildNumber?,
     indicator: ProgressIndicator?,
     updateablePluginsMap: MutableMap<PluginId, IdeaPluginDescriptor?>?,
+    activity: PluginUpdateActivity
   ): InternalPluginResults {
     @Suppress("DEPRECATION")
-    return UpdateChecker.getInternalPluginUpdates(buildNumber, indicator, updateablePluginsMap)
+    return UpdateChecker.getInternalPluginUpdates(buildNumber, indicator, updateablePluginsMap, activity)
   }
 
   override fun saveDisabledToUpdatePlugins() {
@@ -189,8 +188,7 @@ object UpdateChecker {
   fun updateAndShowResult(project: Project?, customSettings: UpdateSettings? = null) {
     ProgressManager.getInstance().run(object : Task.Backgroundable(project, IdeBundle.message("updates.checking.progress"), true) {
       override fun run(indicator: ProgressIndicator) {
-        val coroutineScope = service<CoreUiCoroutineScopeHolder>().coroutineScope
-        coroutineScope.launch {
+        runBlockingCancellable {
           doUpdateAndShowResult(
             project = getProject(),
             customSettings = customSettings,
@@ -340,6 +338,7 @@ object UpdateChecker {
     buildNumber: BuildNumber? = null,
     indicator: ProgressIndicator? = null,
     updateablePluginsMap: MutableMap<PluginId, IdeaPluginDescriptor?>? = null,
+    activity: PluginUpdateActivity = PluginUpdateActivity.AVAILABLE_VERSIONS
   ): InternalPluginResults {
     indicator?.text = IdeBundle.message("updates.checking.plugins")
     if (!PluginEnabler.HEADLESS.isIgnoredDisabledPlugins) {
@@ -368,7 +367,7 @@ object UpdateChecker {
     for (host in RepositoryHelper.getPluginHosts()) {
       try {
         if (host == null && ApplicationInfoEx.getInstanceEx().usesJetBrainsPluginRepository()) {
-          findUpdatesInJetBrainsRepository(updateable, toUpdate, toUpdateDisabled, buildNumber, state, indicator)
+          findUpdatesInJetBrainsRepository(updateable, toUpdate, toUpdateDisabled, buildNumber, state, indicator, activity)
         }
         else {
           RepositoryHelper.loadPluginModels(host, buildNumber, indicator).forEach { model ->
@@ -467,10 +466,11 @@ object UpdateChecker {
     buildNumber: BuildNumber?,
     state: InstalledPluginsState,
     indicator: ProgressIndicator?,
+    activity: PluginUpdateActivity = PluginUpdateActivity.AVAILABLE_VERSIONS,
   ) {
     val marketplacePluginIds = MarketplaceRequests.getInstance().getMarketplacePlugins(indicator)
     val idsToUpdate = updateable.keys.filter { it in marketplacePluginIds }.toSet()
-    val updates = MarketplaceRequests.checkLastCompatiblePluginUpdate(idsToUpdate, buildNumber)
+    val updates = MarketplaceRequests.loadLastCompatiblePluginUpdate(idsToUpdate, buildNumber, false, activity)
     for ((id, descriptor) in updateable) {
       val lastUpdate = updates.find { it.pluginId == id.idString }
       if (lastUpdate != null &&
@@ -492,7 +492,7 @@ object UpdateChecker {
     return it is SocketTimeoutException
            || it is UnknownHostException
            || it is HttpRequests.HttpStatusException && it.statusCode == HttpURLConnection.HTTP_NOT_FOUND
-           || it is JsonMappingException && it.cause?.message?.contains("Unexpected end-of-input") == true
+           || it is JsonMappingException && it.message?.contains("end-of-input") == true
   }
 
   @RequiresBackgroundThread

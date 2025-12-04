@@ -7,9 +7,12 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.DataKey;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.ui.content.ContentManager;
 import com.intellij.util.SingleAlarm;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.impl.proxy.MonolithSessionProxy;
+import com.intellij.xdebugger.impl.proxy.MonolithSessionProxyKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -52,7 +55,7 @@ public abstract class XDebugView implements Disposable {
   @ApiStatus.OverrideOnly
   @ApiStatus.Internal
   public void processSessionEvent(@NotNull SessionEvent event, @NotNull XDebugSessionProxy session) {
-    if (session instanceof XDebugSessionProxy.Monolith monolith) {
+    if (session instanceof MonolithSessionProxy monolith) {
       processSessionEvent(event, monolith.getSession());
     }
   }
@@ -62,7 +65,7 @@ public abstract class XDebugView implements Disposable {
    */
   @ApiStatus.Obsolete
   public void processSessionEvent(@NotNull SessionEvent event, @NotNull XDebugSession session) {
-    processSessionEvent(event, XDebugSessionProxyKeeperKt.asProxy(session));
+    processSessionEvent(event, MonolithSessionProxyKt.asProxy(session));
   }
 
   protected static @Nullable XDebugSession getSession(@NotNull EventObject e) {

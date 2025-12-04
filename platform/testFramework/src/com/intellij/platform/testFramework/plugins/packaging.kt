@@ -1,8 +1,9 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.plugins
 
-import com.intellij.ide.plugins.ModuleLoadingRule
-import com.intellij.ide.plugins.ModuleVisibility
+import com.intellij.platform.plugins.parser.impl.elements.ModuleLoadingRuleValue
+import com.intellij.platform.plugins.parser.impl.elements.ModuleVisibilityValue
+import com.intellij.platform.plugins.parser.impl.elements.xmlValue
 import com.intellij.util.io.DirectoryContentBuilder
 import com.intellij.util.io.directoryContent
 import com.intellij.util.io.jarFile
@@ -38,15 +39,17 @@ fun PluginSpec.buildXml(config: PluginPackagingConfig = PluginPackagingConfig())
     if (implementationDetail) append(""" implementation-detail="true"""")
     if (packagePrefix != null) append(""" package="$packagePrefix"""")
     if (isSeparateJar) append(""" separate-jar="true"""")
-    if (moduleVisibility != ModuleVisibility.PRIVATE) append(""" visibility="${moduleVisibility.name.lowercase()}"""")
+    if (moduleVisibility != ModuleVisibilityValue.PRIVATE) append(""" visibility="${moduleVisibility.name.lowercase()}"""")
     if (rootTagAttributes != null) append(" $rootTagAttributes")
     appendLine(">")
     if (id != null) appendLine("<id>$id</id>")
     if (name != null) appendLine("<name>$name</name>")
-    when {
-      sinceBuild != null && untilBuild != null -> appendLine("""<idea-version since-build="${sinceBuild}" until-build="${untilBuild}"/>""")
-      sinceBuild != null -> appendLine("""<idea-version since-build="${sinceBuild}"/>""")
-      untilBuild != null -> appendLine("""<idea-version until-build="${untilBuild}"/>""")
+    if (sinceBuild != null || untilBuild != null || strictUntilBuild != null) {
+      append("<idea-version")
+      if (sinceBuild != null) append(""" since-build="${sinceBuild}"""")
+      if (untilBuild != null) append(""" until-build="${untilBuild}"""")
+      if (strictUntilBuild != null) append(""" strict-until-build="${strictUntilBuild}"""")
+      appendLine("/>")
     }
     if (category != null) appendLine("<category>$category</category>")
     if (version != null) appendLine("<version>$version</version>")
@@ -63,7 +66,9 @@ fun PluginSpec.buildXml(config: PluginPackagingConfig = PluginPackagingConfig())
     if (moduleDependencies.isNotEmpty() || pluginMainModuleDependencies.isNotEmpty()) {
       appendLine("<dependencies>")
       for (module in moduleDependencies) {
-        appendLine("""<module name="${module}" />""")
+        append("""<module name="${module.name}"""")
+        if (module.namespace != null) append(""" namespace="${module.namespace}"""")
+        appendLine(""" />""")
       }
       for (plugin in pluginMainModuleDependencies) {
         appendLine("""<plugin id="${plugin}" />""")
@@ -80,12 +85,8 @@ fun PluginSpec.buildXml(config: PluginPackagingConfig = PluginPackagingConfig())
       val attributes = if (namespace != null) """ namespace="$namespace"""" else ""
       appendLine("<content$attributes>")
       for (module in content) {
-        val loadingAttribute = when (module.loadingRule) {
-          ModuleLoadingRule.OPTIONAL -> ""
-          ModuleLoadingRule.REQUIRED -> "loading=\"required\" "
-          ModuleLoadingRule.EMBEDDED -> "loading=\"embedded\" "
-          ModuleLoadingRule.ON_DEMAND -> "loading=\"on-demand\" "
-        }
+        val loadingAttribute = module.loadingRule.takeIf { it != ModuleLoadingRuleValue.OPTIONAL }?.let { "loading=\"${it.xmlValue}\" " }.orEmpty() +
+                               module.requiredIfAvailable?.let { "required-if-available=\"$it\" " }.orEmpty()
         val tag = """module name="${module.moduleId}" $loadingAttribute"""
         if (module.embedToPluginXml) {
           appendLine("<$tag><![CDATA[${module.spec.buildXml(config)}]]></module>")

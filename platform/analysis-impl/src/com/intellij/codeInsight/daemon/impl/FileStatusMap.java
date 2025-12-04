@@ -140,13 +140,25 @@ public final class FileStatusMap implements Disposable {
     }
   }
 
-  // used in plugins
+  /**
+   * @deprecated use {@link #markFileUpToDate(Document, CodeInsightContext, int, ProgressIndicator)} instead
+   */
+  @Deprecated
   public void markFileUpToDate(@NotNull Document document, int passId) {
     markFileUpToDate(document, CodeInsightContexts.anyContext(), passId, null);
   }
 
+  /**
+   * @param document document to mark up to date
+   * @param context the context in which the document is up to date. See {@link com.intellij.codeHighlighting.TextEditorHighlightingPass#getContext}
+   * @param passId the id of the pass that is marked up to date
+   * @param indicator the current indicator for debugging purposes
+   */
   @ApiStatus.Experimental
-  public void markFileUpToDate(@NotNull Document document, @NotNull CodeInsightContext context, int passId, ProgressIndicator indicator) {
+  public void markFileUpToDate(@NotNull Document document,
+                               @NotNull CodeInsightContext context,
+                               int passId,
+                               @Nullable ProgressIndicator indicator) {
     synchronized (myFileStatusMapState) {
       FileStatus status = myFileStatusMapState.getOrCreateStatus(document, context);
       status.setDefensivelyMarked(false, passId);
@@ -282,6 +294,22 @@ public final class FileStatusMap implements Disposable {
       FileStatus status = myFileStatusMapState.getStatusOrNull(document, context);
       return status != null && !status.isDefensivelyMarkedForAnyPass() && status.isWolfPassFinished() && status.allDirtyScopesAreNull();
     }
+  }
+
+  /**
+   * @return true when all registered statuses are clean
+   */
+  @ApiStatus.Experimental
+  @ApiStatus.Internal
+  public boolean allDirtyScopesAreNull() {
+    synchronized (myFileStatusMapState) {
+      return myFileStatusMapState.allDirtyScopesAreNull();
+    }
+  }
+
+  @Override
+  public String toString() {
+    return myFileStatusMapState.toString();
   }
 
   public @NotNull String toString(@NotNull Document document) {

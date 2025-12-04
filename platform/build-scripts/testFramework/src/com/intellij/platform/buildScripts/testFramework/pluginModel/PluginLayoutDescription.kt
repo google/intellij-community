@@ -3,6 +3,8 @@ package com.intellij.platform.buildScripts.testFramework.pluginModel
 
 import com.intellij.platform.distributionContent.testFramework.FileEntry
 import com.intellij.platform.distributionContent.testFramework.deserializeContentData
+import com.intellij.platform.plugins.testFramework.resolveModuleSet
+import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.util.JpsPathUtil
@@ -34,10 +36,11 @@ data class PluginLayoutDescription(
 
 fun createLayoutProviderByContentYamlFiles(
   ideContentYamlPath: Path,
+  ultimateHome: Path,
   mainModuleOfCorePlugin: String,
   corePluginDescriptorPath: String,
   nameOfTestWhichGeneratesFiles: String,
-  project: org.jetbrains.jps.model.JpsProject,
+  project: JpsProject,
 ): PluginLayoutProvider {
   return YamlFileBasedPluginLayoutProvider(
     ideContentYamlPath = ideContentYamlPath,
@@ -45,6 +48,7 @@ fun createLayoutProviderByContentYamlFiles(
     corePluginDescriptorPath = corePluginDescriptorPath,
     nameOfTestWhichGeneratesFiles = nameOfTestWhichGeneratesFiles,
     project = project,
+    ultimateHome = ultimateHome,
   )
 }
 
@@ -53,7 +57,8 @@ private class YamlFileBasedPluginLayoutProvider(
   private val mainModuleOfCorePlugin: String,
   private val corePluginDescriptorPath: String,
   private val nameOfTestWhichGeneratesFiles: String,
-  private val project: org.jetbrains.jps.model.JpsProject,
+  private val project: JpsProject,
+  private val ultimateHome: Path,
 ) : PluginLayoutProvider {
   private val ideContentData by lazy {
     deserializeContentData(ideContentYamlPath.readText())
@@ -66,28 +71,27 @@ private class YamlFileBasedPluginLayoutProvider(
   private fun loadMergedContentData(): List<FileEntry> {
     val baseEntries = ideContentData.toMutableList()
 
-    // Collect productModules and productEmbeddedModules separately
-    val productModuleNames = ideContentData.flatMap { it.productModules }.distinct()
-    val productEmbeddedModuleNames = ideContentData.flatMap { it.productEmbeddedModules }.distinct()
+    // Collect productModules and productEmbeddedModules separately, expanding module sets
+    val productModuleNames = ideContentData
+      .asSequence()
+      .flatMap { it.productModules }
+      .flatMap { moduleName -> resolveModuleSet(moduleName, ultimateHome) }
+      .distinct()
 
-    if (productModuleNames.isEmpty() && productEmbeddedModuleNames.isEmpty()) {
-      return baseEntries
-    }
+    val productEmbeddedModuleNames = ideContentData
+      .asSequence()
+      .flatMap { it.productEmbeddedModules }
+      .flatMap { moduleName -> resolveModuleSet(moduleName, ultimateHome) }
+      .distinct()
 
-    // Process productModules with "dist.all/lib/modules/{moduleName}.jar" pattern
-    for (moduleName in productModuleNames) {
-      loadAndMergeModuleContent(moduleName, "dist.all/lib/modules/$moduleName.jar", baseEntries)
-    }
-
-    // Process productEmbeddedModules with "dist.all/lib/module-{moduleName}.jar" pattern
-    for (moduleName in productEmbeddedModuleNames) {
-      loadAndMergeModuleContent(moduleName, "dist.all/lib/module-$moduleName.jar", baseEntries)
+    for (moduleName in (productModuleNames + productEmbeddedModuleNames)) {
+      loadAndMergeModuleContent(moduleName, baseEntries)
     }
 
     return baseEntries
   }
 
-  private fun loadAndMergeModuleContent(moduleName: String, jarName: String, baseEntries: MutableList<FileEntry>) {
+  private fun loadAndMergeModuleContent(moduleName: String, baseEntries: MutableList<FileEntry>) {
     val module = project.findModuleByName(moduleName) ?: return
     val contentRootUrl = module.contentRootsList.urls.firstOrNull() ?: return
     val moduleContentPath = JpsPathUtil.urlToNioPath(contentRootUrl).resolve("module-content.yaml")
@@ -101,7 +105,7 @@ private class YamlFileBasedPluginLayoutProvider(
     // replace <file> placeholder with actual jar path
     for (entry in moduleEntries) {
       if (entry.name == "<file>") {
-        baseEntries.add(entry.copy(name = jarName))
+        baseEntries.add(entry.copy(name = "dist.all/lib/$moduleName.jar"))
       }
       else {
         baseEntries.add(entry)
@@ -153,7 +157,7 @@ private class YamlFileBasedPluginLayoutProvider(
     get() = "Note that the test uses the data from *content.yaml files, so if you changed the layouts, run '$nameOfTestWhichGeneratesFiles' to make sure that they are up-to-date."
 }
 
-private fun toPluginLayoutDescription(
+internal fun toPluginLayoutDescription(
   entries: List<FileEntry>,
   mainModuleName: String,
   pluginDescriptorPath: String,

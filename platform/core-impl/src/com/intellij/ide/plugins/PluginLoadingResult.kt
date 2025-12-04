@@ -1,5 +1,4 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
 package com.intellij.ide.plugins
 
 import com.intellij.core.CoreBundle
@@ -45,17 +44,17 @@ class PluginLoadingResult {
 
   private fun addIncompletePlugin(plugin: PluginMainDescriptor, error: PluginNonLoadReason?) {
     // do not report if some compatible plugin were already added
-    // no race condition here: plugins from classpath are loaded before and not in parallel to loading from plugin dir
+    // no race condition here: plugins from classpath are loaded before and not in parallel to loading from the plugin dir
     if (idMap.containsKey(plugin.pluginId)) {
       return
     }
 
     val existingIncompletePlugin = incompletePlugins.putIfAbsent(plugin.pluginId, plugin)
     if (existingIncompletePlugin != null && VersionComparatorUtil.compare(plugin.version, existingIncompletePlugin.version) > 0) {
-      incompletePlugins.put(plugin.pluginId, plugin)
+      incompletePlugins[plugin.pluginId] = plugin
       if (error != null) {
         // force put
-        pluginErrors.put(plugin.pluginId, error)
+        pluginErrors[plugin.pluginId] = error
       }
     }
     else if (error != null) {
@@ -70,12 +69,14 @@ class PluginLoadingResult {
     for (pluginList in descriptorLoadingResult.discoveredPlugins) {
       for (descriptor in pluginList.plugins) {
         // plugins added via property shouldn't be overridden to avoid plugin root detection issues when running external plugin tests
-        initAndAdd(descriptor = descriptor, overrideUseIfCompatible = pluginList.source is PluginsSourceContext.SystemPropertyProvided, initContext = initContext)
+        initAndAdd(descriptor = descriptor,
+                   overrideExistingIfCompatible = pluginList.source is PluginsSourceContext.SystemPropertyProvided,
+                   initContext = initContext)
       }
     }
   }
 
-  private fun initAndAdd(descriptor: PluginMainDescriptor, overrideUseIfCompatible: Boolean, initContext: PluginInitializationContext) {
+  private fun initAndAdd(descriptor: PluginMainDescriptor, overrideExistingIfCompatible: Boolean, initContext: PluginInitializationContext) {
     initContext.pluginsPerProjectConfig?.let { conf ->
       if (conf.isMainProcess && descriptor.pluginId !in initContext.essentialPlugins) {
         return
@@ -92,13 +93,13 @@ class PluginLoadingResult {
       return
     }
 
-    // remove any error that occurred for plugin with the same `id`
+    // remove any error that occurred for a plugin with the same `id`
     val pluginId = descriptor.pluginId
     pluginErrors.remove(pluginId)
     incompletePlugins.remove(pluginId)
     val prevDescriptor = enabledPluginsById.put(pluginId, descriptor)
     if (prevDescriptor == null) {
-      idMap.put(pluginId, descriptor)
+      idMap[pluginId] = descriptor
       for (pluginAlias in descriptor.pluginAliases) {
         checkAndAdd(descriptor, pluginAlias)
       }
@@ -110,13 +111,13 @@ class PluginLoadingResult {
     }
 
     if (PluginManagerCore.checkBuildNumberCompatibility(descriptor, initContext.productBuildNumber) == null &&
-        (overrideUseIfCompatible || VersionComparatorUtil.compare(descriptor.version, prevDescriptor.version) > 0)) {
+        (overrideExistingIfCompatible || VersionComparatorUtil.compare(descriptor.version, prevDescriptor.version) > 0)) {
       PluginManagerCore.logger.info("$descriptor overrides $prevDescriptor")
-      idMap.put(pluginId, descriptor)
+      idMap[pluginId] = descriptor
       return
     }
     else {
-      enabledPluginsById.put(pluginId, prevDescriptor)
+      enabledPluginsById[pluginId] = prevDescriptor
       return
     }
   }
@@ -188,6 +189,6 @@ class PluginLoadingResult {
     val list = ArrayList<PluginMainDescriptor>(2)
     list.add(existingDescriptor)
     list.add(descriptor)
-    duplicateModuleMap!!.put(id, list)
+    duplicateModuleMap!![id] = list
   }
 }

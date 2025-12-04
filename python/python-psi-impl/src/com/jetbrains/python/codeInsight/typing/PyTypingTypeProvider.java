@@ -49,7 +49,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.dynatrace.hash4j.hashing.Hashing.xxh3_128;
@@ -783,6 +782,11 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     return false;
   }
 
+  @ApiStatus.Internal
+  public static @Nullable Ref<PyType> getType(@NotNull PyExpression expression, @NotNull TypeEvalContext context, boolean useFqn) {
+    return staticWithCustomContext(context, useFqn, customContext -> getType(expression, customContext));
+  }
+
   public static @Nullable Ref<PyType> getType(@NotNull PyExpression expression, @NotNull TypeEvalContext context) {
     return staticWithCustomContext(context, customContext -> getType(expression, customContext));
   }
@@ -850,6 +854,11 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
         return null;
       }
       context.addTypeAlias(alias);
+    }
+    if (resolved instanceof PyClass pyClass && !context.addClassDeclaration(pyClass)) {
+      // Resolving to normal classes shouldn't cause recursive evaluation of type hints,
+      // but constructing recursive PyTypedDictTypes will trigger that.
+      return null;
     }
     try {
       final Ref<PyType> typeHintFromProvider = PyTypeHintProvider.Companion.parseTypeHint(
@@ -974,13 +983,23 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       if (noneType != null) {
         return noneType;
       }
+      PyTypingNewType newType = PyTypingNewTypeTypeProvider.getNewTypeForResolvedElement(resolved, context.getTypeContext());
+      if (newType != null) {
+        return Ref.create(newType.toInstance());
+      }
       final Ref<PyType> classType = getClassType(typeHint, resolved, context);
       if (classType != null) {
         return classType;
       }
+      if (context.myUseFqn && resolved.getText().equals("Unknown")) {
+        return Ref.create();
+      }
       return null;
     }
     finally {
+      if (resolved instanceof PyClass pyClass) {
+        context.removeClassDeclaration(pyClass);
+      }
       if (alias != null) {
         context.removeTypeAlias(alias);
       }
@@ -1034,7 +1053,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       PyClassType scopeClassType = as(containingClass.getType(context.getTypeContext()), PyClassType.class);
       if (scopeClassType == null) return null;
 
-      return Ref.create(new PySelfType(scopeClassType));
+      return Ref.create(new PySelfType(scopeClassType).toInstance());
     }
     return null;
   }
@@ -1106,6 +1125,10 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     if (typeVar != null && !typeVar.isDefinition()) {
       return Ref.create(typeVar.toClass());
     }
+    final PySelfType selfType = as(type, PySelfType.class);
+    if (selfType != null) {
+      return Ref.create(selfType.toClass());
+    }
     // Represent Type[Union[str, int]] internally as Union[Type[str], Type[int]]
     if (type instanceof PyUnionType unionType &&
         ContainerUtil.all(unionType.getMembers(), t -> t instanceof PyClassType clsType && !clsType.isDefinition())) {
@@ -1122,7 +1145,14 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   private static @Nullable Ref<PyType> getClassType(@NotNull PyExpression typeHint, @NotNull PsiElement element, @NotNull Context context) {
     if (typeHint instanceof PyReferenceExpression && element instanceof PyTypedElement) {
       TypeEvalContext typeContext = context.getTypeContext();
-      final PyType type = typeContext.getType((PyTypedElement)element);
+      final PyType type;
+      if (context.myUseFqn) {
+        var class_ = PyPsiFacade.getInstance(element.getProject()).createClassByQName(element.getText(), element);
+        type = class_ != null ? class_.getType(typeContext) : null;
+      }
+      else {
+        type = typeContext.getType((PyTypedElement)element);
+      }
       if (type instanceof PyClassLikeType classLikeType) {
         if (classLikeType.isDefinition()) {
           // If we're interpreting a type hint like "MyGeneric" that is not followed by a list of type arguments (e.g. MyGeneric[int]),
@@ -1176,7 +1206,7 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
 
   private static @Nullable Ref<PyType> getLiteralType(@NotNull PsiElement resolved, @NotNull Context context) {
     if (resolved instanceof PySubscriptionExpression subscriptionExpr) {
-      if (resolvesToQualifiedNames(subscriptionExpr.getOperand(), context.getTypeContext(), LITERAL, LITERAL_EXT)) {
+      if (resolvesToQualifiedNames(subscriptionExpr.getOperand(), context, LITERAL, LITERAL_EXT)) {
         return Optional
           .ofNullable(subscriptionExpr.getIndexExpression())
           .map(index -> PyLiteralType.Companion.fromLiteralParameter(index, context.getTypeContext()))
@@ -1283,6 +1313,15 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   public static <T extends PyAnnotationOwner & PyTypeCommentOwner> boolean isClassVar(@NotNull T owner, @NotNull TypeEvalContext context) {
     return PyUtil.getParameterizedCachedValue(owner, context, p ->
       typeHintedWithName(owner, context, CLASS_VAR));
+  }
+
+  private static boolean resolvesToQualifiedNames(@NotNull PyExpression expression, @NotNull Context context, String... names) {
+    if (!context.myUseFqn) return resolvesToQualifiedNames(expression, context.myContext, names);
+    if (!(expression instanceof PyReferenceExpression referenceExpression)) return false;
+    var qualifier = referenceExpression.getQualifier();
+    if (qualifier == null) return false;
+    var qName = qualifier.getName() + "." + expression.getName();
+    return ContainerUtil.exists(names, name -> name.equals(qName));
   }
 
   private static boolean resolvesToQualifiedNames(@NotNull PyExpression expression, @NotNull TypeEvalContext context, String... names) {
@@ -2307,10 +2346,16 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   }
 
   private static <T> T staticWithCustomContext(@NotNull TypeEvalContext context, @NotNull Function<@NotNull Context, T> delegate) {
+    return staticWithCustomContext(context, false, delegate);
+  }
+
+  private static <T> T staticWithCustomContext(@NotNull TypeEvalContext context,
+                                               boolean useFqn,
+                                               @NotNull Function<@NotNull Context, T> delegate) {
     Context customContext = context.getProcessingContext().get(TYPE_HINT_EVAL_CONTEXT);
     boolean firstEntrance = customContext == null;
     if (firstEntrance) {
-      customContext = new Context(context);
+      customContext = new Context(context, useFqn);
       context.getProcessingContext().put(TYPE_HINT_EVAL_CONTEXT, customContext);
     }
     try {
@@ -2327,10 +2372,19 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
   public static final class Context {
     private final @NotNull TypeEvalContext myContext;
     private final @NotNull Stack<PyQualifiedNameOwner> myTypeAliasStack = new Stack<>();
+    private final @NotNull Set<PyClass> myClassSet = new HashSet<>();
     private boolean myComputeTypeParameterScope = true;
+    private final boolean myUseFqn;
 
     private Context(@NotNull TypeEvalContext context) {
       myContext = context;
+      myUseFqn = false;
+      recomputeStrongHashValue();
+    }
+
+    private Context(@NotNull TypeEvalContext context, boolean useFqn) {
+      myContext = context;
+      myUseFqn = useFqn;
       recomputeStrongHashValue();
     }
 
@@ -2376,6 +2430,14 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
       return res;
     }
 
+    public boolean addClassDeclaration(@NotNull PyClass pyClass) {
+      return myClassSet.add(pyClass);
+    }
+
+    public void removeClassDeclaration(@NotNull PyClass pyClass) {
+      myClassSet.remove(pyClass);
+    }
+
     public boolean isComputeTypeParameterScopeEnabled() {
       return myComputeTypeParameterScope;
     }
@@ -2399,9 +2461,12 @@ public final class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<
     private @NotNull HashValue128 myContextStrongHashValue;
 
     private void recomputeStrongHashValue() {
-      myContextStrongHashValue = xxh3_128().hashCharsTo128Bits(Stream.concat(Stream.of(myComputeTypeParameterScope ? "1" : "0"),
-                                                    myTypeAliasStack.stream().map(it -> it.getQualifiedName()))
-                                                   .collect(Collectors.joining("#")));
+      myContextStrongHashValue = xxh3_128().hashCharsTo128Bits(
+        StreamEx.of(myComputeTypeParameterScope ? "1" : "0")
+          .append(myTypeAliasStack.stream().map(it -> it.getQualifiedName()))
+          .append(myClassSet.stream().map(it -> it.getQualifiedName()))
+          .joining("#")
+      );
     }
 
     private @NotNull HashValue128 getContextStrongHashValue() {

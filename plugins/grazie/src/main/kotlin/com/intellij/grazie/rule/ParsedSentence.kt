@@ -7,7 +7,6 @@ import com.intellij.grazie.rule.ParsedSentence.Companion.findSentenceASAP
 import com.intellij.grazie.rule.ParsedSentence.Companion.findSentenceInFile
 import com.intellij.grazie.rule.ParsedSentence.Companion.getSentences
 import com.intellij.grazie.rule.SentenceBatcher.AsyncBatchParser
-import com.intellij.grazie.text.TextChecker
 import com.intellij.grazie.text.TextChecker.ProofreadingContext
 import com.intellij.grazie.text.TextContent
 import com.intellij.grazie.text.TextExtractor
@@ -112,8 +111,7 @@ class ParsedSentence private constructor(
     }
 
     private suspend fun getSentences(content: TextContent, rangeInFile: TextRange, minimal: Boolean): List<ParsedSentence> {
-      if (HighlightingUtil.isTooLargeText(listOf(content)) ||
-          !NaturalTextDetector.seemsNatural(content.toString())) {
+      if (HighlightingUtil.isTooLargeText(listOf(content)) || !NaturalTextDetector.seemsNatural(content)) {
         return emptyList()
       }
       val parser = DependencyParser.getParser(content, minimal) ?: return emptyList()

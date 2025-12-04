@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.ShellStartupOptions
-import org.jetbrains.plugins.terminal.session.TerminalSessionTerminatedEvent
+import org.jetbrains.plugins.terminal.session.impl.TerminalSessionTerminatedEvent
 import org.jetbrains.plugins.terminal.util.STOP_EMULATOR_TIMEOUT
 import org.jetbrains.plugins.terminal.util.waitFor
 
@@ -33,8 +33,7 @@ fun startTerminalProcess(
 ): Pair<TtyConnector, ShellStartupOptions> {
   val runner = ReworkedLocalTerminalRunner(project)
   val configuredOptions = runner.configureStartupOptions(options)
-  val process = runner.createProcess(configuredOptions)
-  val connector = runner.createTtyConnector(process)
+  val connector = runner.createTtyConnector(configuredOptions)
 
   return connector to configuredOptions
 }

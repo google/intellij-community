@@ -16,10 +16,7 @@ import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.ide.fus.AcceptanceRateTracker
 import com.intellij.grazie.ide.fus.GrazieFUSCounter
 import com.intellij.grazie.ide.inspection.grammar.GrazieInspection
-import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieAddExceptionQuickFix
-import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieCustomFixWrapper
-import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieReplaceTypoQuickFix
-import com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieRuleSettingsAction
+import com.intellij.grazie.ide.inspection.grammar.quickfix.*
 import com.intellij.grazie.ide.language.LanguageGrammarChecking
 import com.intellij.grazie.text.TextChecker.ProofreadingContext
 import com.intellij.grazie.utils.HighlightingUtil
@@ -42,7 +39,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.util.parents
 import com.intellij.psi.util.startOffset
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.yield
 import org.jetbrains.annotations.ApiStatus
 
 private val problemsKey = Key.create<CachedResults>("grazie.text.problems")
@@ -65,7 +65,7 @@ class CheckerRunner(val text: TextContent) {
   }
 
   fun run(): List<TextProblem> {
-    if (text.isBlank() || !seemsNatural(text.toString())) return emptyList()
+    if (text.isBlank() || !seemsNatural(text)) return emptyList()
 
     val context = text.toProofreadingContext()
     if (context.language == Language.UNKNOWN || HighlightingUtil.findInstalledLang(context.language) == null) return emptyList()
@@ -274,6 +274,7 @@ class CheckerRunner(val text: TextContent) {
       }
     })
     result.add(GrazieRuleSettingsAction(problem.rule, problem.text.getTextDomain()))
+    result.add(GrazieEnableCloudAction())
     return result.toTypedArray()
   }
 

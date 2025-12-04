@@ -13,11 +13,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.impl.EditorId
-import com.intellij.openapi.editor.impl.findEditorOrNull
 import com.intellij.openapi.extensions.ExtensionPointAdapter
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.blockingContextToIndicator
 import com.intellij.openapi.project.Project
@@ -37,14 +33,15 @@ import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.breakpoints.*
-import com.intellij.xdebugger.impl.rpc.XBreakpointId
-import com.intellij.xdebugger.impl.rpc.XBreakpointTypeId
 import com.intellij.xdebugger.impl.rpc.models.findValue
+import com.intellij.xdebugger.impl.rpc.sourcePosition
 import fleet.rpc.core.toRpc
 import fleet.util.channels.use
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import org.jetbrains.concurrency.asDeferred
@@ -66,8 +63,9 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
           trySend(getCurrentBreakpointTypeDtos(project))
         }
       })
-      trySend(getCurrentBreakpointTypeDtos(project))
-    }.buffer(1)
+      send(getCurrentBreakpointTypeDtos(project))
+      awaitClose()
+    }.buffer(1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     return XBreakpointTypeList(
       initialTypes,
@@ -75,44 +73,30 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
     )
   }
 
-  override suspend fun getBreakpointsInfoForLine(projectId: ProjectId, editorId: EditorId, line: Int): XBreakpointsLineInfo {
-    val project = projectId.findProjectOrNull() ?: return XBreakpointsLineInfo(listOf(), false)
-    val editor = editorId.findEditorOrNull() ?: return XBreakpointsLineInfo(listOf(), false)
-    val rawInfo: BreakpointsLineRawInfo? = readAction {
-      if (!DocumentUtil.isValidLine(line, editor.document)) return@readAction null
-      blockingContextToIndicator {
-        val position = XDebuggerUtil.getInstance().createPosition(FileDocumentManager.getInstance().getFile(editor.document), line)
-                       ?: return@blockingContextToIndicator null
-        computeBreakpointsLineRawInfo(project, position, editor)
-      }
-    }
-    return rawInfo?.toDto() ?: XBreakpointsLineInfo(listOf(), false)
-  }
-
-  override suspend fun getBreakpointsInfoForEditor(projectId: ProjectId, editorId: EditorId, start: Int, endInclusive: Int): List<XBreakpointsLineInfo>? {
-    val project = projectId.findProjectOrNull() ?: return null
-    val editor = editorId.findEditorOrNull() ?: return null
-    val editorBreakpointsRawInfo: List<BreakpointsLineRawInfo?> = readAction {
-      blockingContextToIndicator {
-        val editorBreakpointLinesRawInfo = mutableListOf<BreakpointsLineRawInfo?>()
-        for (line in start..endInclusive) {
-          if (!DocumentUtil.isValidLine(line, editor.document)) {
-            continue
+  override suspend fun getBreakpointsInfo(projectId: ProjectId, fileId: VirtualFileId, start: Int, endInclusive: Int): List<XBreakpointsLineInfo>? {
+    try {
+      val project = projectId.findProjectOrNull() ?: return null
+      val file = fileId.virtualFile() ?: return null
+      val editorBreakpointsRawInfo: List<BreakpointsLineRawInfo?> = readAction {
+        val document = file.findDocument()
+        blockingContextToIndicator {
+          (start..endInclusive).map { line ->
+            if (document == null) return@map null
+            if (!DocumentUtil.isValidLine(line, document)) return@map null
+            ProgressManager.checkCanceled()
+            val position = XDebuggerUtil.getInstance().createPosition(file, line) ?: return@map null
+            computeBreakpointsLineRawInfo(project, position)
           }
-          ProgressManager.checkCanceled()
-          val position = XDebuggerUtil.getInstance().createPosition(FileDocumentManager.getInstance().getFile(editor.document), line)
-          if (position == null) {
-            editorBreakpointLinesRawInfo.add(null)
-            continue
-          }
-          editorBreakpointLinesRawInfo.add(computeBreakpointsLineRawInfo(project, position, editor))
         }
-        editorBreakpointLinesRawInfo
+      }
+
+      return editorBreakpointsRawInfo.map {
+        it?.toDto() ?: XBreakpointsLineInfo(listOf(), false)
       }
     }
-
-    return editorBreakpointsRawInfo.map {
-      it?.toDto() ?: XBreakpointsLineInfo(listOf(), false)
+    catch (e: CancellationException) {
+      LOG.info("Request getBreakpointsInfo was cancelled: $e")
+      return null
     }
   }
 
@@ -319,8 +303,8 @@ internal class BackendXBreakpointTypeApi : XBreakpointTypeApi {
   }
 
   @RequiresReadLock
-  private fun computeBreakpointsLineRawInfo(project: Project, position: XSourcePosition, editor: Editor): BreakpointsLineRawInfo {
-    val lineBreakpointTypes = XBreakpointUtil.getAvailableLineBreakpointTypes(project, position, editor)
+  private fun computeBreakpointsLineRawInfo(project: Project, position: XSourcePosition): BreakpointsLineRawInfo {
+    val lineBreakpointTypes = XBreakpointUtil.getAvailableLineBreakpointTypes(project, position, true, null)
     val variantsPromise = if (lineBreakpointTypes.isNotEmpty()) {
       XDebuggerUtilImpl.getLineBreakpointVariants(project, lineBreakpointTypes, position).asDeferred()
     }

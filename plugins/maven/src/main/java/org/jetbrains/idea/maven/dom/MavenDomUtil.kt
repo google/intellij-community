@@ -24,10 +24,14 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.ObjectUtils
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.xml.*
 import org.jetbrains.idea.maven.dom.model.*
 import org.jetbrains.idea.maven.model.MavenConstants
+import org.jetbrains.idea.maven.model.MavenConstants.MODEL_VERSION_4_0_0
+import org.jetbrains.idea.maven.model.MavenConstants.MODEL_VERSION_4_1_0
 import org.jetbrains.idea.maven.model.MavenCoordinate
 import org.jetbrains.idea.maven.model.MavenId
 import org.jetbrains.idea.maven.model.MavenResource
@@ -37,6 +41,7 @@ import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.server.MavenDistribution
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
 import org.jetbrains.idea.maven.utils.MavenLog
+import org.jetbrains.idea.maven.utils.MavenUtil
 import org.jetbrains.idea.maven.utils.MavenUtil.isPomFileName
 import java.util.regex.Pattern
 
@@ -69,6 +74,29 @@ object MavenDomUtil {
     }
 
     return isPomFileName(file.getName())
+  }
+
+  @JvmStatic
+  fun isProjectFileWithModel410(file: PsiFile?): Boolean {
+    if (file !is XmlFile) return false
+
+    val rootTag = file.getRootTag()
+    if (rootTag == null || "project" != rootTag.getName()) return false
+
+    val xmlns = rootTag.getAttributeValue("xmlns")
+    if (xmlns != "http://maven.apache.org/POM/4.1.0" && xmlns != "https://maven.apache.org/POM/4.1.0"){
+      return false
+    }
+
+    if (!isPomFileName(file.getName())) return false
+
+    val modelTag = rootTag.findSubTags("modelVersion").singleOrNull()
+    if (modelTag?.value?.text == MODEL_VERSION_4_1_0) return true
+    if (modelTag?.value?.text == MODEL_VERSION_4_0_0) return false
+    return MavenUtil.isMaven410(
+      rootTag?.getAttribute("xmlns")?.value,
+      rootTag?.getAttribute("xsi:schemaLocation")?.value)
+
   }
 
   @JvmStatic
@@ -233,6 +261,8 @@ object MavenDomUtil {
     return manager.findContainingProject(file)
   }
 
+  @RequiresReadLock
+  @RequiresBackgroundThread(generateAssertion = false)
   @JvmStatic
   fun getMavenDomProjectModel(project: Project, file: VirtualFile): MavenDomProjectModel? {
     return getMavenDomModel(project, file, MavenDomProjectModel::class.java)
@@ -250,6 +280,8 @@ object MavenDomUtil {
     return getMavenDomModel<MavenDomProfiles>(project, file, MavenDomProfiles::class.java) // try an old-style model
   }
 
+  @RequiresReadLock
+  @RequiresBackgroundThread(generateAssertion = false)
   @JvmStatic
   fun <T : MavenDomElement?> getMavenDomModel(
     project: Project,

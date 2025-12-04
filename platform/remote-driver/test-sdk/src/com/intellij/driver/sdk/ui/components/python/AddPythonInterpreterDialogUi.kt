@@ -13,6 +13,8 @@ class AddPythonInterpreterDialogUi(data: ComponentData): UiComponent(data) {
   val okButton = x { byAccessibleName("OK") }
   val useVenv1Link = x { byAccessibleName("Use .venv1") }
   val selectExisting = x { byAccessibleName("Select existing") }
+  val generateNew = x { byAccessibleName("Generate new") }
+  val browseButton = x("//div[@tooltiptext='Browse…']")
 
-  fun clickPathToExecutable(type: String) = x("//div[@text='Path to $type:']/following-sibling:: *[@class='TextFieldWithBrowseButton'][1]").click()
+  fun clickPathToExecutable(type: String) = x("//div[@text='Path to $type:']/following-sibling:: *[@class='ValidatedPathField'][1]").click()
 }

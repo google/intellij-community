@@ -20,8 +20,8 @@ jvm_library(
   deps = [
     "@lib//:jetbrains-annotations",
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinx-coroutines-core",
-    "@lib//:kotlinx-collections-immutable",
+    "//libraries/kotlinx/coroutines/core",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/guava",
     "//platform/util",
     "//platform/util/coroutines",
@@ -46,7 +46,7 @@ jvm_library(
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "@lib//:junit5",
     "//platform/util/progress",
     "//platform/testFramework/common",

@@ -12,12 +12,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.codeInsight.PyCodeInsightSettings;
-import com.jetbrains.python.codeInsight.completion.PyModuleNameCompletionContributor;
 import com.jetbrains.python.codeInsight.typing.PyTypeShed;
 import com.jetbrains.python.documentation.docstrings.DocStringFormat;
 import com.jetbrains.python.fixture.PythonCommonTestCase;
 import com.jetbrains.python.psi.LanguageLevel;
-import com.jetbrains.python.sdk.PythonSdkUtil;
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,7 +28,6 @@ public abstract class PythonCommonCompletionTest extends PythonCommonTestCase {
   protected void setUp() throws Exception {
     super.setUp();
     myFixture.setTestDataPath(getTestDataPath());
-    PyModuleNameCompletionContributor.ENABLED = false;
   }
 
   protected void doTest() {
@@ -2251,6 +2249,14 @@ public abstract class PythonCommonCompletionTest extends PythonCommonTestCase {
       // TODO Use regular doMultiFileTest once PY-73173 is fixed
       assertEquals(1, Collections.frequency(variants, "MyClass"));
     });
+  }
+
+  // PY-62203 PY-84778
+  public void testMatchingSymbolsAndModulesSuggestedTogether() {
+    myFixture.copyDirectoryToProject(getTestName(true), "");
+    myFixture.configureByFile("a.py");
+    myFixture.complete(CompletionType.BASIC, 1);
+    assertContainsElements(myFixture.getLookupElementStrings(), "dataclasses", "dataclass");
   }
 
   private static void runWithImportableNamesInBasicCompletionDisabled(@NotNull Runnable action) {

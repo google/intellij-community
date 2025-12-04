@@ -61,17 +61,16 @@
     <orderEntry type="module" module-name="intellij.libraries.jackson.databind" />
     <orderEntry type="library" name="json-schema-validator" level="project" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" />
-    <orderEntry type="library" name="kotlinx-serialization-json-io" level="project" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" />
     <orderEntry type="module" module-name="intellij.platform.util.zip" />
     <orderEntry type="module" module-name="intellij.platform.runtime.product" />
     <orderEntry type="library" name="okhttp" level="project" />
     <orderEntry type="library" name="zstd-jni" level="project" />
     <orderEntry type="module" module-name="intellij.platform.util.rt.java8" />
-    <orderEntry type="library" name="kotlinx-collections-immutable" level="project" />
-    <orderEntry type="library" name="kotlinx-coroutines-core" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.core" />
     <orderEntry type="library" name="opentelemetry-extension-kotlin" level="project" />
-    <orderEntry type="library" name="blockmap" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.blockmap" />
     <orderEntry type="module" module-name="intellij.libraries.commons.io" />
     <orderEntry type="module" module-name="intellij.libraries.bouncy.castle.provider" />
     <orderEntry type="module-library">
@@ -94,7 +93,6 @@
     </orderEntry>
     <orderEntry type="library" name="jackson-datatype-joda" level="project" />
     <orderEntry type="module" module-name="intellij.libraries.http.client" />
-    <orderEntry type="library" name="ktor-serialization-kotlinx-json" level="project" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.slf4j" />
     <orderEntry type="library" name="slf4j-api" level="project" />
     <orderEntry type="module-library">
@@ -215,8 +213,8 @@
       </library>
     </orderEntry>
     <orderEntry type="module" module-name="intellij.libraries.hash4j" />
-    <orderEntry type="library" name="jbr-api" level="project" />
-    <orderEntry type="library" name="kotlinx-serialization-protobuf" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.jbr" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.protobuf" />
     <orderEntry type="module" module-name="intellij.libraries.jackson.module.kotlin" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.libraries.jackson.dataformat.yaml" />
     <orderEntry type="module" module-name="intellij.libraries.ion" />
@@ -225,13 +223,12 @@
     <orderEntry type="module" module-name="intellij.platform.ijent.community.buildConstants" />
     <orderEntry type="module" module-name="intellij.devkit.runtimeModuleRepository.generator" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.io" />
-    <orderEntry type="library" scope="RUNTIME" name="snakeyaml" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.snakeyaml" scope="RUNTIME" />
     <orderEntry type="library" name="netty-tcnative-boringssl" level="project" />
     <orderEntry type="module" module-name="intellij.platform.util.coroutines" />
     <orderEntry type="module" module-name="intellij.idea.community.build.zip" />
-    <orderEntry type="library" name="com.jetbrains.fus.reporting.configuration" level="project" />
-    <orderEntry type="library" name="com.jetbrains.fus.reporting.serialization.kotlin" level="project" />
-    <orderEntry type="library" name="com.jetbrains.fus.reporting.model" level="project" />
+    <orderEntry type="library" name="com.jetbrains.fus.reporting.api" level="project" />
+    <orderEntry type="library" name="com.jetbrains.fus.reporting.ap.validation.all" level="project" />
     <orderEntry type="module-library">
       <library name="netty" type="repository">
         <properties maven-id="io.netty:netty-all:4.2.0.RC2">
@@ -422,5 +419,8 @@
       </library>
     </orderEntry>
     <orderEntry type="module" module-name="intellij.libraries.ktor.client" />
+    <orderEntry type="module" module-name="intellij.platform.plugins.parser.impl" />
+    <orderEntry type="module" module-name="intellij.platform.buildScripts.api" exported="" />
+    <orderEntry type="module" module-name="intellij.platform.buildScripts.productDsl" exported="" />
   </component>
 </module>

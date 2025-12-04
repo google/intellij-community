@@ -122,11 +122,9 @@ public final class JBCefApp {
       if (isRemoteEnabledSystemProp != null) {
         final boolean val = isRemoteEnabledSystemProp.trim().compareToIgnoreCase("true") == 0;
         LOG.info(String.format("Force %s out-of-process jcef mode.", val ? "enabled" : "disabled"));
-      } else {
-        if (StartupUiUtil.isWayland())
-          LOG.debug("Out-of-process jcef mode is temporarily disabled in Wayland"); // TODO: fix https://youtrack.jetbrains.com/issue/IJPL-161273
-        else
-          System.setProperty(PROPERTY_NAME, "true");
+      }
+      else {
+        System.setProperty(PROPERTY_NAME, "true");
       }
     }
 
@@ -168,6 +166,8 @@ public final class JBCefApp {
     }
     else {
       CefSettings settings = Cancellation.forceNonCancellableSectionInClassInitializer(() -> SettingsHelper.loadSettings(config));
+      final String logPath = SettingsHelper.getLogPath();
+      CefLog.init(logPath, settings.log_severity);
 
       JBCefHealthMonitor.getInstance().performHealthCheckAsync(settings, () -> {
         CefApp.startup(ArrayUtil.EMPTY_STRING_ARRAY);
@@ -182,8 +182,8 @@ public final class JBCefApp {
         // Init verbose chromium logging to stderr via 'vmodule' (to decrease output size)
         args = ArrayUtil.mergeArrays(args, "--enable-logging=stderr", "--vmodule=statistics_recorder*=0", "--v=1");
       }
-      if (settings.log_severity != CefSettings.LogSeverity.LOGSEVERITY_DISABLE || settings.log_file != null)
-        LOG.info(String.format("JCEF logging: level=%s, file=%s", settings.log_severity, settings.log_file));
+      if (settings.log_severity != CefSettings.LogSeverity.LOGSEVERITY_DISABLE || settings.log_file != null || logPath != null)
+        LOG.info(String.format("JCEF logging: level=%s, file=%s, chromium_log=%s", settings.log_severity, logPath, settings.log_file));
 
       myCefArgs = args;
       CefApp.addAppHandler(new MyCefAppHandler(args, trackGPUCrashes.get()));
@@ -461,7 +461,7 @@ public final class JBCefApp {
   /**
    * @deprecated use {@link JBCefApp#getRemoteDebuggingPort(Consumer)} instead
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   @Contract(pure = true)
   public @NotNull Integer getRemoteDebuggingPort() {
     if (myCefSettings == null) throw new UnsupportedOperationException();

@@ -281,34 +281,52 @@ public abstract class TestObject extends JavaTestFrameworkRunnableState<JUnitCon
     }
   }
 
-  public static File getJUnitRtFile(@NotNull String runner) {
+  public static File getJUnitRtFile(@NotNull String runner) throws CantRunException {
     String version = RUNNER_VERSIONS.getOrDefault(runner, "5");
     File junit4Rt = getJUnitRtPath();
-    String junit4Name = junit4Rt.getName();
-    String junitCurrentName;
+    if (version.equals("3") || version.equals("4")) {
+      return junit4Rt;
+    }
+
+    // guess by module name, flat classloaders
+    String junitCurrentModuleName = "intellij.junit.v" + version + ".rt";
     if (junit4Rt.isDirectory()) {
-      junitCurrentName = junit4Name.replace("junit", "junit.v" + version);
+      return new File(junit4Rt.getParent(), junitCurrentModuleName);
     }
     else {
       var relevantJarsRoot = ArchivedCompilationContextUtil.getArchivedCompiledClassesLocation();
       Map<String, String> mapping = ArchivedCompilationContextUtil.getArchivedCompiledClassesMapping();
       if (relevantJarsRoot != null && junit4Rt.toPath().startsWith(relevantJarsRoot) && mapping != null) {
-        return new File(mapping.get("production/intellij.junit.v" + version + ".rt"));
-      }
-      else {
-        junitCurrentName = junit4Name.replace("junit", "junit" + version);
+        return new File(mapping.get("production/" + junitCurrentModuleName));
       }
     }
-    return new File(junit4Rt.getParent(), junitCurrentName);
+
+    // fallback to idea test runner jar location, production-like classloaders
+    String junitCurrentIdeaTestRunnerClassName = "com.intellij.junit" + version + ".JUnit" + version + "IdeaTestRunner";
+    Class<?> junitCurrentIdeaTestRunnerClass;
+    try {
+      junitCurrentIdeaTestRunnerClass = Class.forName(junitCurrentIdeaTestRunnerClassName, false, TestObject.class.getClassLoader());
+    }
+    catch (ClassNotFoundException e) {
+      throw new CantRunException(JUnitBundle.message("dialog.message.failed.to.resolve.junit.rt.jar.class.0.not.found", junitCurrentIdeaTestRunnerClassName), e);
+    }
+
+    return new File(PathUtil.getJarPathForClass(junitCurrentIdeaTestRunnerClass));
   }
 
   public static File getJUnitRtPath() {
     String currentPath = PathUtil.getJarPathForClass(TestObject.class);
     String currentUrl = VfsUtil.getUrlForLibraryRoot(new File(currentPath));
-    if (StandardFileSystems.FILE_PROTOCOL.equals(VirtualFileManager.extractProtocol(currentUrl))) {
+    if (StandardFileSystems.FILE_PROTOCOL.equals(VirtualFileManager.extractProtocol(currentUrl))) {  // JPS compilation
       File rtDir = new File(new File(currentPath).getParentFile(), "intellij.junit.rt");
-      if (rtDir.exists()) {
+      if (rtDir.isDirectory()) {
         return rtDir;
+      }
+    }
+    else if (StandardFileSystems.JAR_PROTOCOL.equals(VirtualFileManager.extractProtocol(currentUrl))) {  // Bazel compilation
+      File rtJar = new File(new File(new File(currentPath).getParentFile().getParentFile(), "junit_rt"), "junit-rt.jar");
+      if (rtJar.isFile()) {
+        return rtJar;
       }
     }
     return new File(PathUtil.getJarPathForClass(JUnit4IdeaTestRunner.class));
@@ -525,9 +543,6 @@ public abstract class TestObject extends JavaTestFrameworkRunnableState<JUnitCon
                                                 @NotNull List<String> classPath,
                                                 @NotNull RepositoryLibraryProperties properties) throws CantRunException {
     Collection<OrderRoot> roots;
-    if (DumbService.isDumb(project)) {
-      throw new CantRunException(JUnitBundle.message("downloading.tests.disabled.during.index.update.error.message"));
-    }
     //noinspection IncorrectCancellationExceptionHandling
     try {
       Application application = ApplicationManager.getApplication();
@@ -815,6 +830,19 @@ public abstract class TestObject extends JavaTestFrameworkRunnableState<JUnitCon
         return isClassConfiguration ? JUnitStarter.JUNIT4_PARAMETER : JUnitStarter.JUNIT3_PARAMETER;
       }
       if (testFramework instanceof JUnitTestFramework && !((JUnitTestFramework)testFramework).shouldRunSingleClassAsJUnit5(project, globalSearchScope)) {
+        return JUnitStarter.JUNIT4_PARAMETER;
+      }
+    }
+
+    if (JUnitConfiguration.TEST_PATTERN.equals(data.TEST_OBJECT)) {
+      if (ContainerUtil.and(data.getPatterns(), name -> {
+        PsiClass aClass = JavaExecutionUtil.findMainClass(project, name, globalSearchScope);
+        if (aClass == null) {
+          return false;
+        }
+        TestFramework framework = TestFrameworks.detectFramework(aClass);
+        return framework instanceof JUnit4Framework || framework instanceof JUnit3Framework;
+      })) {
         return JUnitStarter.JUNIT4_PARAMETER;
       }
     }

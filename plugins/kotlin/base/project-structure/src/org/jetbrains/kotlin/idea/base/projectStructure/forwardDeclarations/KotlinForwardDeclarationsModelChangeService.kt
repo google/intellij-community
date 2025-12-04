@@ -1,21 +1,19 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.projectStructure.forwardDeclarations
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.OrderRootType
-import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.backend.workspace.virtualFile
 import com.intellij.platform.workspace.jps.entities.LibraryEntity
+import com.intellij.platform.workspace.jps.entities.LibraryRootTypeId
 import com.intellij.platform.workspace.jps.entities.modifyLibraryEntity
 import com.intellij.platform.workspace.storage.EntityChange
-import com.intellij.platform.workspace.storage.ImmutableEntityStorage
 import com.intellij.platform.workspace.storage.impl.url.toVirtualFileUrl
 import com.intellij.util.PathUtil
-import com.intellij.workspaceModel.ide.impl.legacyBridge.library.findLibraryBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.kotlin.idea.base.platforms.detectLibraryKind
@@ -44,7 +42,7 @@ internal class KotlinForwardDeclarationsModelChangeService(private val project: 
                 val libraryChanges = event.getChanges<LibraryEntity>().ifEmpty { return@collect }
 
                 val nativeKlibs: Map<LibraryEntity, KLibRoot> =
-                    libraryChanges.toNativeKLibs(event.storageAfter).ifEmpty { return@collect }
+                    libraryChanges.toNativeKLibs().ifEmpty { return@collect }
                 val workspaceModel = WorkspaceModel.getInstance(project)
                 val createEntityStorageChanges = createEntityStorageChanges(workspaceModel, nativeKlibs)
 
@@ -74,7 +72,7 @@ internal class KotlinForwardDeclarationsModelChangeService(private val project: 
     private fun createEntityStorageChanges(
         workspaceModel: WorkspaceModel,
         nativeKlibs: Map<LibraryEntity, KLibRoot>
-    ): Map<LibraryEntity, KotlinForwardDeclarationsWorkspaceEntity.Builder> {
+    ): Map<LibraryEntity, KotlinForwardDeclarationsWorkspaceEntityBuilder> {
         val virtualFileUrlManager = workspaceModel.getVirtualFileUrlManager()
         return buildMap {
             for ((libraryEntity, klib) in nativeKlibs) {
@@ -91,30 +89,29 @@ internal class KotlinForwardDeclarationsModelChangeService(private val project: 
         }
     }
 
-    private fun List<EntityChange<LibraryEntity>>.toNativeKLibs(
-        storageAfter: ImmutableEntityStorage
-    ): Map<LibraryEntity, KLibRoot> {
+    private fun List<EntityChange<LibraryEntity>>.toNativeKLibs(): Map<LibraryEntity, KLibRoot> {
         val libraryEntityChanges = this
         return buildMap {
             for (entityChange in libraryEntityChanges) {
                 val newLibraryEntity: LibraryEntity = entityChange.newEntity ?: continue
-                val library = newLibraryEntity.findLibraryBridge(storageAfter) as? LibraryEx ?: continue
-                val nativeRootsAfterChange = library.getClassRootsIfNative()
+                val nativeRootsAfterChange = newLibraryEntity.getClassRootsIfNative()
 
                 for (classRoot in nativeRootsAfterChange) {
                     val path = PathUtil.getLocalPath(classRoot) ?: continue
-                    put(newLibraryEntity, KLibRoot(library, path))
+                    put(newLibraryEntity, KLibRoot(path))
                 }
             }
         }
     }
 
-    private fun LibraryEx.getClassRootsIfNative(): List<VirtualFile> {
+    private fun LibraryEntity.getClassRootsIfNative(): List<VirtualFile> {
         if (detectLibraryKind(this, project)?.platform?.idePlatformKind != NativeIdePlatformKind) return emptyList()
 
-        return getFiles(OrderRootType.CLASSES).filter {
-            it.isKlibLibraryRootForPlatform(NativeIdePlatformKind.defaultPlatform)
-        }
+        return roots.asSequence()
+            .filter { it.type == LibraryRootTypeId.COMPILED }
+            .mapNotNull { it.url.virtualFile }
+            .filter { it.isKlibLibraryRootForPlatform(NativeIdePlatformKind.defaultPlatform) }
+            .toList()
     }
 }
 

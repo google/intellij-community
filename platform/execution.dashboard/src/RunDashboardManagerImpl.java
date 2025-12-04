@@ -25,10 +25,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Condition;
-import com.intellij.platform.execution.dashboard.splitApi.RunDashboardServiceDto;
-import com.intellij.platform.execution.dashboard.splitApi.RunDashboardSettingsDto;
-import com.intellij.platform.execution.dashboard.splitApi.ServiceCustomizationDto;
-import com.intellij.platform.execution.dashboard.splitApi.ServiceStatusDto;
+import com.intellij.platform.execution.dashboard.splitApi.*;
 import com.intellij.platform.execution.dashboard.splitApi.frontend.RunDashboardUiManagerImpl;
 import com.intellij.ui.content.Content;
 import com.intellij.util.SmartList;
@@ -82,6 +79,11 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
   }
 
   @Override
+  public boolean isInitialized() {
+    return true;
+  }
+
+  @Override
   public void updateServiceRunContentDescriptor(@NotNull Content contentWithNewDescriptor, @NotNull RunContentDescriptor oldDescriptor) {
     RunContentDescriptorId oldDescriptorId = oldDescriptor.getId();
     if (oldDescriptorId == null) return;
@@ -94,6 +96,14 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
     }
 
     RunDashboardUiManagerImpl.getInstance(myProject).getDashboardContentManager().addContent(contentWithNewDescriptor);
+  }
+
+  @Override
+  public void navigateToServiceOnRun(@NotNull RunContentDescriptorId descriptorId, Boolean focus){
+    RunDashboardService service = findService(descriptorId);
+    if (service == null) return;
+
+    mySharedState.fireNavigateToServiceEvent(service.getUuid(), focus);
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -148,9 +158,11 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
     if (!myListenersInitialized.compareAndSet(false, true)) return;
 
     MessageBusConnection connection = myProject.getMessageBus().connect(myProject);
-    // todo backend updates
     connection.subscribe(RunManagerListener.TOPIC, new RunManagerListener() {
-      private volatile boolean myUpdateStarted;
+      private final BackendRunDashboardUpdatesQueue synchronizationScheduler
+        = new BackendRunDashboardUpdatesQueue(
+          RunDashboardCoroutineScopeProvider.getInstance(myProject).createChildNamedScope("Backend run manager listener sync requests"),
+          OverlappingTasksStrategy.SKIP_NEW);
 
       @Override
       public void runConfigurationAdded(@NotNull RunnerAndConfigurationSettings settings) {
@@ -158,10 +170,10 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
           // Always include newly added temporary configurations.
           myShownConfigurations.add(settings.getConfiguration());
         }
-        if (!myUpdateStarted) {
+        synchronizationScheduler.submit(() -> {
           syncConfigurations();
           updateDashboardIfNeeded(settings);
-        }
+        });
       }
 
       @Override
@@ -170,29 +182,28 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
         myHiddenConfigurations.remove(configuration);
         myShownConfigurations.remove(configuration);
         myConfigurationStatuses.remove(configuration);
-        if (!myUpdateStarted) {
+        synchronizationScheduler.submit(() -> {
           syncConfigurations();
           updateDashboardIfNeeded(settings);
-        }
+        });
       }
 
       @Override
       public void runConfigurationChanged(@NotNull RunnerAndConfigurationSettings settings) {
-        if (!myUpdateStarted) {
+        synchronizationScheduler.submit(() -> {
           updateDashboardIfNeeded(settings);
-        }
+        });
       }
 
       @Override
-      public void beginUpdate() {
-        myUpdateStarted = true;
-      }
+      public void beginUpdate() { }
 
       @Override
       public void endUpdate() {
-        myUpdateStarted = false;
-        syncConfigurations();
-        updateDashboard(true);
+        synchronizationScheduler.submit(() -> {
+          syncConfigurations();
+          updateDashboard(true);
+        });
       }
     });
     connection.subscribe(ExecutionManager.EXECUTION_TOPIC, new ExecutionListener() {
@@ -268,6 +279,18 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
 
   public Flow<ServiceCustomizationDto> getCustomizationsDto() {
     return mySharedState.getCustomizations();
+  }
+
+  public Flow<Set<String>> getExcludedTypesDto() {
+    return mySharedState.getExcludedTypes();
+  }
+
+  public Flow<Set<String>> getConfigurationTypes() {
+    return mySharedState.getConfigurationTypes();
+  }
+
+  public Flow<NavigateToServiceEvent> getNavigateToServiceEvents() {
+    return mySharedState.getNavigateToServiceEvents();
   }
 
   public void runCallbackForLink(@NotNull String link, @NotNull RunDashboardServiceId serviceId) {
@@ -373,7 +396,7 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
   }
 
   @Override
-  public void hideConfigurations(Collection<? extends RunConfiguration> configurations) {
+  public void hideConfigurations(@NotNull Collection<? extends RunConfiguration> configurations) {
     for (RunConfiguration configuration : configurations) {
       if (myState.excludedNewTypes.contains(configuration.getType().getId())) {
         myShownConfigurations.remove(configuration);
@@ -485,7 +508,8 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
   @Override
   public void updateDashboard(boolean withStructure) {
     for (RunDashboardService backendService : getRunConfigurations()) {
-      mySharedState.fireStatusUpdated(backendService);
+      mySharedState.fireStatusUpdated(backendService, getPersistedStatus(backendService.getConfigurationSettings().getConfiguration()));
+      mySharedState.fireExcludedTypesUpdated(myState.excludedTypes);
 
       var applicableCustomizers = getCustomizers(backendService.getConfigurationSettings(), backendService.getDescriptor());
       if (applicableCustomizers.isEmpty()) continue;
@@ -524,6 +548,7 @@ public final class RunDashboardManagerImpl implements RunDashboardManager, Persi
     finally {
       myServiceLock.writeLock().unlock();
       mySharedState.setServices(myServices);
+      mySharedState.setConfigurationTypes(myState.configurationTypes);
     }
   }
 

@@ -664,6 +664,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../../completion/testData/handlers/basic/importAliases/CompanionObject.kt");
             }
 
+            @TestMetadata("Constructor.kt")
+            public void testConstructor() throws Exception {
+                runTest("../../completion/testData/handlers/basic/importAliases/Constructor.kt");
+            }
+
             @TestMetadata("ExtensionFun.kt")
             public void testExtensionFun() throws Exception {
                 runTest("../../completion/testData/handlers/basic/importAliases/ExtensionFun.kt");
@@ -1398,6 +1403,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../../completion/testData/handlers/basic/typeArgsForCall/HasExpectedType.kt");
             }
 
+            @TestMetadata("NoTypeArgumentsForOverloadWithError.kt")
+            public void testNoTypeArgumentsForOverloadWithError() throws Exception {
+                runTest("../../completion/testData/handlers/basic/typeArgsForCall/NoTypeArgumentsForOverloadWithError.kt");
+            }
+
             @TestMetadata("NotAllTypeArgumentsFromParameters.kt")
             public void testNotAllTypeArgumentsFromParameters() throws Exception {
                 runTest("../../completion/testData/handlers/basic/typeArgsForCall/NotAllTypeArgumentsFromParameters.kt");
@@ -1451,6 +1461,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
             @TestMetadata("TypeArgumentsFromReturnType4.kt")
             public void testTypeArgumentsFromReturnType4() throws Exception {
                 runTest("../../completion/testData/handlers/basic/typeArgsForCall/TypeArgumentsFromReturnType4.kt");
+            }
+
+            @TestMetadata("TypeForUnrelatedOverloadWIthoutError.kt")
+            public void testTypeForUnrelatedOverloadWIthoutError() throws Exception {
+                runTest("../../completion/testData/handlers/basic/typeArgsForCall/TypeForUnrelatedOverloadWIthoutError.kt");
             }
         }
 
@@ -1846,6 +1861,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../../completion/testData/handlers/basic/KT36306.kt");
             }
 
+            @TestMetadata("LoadFromIndexAfterTyping.kt")
+            public void testLoadFromIndexAfterTyping() throws Exception {
+                runTest("../../completion/testData/handlers/basic/LoadFromIndexAfterTyping.kt");
+            }
+
             @TestMetadata("LocalClassNameWithPackageLevelConflict.kt")
             public void testLocalClassNameWithPackageLevelConflict() throws Exception {
                 runTest("../../completion/testData/handlers/basic/LocalClassNameWithPackageLevelConflict.kt");
@@ -2165,6 +2185,11 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
         @TestMetadata("ClassCompletionImportBeforeIfInReturn.kt")
         public void testClassCompletionImportBeforeIfInReturn() throws Exception {
             runTest("../../completion/testData/handlers/ClassCompletionImportBeforeIfInReturn.kt");
+        }
+
+        @TestMetadata("ClassCompletionImportWithoutPrefix.kt")
+        public void testClassCompletionImportWithoutPrefix() throws Exception {
+            runTest("../../completion/testData/handlers/ClassCompletionImportWithoutPrefix.kt");
         }
 
         @TestMetadata("ClassCompletionInImport.kt")

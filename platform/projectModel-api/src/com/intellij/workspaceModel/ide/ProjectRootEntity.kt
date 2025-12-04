@@ -13,9 +13,9 @@ import org.jetbrains.annotations.ApiStatus.Internal
 
 @Internal
 suspend fun registerProjectRoot(project: Project, projectDir: VirtualFileUrl) {
-  val entity = ProjectRootEntity(projectDir, ProjectRootEntitySource)
   val workspaceModel = project.serviceAsync<WorkspaceModel>()
   workspaceModel.update("Add project root ${projectDir.presentableUrl} to project ${project.name}") { storage ->
+    val entity = ProjectRootEntity(projectDir, ProjectRootEntitySource)
     if (storage.entities<ProjectRootEntity>().none { it.root == entity.root }) storage.addEntity(entity)
   }
 }
@@ -27,6 +27,29 @@ suspend fun registerProjectRoot(project: Project, projectDir: Path) {
   registerProjectRoot(project, projectBaseDirUrl)
 }
 
+@Internal
+suspend fun unregisterProjectRoot(project: Project, projectRoot: VirtualFileUrl) {
+  val workspaceModel = project.serviceAsync<WorkspaceModel>()
+  workspaceModel.update("Remove project root ${projectRoot.presentableUrl} from project ${project.name}") { storage ->
+    val entity = storage.entities(ProjectRootEntity::class.java).firstOrNull { it.root == projectRoot } ?: return@update
+    storage.removeEntity(entity)
+  }
+}
+
+/**
+ * Non-suspend alternative to [unregisterProjectRoot]
+ */
+@Internal
+fun unregisterProjectRootBlocking(project: Project, projectDir: VirtualFileUrl) {
+  val workspaceModel = WorkspaceModel.getInstance(project)
+  ApplicationManager.getApplication().runWriteAction {
+    workspaceModel.updateProjectModel("Remove project root ${projectDir.presentableUrl} from project ${project.name}") { storage ->
+      val entity = storage.entities<ProjectRootEntity>().firstOrNull { it.root == projectDir } ?: return@updateProjectModel
+      storage.removeEntity(entity)
+    }
+  }
+}
+
 /**
  * Non-suspend alternative
  */
@@ -34,9 +57,9 @@ suspend fun registerProjectRoot(project: Project, projectDir: Path) {
 fun registerProjectRootBlocking(project: Project, projectDir: Path) {
   val workspaceModel = WorkspaceModel.getInstance(project)
   val projectBaseDirUrl = projectDir.toVirtualFileUrl(workspaceModel.getVirtualFileUrlManager())
-  val entity = ProjectRootEntity(projectBaseDirUrl, ProjectRootEntitySource)
   ApplicationManager.getApplication().runWriteAction {
     workspaceModel.updateProjectModel("Add project root $projectDir to project ${project.name}") { storage ->
+      val entity = ProjectRootEntity(projectBaseDirUrl, ProjectRootEntitySource)
       if (storage.entities<ProjectRootEntity>().none { it.root == entity.root }) storage.addEntity(entity)
     }
   }
@@ -51,39 +74,4 @@ object ProjectRootEntitySource : EntitySource
 @Internal
 interface ProjectRootEntity : WorkspaceEntity {
   val root: VirtualFileUrl
-
-  //region generated code
-  @GeneratedCodeApiVersion(3)
-  interface Builder : WorkspaceEntity.Builder<ProjectRootEntity> {
-    override var entitySource: EntitySource
-    var root: VirtualFileUrl
-  }
-
-  companion object : EntityType<ProjectRootEntity, Builder>() {
-    @JvmOverloads
-    @JvmStatic
-    @JvmName("create")
-    operator fun invoke(
-      root: VirtualFileUrl,
-      entitySource: EntitySource,
-      init: (Builder.() -> Unit)? = null,
-    ): Builder {
-      val builder = builder()
-      builder.root = root
-      builder.entitySource = entitySource
-      init?.invoke(builder)
-      return builder
-    }
-  }
-  //endregion
 }
-
-//region generated code
-@Internal
-fun MutableEntityStorage.modifyProjectRootEntity(
-  entity: ProjectRootEntity,
-  modification: ProjectRootEntity.Builder.() -> Unit,
-): ProjectRootEntity {
-  return modifyEntity(ProjectRootEntity.Builder::class.java, entity, modification)
-}
-//endregion

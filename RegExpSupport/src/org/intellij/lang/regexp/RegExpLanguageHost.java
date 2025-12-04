@@ -32,7 +32,26 @@ public interface RegExpLanguageHost {
   }
 
   boolean supportsPerl5EmbeddedComments();
-  boolean supportsPossessiveQuantifiers();
+  /**
+   * @deprecated use `supportsPossessiveQuantifiers(RegExpElement)`
+   */
+  @Deprecated
+  default boolean supportsPossessiveQuantifiers() {
+    return false;
+  }
+
+  /**
+   * Returns whether possessive quantifiers and atomic groups are supported.
+   * <p>
+   * Possessive quantifiers (e.g., {@code *+}, {@code ++}, {@code ?+}, {@code {n,m}+}) match as much as possible
+   * without backtracking.
+   * <p>
+   * Atomic groups (e.g., {@code (?>pattern)}) prevent backtracking within the group once it matches.
+   */
+  default boolean supportsPossessiveQuantifiers(RegExpElement context) {
+    return supportsPossessiveQuantifiers();
+  }
+
   default boolean isDuplicateGroupNamesAllowed(@NotNull RegExpGroup group) {
     return false;
   }

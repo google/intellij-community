@@ -1750,6 +1750,22 @@ public final class UIUtil {
     return component;
   }
 
+  public static @Nullable JLayeredPane getWindowLayeredPaneFor(@NotNull Component component) {
+    Window window = SwingUtilities.windowForComponent(component);
+    if (window instanceof JFrame) {
+      return ((JFrame)window).getLayeredPane();
+    }
+    else if (window instanceof JDialog) {
+      return ((JDialog)window).getLayeredPane();
+    }
+    else if (window instanceof JWindow) {
+      return ((JWindow)window).getLayeredPane();
+    }
+    else {
+      return null;
+    }
+  }
+
   private static Component getDeepestComponentAtForComponent(@NotNull Component parent, int x, int y, @NotNull Component component) {
     Point point = SwingUtilities.convertPoint(parent, new Point(x, y), component);
     return SwingUtilities.getDeepestComponentAt(component, point.x, point.y);
@@ -2149,6 +2165,33 @@ public final class UIUtil {
     return ComponentUtil.getParentOfType(type, component);
   }
 
+  /**
+   * Searches above in the component hierarchy starting from the specified component, taking foster parents into account.
+   * <p>
+   * Note that the initial component is also checked and is immediately returned if it has the correct type.
+   *</p>
+   * <p>
+   * <em>Please consider using the plain {@link #getParent(Component)} if you're dealing with pure UI without remote development hacks.</em>
+   *</p>
+   * @param type      expected class
+   * @param component initial component
+   * @return a component of the specified type, or {@code null} if the search is failed
+   * @see #getParent(Component)
+   * @see #getParentOfType(Class, Component)
+   */
+  @Contract(pure = true)
+  public static @Nullable <T> T getGeneralizedParentOfType(@NotNull Class<? extends T> type, @Nullable Component component) {
+    var result = component;
+    while (result != null) {
+      if (type.isInstance(result)) {
+        //noinspection unchecked
+        return (T)result;
+      }
+      result = getParent(result);
+    }
+    return null;
+  }
+
   public static @NotNull JBIterable<Component> uiParents(@Nullable Component c, boolean strict) {
     return strict ? JBIterable.generate(c, c1 -> c1.getParent()).skip(1) : JBIterable.generate(c, c1 -> c1.getParent());
   }
@@ -2247,6 +2290,7 @@ public final class UIUtil {
     private float myLineSpacing;
     private Font myFont;
     private Color myColor;
+    private Color myShortcutColor;
 
     public TextPainter() {
       myDrawShadow = StartupUiUtil.isUnderDarcula();
@@ -2267,6 +2311,11 @@ public final class UIUtil {
 
     public @NotNull TextPainter withColor(Color color) {
       myColor = color;
+      return this;
+    }
+
+    public @NotNull TextPainter withShortcutColor(Color color) {
+      myShortcutColor = color;
       return this;
     }
 
@@ -2335,7 +2384,9 @@ public final class UIUtil {
           g.drawString(text, x, yOffset[0]);
           if (!Strings.isEmpty(shortcut)) {
             Color oldColor1 = g.getColor();
-            g.setColor(JBColor.namedColor("Editor.shortcutForeground", new JBColor(new Color(82, 99, 155), new Color(88, 157, 246))));
+            g.setColor(myShortcutColor == null
+                       ? JBColor.namedColor("Editor.shortcutForeground", new JBColor(new Color(82, 99, 155), new Color(88, 157, 246)))
+                       : myShortcutColor);
             g.drawString(shortcut, x + fm.stringWidth(text + (StartupUiUtil.isUnderDarcula() ? " " : "")), yOffset[0]);
             g.setColor(oldColor1);
           }
@@ -2528,7 +2579,7 @@ public final class UIUtil {
   }
 
   public static @NotNull Paint getGradientPaint(float x1, float y1, @NotNull Color c1, float x2, float y2, @NotNull Color c2) {
-    return Registry.is("ui.no.bangs.and.whistles", false) ? ColorUtil.mix(c1, c2, .5) : new GradientPaint(x1, y1, c1, x2, y2, c2);
+    return Registry.is("ui.simplified", false) ? ColorUtil.mix(c1, c2, .5) : new GradientPaint(x1, y1, c1, x2, y2, c2);
   }
 
   public static @Nullable Point getLocationOnScreen(@NotNull JComponent component) {

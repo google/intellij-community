@@ -12,6 +12,7 @@ import com.jetbrains.rd.framework.RdId
 import com.jetbrains.rd.util.string.IPrintable
 import org.jetbrains.kotlin.config.KotlinModuleKind
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase.assertNotNull
+import kotlin.script.experimental.api.SourceCode
 
 internal object LibrariesRequiredForWorkspace {
   val workspaceStorage = ModuleLibrary("intellij.platform.workspace.storage")
@@ -22,9 +23,15 @@ internal object LibrariesRequiredForWorkspace {
   private val riderUnityPlugin = ModuleLibrary("intellij.rider.plugins.unity")
   private val riderModel = ModuleLibrary("intellij.rider.model.generated")
   private val riderRdClient = ModuleLibrary("intellij.rider.rdclient.dotnet")
-  private val bazelCommons = ModuleLibrary("intellij.bazel.commons")
+  private val gradle = ModuleLibrary("intellij.gradle")
+  private val gradleToolingExtension = ModuleLibrary("intellij.gradle.toolingExtension")
+  private val gradleExternalSystemImpl = ModuleLibrary("intellij.platform.externalSystem.impl")
+  private val pyCommon = ModuleLibrary("intellij.python.common")
+  private val cidrProjectModel = ModuleLibrary("intellij.cidr.projectModel")
+  private val kotlinBaseScripting = ModuleLibrary("intellij.kotlin.base.scripting")
 
   private val kotlinJpsCommon = JarLibrary("kotlinc-kotlin-jps-common", KotlinModuleKind::class.java)
+  private val kotlinScriptingCommon = JarLibrary("kotlinc-kotlin-scripting-common", SourceCode::class.java)
   private val rdCore = JarLibrary("rd-core", IPrintable::class.java)
   private val rdFramework = JarLibrary("rd-framework", RdId::class.java)
 
@@ -42,11 +49,26 @@ internal object LibrariesRequiredForWorkspace {
       "intellij.rider.rdclient.dotnet" -> {
         listOf(rdFramework, rdCore, riderModel, riderUnityPlugin, rider, riderRdClient)
       }
-      "kotlin.base.facet" -> {
+      "intellij.kotlin.base.facet" -> {
         listOf(intellijJava, kotlinJpsCommon)
       }
-      "intellij.bazel.plugin" -> {
-        listOf(bazelCommons)
+      "intellij.kotlin.base.scripting" -> {
+        listOf(kotlinScriptingCommon)
+      }
+      "intellij.kotlin.gradle.scripting" -> {
+        listOf(kotlinBaseScripting)
+      }
+      "intellij.gradle" -> {
+        listOf(gradleToolingExtension, gradleExternalSystemImpl)
+      }
+      "intellij.gradle.tests" -> {
+        listOf(gradle, gradleToolingExtension)
+      }
+      "intellij.python.pyproject" -> {
+        listOf(pyCommon)
+      }
+      "intellij.clion.openfolder" -> {
+        listOf(cidrProjectModel)
       }
       else -> {
         emptyList()

@@ -8,7 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SimpleModificationTracker
 import org.jetbrains.kotlin.caches.project.cacheByClass
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.core.script.k2.settings.ScriptDefinitionPersistentSettings
+import org.jetbrains.kotlin.idea.core.script.k2.settings.ScriptDefinitionSettingsPersistentStateComponent
 import org.jetbrains.kotlin.idea.core.script.shared.SCRIPT_DEFINITIONS_SOURCES
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionProvider
@@ -25,11 +25,21 @@ class ScriptDefinitionsModificationTracker : SimpleModificationTracker() {
 
 class ScriptDefinitionProviderImpl(val project: Project) : ScriptDefinitionProvider {
     override val currentDefinitions: Sequence<ScriptDefinition>
+        get() {
+            val settingsProvider = ScriptDefinitionSettingsPersistentStateComponent.getInstance(project)
+
+            return definitionsFromSources.asSequence()
+                .filter { settingsProvider.isScriptDefinitionEnabled(it) }
+                .sortedBy { settingsProvider.getScriptDefinitionOrder(it) }
+        }
+
+    val definitionsFromSources: List<ScriptDefinition>
         get() = computeOrGetDefinitions(project)
 
     override fun isScript(script: SourceCode): Boolean = findDefinition(script) != null
 
-    override fun getKnownFilenameExtensions(): Sequence<String> = (currentDefinitions + getDefaultDefinition()).map { it.fileExtension }.distinct()
+    override fun getKnownFilenameExtensions(): Sequence<String> =
+        (currentDefinitions + getDefaultDefinition()).map { it.fileExtension }.distinct()
 
     override fun findDefinition(script: SourceCode): ScriptDefinition? {
         val locationId = script.locationId ?: return null
@@ -41,16 +51,11 @@ class ScriptDefinitionProviderImpl(val project: Project) : ScriptDefinitionProvi
     override fun getDefaultDefinition(): ScriptDefinition = project.defaultDefinition
 
     companion object {
-        private fun computeOrGetDefinitions(project: Project): Sequence<ScriptDefinition> = project.cacheByClass(
+        private fun computeOrGetDefinitions(project: Project): List<ScriptDefinition> = project.cacheByClass(
             ScriptDefinitionProviderImpl::class.java,
             ScriptDefinitionsModificationTracker.getInstance(project)
         ) {
-            val settingsProvider = ScriptDefinitionPersistentSettings.getInstance(project)
-
             SCRIPT_DEFINITIONS_SOURCES.getExtensions(project).flatMap { it.definitions }
-                .filter { settingsProvider.isScriptDefinitionEnabled(it) }
-                .sortedBy { settingsProvider.getScriptDefinitionOrder(it) }
-                .asSequence()
         }
 
         private val nonScriptFilenameSuffixes: Set<String> = setOf(".${KotlinFileType.EXTENSION}", ".${JavaFileType.DEFAULT_EXTENSION}")

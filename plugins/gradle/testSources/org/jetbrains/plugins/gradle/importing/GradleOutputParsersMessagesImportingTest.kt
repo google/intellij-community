@@ -23,12 +23,14 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
                          "}")
     importProject("subprojects { apply plugin: 'java' }")
 
-    val expectedExecutionTree =
-      "-\n" +
-      " -failed\n" +
-      "  -build.gradle\n" +
-      "   Could not find method ghostConf() for arguments [project ':api'] on object of type org.gradle.api.internal.artifacts.dsl.dependencies.DefaultDependencyHandler"
-    assertSyncViewTreeEquals(expectedExecutionTree)
+    assertSyncViewTree {
+      assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
+        assertNode("build.gradle") {
+          assertNode("Could not find method ghostConf() for arguments [project ':api'] on object of type org.gradle.api.internal.artifacts.dsl.dependencies.DefaultDependencyHandler")
+        }
+      }
+    }
   }
 
   @Test
@@ -50,6 +52,7 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
 
     assertSyncViewTree {
       assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
         assertNode(":buildSrc:compileJava")
         assertNode(":buildSrc:compileGroovy")
         assertNode(":buildSrc:processResources")
@@ -75,6 +78,11 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
     val className = if (isGradleAtLeast("6.8")) "class 'example.SomePlugin'." else "[class 'example.SomePlugin']"
 
     val tryText = when {
+      isGradleAtLeast("9.2") ->
+        """|> Run with --stacktrace option to get the stack trace.
+                                 |> Run with --debug option to get more log output.
+                                 |> Run with --scan to generate a Build Scan (powered by Develocity).
+                                 |> Get more help at https://help.gradle.org."""
       isGradleAtLeast("9.0") ->
         """|> Run with --stacktrace option to get the stack trace.
                                  |> Run with --debug option to get more log output.
@@ -254,6 +262,7 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
     }
     assertSyncViewTree {
       assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
         assertNode("Could not resolve junit:junit:4.12 because no repositories are defined")
       }
     }
@@ -298,6 +307,7 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
     }
     assertSyncViewTree {
       assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
         assertNode("Could not resolve junit:junit:99.99")
       }
     }
@@ -327,6 +337,7 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
     }
     assertSyncViewTree {
       assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
         assertNode("Could not resolve junit:junit:99.99")
       }
     }
@@ -354,22 +365,34 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
 
     when {
       isGradleOlderThan("7.0") -> {
-        assertSyncViewTreeEquals("-\n" +
-                                 " -failed\n" +
-                                 "  -build.gradle\n" +
-                                 "   expecting ''', found '\\n'")
+        assertSyncViewTree {
+          assertNode("failed") {
+            assertNodeWithDeprecatedGradleWarning()
+            assertNode("build.gradle") {
+              assertNode("expecting ''', found '\\n'")
+            }
+          }
+        }
       }
       isGradleOlderThan("7.4") -> {
-        assertSyncViewTreeEquals("-\n" +
-                                 " -failed\n" +
-                                 "  -build.gradle\n" +
-                                 "   Unexpected input: '{'")
+        assertSyncViewTree {
+          assertNode("failed") {
+            assertNodeWithDeprecatedGradleWarning()
+            assertNode("build.gradle") {
+              assertNode("Unexpected input: '{'")
+            }
+          }
+        }
       }
       else -> {
-        assertSyncViewTreeEquals("-\n" +
-                                 " -failed\n" +
-                                 "  -build.gradle\n" +
-                                 "   Unexpected character: '\\''")
+        assertSyncViewTree {
+          assertNode("failed") {
+            assertNodeWithDeprecatedGradleWarning()
+            assertNode("build.gradle") {
+              assertNode("Unexpected character: '\\''")
+            }
+          }
+        }
       }
     }
   }
@@ -381,13 +404,21 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
       "plugins { id 'java' }"
     )
 
-    assertSyncViewTreeEquals("-\n" +
-                             " -failed\n" +
-                             "  -build.gradle\n" +
-                             "   only buildscript {}" +
-                             (if (isGradleAtLeast("7.4")) {", pluginManagement {}"} else {""}) +
-                             " and other plugins {} script blocks are allowed before plugins {} blocks, no other statements are allowed")
-
+    assertSyncViewTree {
+      assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
+        assertNode("build.gradle") {
+          assertNode("only buildscript {}" +
+                     (if (isGradleAtLeast("7.4")) {
+                       ", pluginManagement {}"
+                     }
+                     else {
+                       ""
+                     }) +
+                     " and other plugins {} script blocks are allowed before plugins {} blocks, no other statements are allowed")
+        }
+      }
+    }
   }
 
   @Test
@@ -397,14 +428,22 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
       "apply plugin: 'java'foo"  // expected syntax error
     )
 
-    assertSyncViewTreeEquals("-\n" +
-                             " -failed\n" +
-                             "  -build.gradle\n" +
-                             "   Cannot get property 'foo' on null object")
+    assertSyncViewTree {
+      assertNode("failed") {
+        assertNodeWithDeprecatedGradleWarning()
+        assertNode("build.gradle") {
+          assertNode("Cannot get property 'foo' on null object")
+        }
+      }
+    }
 
     val filePath = FileUtil.toSystemDependentName(myProjectConfig.path)
     assertSyncViewSelectedNode("Cannot get property 'foo' on null object") {
       val trySuggestion = when {
+        isGradleAtLeast("9.2") ->
+          """|> Run with --debug option to get more log output.
+             |> Run with --scan to generate a Build Scan (powered by Develocity).
+             |> Get more help at https://help.gradle.org."""
         isGradleAtLeast("9.0") ->
           """|> Run with --debug option to get more log output.
              |> Run with --scan to generate a Build Scan (Powered by Develocity).
@@ -451,6 +490,8 @@ class GradleOutputParsersMessagesImportingTest : GradleOutputParsersMessagesImpo
       val text = it.lineSequence()
         .dropWhile { s -> s == "Starting Gradle Daemon..."
                           || s.startsWith("Gradle Daemon started in")
+                          || s == ""
+                          || s.startsWith("CONFIGURE SUCCESSFUL")
                           || s.startsWith("Download ") }
         .joinToString(separator = "\n")
 

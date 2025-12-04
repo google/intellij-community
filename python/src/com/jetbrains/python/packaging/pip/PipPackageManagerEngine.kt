@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.python.community.execService.Args
 import com.intellij.python.community.execService.ExecService
 import com.intellij.python.community.execService.python.HelperName
 import com.jetbrains.python.errorProcessing.PyResult
@@ -58,7 +59,7 @@ class PipPackageManagerEngine(
   suspend fun syncRequirementsTxt(file: VirtualFile): PyResult<Unit> {
     return runPackagingTool(
       operation = "install",
-      arguments = listOf("-r", file.path)
+      arguments = Args("-r").addLocalFile(file.toNioPath())
     ).mapSuccess { }
   }
 
@@ -81,15 +82,14 @@ class PipPackageManagerEngine(
     return PyResult.success(packages)
   }
 
-  suspend fun runPackagingTool(operation: String, arguments: List<String>): PyResult<String> = withContext(Dispatchers.IO) {
-    val parameters = mutableListOf(operation)
+  private suspend fun runPackagingTool(operation: String, arguments: Args): PyResult<String> = withContext(Dispatchers.IO) {
+    val parameters = Args(operation)
     if (operation == "install") {
       PyProxyUtils.proxyString?.let {
-        parameters += "--proxy"
-        parameters += it
+        parameters.addArgs("--proxy", it)
       }
     }
-    parameters += arguments
+    parameters.add(arguments)
 
     thisLogger().debug("Running python packaging tool. Operation: $operation")
     ExecService().executeHelper(
@@ -99,11 +99,14 @@ class PipPackageManagerEngine(
     )
   }
 
+  private suspend fun runPackagingTool(operation: String, arguments: List<String>): PyResult<String> =
+    runPackagingTool(operation, Args(*arguments.toTypedArray()))
 
-  private fun partitionPackagesBySource(installRequest: PythonPackageInstallRequest): List<List<String>> {
+
+  private fun partitionPackagesBySource(installRequest: PythonPackageInstallRequest): List<Args> {
     when (installRequest) {
       is PythonPackageInstallRequest.ByLocation -> {
-        return listOf(listOf(installRequest.location.toString()))
+        return listOf(Args(installRequest.location.toString()))
       }
       is PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications -> {
         return partitionPackagesBySource(installRequest.specifications)
@@ -111,7 +114,7 @@ class PipPackageManagerEngine(
     }
   }
 
-  private fun partitionPackagesBySource(specifications: List<PythonRepositoryPackageSpecification>): List<List<String>> {
+  private fun partitionPackagesBySource(specifications: List<PythonRepositoryPackageSpecification>): List<Args> {
     val (pypiSpecs, nonPypi) = specifications.partition {
       val url = it.repository.urlForInstallation?.toString()
       url == null || url == PyPIPackageUtil.PYPI_LIST_URL
@@ -124,25 +127,27 @@ class PipPackageManagerEngine(
           return@mapNotNull null
         }
 
-        listOf(
+        val argsStr = listOf(
           "--index-url",
           url
         ) + specs.map { it.nameWithVersionSpec }
+
+        Args().addArgs(argsStr)
       }
 
-    val pypi = mutableListOf<List<String>>()
+    val pypi = mutableListOf<Args>()
     if (pypiSpecs.isNotEmpty()) {
-      pypi.add(pypiSpecs.map { it.nameWithVersionsSpec })
+      pypi.add(Args().addArgs(pypiSpecs.map { it.nameWithVersionsSpec }))
     }
 
     return pypi + byRepository
   }
 
-  suspend fun performInstall(argumentsGroups: List<List<String>>, options: List<String>): PyResult<Unit> {
+  suspend fun performInstall(argumentsGroups: List<Args>, options: List<String>): PyResult<Unit> {
     for (argumentsGroup in argumentsGroups) {
       val result = runPackagingTool(
         operation = "install",
-        arguments = argumentsGroup + options
+        arguments = argumentsGroup.addArgs(options)
       )
 
       result.onFailure {

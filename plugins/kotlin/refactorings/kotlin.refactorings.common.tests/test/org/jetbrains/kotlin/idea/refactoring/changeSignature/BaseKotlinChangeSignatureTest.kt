@@ -249,10 +249,12 @@ public @interface NotNull {
             }
 
             if (checkErrorsAfter && psiFile is KtFile) {
-                DirectiveBasedActionUtils.checkForUnexpectedErrors(psiFile)
+                DirectiveBasedActionUtils.checkForUnexpectedErrors(psiFile, diagnosticsProvider = getDiagnosticProvider())
             }
         }
     }
+
+    abstract fun getDiagnosticProvider(): (KtFile) -> List<Diagnostic>
 
     protected open fun checkErrorsAfter() = InTextDirectivesUtils.isDirectiveDefined(file!!.text, "// CHECK_ERRORS_AFTER")
 
@@ -779,6 +781,8 @@ public @interface NotNull {
     fun testRemoveLastNonLambdaParameter2() = doTest { removeParameter(1) }
 
     fun testRemoveParameterPreserveReceiver() = doTest { removeParameter(1) }
+
+    fun testRemoveParameterWithNextDefaults() = doTest { removeParameter(2) }
 
     fun testRemoveParameterInParentConflict() = doTestConflict {
         removeParameter(0)

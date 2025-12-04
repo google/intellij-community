@@ -54,7 +54,8 @@ Unused: TypeAlias = object  # stable
 
 # Marker for return types that include None, but where forcing the user to
 # check for None can be detrimental. Sometimes called "the Any trick". See
-# CONTRIBUTING.md for more information.
+# https://typing.python.org/en/latest/guides/writing_stubs.html#the-any-trick
+# for more information.
 MaybeNone: TypeAlias = Any  # stable
 
 # Used to mark arguments that default to a sentinel value. This prevents
@@ -140,6 +141,9 @@ class SupportsIter(Protocol[_T_co]):
 # generic over the type that is iterated over.
 class SupportsAiter(Protocol[_T_co]):
     def __aiter__(self) -> _T_co: ...
+
+class SupportsLen(Protocol):
+    def __len__(self) -> int: ...
 
 class SupportsLenAndGetItem(Protocol[_T_co]):
     def __len__(self) -> int: ...

@@ -59,6 +59,9 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/whenWithOnlyElse")
             model("${idea}/inspectionsLocal/redundantRequireNotNullCall")
             model("${idea}/inspectionsLocal/suspiciousCallOnCollectionToAddOrRemovePath")
+            model("${idea}/inspectionsLocal/arrayHashCode")
+            model("${idea}/inspectionsLocal/arrayToString")
+            model("${idea}/inspectionsLocal/stringReferentialEquality")
             model("${idea}/inspectionsLocal/suspiciousCascadingIf")
             model("${idea}/inspectionsLocal/equalsOrHashCode")
             model("${idea}/inspectionsLocal/removeRedundantQualifierName")
@@ -77,9 +80,11 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/foldInitializerAndIfToElvis")
             model("${idea}/inspectionsLocal/redundantElseInIf")
             model("${idea}/inspectionsLocal/kdocMissingDocumentation")
+            model("${idea}/inspectionsLocal/kdocResolutionResultHasChanged")
             model("${idea}/inspectionsLocal/redundantExplicitType")
             model("${idea}/intentions/convertArgumentToSet")
             model("${idea}/inspectionsLocal/coroutines/redundantRunCatching")
+            model("${idea}/inspectionsLocal/coroutines/simplifiableFlowCallChain")
             model("${idea}/inspectionsLocal/coroutines/unusedFlow")
             model("${idea}/inspectionsLocal/joinDeclarationAndAssignment")
             model("${idea}/inspectionsLocal/replaceArrayOfWithLiteral")
@@ -106,6 +111,7 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/replaceIsEmptyWithIfEmpty")
             model("${idea}/inspectionsLocal/booleanLiteralArgument")
             model("${idea}/inspectionsLocal/replaceArrayEqualityOpWithArraysEquals")
+            model("${idea}/inspectionsLocal/verboseNullabilityAndEmptiness")
             model("${idea}/inspectionsLocal/nestedLambdaShadowedImplicitParameter")
             model("${idea}/inspectionsLocal/unusedReceiverParameter")
             model("${idea}/inspectionsLocal/filterIsInstanceAlwaysEmpty")
@@ -115,13 +121,13 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/mapGetWithNotNullAssertionOperator")
             model("${idea}/inspectionsLocal/replaceSubstring")
             model("${idea}/inspectionsLocal/replaceWithIgnoreCaseEquals")
+            model("${idea}/inspectionsLocal/replaceWithImportAlias")
             model("${idea}/inspectionsLocal/replaceToWithInfixForm")
             model("${idea}/inspectionsLocal/addOperatorModifier")
             model("${idea}/inspectionsLocal/kotlinUnreachableCode")
             model("${idea}/inspectionsLocal/removeRedundantLabel")
             model("${idea}/inspectionsLocal/removeRedundantCallsOfConversionMethods")
             model("${idea}/inspectionsLocal/removeExplicitTypeArguments")
-            model("${idea}/inspectionsLocal/contextParametersMigration")
             model("${idea}/inspectionsLocal/defaultAnnotationTarget")
             model("${idea}/inspectionsLocal/redundantEnumConstructorInvocation")
             model("${idea}/inspectionsLocal/redundantReturnKeyword")
@@ -189,9 +195,11 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
 
         testClass<AbstractK2MultiFileInspectionTest> {
             model("${idea}/multiFileInspections/mismatchedPackageDirectoryWithEmptyKts", pattern = Patterns.TEST)
+            model("${idea}/multiFileInspections/mismatchedPackageDirectory", pattern = Patterns.TEST)
             model("${idea}/multiFileInspections/mismatchedProjectAndDirectory", pattern = Patterns.TEST)
             model("${idea}/multiFileInspections/kotlinSealedInJavaTest", pattern = Patterns.TEST)
-            model("${idea}/multiFileInspections/mismatchedProjectAndDirectoryRoot", pattern = Patterns.TEST)
+            // K2 test data intentionally slightly differs from K1
+            //model("${idea}/multiFileInspections/mismatchedProjectAndDirectoryRoot", pattern = Patterns.TEST)
         }
 
         testClass<AbstractK2MultiFileLocalInspectionTest> {

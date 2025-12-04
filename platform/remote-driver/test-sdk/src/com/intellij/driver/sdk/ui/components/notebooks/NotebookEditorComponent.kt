@@ -7,26 +7,28 @@ import com.intellij.driver.sdk.PsiManager
 import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.invokeActionWithRetries
 import com.intellij.driver.sdk.singleProject
-import com.intellij.driver.sdk.step
 import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.UiText.Companion.asString
 import com.intellij.driver.sdk.ui.components.ComponentData
 import com.intellij.driver.sdk.ui.components.UiComponent
 import com.intellij.driver.sdk.ui.components.common.EditorComponentImpl
+import com.intellij.driver.sdk.ui.components.common.IdeaFrameUI
 import com.intellij.driver.sdk.ui.components.common.JEditorUiComponent
 import com.intellij.driver.sdk.ui.components.common.editor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
+import com.intellij.driver.sdk.ui.components.common.toolwindows.ToolWindowLeftToolbarUi
 import com.intellij.driver.sdk.ui.components.common.toolwindows.ToolWindowRightToolbarUi
 import com.intellij.driver.sdk.ui.components.common.toolwindows.projectView
+import com.intellij.driver.sdk.ui.components.elements.*
 import com.intellij.driver.sdk.ui.components.elements.JLabelUiComponent
 import com.intellij.driver.sdk.ui.components.elements.JTextFieldUI
 import com.intellij.driver.sdk.ui.components.elements.JcefOffScreenViewComponent
 import com.intellij.driver.sdk.ui.components.elements.LetsPlotComponent
 import com.intellij.driver.sdk.ui.components.elements.NotebookTableOutputUi
 import com.intellij.driver.sdk.ui.components.elements.popup
+import com.intellij.driver.sdk.ui.hasFocus
 import com.intellij.driver.sdk.ui.pasteText
 import com.intellij.driver.sdk.ui.ui
-import com.intellij.driver.sdk.wait
 import com.intellij.driver.sdk.waitFor
 import com.intellij.driver.sdk.waitForCodeAnalysis
 import org.intellij.lang.annotations.Language
@@ -88,18 +90,27 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
     get() = xx("//div[@class='LetsPlotComponent']", LetsPlotComponent::class.java).list()
   val toolbar: UiComponent
     get() = x("//div[@class='JupyterFileEditorToolbar']")
+  val kotlinNotebookToolbar: KotlinNotebookActionToolBarComponent
+    get() = x(
+      "//div[@class='ActionToolbarImpl' and contains(@myvisibleactions, 'Kotlin Notebook')]",
+      KotlinNotebookActionToolBarComponent::class.java
+    )
   val imagePanel: List<UiComponent>
     get() = xx("//div[@class='FullEditorWidthRenderer']//div[@class='ImagePanel']").list()
+  val firstNotebookOutput: String
+    get() = notebookCellOutputs.first().getAllTexts().asString()
   val lastNotebookOutput: String
     get() = notebookCellOutputs.last().getAllTexts().asString()
   val statusBar: UiComponent
-    get() = xx("//div[@class='JupyterFileEditorToolbar']//div[@class='ActionToolbarImpl']").list().last()
+    get() = x("//div[@class='JupyterFileEditorToolbar']")
   val cellIndexPanel: UiComponent
-    get() = xx("//div[@class='MyScrollPane']//div[@class='JBViewport']").list().first()
-  val selectedCellActions: UiComponent
-    get() = xx("//div[@class='JupyterCellActionsToolbar']").list().first()
-  val firstFoldingBar: UiComponent
-    get() = xx("//div[@class='EditorCellFoldingBarComponent']").list().first()
+    get() = x("//div[@class='MyScrollPane']//div[@class='JBViewport']//div[@class='EditorGutterComponentImpl']")
+  val cellActions: List<UiComponent>
+    get() = xx("//div[@class='JupyterCellActionsToolbar']").list()
+  val newCellActions: List<UiComponent>
+    get() = x("//div[@class='JupyterAddNewCellToolbar']").xx("//div[@class='ActionButtonWithText']", JButtonUiComponent::class.java).list()
+  val foldingBars: List<UiComponent>
+    get() = xx("//div[@class='EditorCellFoldingBarComponent']").list()
 
   override val editorComponent: EditorComponentImpl
     get() = when {
@@ -115,7 +126,9 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
       service<PsiManager>(singleProject()).findFile(editor.getVirtualFile())
     }
 
-  fun addEmptyCodeCell(): Unit = addCellBelow.strictClick()
+  fun addEmptyCodeCell(): Unit {
+    driver.invokeActionWithRetries("NotebookInsertCodeCellAction")
+  }
 
   fun addCodeCell(text: String) {
     addEmptyCodeCell()
@@ -142,79 +155,19 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
     deleteCell.click()
   }
 
-  fun restartHighlighting() {
-    driver.withContext {
-      invokeActionWithRetries("RestartKotlinNotebookHighlighting")
-
-      waitForHighlighting()
-    }
-  }
-
-  fun runCellAndWaitExecuted(timeout: Duration = 30.seconds): Unit = step("Executing cell") {
-    runCell()
-    waitFor(timeout = timeout) {
-      // TODO: what if the cell we ran doesn't have an execution label yet, and we are waiting for the previous one?
-      notebookCellExecutionInfos.isNotEmpty() && notebookCellExecutionInfos.last().getParent().x {
-        contains(byAttribute("defaulticon", "greenCheckmark.svg"))
-      }.present()
-    }
-  }
-
-  /*
-    This function should be removed when fixed:
-    PY-84369
-    PY-84374
+  /**
+   * Checks if there are exactly [expectedFinalExecutionCount] finished cells with green checkmark
+   * in the current notebook editor.
    */
-  fun softRunCellAndWaitExecuted(timeout: Duration = 1.minutes): Unit = step("Executing cell") {
-    runCell()
-    waitFor(timeout = timeout) {
-      val last = notebookCellExecutionInfos.lastOrNull()
-      if (last == null) {
-        false
-      } else {
-        val timeBefore = last.getExecutionTimeInMsSafe()
-        wait(250.milliseconds)
-        val timeAfter = last.getExecutionTimeInMsSafe()
-        timeAfter == timeBefore && timeAfter != null
-      }
-    }
-  }
-
-  fun runAllCellsAndWaitExecuted(timeout: Duration = 1.minutes): Unit = step("Executing all cells") {
-    runAllCells()
-    waitFor(timeout = timeout) {
-      // TODO: what if we have some cells that were executed before, and their checkmarks are still there,
-      //  while new execution labels are not yet created?
-      val infos = notebookCellExecutionInfos
-
-      infos.isNotEmpty()
-      && infos.size == notebookCellEditors.size
-      && infos.all {
-        it.getParent().x { contains(byAttribute("defaulticon", "greenCheckmark.svg")) }.present()
-      }
-    }
-  }
-
-  /*
-    This functions should be removed when fixed:
-    PY-84369
-    PY-84374
-   */
-  fun softRunAllCellsAndWaitExecuted(timeout: Duration = 1.minutes): Unit = step("Executing all cells") {
-    runAllCells()
-    waitFor(timeout = timeout) {
-      val infos = notebookCellExecutionInfos
-      val timesBefore = infos.map { it.getExecutionTimeInMsSafe() }
-
-      wait(250.milliseconds)
-
-      val timesAfter = infos.map { it.getExecutionTimeInMsSafe() }
-
-      infos.isNotEmpty()
-      && infos.size == notebookCellEditors.size
-      && timesAfter.all { it != null }
-      && timesBefore == timesAfter
-    }
+  fun areAllExecutionsFinishedSuccessfully(
+    expectedFinalExecutionCount: Int,
+  ): Boolean {
+    val infos = notebookCellExecutionInfos
+    return infos.isNotEmpty() &&
+           infos.size == expectedFinalExecutionCount &&
+           infos.all {
+             it.getParent().x { contains(byAttribute("defaulticon", "greenCheckmark.svg")) }.present()
+           }
   }
 
   fun clickOnCell(cellSelector: CellSelector) {
@@ -264,27 +217,6 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
       ]
     """.trimIndent()
     ).list()
-
-  fun JLabelUiComponent.getExecutionTimeInMsSafe(): Long? = step("Get cell execution time") {
-    if (this.notPresent()) return@step null
-    val text = this.getText()
-    if (text == null) return@step null
-    if (text.isEmpty()) return@step null
-
-    val seconds = Regex("""(\d+)s""").find(text)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-    val millis  = Regex("""(\d+)ms""").find(text)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-
-    seconds * 1_000 + millis
-  }
-
-  fun JLabelUiComponent.getExecutionTimeInMs(): Long = step("Get cell execution time") {
-    this.getText().run {
-      val matchSeconds = Regex("\\d+s").find(this)?.value?.substringBefore("s")?.toLong() ?: 0
-      val matchMs = Regex("\\d+ms").find(this)?.value?.substringBefore("ms")?.toLong() ?: 0
-
-      matchSeconds * 1000 + matchMs
-    }
-  }
 }
 
 enum class NotebookType(val typeName: String, val newNotebookActionId: String) {
@@ -300,11 +232,13 @@ enum class NotebookType(val typeName: String, val newNotebookActionId: String) {
  */
 fun Driver.createNewNotebook(name: String = "New Notebook", type: NotebookType) {
   ideFrame {
+    leftToolWindowToolbar.projectButton.open() // making sure the project view is open and in focus for correct scrolling
     projectView {
       projectViewTree.run {
         waitFor("wait for project tree to load", 30.seconds) {
           getAllTexts().isNotEmpty()
         }
+        invokeActionWithRetries("ScrollPane-scrollHome") // making sure the first line is within the visible bounds
         getAllTexts().first().strictClick()
       }
     }
@@ -336,16 +270,20 @@ fun Driver.createNewNotebookWithMouse(name: String = "New Notebook", type: Noteb
         waitFor("wait for project tree to load", 30.seconds) {
           getAllTexts().isNotEmpty()
         }
-        getAllTexts().first().moveMouse()
+        getAllTexts().first().strictClick()
       }
     }
 
     val newFileButton = x { byAccessibleName("New File or Directory…") }
 
-    waitFor {
+    waitFor(timeout = 30.seconds) {
       newFileButton.present()
     }
     newFileButton.strictClick()
+
+    waitFor("New file popup will be selected", timeout = 15.seconds) {
+      hasFocus(popup())
+    }
 
     popup().run {
       waitOneText("${type.typeName} Notebook").strictClick()
@@ -359,8 +297,27 @@ fun Driver.createNewNotebookWithMouse(name: String = "New Notebook", type: Noteb
       }
     }
 
-    waitFor("the editor is present") {
+    waitFor("the editor is present", timeout = 1.minutes) {
       notebookEditor().present()
+    }
+    projectView {
+      projectViewTree.run {
+        waitOneText(message = "File name should present in project tree", timeout = 15.seconds) {
+          it.text == "$name.ipynb"
+        }
+      }
+    }
+  }
+}
+
+//TODO: @Stankevych should be refactored to a single fun that interacts with the right toolbar
+fun Driver.openRightToolWindow(stripeButtonName: String) {
+  ideFrame {
+    val rightToolbar = xx(ToolWindowRightToolbarUi::class.java) { byClass("ToolWindowRightToolbar") }.list().firstOrNull()
+                       ?: return@ideFrame
+    val varsButton = rightToolbar.stripeButton(stripeButtonName)
+    if (varsButton.present()) {
+      varsButton.open()
     }
   }
 }
@@ -373,5 +330,42 @@ fun Driver.closeRightToolWindow(stripeButtonName: String) {
     if (varsButton.present()) {
       varsButton.close()
     }
+  }
+}
+
+//TODO: @Stankevych should be refactored to a single fun that interacts with the left toolbar
+fun Driver.openLeftToolWindow(stripeButtonName: String) {
+  ideFrame {
+    val leftToolbar = xx(ToolWindowLeftToolbarUi::class.java) { byClass("ToolWindowLeftToolbar") }.list().firstOrNull()
+                       ?: return@ideFrame
+    val varsButton = leftToolbar.stripeButton(stripeButtonName)
+    if (varsButton.notPresent()) {
+      varsButton.open()
+    }
+  }
+}
+
+/**
+ * Executes a test block within the context of the notebook editor UI component.
+ * Note: only the NotebookEditorUiComponent and its successors are directly available in the context of this block.
+ * If you need to access other UI components in testBody(), use the `driver.ideFrame {}`.
+ *
+ * @param testBody A lambda containing the test actions to be executed with the `NotebookEditorUiComponent`.
+ */
+fun Driver.withNotebookEditor(testBody: NotebookEditorUiComponent.() -> Unit): IdeaFrameUI = ideFrame {
+  notebookEditor {
+    testBody()
+  }
+}
+
+fun Driver.openFileWithProjectPanel(fileName: String): IdeaFrameUI = ideFrame {
+  leftToolWindowToolbar.projectButton.open()
+  projectView {
+    projectViewTree.run {
+      waitOneText(fileName).doubleClick()
+    }
+  }
+  waitFor("the editor is present", timeout = 30.seconds) {
+    editor().present()
   }
 }

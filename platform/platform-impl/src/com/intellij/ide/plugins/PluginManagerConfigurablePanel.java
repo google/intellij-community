@@ -47,6 +47,10 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.wm.WelcomeScreen;
+import com.intellij.openapi.wm.impl.welcomeScreen.PluginsTabFactory;
+import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeScreenEventCollector;
+import com.intellij.ui.ComponentUtil;
 import com.intellij.ui.GotItTooltip;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.components.JBScrollPane;
@@ -69,6 +73,7 @@ import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.CoroutineScopeKt;
 import kotlinx.coroutines.Dispatchers;
 import org.jetbrains.annotations.*;
+import org.jspecify.annotations.NonNull;
 
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
@@ -146,6 +151,7 @@ public final class PluginManagerConfigurablePanel implements Disposable {
   private boolean myShowMarketplaceTab;
 
   private Boolean myPluginsAutoUpdateEnabled;
+  private volatile Boolean myDisposeStarted = false;
 
   public PluginManagerConfigurablePanel() {
     myPluginModelFacade = new PluginModelFacade(new MyPluginModel(null));
@@ -900,29 +906,37 @@ public final class PluginManagerConfigurablePanel implements Disposable {
               Map<PluginUiModel, Double> pluginToScore = null;
 
               if (parser.internal) {
-                PluginsViewCustomizer.PluginsGroupDescriptor groupDescriptor =
-                  PluginsViewCustomizerKt.getPluginsViewCustomizer().getInternalPluginsGroupDescriptor();
-                if (groupDescriptor != null) {
-                  if (parser.searchQuery == null) {
-                    result.addDescriptors(groupDescriptor.getPlugins());
-                  }
-                  else {
-                    for (IdeaPluginDescriptor pluginDescriptor : groupDescriptor.getPlugins()) {
-                      if (StringUtil.containsIgnoreCase(pluginDescriptor.getName(), parser.searchQuery)) {
-                        result.addDescriptor(pluginDescriptor);
+                try {
+                  PluginsViewCustomizer.PluginsGroupDescriptor groupDescriptor =
+                    PluginsViewCustomizerKt.getPluginsViewCustomizer().getInternalPluginsGroupDescriptor();
+                  if (groupDescriptor != null) {
+                    if (parser.searchQuery == null) {
+                      result.addDescriptors(groupDescriptor.getPlugins());
+                    }
+                    else {
+                      for (IdeaPluginDescriptor pluginDescriptor : groupDescriptor.getPlugins()) {
+                        if (StringUtil.containsIgnoreCase(pluginDescriptor.getName(), parser.searchQuery)) {
+                          result.addDescriptor(pluginDescriptor);
+                        }
                       }
                     }
+                    result.removeDuplicates();
+                    result.sortByName();
+                    return;
                   }
-                  result.removeDuplicates();
-                  result.sortByName();
-                  return;
+                }
+                catch (Exception e) {
+                  LOG.error("Error while loading internal plugins group", e);
                 }
               }
 
               PluginModelAsyncOperationsExecutor.INSTANCE.getCustomRepositoriesPluginMap(myCoroutineScope, map -> {
                 Map<String, List<PluginUiModel>> customRepositoriesMap = (Map<String, List<PluginUiModel>>)map;
                 if (parser.suggested && project != null) {
-                  result.addModels(PluginsAdvertiserStartupActivityKt.findSuggestedPlugins(project, customRepositoriesMap));
+                  List<@NotNull PluginUiModel> plugins =
+                    PluginsAdvertiserStartupActivityKt.findSuggestedPlugins(project, customRepositoriesMap);
+                  result.addModels(plugins);
+                  updateSearchPanel(result, runQuery, plugins);
                 }
                 else if (!parser.repositories.isEmpty()) {
                   for (String repository : parser.repositories) {
@@ -943,10 +957,7 @@ public final class PluginManagerConfigurablePanel implements Disposable {
                   }
                   result.removeDuplicates();
                   result.sortByName();
-                  Set<PluginId> ids = result.getModels().stream().map(it -> it.getPluginId()).collect(Collectors.toSet());
-                  result.getPreloadedModel().setInstalledPlugins(UiPluginManager.getInstance().findInstalledPluginsSync(ids));
-                  result.getPreloadedModel().setPluginInstallationStates(UiPluginManager.getInstance().getInstallationStatesSync());
-                  updatePanel(runQuery);
+                  updateSearchPanel(result, runQuery, result.getModels());
                 }
                 else {
                   PluginModelAsyncOperationsExecutor.INSTANCE
@@ -962,6 +973,13 @@ public final class PluginManagerConfigurablePanel implements Disposable {
                 }
                 return null;
               });
+            }
+
+            private void updateSearchPanel(@NonNull PluginsGroup result, AtomicBoolean runQuery, List<@NotNull PluginUiModel> plugins) {
+              Set<PluginId> ids = plugins.stream().map(it -> it.getPluginId()).collect(Collectors.toSet());
+              result.getPreloadedModel().setInstalledPlugins(UiPluginManager.getInstance().findInstalledPluginsSync(ids));
+              result.getPreloadedModel().setPluginInstallationStates(UiPluginManager.getInstance().getInstallationStatesSync());
+              updatePanel(runQuery);
             }
 
             private void applySearchResult(@NotNull PluginsGroup result,
@@ -1409,6 +1427,7 @@ public final class PluginManagerConfigurablePanel implements Disposable {
               .loadErrors(myPluginModelFacade.getModel().mySessionId.toString(),
                           ContainerUtil.map(descriptors, PluginUiModel::getPluginId));
             result.getPreloadedModel().setErrors(MyPluginModel.getErrors(errors));
+            result.getPreloadedModel().setPluginInstallationStates(UiPluginManager.getInstance().getInstallationStatesSync());
             PluginManagerUsageCollector.performInstalledTabSearch(
               ProjectUtil.getActiveProject(), parser, result.getModels(), searchIndex, null);
 
@@ -1933,6 +1952,10 @@ public final class PluginManagerConfigurablePanel implements Disposable {
 
   @Override
   public void dispose() {
+    myDisposeStarted = true;
+    if (ComponentUtil.getParentOfType(WelcomeScreen.class, myCardPanel) != null && isModified()) {
+      scheduleApply();
+    }
     InstalledPluginsState pluginsState = InstalledPluginsState.getInstance();
     if (myPluginModelFacade.getModel().toBackground()) {
       pluginsState.clearShutdownCallback();
@@ -1979,12 +2002,26 @@ public final class PluginManagerConfigurablePanel implements Disposable {
     return myPluginModelFacade.getModel().isModified();
   }
 
+  public void scheduleApply() {
+    ApplicationManager.getApplication().invokeLater(() -> {
+      try {
+        apply();
+        WelcomeScreenEventCollector.logPluginsModified();
+        if (myDisposeStarted) { //To avoid race condition when dispose is called before apply callback gets called
+          InstalledPluginsState.getInstance().runShutdownCallback();
+        }
+      }
+      catch (ConfigurationException exception) {
+        Logger.getInstance(PluginsTabFactory.class).error(exception);
+      }
+    }, ModalityState.nonModal());
+  }
+
   public void apply() throws ConfigurationException {
     if (myPluginsAutoUpdateEnabled != null) {
       UpdateOptions state = UpdateSettings.getInstance().getState();
       if (state.isPluginsAutoUpdateEnabled() != myPluginsAutoUpdateEnabled) {
-        state.setPluginsAutoUpdateEnabled(myPluginsAutoUpdateEnabled);
-        ApplicationManager.getApplication().getService(PluginAutoUpdateService.class).onSettingsChanged();
+        UiPluginManager.getInstance().setPluginsAutoUpdateEnabled(myPluginsAutoUpdateEnabled);
       }
     }
 
@@ -2005,7 +2042,9 @@ public final class PluginManagerConfigurablePanel implements Disposable {
         });
       }
 
-      installedPluginsState.runShutdownCallback();
+      if (myDisposeStarted) {
+        installedPluginsState.runShutdownCallback();
+      }
     });
   }
 

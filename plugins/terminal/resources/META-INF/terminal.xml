@@ -33,6 +33,9 @@
     <statistics.validation.customValidationRule implementation="org.jetbrains.plugins.terminal.fus.TerminalFocusRule"/>
     <statistics.applicationUsagesCollector implementation="org.jetbrains.plugins.terminal.fus.TerminalSettingsStateCollector"/>
 
+    <registryKey key="terminal.persistent.tabs" defaultValue="true"
+                 description="Save state of terminal tabs between IDE restarts"/>
+
     <registryKey key="terminal.Ctrl-E.opens.RecentFiles.popup" defaultValue="false"
                  description="Ctrl+E in terminal opens 'Recent Files' popup on Linux/Windows"/>
 
@@ -58,16 +61,19 @@
     <registryKey key="terminal.classic.refresh.vfs.on.shell.command.finished" defaultValue="true"
                  description="Refresh VFS when shell commands are finished in the Classic Terminal.
                   May not work 100% reliably as it uses heuristics to determine when command is finished."/>
-    <registryKey key="terminal.use.EelApi" defaultValue="false"
+    <registryKey key="terminal.use.EelApi" defaultValue="true"
                  description="Use EelApi to launch a shell process. Launching a local shell works the same as before.
                   For WSL environments, the shell process in WSL will be launched via IJEnt instead of using wsl.exe."/>
     <registryKey key="terminal.new.ui.completion.popup" defaultValue="true"
                  description="Whether popup-based command completion feature is enabled in the Reworked Terminal"/>
     <registryKey key="terminal.type.ahead" defaultValue="true"
                  description="Whether terminal should predict how shell handles typing to minimize the typing latency. Monolith-only at the moment"/>
-    <registryKey key="terminal.generic.hyperlinks" defaultValue="false"
+    <registryKey key="terminal.generic.hyperlinks" defaultValue="true"
                  description="Show generic file hyperlinks in the reworked terminal. Such hyperlinks are highlighted on mouse hover.
                   Open a new terminal after enabling this option to take effect."/>
+    <registryKey key="terminal.ai.inline.completion.enabled" defaultValue="false"
+                 description="Whether Terminal AI Inline Completion is enabled and visible in the settings"/>
+    <consoleFilterProvider implementation="org.jetbrains.plugins.terminal.block.reworked.hyperlinks.TerminalGenericFileFilterProvider"/>
 
     <experimentalFeature id="terminal.shell.command.handling" percentOfUsers="100"/>
     <terminal.shellCommandHandler implementation="org.jetbrains.plugins.terminal.RunAnythingTerminalBridge"/>

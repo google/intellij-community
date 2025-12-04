@@ -18,13 +18,13 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Writer
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.DirSource
-import org.jetbrains.intellij.build.JetBrainsProductProperties
 import org.jetbrains.intellij.build.ZipSource
 import org.jetbrains.intellij.build.buildJar
 import org.jetbrains.intellij.build.impl.commonModuleExcludes
 import org.jetbrains.intellij.build.impl.createModuleSourcesNamesFilter
 import org.jetbrains.intellij.build.impl.getLibraryFilename
 import org.jetbrains.intellij.build.impl.libraries.isLibraryModule
+import org.jetbrains.intellij.build.isCommunityModule
 import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
 import org.jetbrains.jps.model.java.JavaResourceRootType
@@ -90,8 +90,9 @@ open class MavenArtifactsBuilder(protected val context: BuildContext) {
 
     internal fun scopedDependencies(module: JpsModule): Map<JpsDependencyElement, DependencyScope> {
       val result = LinkedHashMap<JpsDependencyElement, DependencyScope>()
+      val javaExtensionService = JpsJavaExtensionService.getInstance()
       for (dependency in module.dependenciesList.dependencies) {
-        val extension = JpsJavaExtensionService.getInstance().getDependencyExtension(dependency) ?: continue
+        val extension = javaExtensionService.getDependencyExtension(dependency) ?: continue
         result[dependency] = when (extension.scope) {
           JpsJavaDependencyScope.COMPILE ->
             //if a dependency isn't exported, transitive dependencies will include it in runtime classpath only
@@ -317,9 +318,7 @@ open class MavenArtifactsBuilder(protected val context: BuildContext) {
     }
 
     val artifactData = MavenArtifactData(module, generateMavenCoordinatesForModule(module), patchedDependencies)
-    if (!module.isLibraryModule()) {
-      results[module] = artifactData
-    }
+    results[module] = artifactData
     return artifactData
   }
 
@@ -435,7 +434,7 @@ private fun generatePomXmlData(artifactData: MavenArtifactData, file: Path, cont
     organization = "JetBrains"
     organizationUrl = "https://www.jetbrains.com"
   })
-  if (JetBrainsProductProperties.isCommunityModule(artifactData.module, context)) {
+  if (isCommunityModule(artifactData.module, context)) {
     pomModel.url = "https://github.com/JetBrains/intellij-community"
     pomModel.scm = Scm().apply {
       connection = "scm:git:https://github.com/JetBrains/intellij-community.git"
@@ -495,7 +494,7 @@ private fun createArtifactDependencyByLibrary(descriptor: JpsMavenRepositoryLibr
 }
 
 private fun splitByCamelHumpsMergingNumbers(s: String): List<String> {
-  val words = NameUtilCore.splitNameIntoWords(s)
+  val words = NameUtilCore.splitNameIntoWordList(s)
   val result = ArrayList<String>()
   var i = 0
   while (i < words.size) {

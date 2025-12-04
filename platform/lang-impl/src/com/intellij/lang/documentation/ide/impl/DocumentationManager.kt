@@ -42,7 +42,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import org.jetbrains.annotations.ApiStatus
+import java.awt.Component
 import java.awt.Point
+import java.awt.Rectangle
 import java.lang.ref.WeakReference
 
 @ApiStatus.Internal
@@ -61,7 +63,11 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
     cs.cancel()
   }
 
-  fun actionPerformed(dataContext: DataContext, popupDependencies: Disposable? = null, documentationUiDependencies: Disposable? = null) {
+  fun actionPerformed(
+    dataContext: DataContext,
+    popupDependencies: Disposable? = null,
+    documentationUiDependencies: Disposable? = null,
+  ) {
     EDT.assertIsEdt()
 
     val editor = dataContext.getData(CommonDataKeys.EDITOR)
@@ -114,6 +120,26 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
       return popup?.get()?.isVisible == true
     }
 
+  @ApiStatus.Experimental
+  fun showDocumentationOnHoverAround(
+    targets: List<DocumentationTarget>,
+    project: Project,
+    component: Component,
+    areaWithinComponent: Rectangle,
+    minHeight: Int,
+    onDocumentationSessionDone: Runnable?,
+  ): DocumentationOnHoverSession? {
+    EDT.assertIsEdt()
+    val requests = targets.map { it.documentationRequest() }
+    if (requests.isEmpty() || !CodeInsightSettings.getInstance().AUTO_POPUP_JAVADOC_INFO) return null
+
+    val popupContext = ComponentAreaPopupContext(project, component, areaWithinComponent, onDocumentationSessionDone, minHeight)
+    showDocumentation(requests, popupContext, null) {
+      onDocumentationSessionDone?.run()
+    }
+    return popupContext.session
+  }
+
   private fun getPopup(): AbstractPopup? {
     EDT.assertIsEdt()
     val popup: AbstractPopup? = popup?.get()
@@ -141,10 +167,12 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
     documentationUiDependencies?.let { Disposer.register(documentationUI, it) }
   }
 
-  private fun showDocumentation(requests: List<DocumentationRequest>,
-                                popupContext: PopupContext,
-                                popupDependencies: Disposable? = null,
-                                documentationUiDependencies: Disposable? = null) {
+  private fun showDocumentation(
+    requests: List<DocumentationRequest>,
+    popupContext: PopupContext,
+    popupDependencies: Disposable? = null,
+    documentationUiDependencies: Disposable? = null,
+  ) {
     val toolWindowManager = DocumentationToolWindowManager.getInstance(project)
     val initial = requests.first()
     if (skipPopup) {
@@ -198,7 +226,7 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
     lookup: LookupEx,
     lookupElement: LookupElement,
     delay: Long,
-    mapper: suspend (LookupElement) -> DocumentationRequest?
+    mapper: suspend (LookupElement) -> DocumentationRequest?,
   ) {
     if (getPopup() != null) {
       return // return here to avoid showing another popup if the current one gets cancelled during the delay
@@ -226,7 +254,7 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
 
   fun navigateInlineLink(
     url: String,
-    targetSupplier: () -> DocumentationTarget?
+    targetSupplier: () -> DocumentationTarget?,
   ) {
     EDT.assertIsEdt()
     cs.launch(Dispatchers.EDT + ModalityState.current().asContextElement(), start = CoroutineStart.UNDISPATCHED) {
@@ -246,7 +274,7 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
     url: String,
     targetSupplier: () -> DocumentationTarget?,
     editor: Editor,
-    popupPosition: Point
+    popupPosition: Point,
   ) {
     EDT.assertIsEdt()
     cs.launch(Dispatchers.EDT + ModalityState.current().asContextElement(), start = CoroutineStart.UNDISPATCHED) {
@@ -281,6 +309,16 @@ class DocumentationManager(private val project: Project, private val cs: Corouti
     finally {
       pauseAutoUpdateHandle?.let(Disposer::dispose)
     }
+  }
+
+  interface DocumentationOnHoverSession {
+
+    fun mouseOutsideOfSourceArea()
+
+    fun mouseWithinSourceArea()
+
+    fun tryFinishImmediately(): Boolean
+
   }
 }
 

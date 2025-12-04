@@ -6,8 +6,10 @@ import com.intellij.driver.client.service
 import com.intellij.driver.model.OnDispatcher
 import com.intellij.driver.model.RdTarget
 import com.intellij.driver.sdk.remoteDev.GuestNavigationService
+import com.intellij.driver.sdk.ui.remote.ColorRef
 import java.awt.Point
 import java.awt.Rectangle
+import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
 @Remote("com.intellij.openapi.editor.Editor")
@@ -29,6 +31,7 @@ interface Editor {
   fun getSoftWrapModel(): SoftWrapModel
   fun visualLineToY(visualLine: Int): Int
   fun getMarkupModel(): MarkupModel
+  fun getScrollingModel(): ScrollingModel
 }
 
 @Remote("com.intellij.openapi.editor.markup.MarkupModel")
@@ -37,7 +40,11 @@ interface MarkupModel {
 }
 
 @Remote("com.intellij.openapi.editor.markup.RangeHighlighter")
-interface RangeHighlighter
+interface RangeHighlighter {
+  fun getStartOffset(): Int
+  fun getEndOffset(): Int
+  fun getTextAttributes(): TextAttributes?
+}
 
 @Remote("com.intellij.openapi.editor.VisualPosition")
 interface VisualPosition {
@@ -59,8 +66,24 @@ interface CaretModel {
   fun moveToLogicalPosition(position: LogicalPosition)
   fun moveToVisualPosition(pos: VisualPosition)
   fun getLogicalPosition(): LogicalPosition
+  fun getAllCarets(): List<Caret>
   fun moveToOffset(offset: Int)
   fun getOffset(): Int
+}
+@Remote("com.intellij.openapi.editor.Caret")
+interface Caret {
+  fun getLogicalPosition(): LogicalPosition
+}
+
+@Remote("com.intellij.openapi.editor.ScrollingModel")
+interface ScrollingModel {
+  fun scrollToCaret(type: ScrollType)
+  fun scrollTo(pos: LogicalPosition, scrollType: ScrollType)
+}
+
+@Remote("com.intellij.openapi.editor.ScrollType")
+interface ScrollType {
+  fun valueOf(name: String): ScrollType
 }
 
 @Remote("com.intellij.openapi.editor.InlayModel")
@@ -111,7 +134,6 @@ interface InlayPresentationList {
   fun getEntries(): Array<TextInlayPresentationEntry>
 }
 
-
 @Remote("com.intellij.codeInsight.hints.declarative.impl.views.TextInlayPresentationEntry")
 interface TextInlayPresentationEntry {
   fun getText(): String
@@ -151,9 +173,18 @@ interface EditorColorsScheme {
 @Remote("com.intellij.openapi.editor.SelectionModel")
 interface SelectionModel {
   fun setSelection(startOffset: Int, endOffset: Int)
-  fun getSelectedText(): String?
+  fun getSelectedText(allCaret: Boolean = false): String?
   fun removeSelection()
 }
+
+@Remote("com.intellij.openapi.editor.markup.TextAttributes")
+interface TextAttributes {
+  fun getEffectType(): EffectType
+  fun getEffectColor(): ColorRef?
+}
+
+@Remote("com.intellij.openapi.editor.markup.EffectType")
+interface EffectType
 
 fun Driver.openEditor(file: VirtualFile, project: Project? = null): Array<FileEditor> {
   return withContext(OnDispatcher.EDT) {
@@ -182,7 +213,7 @@ fun Driver.openFile(relativePath: String, project: Project = singleProject(), wa
                 },
                 checker = { virtualFile ->
                   virtualFile != null &&
-                  virtualFile.getPath().contains(relativePath)
+                  Path.of(virtualFile.getPath()).endsWith(Path.of(relativePath))
                 })!!
       }
     }

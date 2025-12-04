@@ -1,9 +1,11 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins.newui
 
-import com.intellij.ide.plugins.PluginEnabler
+import com.intellij.diagnostic.LoadingState
+import com.intellij.frontend.FrontendApplicationInfo
+import com.intellij.frontend.FrontendType
 import com.intellij.ide.plugins.marketplace.*
-import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.PluginId
@@ -70,6 +72,12 @@ class UiPluginManager {
   fun resetSession(sessionId: String, removeSession: Boolean, parentComponent: JComponent? = null, callback: (Map<PluginId, Boolean>) -> Unit = {}) {
     service<FrontendRpcCoroutineContext>().coroutineScope.launch(Dispatchers.IO) {
       callback(getController().resetSession(sessionId, removeSession, parentComponent))
+    }
+  }
+
+  fun setPluginsAutoUpdateEnabled(enabled: Boolean) {
+    service<FrontendRpcCoroutineContext>().coroutineScope.launch(Dispatchers.IO) {
+      getController().setPluginsAutoUpdateEnabled(enabled)
     }
   }
 
@@ -221,7 +229,7 @@ class UiPluginManager {
   }
 
   fun getController(): UiPluginManagerController {
-    if (Registry.`is`("reworked.plugin.manager.enabled", false)) {
+    if (isCombinedPluginManagerEnabled()) {
       return UiPluginManagerController.EP_NAME.extensionList.firstOrNull { it.isEnabled() } ?: DefaultUiPluginManagerController
     }
     return DefaultUiPluginManagerController
@@ -234,6 +242,15 @@ class UiPluginManager {
   companion object {
     @JvmStatic
     fun getInstance(): UiPluginManager = service()
+
+    @JvmStatic
+    fun isCombinedPluginManagerEnabled(): Boolean {
+      if (!LoadingState.APP_READY.isOccurred || ApplicationManager.getApplication() == null) {
+        return false
+      }
+      val frontendType = FrontendApplicationInfo.getFrontendType()
+      return frontendType is FrontendType.Remote && frontendType.isController() && Registry.`is`("reworked.plugin.manager.enabled", false)
+    }
   }
 }
 

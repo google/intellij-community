@@ -4,82 +4,123 @@ package com.intellij.platform.debugger.impl.frontend.evaluate.quick
 import com.intellij.ide.ui.icons.icon
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
-import com.intellij.platform.debugger.impl.rpc.XValueComputeChildrenEvent
-import com.intellij.platform.debugger.impl.rpc.XValueGroupDto
+import com.intellij.platform.debugger.impl.frontend.frame.VariablesPreloadManager
+import com.intellij.platform.debugger.impl.rpc.*
+import com.intellij.platform.debugger.impl.shared.XValuesPresentationBuilder
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XNamedValue
 import com.intellij.xdebugger.frame.XValueChildrenList
 import com.intellij.xdebugger.frame.XValueContainer
+import com.intellij.xdebugger.impl.ui.tree.XDebuggerTreeState
+import com.intellij.xdebugger.impl.ui.tree.nodes.XValueContainerNode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+
+private class XValueChildrenManager private constructor(
+  @Suppress("TestOnlyProblems")
+  private val preloadManager: VariablesPreloadManager?,
+) : AbstractCoroutineContextElement(Key) {
+  companion object Key : CoroutineContext.Key<XValueChildrenManager>
+
+  constructor() : this(null)
+  constructor(cs: CoroutineScope, frameId: XStackFrameId, stateToRecover: XDebuggerTreeState?)
+    : this(VariablesPreloadManager.creteIfNeeded(cs, stateToRecover, frameId))
+
+  suspend fun getChildrenEventsFlow(entityId: XContainerId): Flow<XValueComputeChildrenEvent> {
+    return preloadManager?.getChildrenEventsFlow(entityId) ?: XValueApi.getInstance().computeChildren(entityId)
+  }
+}
 
 internal class FrontendXValueContainer(
   private val project: Project,
   private val cs: CoroutineScope,
   private val hasParentValue: Boolean,
-  private val childrenComputation: suspend () -> Flow<XValueComputeChildrenEvent>,
+  private val id: XContainerId,
 ) : XValueContainer() {
+  private fun getOrCreteChildrenManager(node: XCompositeNode): XValueChildrenManager {
+    val existing = cs.coroutineContext[XValueChildrenManager]
+    if (existing != null) return existing
+
+    return if (id is XStackFrameId) {
+      val stateToRecover = (node as? XValueContainerNode.Root<*>)?.stateToRecover
+      XValueChildrenManager(cs, id, stateToRecover)
+    }
+    else {
+      XValueChildrenManager()
+    }
+  }
+
   override fun computeChildren(node: XCompositeNode) {
-    node.childCoroutineScope(parentScope = cs, "FrontendXValueContainer#computeChildren").launch(Dispatchers.EDT) {
-      childrenComputation().collect { computeChildrenEvent ->
-        when (computeChildrenEvent) {
+    val childrenManager = getOrCreteChildrenManager(node)
+    val scope = node.childCoroutineScope(parentScope = cs, "FrontendXValueContainer#computeChildren", childrenManager)
+    scope.launch(Dispatchers.EDT) {
+      val flow = childrenManager.getChildrenEventsFlow(id)
+      val builder = XValuesPresentationBuilder()
+      flow.collect { event ->
+        when (event) {
           is XValueComputeChildrenEvent.AddChildren -> {
-            val childrenXValues = coroutineScope {
-              computeChildrenEvent.children.map {
-                FrontendXValue.create(project, cs, it, hasParentValue)
-              }
-            }
             val childrenList = XValueChildrenList()
-            for (i in computeChildrenEvent.children.indices) {
-              childrenList.add(computeChildrenEvent.names[i], childrenXValues[i])
+            for ((name, xValue) in event.names zip event.children) {
+              val (presentationFlow, fullValueEvaluatorFlow) = builder.createFlows(xValue.id)
+              val value = FrontendXValue.create(project, scope, xValue, presentationFlow, fullValueEvaluatorFlow, hasParentValue)
+              childrenList.add(name, value)
             }
 
             fun List<XValueGroupDto>.toFrontendXValueGroups() = map {
-              FrontendXValueGroup(project, cs, it, hasParentValue)
+              FrontendXValueGroup(project, scope, it, hasParentValue)
             }
 
-            for (group in computeChildrenEvent.topGroups.toFrontendXValueGroups()) {
+            for (group in event.topGroups.toFrontendXValueGroups()) {
               childrenList.addTopGroup(group)
             }
 
-            for (group in computeChildrenEvent.bottomGroups.toFrontendXValueGroups()) {
+            for (group in event.bottomGroups.toFrontendXValueGroups()) {
               childrenList.addBottomGroup(group)
             }
 
-            for (topValue in computeChildrenEvent.topValues) {
-              childrenList.addTopValue(FrontendXValue.create(project, cs, topValue, hasParentValue) as XNamedValue)
+            for (topValue in event.topValues) {
+              val (presentationFlow, fullValueEvaluatorFlow) = builder.createFlows(topValue.id)
+              val xValue = FrontendXValue.create(project, scope, topValue, presentationFlow, fullValueEvaluatorFlow, hasParentValue)
+              childrenList.addTopValue(xValue as XNamedValue)
             }
 
-            node.addChildren(childrenList, computeChildrenEvent.isLast)
+            node.addChildren(childrenList, event.isLast)
           }
           is XValueComputeChildrenEvent.SetAlreadySorted -> {
-            node.setAlreadySorted(computeChildrenEvent.value)
+            node.setAlreadySorted(event.value)
           }
           is XValueComputeChildrenEvent.SetErrorMessage -> {
-            node.setErrorMessage(computeChildrenEvent.message, computeChildrenEvent.link)
+            node.setErrorMessage(event.message, event.link)
           }
           is XValueComputeChildrenEvent.SetMessage -> {
             // TODO[IJPL-160146]: support SimpleTextAttributes serialization -- don't pass SimpleTextAttributes.REGULAR_ATTRIBUTES
             node.setMessage(
-              computeChildrenEvent.message,
-              computeChildrenEvent.icon?.icon(),
-              computeChildrenEvent.attributes ?: SimpleTextAttributes.REGULAR_ATTRIBUTES,
-              computeChildrenEvent.link
+              event.message,
+              event.icon?.icon(),
+              event.attributes ?: SimpleTextAttributes.REGULAR_ATTRIBUTES,
+              event.link
             )
           }
           is XValueComputeChildrenEvent.TooManyChildren -> {
-            val addNextChildren = computeChildrenEvent.addNextChildren
+            val addNextChildren = event.addNextChildren
             if (addNextChildren != null) {
-              node.tooManyChildren(computeChildrenEvent.remaining, Runnable { addNextChildren.trySend(Unit) })
+              node.tooManyChildren(event.remaining) { addNextChildren.trySend(Unit) }
             }
             else {
               @Suppress("DEPRECATION")
-              node.tooManyChildren(computeChildrenEvent.remaining)
+              node.tooManyChildren(event.remaining)
             }
+          }
+          is XValueComputeChildrenEvent.XValueFullValueEvaluatorEvent -> {
+            builder.consume(event)
+          }
+          is XValueComputeChildrenEvent.XValuePresentationEvent -> {
+            builder.consume(event)
           }
         }
       }

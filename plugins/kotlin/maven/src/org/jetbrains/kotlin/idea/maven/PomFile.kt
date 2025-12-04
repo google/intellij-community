@@ -39,6 +39,10 @@ import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 import org.jetbrains.kotlin.psi.psiUtil.getChildrenOfType
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 import org.jetbrains.kotlin.utils.SmartList
+import java.io.File
+
+private const val KOTLIN_SOURCE_ENTRY = "src/main/kotlin"
+private const val KOTLIN_TEST_SOURCE_ENTRY = "src/test/kotlin"
 
 class PomFile private constructor(private val xmlFile: XmlFile, val domModel: MavenDomProjectModel) {
     constructor(xmlFile: XmlFile) : this(
@@ -151,6 +155,27 @@ class PomFile private constructor(private val xmlFile: XmlFile, val domModel: Ma
         return plugin
     }
 
+    fun addPluginDependency(plugin: MavenDomPlugin, artifact: MavenId): MavenDomDependency? {
+        ensureBuild()
+
+        val dependencies = plugin.dependencies
+
+        dependencies.dependencies.firstOrNull {
+            it.groupId.stringValue == artifact.groupId &&
+            it.artifactId.stringValue == artifact.artifactId
+        }?.let { return it }
+
+        with(dependencies.addDependency()) {
+            groupId.stringValue = artifact.groupId
+            artifactId.stringValue = artifact.artifactId
+            artifact.version?.let {
+                version.stringValue = it
+            }
+            ensureTagExists()
+            return this
+        }
+    }
+
     fun findPlugin(groupArtifact: MavenId): MavenDomPlugin? = domModel.build.plugins.plugins.firstOrNull { it.matches(groupArtifact) }
 
     fun isPluginAfter(plugin: MavenDomPlugin, referencePlugin: MavenDomPlugin): Boolean {
@@ -214,15 +239,24 @@ class PomFile private constructor(private val xmlFile: XmlFile, val domModel: Ma
         isTest: Boolean,
         goals: List<String>
     ) {
-        val execution = addExecution(plugin, executionId, phase, goals)
+        val contentEntries = ModuleRootManager.getInstance(module).contentEntries
 
-        val sourceDirs = ModuleRootManager.getInstance(module)
-            .contentEntries
+        val sourceDirs = contentEntries
             .flatMap { it.sourceFolders.filter { it.isRelatedSourceRoot(isTest) } }
-            .mapNotNull { it.file }
+            .mapNotNull { it.file } // filters out source paths for which directories don't exist
             .mapNotNull { VfsUtilCore.getRelativePath(it, xmlFile.virtualFile.parent, '/') }
+            .toMutableSet()
 
-        executionSourceDirs(execution, sourceDirs)
+        // Adds a Kotlin source path if it exists
+        for (contentEntry in contentEntries) {
+            val contentEntryPath = contentEntry.file?.path ?: return
+            val kotlinEntry = if (isTest) KOTLIN_TEST_SOURCE_ENTRY else KOTLIN_SOURCE_ENTRY
+            val file = resolveRelativePath(kotlinEntry, contentEntryPath)
+            if (file.exists()) sourceDirs.add(kotlinEntry) else continue
+        }
+
+        val execution = addExecution(plugin, executionId, phase, goals)
+        executionSourceDirs(execution, sourceDirs.toList())
     }
 
     fun isPluginExecutionMissing(plugin: MavenPlugin?, excludedExecutionId: String, goal: String): Boolean =
@@ -318,7 +352,7 @@ class PomFile private constructor(private val xmlFile: XmlFile, val domModel: Ma
             val sourceDirsTag = executionConfiguration(execution, "sourceDirs")
             execution.configuration.createChildTag("sourceDirs")?.let { newSourceDirsTag ->
                 for (dir in sourceDirs) {
-                    newSourceDirsTag.add(newSourceDirsTag.createChildTag("source", dir))
+                    newSourceDirsTag.add(newSourceDirsTag.createChildTag("sourceDir", dir))
                 }
                 sourceDirsTag.replace(newSourceDirsTag)
             }
@@ -637,14 +671,15 @@ fun PomFile.changeLanguageVersion(languageVersion: String?, apiVersion: String?)
 }
 
 @ApiStatus.Internal
-fun PomFile.addKotlinCompilerPlugins(name: String) {
-    val kotlinPlugin = findPlugin(kotlinPluginId(null)) ?: return
+fun PomFile.addKotlinCompilerPlugin(name: String): MavenDomPlugin? {
+    val kotlinPlugin = findPlugin(kotlinPluginId(null)) ?: return null
     val configurationTag = kotlinPlugin.configuration.ensureTagExists()
     val compilerPluginsTag = configurationTag.findSubTagOrCreate("compilerPlugins")
     compilerPluginsTag.findSubTags("plugin").firstOrNull { it.value.trimmedText == name } ?: run {
         val pluginTag = compilerPluginsTag.createChildTag("plugin", name)
         compilerPluginsTag.add(pluginTag)
     }
+    return kotlinPlugin
 }
 
 internal fun MavenDomDependencies.findDependencies(artifact: MavenId, scope: MavenArtifactScope? = null) =
@@ -729,5 +764,9 @@ private tailrec fun XmlTag.deleteCascade() {
     if (oldParent != null && oldParent.subTags.isEmpty()) {
         oldParent.deleteCascade()
     }
+}
+
+private fun resolveRelativePath(relativePath: String, contentEntryPath: String): File {
+    return File(contentEntryPath, relativePath.replace("/", File.separator))
 }
 

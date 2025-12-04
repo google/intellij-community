@@ -23,7 +23,7 @@ jvm_library(
     "//platform/lang-core",
     "//platform/lang-impl",
     "//platform/core-ui",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/platform-impl/concurrency",
     "//platform/platform-impl:ide-impl",
     "//platform/projectModel-api:projectModel",
@@ -32,6 +32,9 @@ jvm_library(
     "//platform/indexing-impl",
     "//platform/usageView-impl",
     "//platform/editor-ui-ex:editor-ex",
+    "//platform/projectModel-impl",
+    "//platform/core-impl",
+    "//platform/lang-api:lang",
   ]
 )
 ### auto-generated section `build intellij.platform.todo` end

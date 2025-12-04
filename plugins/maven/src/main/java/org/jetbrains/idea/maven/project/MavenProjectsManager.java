@@ -53,6 +53,8 @@ import org.jetbrains.idea.maven.utils.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -76,8 +78,11 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
 
   private final MavenEmbeddersManager myEmbeddersManager;
 
-  private MavenProjectsTree myProjectsTree;
-  private MavenProjectManagerWatcher myWatcher;
+  private final @NotNull MavenProjectsTree myProjectsTree = new MavenProjectsTree(getProject());
+  @SuppressWarnings("FieldMayBeFinal") //cannot be, is is accessed via watcherHandle
+  private MavenProjectManagerWatcher myWatcher = null;
+  private static final VarHandle watcherHandle;
+  private volatile Exception myWatcherCreationTrace;
 
   private final EventDispatcher<MavenProjectsTree.Listener> myProjectsTreeDispatcher =
     EventDispatcher.create(MavenProjectsTree.Listener.class);
@@ -96,6 +101,16 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
 
   public static @Nullable MavenProjectsManager getInstanceIfCreated(@NotNull Project project) {
     return project.getServiceIfCreated(MavenProjectsManager.class);
+  }
+
+  static {
+    try {
+      watcherHandle = MethodHandles.lookup()
+        .findVarHandle(MavenProjectsManager.class, "myWatcher", MavenProjectManagerWatcher.class);
+    }
+    catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public MavenProjectsManager(@NotNull Project project, @NotNull CoroutineScope coroutineScope) {
@@ -120,7 +135,6 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   protected boolean wasMavenized() {
     return !myState.originalFiles.isEmpty();
   }
-
 
 
   @Override
@@ -159,7 +173,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
 
   @Deprecated(forRemoval = true)
   public File getLocalRepository() {
-      return MavenSettingsCache.getInstance(myProject).getEffectiveUserLocalRepo().toFile();
+    return MavenSettingsCache.getInstance(myProject).getEffectiveUserLocalRepo().toFile();
   }
 
   public Path getRepositoryPath() {
@@ -198,7 +212,6 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     }
     fireActivated();
     if (!ApplicationManager.getApplication().isUnitTestMode()) {
-      listenForExternalChanges();
       MavenIndicesManager.getInstance(myProject).scheduleUpdateIndicesList();
     }
   }
@@ -254,13 +267,14 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
       scheduleUpdateAllMavenProjects(MavenSyncSpec.full("MavenProjectsManager.onProjectStartup"));
     }
   }
+
   private void initProjectsTree() {
     initLock.lock();
     try {
       if (projectsTreeInitialized.getAndSet(true)) return;
 
       Path path = getProjectsTreeFile();
-      myProjectsTree = MavenProjectsTree.read(myProject, path);
+      myProjectsTree.read(path);
       applyStateToTree(myProjectsTree, this);
       myProjectsTree.addListener(myProjectsTreeDispatcher.getMulticaster(), this);
     }
@@ -289,23 +303,23 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     Update update = new Update(this) {
       @Override
       public void run() {
-       saveTree();
+        saveTree();
       }
     };
     if (MavenUtil.isMavenUnitTestModeEnabled()) {
       mySaveQueue.queue(update);
-    } else {
+    }
+    else {
       MergingQueueUtil.queueTracked(mySaveQueue, update);
     }
   }
 
   private void saveTree() {
     try {
-      MavenProjectsTree tree = myProjectsTree;
-      if (tree == null) {
+      if (!projectsTreeInitialized.get()) {
         return;
       }
-      tree.save(getProjectsTreeFile());
+      myProjectsTree.save(getProjectsTreeFile());
     }
     catch (IOException e) {
       MavenLog.LOG.info(e);
@@ -328,18 +342,39 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   private void initWorkers() {
-    myWatcher = new MavenProjectManagerWatcher(myProject, myProjectsTree);
+    var watcher = new MavenProjectManagerWatcher(myProject);
+    if (watcherHandle.compareAndSet(this, null, watcher)) {
+      myWatcherCreationTrace = new Exception("Created here");
+      if(!ApplicationManager.getApplication().isUnitTestMode()) {
+        watcher.start();
+      }
+    }
+    else {
+      MavenLog.LOG.error("Watcher is already created", new Exception("tried to create second time", myWatcherCreationTrace));
+    }
   }
 
   public void listenForExternalChanges() {
-    myWatcher.start();
+    var watcher = (MavenProjectManagerWatcher)watcherHandle.getVolatile(this);
+    if (watcher != null) {
+      watcher.start();
+    }
+    else {
+      MavenLog.LOG.error("trying to start watcher, which is null", new Exception());
+    }
   }
 
   @TestOnly
   public void enableAutoImportInTests() {
     assert isInitialized();
     listenForExternalChanges();
-    myWatcher.enableAutoImportInTests();
+    var watcher = (MavenProjectManagerWatcher)watcherHandle.getVolatile(this);
+    if (watcher != null) {
+      watcher.enableAutoImportInTests();
+    }
+    else {
+      MavenLog.LOG.error("trying to start watcher, which is null", new Exception());
+    }
   }
 
   private void projectClosed() {
@@ -348,9 +383,13 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
       if (!isInitialized.getAndSet(false)) {
         return;
       }
-
-      myWatcher.stop();
-
+      var watcher = (MavenProjectManagerWatcher)watcherHandle.getVolatile(this);
+      if (watcher != null) {
+        watcher.stop();
+      }
+      else {
+        MavenLog.LOG.error("trying to stop watcher, which is null", new Exception());
+      }
       mySaveQueue.flush();
 
       if (MavenUtil.isMavenUnitTestModeEnabled()) {
@@ -383,7 +422,9 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     if (!isInitialized()) {
       doInit();
       doActivate();
-      var distributionUrl = getWrapperDistributionUrl(ProjectUtil.guessProjectDir(myProject));
+      var baseDir = ProjectUtil.guessProjectDir(myProject);
+
+      var distributionUrl = baseDir == null ? null : getWrapperDistributionUrl(baseDir.toNioPath());
       if (distributionUrl != null) {
         getGeneralSettings().setMavenHomeType(MavenWrapper.INSTANCE);
       }
@@ -577,7 +618,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
 
   @ApiStatus.Internal
   public @NotNull MavenProjectsTree getProjectsTree() {
-    if (myProjectsTree == null) {
+    if (!projectsTreeInitialized.get()) {
       initProjectsTree();
     }
     return myProjectsTree;
@@ -662,8 +703,8 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   public void updateProjectTargetFolders() {
-      if (myProject.isDisposed()) return;
-      MavenProjectImporter.scheduleUpdateTargetFolders(myProject);
+    if (myProject.isDisposed()) return;
+    MavenProjectImporter.scheduleUpdateTargetFolders(myProject);
   }
 
   @ApiStatus.Internal

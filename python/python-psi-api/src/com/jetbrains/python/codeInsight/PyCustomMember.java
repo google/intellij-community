@@ -38,6 +38,8 @@ public class PyCustomMember extends UserDataHolderBase {
   private final PsiElement myTarget;
   private PyPsiPath myPsiPath;
 
+  private boolean myIsClassVar = false;
+
   boolean myFunction = false;
 
   /**
@@ -214,7 +216,8 @@ public class PyCustomMember extends UserDataHolderBase {
         targetClass = (PyClass)resolveTarget;
       }
 
-      return PyCustomMemberProvider.getInstance().createPyCustomMemberTarget(this, targetClass, context, resolveTarget, myTypeCallback, myCustomTypeInfo, myResolveToInstance);
+      return PyCustomMemberProvider.getInstance()
+        .createPyCustomMemberTarget(this, targetClass, context, resolveTarget, myTypeCallback, myCustomTypeInfo, myResolveToInstance);
     }
     return null;
   }
@@ -241,6 +244,16 @@ public class PyCustomMember extends UserDataHolderBase {
 
   public boolean isFunction() {
     return myFunction;
+  }
+
+
+  public PyCustomMember asClassVar() {
+    myIsClassVar = true;
+    return this;
+  }
+
+  public boolean isClassVar() {
+    return myIsClassVar;
   }
 
   /**
@@ -272,5 +285,4 @@ public class PyCustomMember extends UserDataHolderBase {
     myCustomTypeInfo = customInfo;
     return this;
   }
-
 }

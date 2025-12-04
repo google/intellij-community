@@ -1,6 +1,7 @@
 <idea-plugin visibility="public">
   <dependencies>
     <module name="intellij.python.psi"/>
+    <module name="intellij.python.sdk"/>
     <module name="intellij.python.community"/>
     <module name="intellij.python.community.helpersLocator"/>
   </dependencies>
@@ -127,6 +128,7 @@
     <completion.contributor language="Python"
                             implementationClass="com.jetbrains.python.codeInsight.completion.PySuperMethodCompletionContributor"/>
     <completion.contributor language="Python"
+                            id="PyDocstringCompletionContributor"
                             implementationClass="com.jetbrains.python.codeInsight.completion.PyDocstringCompletionContributor"/>
     <completion.contributor language="Python" implementationClass="com.jetbrains.python.documentation.docstrings.DocStringTagCompletionContributor"/>
     <completion.contributor language="Python" implementationClass="com.jetbrains.python.documentation.docstrings.DocStringSectionHeaderCompletionContributor"/>
@@ -156,10 +158,6 @@
 
     <completion.contributor language="Python" order="first" id="pyClassNameCompletionContributor"
                             implementationClass="com.jetbrains.python.codeInsight.completion.PyClassNameCompletionContributor"/>
-    <completion.contributor language="Python" order="last"
-                            implementationClass="com.jetbrains.python.codeInsight.completion.PyModulePackageCompletionContributor"/>
-    <completion.contributor language="Python" order="first" id="pyModuleNameCompletionContributor"
-                            implementationClass="com.jetbrains.python.codeInsight.completion.PyModuleNameCompletionContributor"/>
     <completion.contributor language="Python"
                             implementationClass="com.jetbrains.python.codeInsight.completion.PyUnresolvedModuleAttributeCompletionContributor"/>
     <completion.contributor language="Python"
@@ -186,6 +184,8 @@
     <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyFunctionHighlightingAnnotator"/>
     <annotator language="Python" implementationClass="com.jetbrains.python.validation.PyBuiltinHighlightingAnnotator"/>
     <annotator language="Python" implementationClass="com.jetbrains.python.validation.UnsupportedFeatures"/>
+
+    <daemon.changeLocalityDetector implementation="com.jetbrains.python.inspections.PyChangeLocalityDetector"/>
 
     <localInspection language="Python" shortName="PyUnusedLocalInspection" suppressId="PyUnusedLocal" bundle="messages.PyPsiBundle" key="INSP.NAME.unused" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING" implementationClass="com.jetbrains.python.inspections.unusedLocal.PyUnusedLocalInspection"/>
     <localInspection language="Python" shortName="PyRedundantParenthesesInspection" suppressId="PyRedundantParentheses" bundle="messages.PyPsiBundle" key="INSP.NAME.redundant.parentheses" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING" implementationClass="com.jetbrains.python.inspections.PyRedundantParenthesesInspection"/>
@@ -269,6 +269,7 @@
     <localInspection language="Python" shortName="PyAssertTypeInspection" suppressId="PyAssertType" bundle="messages.PyPsiBundle" key="INSP.NAME.assert.type" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING" implementationClass="com.jetbrains.python.inspections.PyAssertTypeInspection"/>
     <localInspection language="Python" shortName="PyEnumInspection" suppressId="PyEnum" bundle="messages.PyPsiBundle" key="INSP.NAME.enum" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING" implementationClass="com.jetbrains.python.inspections.PyEnumInspection"/>
     <localInspection language="Python" shortName="PyNewTypeInspection" suppressId="PyNewType" bundle="messages.PyPsiBundle" key="INSP.NAME.new.type" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING" implementationClass="com.jetbrains.python.inspections.PyNewTypeInspection"/>
+    <localInspection language="Python" shortName="PyInvalidEscapeSequenceInspection" suppressId="PyInvalidEscapeSequence" bundle="messages.PyPsiBundle" key="INSP.NAME.invalid.escape.sequence" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING" implementationClass="com.jetbrains.python.inspections.PyInvalidEscapeSequenceInspection"/>
 
     <intentionAction>
       <language>Python</language>
@@ -529,6 +530,9 @@
       <categoryKey>INTN.category.python</categoryKey>
     </intentionAction>
 
+    <registryKey defaultValue="false"
+                 description="Enable experimental better handling of recursive cases in type inference"
+                 key="python.use.better.control.flow.type.inference"/>
     <registryKey defaultValue="true"
                  description="Enable pyi stubs distributed with numpy (see https://github.com/numpy/numpy/issues/18565)"
                  key="enable.numpy.pyi.stubs"/>
@@ -547,6 +551,8 @@
                  description="Enables incremental reparse for statement lists"/>
     <registryKey key="python.strict.type.narrow" defaultValue="false"
                  description="Allows narrowing types exhaustively to Never"/>
+    <registryKey key="python.lsp.tools.enabled" defaultValue="true" restartRequired="true"
+                 description="Enables lsp tools"/>
 
     <virtualFileCustomDataProvider implementation="com.jetbrains.python.formatter.PyCodeStyleSettingsProvider"/>
   </extensions>

@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighter
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.editor.impl.event.EditorEventMulticasterImpl
 import com.intellij.openapi.editor.impl.view.EditorPainter
+import com.intellij.openapi.editor.impl.zombie.Necropolis
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader.Companion.isEditorLoaded
 import com.intellij.openapi.fileTypes.FileType
@@ -231,6 +232,7 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
   @RequiresEdt
   override fun releaseEditor(editor: Editor) {
     try {
+      turnIntoZombiesAndBury(editor)
       val event = EditorFactoryEvent(this, editor)
       editorFactoryEventDispatcher.multicaster.editorReleased(event)
       EP.forEachExtensionSafe { it.editorReleased(event) }
@@ -245,7 +247,9 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
         for (clientEditors in ClientEditorManager.getAllInstances()) {
           if (clientEditors.editorReleased(editor)) {
             LOG.debug { "number of Editors after release: ${clientEditors.editorsSequence().count()}" }
-            if (clientEditors != ClientEditorManager.getCurrentInstance()) {
+            //don't try creating the service to avoid CancellationException
+            val currentInstance = ClientEditorManager.getCurrentInstanceIfCreated()
+            if (currentInstance != null && clientEditors != currentInstance) {
               LOG.warn("Released editor didn't belong to current session")
             }
             break
@@ -283,6 +287,17 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
   }
 
   override fun getEventMulticaster(): EditorEventMulticaster = editorEventMulticaster
+
+  /**
+   * Must be called before the listeners because they could do disposing things corrupting the editor's state,
+   * see CodeVisionHost
+   */
+  private fun turnIntoZombiesAndBury(editor: Editor) {
+    val necropolis = editor.project?.let {
+      Necropolis.getInstance(it, onlyIfCreated = true)
+    }
+    necropolis?.turnIntoZombiesAndBury(editor)
+  }
 }
 
 @Suppress("unused")

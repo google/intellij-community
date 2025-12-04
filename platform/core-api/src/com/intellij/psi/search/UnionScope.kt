@@ -111,6 +111,10 @@ internal class UnionScope private constructor(
     return myScopes.joinToString(prefix = "Union: (", separator = ",", postfix = ")")
   }
 
+  override fun toFullString(): @NonNls String {
+    return myScopes.joinToString(prefix = "Union: (", separator = ",", postfix = ")") { it.toFullString() }
+  }
+
   override fun uniteWith(scope: GlobalSearchScope): GlobalSearchScope {
     if (scope is UnionScope) {
       val newScopes = ArrayUtil.mergeArrays(myScopes, scope.myScopes)
@@ -192,8 +196,8 @@ internal class UnionScope private constructor(
 
         val (united, leftScopes) = scope.uniteWith(others) ?: continue
 
-        if (leftScopes.isEmpty()) {
-          return listOf(united)
+        if (leftScopes.size < 2) {
+          return listOf(united) + leftScopes
         }
 
         return listOf(united) + tryUniting(leftScopes)

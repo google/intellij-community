@@ -5,7 +5,6 @@ import com.intellij.ide.highlighter.HtmlFileType;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.LanguageFileType;
-import com.intellij.openapi.fileTypes.StdFileTypes;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.util.SimpleModificationTracker;
@@ -21,6 +20,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.spi.psi.SPIFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBusConnection;
+import com.intellij.xml.util.JspFileTypeUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -126,8 +126,7 @@ public class OuterModelsModificationTracker extends SimpleModificationTracker {
     private static boolean isIgnoredFileType(@NotNull FileType type) {
       return type.equals(HtmlFileType.INSTANCE) ||
              type instanceof LanguageFileType && "JavaScript".equals(((LanguageFileType)type).getLanguage().getID()) ||
-             type.equals(StdFileTypes.JSP) ||
-             type.equals(StdFileTypes.JSPX);
+             JspFileTypeUtil.isJspOrJspX(type);
     }
   }
 

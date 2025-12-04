@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.modcommand;
 
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.ModNavigator;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.util.NlsContexts;
@@ -26,7 +28,7 @@ import java.util.function.Consumer;
  * @see ModCommand#psiUpdate(PsiElement, BiConsumer)
  * @see ModCommand#psiUpdate(ActionContext, Consumer) 
  */
-public interface ModPsiUpdater extends ModPsiNavigator {
+public interface ModPsiUpdater extends ModNavigator {
   /**
    * Returns a copy of this element inside a writable non-physical file, whose changes are tracked and will be added to the final command.
    * If {@code element} is a {@link PsiDirectory}, a non-physical copy is returned, which allows you to create new files inside that directory.
@@ -152,7 +154,6 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    *
    * @param element element to select
    */
-  @Override
   void select(@NotNull PsiElement element);
 
   /**
@@ -177,7 +178,6 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    *
    * @param element element to navigate to
    */
-  @Override
   void moveCaretTo(@NotNull PsiElement element);
 
   /**
@@ -187,4 +187,10 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    */
   @Override
   int getCaretOffset();
+
+  /**
+   * @return the writable copy of the context document 
+   */
+  @Override
+  @NotNull Document getDocument();
 }

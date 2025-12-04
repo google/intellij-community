@@ -1,3 +1,14 @@
+c:com.intellij.codeInsight.CharTailType
+- com.intellij.codeInsight.ModNavigatorTailType
+- processTail(com.intellij.openapi.project.Project,com.intellij.openapi.editor.ModNavigator,I):I
+a:com.intellij.codeInsight.TailType
+- s:insertChar(com.intellij.openapi.editor.ModNavigator,I,C):I
+- s:insertChar(com.intellij.openapi.editor.ModNavigator,I,C,Z):I
+- ps:moveCaret(com.intellij.openapi.editor.ModNavigator,I,I):I
+com.intellij.codeInsight.completion.BaseCompletionParameters
+- a:getOffset():I
+- a:getOriginalFile():com.intellij.psi.PsiFile
+- a:getPosition():com.intellij.psi.PsiElement
 com.intellij.codeInsight.completion.BatchConsumer
 - com.intellij.util.Consumer
 - endBatch():V
@@ -6,6 +17,7 @@ f:com.intellij.codeInsight.completion.CompletionConfidenceEP
 - com.intellij.lang.LanguageExtensionPoint
 - <init>():V
 f:com.intellij.codeInsight.completion.CompletionParameters
+- com.intellij.codeInsight.completion.BaseCompletionParameters
 - getCompletionType():com.intellij.codeInsight.completion.CompletionType
 - getEditor():com.intellij.openapi.editor.Editor
 - getInvocationCount():I
@@ -39,6 +51,8 @@ com.intellij.codeInsight.completion.LookupElementListPresenter
 - a:getSelectedIndex():I
 - a:isSelectionTouched():Z
 - a:isShown():Z
+c:com.intellij.codeInsight.completion.PlainPrefixMatcher
+- sf:ALWAYS_TRUE:com.intellij.codeInsight.completion.PrefixMatcher
 a:com.intellij.codeInsight.completion.PrefixMatcher
 - getMatchingFragments(java.lang.String):java.util.List
 com.intellij.codeInsight.daemon.ChangeLocalityDetector
@@ -182,6 +196,10 @@ com.intellij.codeInsight.lookup.Lookup
 - a:itemMatcher(com.intellij.codeInsight.lookup.LookupElement):com.intellij.codeInsight.completion.PrefixMatcher
 - a:itemPattern(com.intellij.codeInsight.lookup.LookupElement):java.lang.String
 - a:removeLookupListener(com.intellij.codeInsight.lookup.LookupListener):V
+a:com.intellij.codeInsight.lookup.LookupArranger
+- f:prefixChanged(com.intellij.codeInsight.lookup.Lookup):V
+f:com.intellij.codeInsight.lookup.LookupElementBuilder
+- s:createWithSymbolPointer(java.lang.String,com.intellij.model.Symbol):com.intellij.codeInsight.lookup.LookupElementBuilder
 com.intellij.codeInsight.lookup.LookupEx
 - com.intellij.codeInsight.lookup.Lookup
 - a:getComponent():java.awt.Component
@@ -269,6 +287,8 @@ com.intellij.codeInspection.HintAction
 - com.intellij.codeInsight.intention.IntentionAction
 - fixSilently(com.intellij.openapi.editor.Editor):Z
 - a:showHint(com.intellij.openapi.editor.Editor):Z
+a:com.intellij.codeInspection.InspectionManager
+- a:createProblemDescriptor(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,java.lang.String,com.intellij.codeInspection.ProblemHighlightType,java.lang.String,Z,com.intellij.codeInspection.LocalQuickFix[]):com.intellij.codeInspection.ProblemDescriptor
 com.intellij.codeInspection.InspectionProfile
 - java.lang.Comparable
 - sf:DEFAULT_PROFILE_NAME:java.lang.String
@@ -299,6 +319,7 @@ com.intellij.codeInspection.LocalQuickFix
 - sf:EMPTY_ARRAY:com.intellij.codeInspection.LocalQuickFix[]
 - availableInBatchMode():Z
 - s:from(com.intellij.modcommand.ModCommandAction):com.intellij.codeInspection.LocalQuickFix
+- s:from(com.intellij.modcommand.ModCommandAction,Z):com.intellij.codeInspection.LocalQuickFix
 - generatePreview(com.intellij.openapi.project.Project,com.intellij.codeInspection.ProblemDescriptor):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 - getRangesToHighlight(com.intellij.openapi.project.Project,com.intellij.codeInspection.ProblemDescriptor):java.util.List
 - s:notNullElements(com.intellij.codeInspection.LocalQuickFix):com.intellij.codeInspection.LocalQuickFix[]
@@ -328,6 +349,8 @@ com.intellij.codeInspection.ProblemDescriptor
 - a:setProblemGroup(com.intellij.lang.annotation.ProblemGroup):V
 - a:setTextAttributes(com.intellij.openapi.editor.colors.TextAttributesKey):V
 - a:showTooltip():Z
+f:com.intellij.codeInspection.ProblemsHolder$ProblemBuilder
+- tooltip(java.lang.String):com.intellij.codeInspection.ProblemsHolder$ProblemBuilder
 com.intellij.codeInspection.QuickFix
 - com.intellij.openapi.application.WriteActionAware
 - sf:EMPTY_ARRAY:com.intellij.codeInspection.QuickFix[]
@@ -583,9 +606,13 @@ com.intellij.lang.documentation.ExternalDocumentationProvider
 - fetchExternalDocumentation(com.intellij.openapi.project.Project,com.intellij.psi.PsiElement,java.util.List,Z):java.lang.String
 - a:hasDocumentationFor(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement):Z
 - a:promptToConfigureDocumentation(com.intellij.psi.PsiElement):V
+f:com.intellij.lang.parameterInfo.ParameterInfoUtilsBase
+- s:findParentOfTypeWithStopElements(com.intellij.psi.PsiElement,java.lang.Class,java.lang.Class[]):com.intellij.psi.PsiElement
 com.intellij.lang.refactoring.NamesValidator
 - a:isIdentifier(java.lang.String,com.intellij.openapi.project.Project):Z
 - a:isKeyword(java.lang.String,com.intellij.openapi.project.Project):Z
+f:com.intellij.modcommand.ActionContext
+- withSelection(com.intellij.openapi.util.TextRange):com.intellij.modcommand.ActionContext
 com.intellij.modcommand.ModCommand
 - andThen(com.intellij.modcommand.ModCommand):com.intellij.modcommand.ModCommand
 - s:chooseAction(java.lang.String,java.util.List):com.intellij.modcommand.ModCommand
@@ -595,6 +622,7 @@ com.intellij.modcommand.ModCommand
 - s:highlight(com.intellij.openapi.editor.colors.TextAttributesKey,com.intellij.psi.PsiElement[]):com.intellij.modcommand.ModCommand
 - s:highlight(com.intellij.psi.PsiElement[]):com.intellij.modcommand.ModCommand
 - s:info(java.lang.String):com.intellij.modcommand.ModCommand
+- s:insertText(com.intellij.modcommand.ActionContext,java.lang.String,Z):com.intellij.modcommand.ModCommand
 - isEmpty():Z
 - modifiedFiles():java.util.Set
 - s:moveFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vfs.VirtualFile):com.intellij.modcommand.ModCommand
@@ -631,16 +659,19 @@ com.intellij.modcommand.ModCommandExecutor
 com.intellij.modcommand.ModCommandService
 - a:chooseFileAndPerform(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor,com.intellij.modcommand.ModCommandAction,I):com.intellij.modcommand.ModCommandWithContext
 - s:getInstance():com.intellij.modcommand.ModCommandService
-- a:psiUpdate(com.intellij.modcommand.ActionContext,java.util.function.Consumer):com.intellij.modcommand.ModCommand
+- a:insertText(com.intellij.modcommand.ActionContext,java.lang.String,Z):com.intellij.modcommand.ModCommand
+- a:psiUpdate(com.intellij.modcommand.ActionContext,java.util.function.Consumer,java.util.function.Consumer):com.intellij.modcommand.ModCommand
 - a:unwrap(com.intellij.codeInspection.LocalQuickFix):com.intellij.modcommand.ModCommandAction
 - a:updateOption(com.intellij.psi.PsiElement,com.intellij.codeInspection.InspectionProfileEntry,java.util.function.Consumer):com.intellij.modcommand.ModCommand
 - a:wrap(com.intellij.modcommand.ModCommandAction):com.intellij.codeInsight.intention.IntentionAction
 - a:wrapToLocalQuickFixAndIntentionActionOnPsiElement(com.intellij.modcommand.ModCommandAction,com.intellij.psi.PsiElement):com.intellij.codeInspection.LocalQuickFixAndIntentionActionOnPsiElement
 - a:wrapToQuickFix(com.intellij.modcommand.ModCommandAction):com.intellij.codeInspection.LocalQuickFix
+- a:wrapToQuickFix(com.intellij.modcommand.ModCommandAction,Z):com.intellij.codeInspection.LocalQuickFix
 com.intellij.modcommand.ModPsiUpdater
-- com.intellij.modcommand.ModPsiNavigator
+- com.intellij.openapi.editor.ModNavigator
 - a:cancel(java.lang.String):V
 - a:getCaretOffset():I
+- a:getDocument():com.intellij.openapi.editor.Document
 - a:getOriginalFile(com.intellij.psi.PsiFile):com.intellij.psi.PsiFile
 - a:getWritable(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
 - a:highlight(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.colors.TextAttributesKey):V
@@ -655,6 +686,16 @@ com.intellij.modcommand.ModPsiUpdater
 - a:select(com.intellij.psi.PsiElement):V
 - a:showConflicts(java.util.Map):V
 - a:templateBuilder():com.intellij.modcommand.ModTemplateBuilder
+f:com.intellij.modcommand.ModRegisterTabOut
+- java.lang.Record
+- com.intellij.modcommand.ModCommand
+- <init>(com.intellij.openapi.vfs.VirtualFile,I,I,I):V
+- f:equals(java.lang.Object):Z
+- file():com.intellij.openapi.vfs.VirtualFile
+- f:hashCode():I
+- rangeEnd():I
+- rangeStart():I
+- target():I
 com.intellij.modcommand.ModTemplateBuilder
 - a:field(com.intellij.psi.PsiElement,com.intellij.codeInsight.template.Expression):com.intellij.modcommand.ModTemplateBuilder
 - a:field(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,java.lang.String,com.intellij.codeInsight.template.Expression):com.intellij.modcommand.ModTemplateBuilder
@@ -663,6 +704,8 @@ com.intellij.modcommand.ModTemplateBuilder
 - a:field(com.intellij.psi.PsiElement,java.lang.String,java.lang.String,Z):com.intellij.modcommand.ModTemplateBuilder
 - a:finishAt(I):com.intellij.modcommand.ModTemplateBuilder
 - a:onTemplateFinished(java.util.function.Function):com.intellij.modcommand.ModTemplateBuilder
+f:com.intellij.modcommand.ModUpdateFileText
+- translateOffset(I,Z):I
 f:com.intellij.modcommand.Presentation$HighlightRange
 - <init>(com.intellij.openapi.util.TextRange,com.intellij.modcommand.Presentation$HighlightingKind):V
 - highlightingKind():com.intellij.modcommand.Presentation$HighlightingKind

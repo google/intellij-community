@@ -6,6 +6,7 @@ import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -14,6 +15,7 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.subpackage.SubSimpleEntity
+import com.intellij.workspaceModel.test.api.subpackage.SubSimpleEntityBuilder
 
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
@@ -23,8 +25,7 @@ internal class SubSimpleEntityImpl(private val dataSource: SubSimpleEntityData) 
   private companion object {
 
 
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -56,8 +57,7 @@ internal class SubSimpleEntityImpl(private val dataSource: SubSimpleEntityData) 
   }
 
 
-  internal class Builder(result: SubSimpleEntityData?) : ModifiableWorkspaceEntityBase<SubSimpleEntity, SubSimpleEntityData>(result),
-                                                         SubSimpleEntity.Builder {
+  internal class Builder(result: SubSimpleEntityData?) : ModifiableWorkspaceEntityBase<SubSimpleEntity, SubSimpleEntityData>(result), SubSimpleEntityBuilder {
     internal constructor() : this(SubSimpleEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -155,7 +155,7 @@ internal class SubSimpleEntityData : WorkspaceEntityData<SubSimpleEntity>() {
   internal fun isNameInitialized(): Boolean = ::name.isInitialized
 
 
-  override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SubSimpleEntity> {
+  override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntityBuilder<SubSimpleEntity> {
     val modifiable = SubSimpleEntityImpl.Builder(null)
     modifiable.diff = diff
     modifiable.id = createEntityId()
@@ -181,9 +181,8 @@ internal class SubSimpleEntityData : WorkspaceEntityData<SubSimpleEntity>() {
     return SubSimpleEntity::class.java
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
-    return SubSimpleEntity(version, name, isSimple, entitySource) {
-    }
+  override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
+    return SubSimpleEntity(version, name, isSimple, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {

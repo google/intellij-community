@@ -1,7 +1,6 @@
 // Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python.psi.types
 
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.python.PyNames
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider
@@ -14,13 +13,13 @@ import java.util.*
 class PyTypedDictType @JvmOverloads constructor(
   private val name: String,
   val fields: Map<String, FieldTypeAndTotality>,
-  
+
   private val dictClass: PyClass,
   private val definitionLevel: DefinitionLevel,
   private val ancestors: List<PyTypedDictType>,
   private val declaration: PyQualifiedNameOwner? = null,
 ) :
-  PyClassTypeImpl(dictClass, definitionLevel != DefinitionLevel.INSTANCE){
+  PyClassTypeImpl(dictClass, definitionLevel != DefinitionLevel.INSTANCE) {
   fun getElementType(key: String): PyType? {
     return fields[key]?.type
   }
@@ -46,7 +45,7 @@ class PyTypedDictType @JvmOverloads constructor(
       this
   }
 
-  override fun toClass(): PyClassLikeType {
+  override fun toClass(): PyClassType {
     return if (definitionLevel == DefinitionLevel.INSTANCE)
       PyTypedDictType(name, fields, dictClass,
                       DefinitionLevel.NEW_TYPE, ancestors,
@@ -112,7 +111,11 @@ class PyTypedDictType @JvmOverloads constructor(
    */
   data class TypedDictFieldQualifiers(val isRequired: Boolean? = true, val isReadOnly: Boolean = false)
 
-  data class FieldTypeAndTotality(val value: PyExpression?, val type: PyType?, val qualifiers: TypedDictFieldQualifiers = TypedDictFieldQualifiers()) {
+  data class FieldTypeAndTotality(
+    val value: PyExpression?,
+    val type: PyType?,
+    val qualifiers: TypedDictFieldQualifiers = TypedDictFieldQualifiers(),
+  ) {
     val isRequired: Boolean get() = qualifiers.isRequired ?: true
     val isReadOnly: Boolean get() = qualifiers.isReadOnly
   }

@@ -2,6 +2,12 @@
 load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
+  name = "junit-v6-rt-tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "junit-v6-rt-tests_test_lib",
   module_name = "intellij.junit.v6.rt.tests",
   visibility = ["//visibility:public"],
@@ -27,10 +33,11 @@ jvm_library(
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//java/java-runtime:rt",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/platform-util-io:ide-util-io",
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.junit.v6.rt.tests` end

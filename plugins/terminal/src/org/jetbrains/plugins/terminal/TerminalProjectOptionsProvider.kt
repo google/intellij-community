@@ -25,6 +25,7 @@ import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.path.EelPathException
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.util.text.nullize
 import com.intellij.util.xmlb.annotations.Property
 import org.jetbrains.plugins.terminal.settings.TerminalLocalOptions
@@ -168,7 +169,7 @@ class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComp
       return "powershell.exe"
     }
     val eelApi = eelDescriptor.toEelApi()
-    val envs = if (eelDescriptor == LocalEelDescriptor) System.getenv() else eelApi.exec.fetchLoginShellEnvVariables()
+    val envs = eelApi.fetchMinimalEnvironmentVariables()
     val candidates = listOfNotNull(
       envs["SHELL"],
       "/bin/zsh".takeIf { eelApi.platform.isMac },

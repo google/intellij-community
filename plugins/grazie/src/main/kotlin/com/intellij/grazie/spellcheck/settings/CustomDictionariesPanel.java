@@ -1,8 +1,11 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.grazie.spellcheck.settings;
 
+import com.intellij.grazie.GrazieBundle;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -115,15 +118,11 @@ public final class CustomDictionariesPanel extends JPanel {
   }
 
   private void doChooseFiles(@NotNull Project project, @NotNull Consumer<? super List<VirtualFile>> consumer) {
-    final FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(true, false, false, false, false, true) {
-      @Override
-      public boolean isFileSelectable(@Nullable VirtualFile file) {
-        return file != null && isDic(file.getName());
-      }
-    };
-
-    final var directory = ProjectUtil.guessProjectDir(project);
-    FileChooser.chooseFiles(fileChooserDescriptor, project, this.getParent(), directory, consumer);
+    var directory = ProjectUtil.guessProjectDir(project);
+    FileChooser.chooseFiles(
+      new CustomDictionariesTableView.DictionaryFileChooserDescriptor(),
+      project, this.getParent(), directory, consumer
+    );
   }
 
   public List<String> getRemovedDictionaries() {
@@ -238,6 +237,19 @@ public final class CustomDictionariesPanel extends JPanel {
           }
         }
       };
+    }
+
+    private static class DictionaryFileChooserDescriptor extends FileChooserDescriptor {
+      private DictionaryFileChooserDescriptor() {
+        super(FileChooserDescriptorFactory.multiFiles());
+      }
+
+      @Override
+      public void validateSelectedFiles(@NotNull VirtualFile @NotNull [] files) throws Exception {
+        if (ContainerUtil.exists(files, f -> !isDic(f.getName()))) {
+          throw new ConfigurationException(GrazieBundle.message("grazie.filetype.dictionary.incorrect.message"));
+        }
+      }
     }
   }
 }

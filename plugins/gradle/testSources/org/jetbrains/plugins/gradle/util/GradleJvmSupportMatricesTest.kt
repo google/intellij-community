@@ -10,8 +10,8 @@ class GradleJvmSupportMatricesTest : GradleJvmSupportMatricesTestCase() {
     private const val FUTURE_GRADLE_VERSION = "100.0.0"
     private const val LATEST_SUPPORTED_JAVA_VERSION = 25
     private const val FUTURE_JAVA_VERSION = 100
-    private const val BUNDLED_GRADLE_VERSION = "9.0.0"
-    private const val LATEST_GRADLE_VERSION = "9.1.0"
+    private const val BUNDLED_GRADLE_VERSION = "9.2.0"
+    private const val LATEST_GRADLE_VERSION = "9.2.0"
   }
 
   fun `test bundled gradle version`() {
@@ -159,10 +159,10 @@ class GradleJvmSupportMatricesTest : GradleJvmSupportMatricesTestCase() {
   }
 
   fun `test suggesting oldest compatible gradle version for java version`() {
-    assertEquals("4.5", suggestOldestSupportedGradleVersion(6))
-    assertEquals("4.5", suggestOldestSupportedGradleVersion(7))
-    assertEquals("4.5", suggestOldestSupportedGradleVersion(8))
-    assertEquals("4.5", suggestOldestSupportedGradleVersion(9))
+    assertEquals("4.6", suggestOldestSupportedGradleVersion(6))
+    assertEquals("4.6", suggestOldestSupportedGradleVersion(7))
+    assertEquals("4.6", suggestOldestSupportedGradleVersion(8))
+    assertEquals("4.6", suggestOldestSupportedGradleVersion(9))
     assertEquals("4.7", suggestOldestSupportedGradleVersion(10))
     assertEquals("5.0", suggestOldestSupportedGradleVersion(11))
     assertEquals("5.4", suggestOldestSupportedGradleVersion(12))
@@ -202,7 +202,7 @@ class GradleJvmSupportMatricesTest : GradleJvmSupportMatricesTestCase() {
   }
 
   fun `test Gradle version format`() {
-    assertSupportedGradleVersion("4.5") { minOrNull() }
+    assertSupportedGradleVersion("4.6") { minOrNull() }
     assertSupportedGradleVersion("4.10.3") { maxOrNull() }
     assertSupportedGradleVersion("5.0") { minOrNull() }
     assertSupportedGradleVersion("5.6.2") { maxOrNull() }
@@ -213,7 +213,7 @@ class GradleJvmSupportMatricesTest : GradleJvmSupportMatricesTestCase() {
     assertSupportedGradleVersion("8.0") { minOrNull() }
     assertSupportedGradleVersion("8.14") { maxOrNull() }
     assertSupportedGradleVersion("9.0.0") { minOrNull() }
-    assertSupportedGradleVersion("9.1.0") { maxOrNull() }
+    assertSupportedGradleVersion("9.2.0") { maxOrNull() }
 
     assertSupportedGradleVersion(LATEST_GRADLE_VERSION) { maxOrNull() }
   }

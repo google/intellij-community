@@ -6,10 +6,13 @@ import com.intellij.application.options.colors.SchemesPanel
 import com.intellij.application.options.colors.SchemesPanelFactory
 import com.intellij.application.options.editor.CheckboxDescriptor
 import com.intellij.application.options.editor.checkBox
-import com.intellij.ide.*
+import com.intellij.ide.DataManager
+import com.intellij.ide.GeneralSettings
 import com.intellij.ide.IdeBundle.message
+import com.intellij.ide.ProjectWindowCustomizerService
 import com.intellij.ide.actions.IdeScaleTransformer
 import com.intellij.ide.actions.QuickChangeLookAndFeel
+import com.intellij.ide.isSupportScreenReadersOverridden
 import com.intellij.ide.plugins.PluginManagerConfigurable
 import com.intellij.ide.ui.laf.LafManagerImpl
 import com.intellij.ide.ui.search.OptionDescription
@@ -83,6 +86,12 @@ private val generalSettings: GeneralSettings
 private val lafManager: LafManager
   get() = LafManager.getInstance()
 
+private val cdDifferentToolwindowBackground
+  get() = CheckboxDescriptor(message("checkbox.different.toolwindow.background"), { settings.differentToolwindowBackground },
+                             { settings.differentToolwindowBackground = it
+                               lafManager.applyAltColors()
+                             })
+
 private val cdShowToolWindowBars
   get() = CheckboxDescriptor(message("checkbox.show.tool.window.bars"),
                              { !settings.hideToolStripes }, { settings.hideToolStripes = !it },
@@ -146,6 +155,7 @@ internal fun getAppearanceOptionDescriptors(): Sequence<OptionDescription> {
   return sequenceOf(
     cdShowToolWindowBars,
     cdShowToolWindowNumbers,
+    cdDifferentToolwindowBackground,
     cdEnableMenuMnemonics,
     cdEnableControlsMnemonics,
     cdSmoothScrolling,
@@ -196,14 +206,6 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           theme.component.renderer = lafManager.getLookAndFeelCellRenderer(theme.component)
           lafComboBoxModelWrapper.comboBoxComponent = theme.component
 
-          browserLink(message("ide.islands.read.more"), IslandsFeedback.getReadMoreUrl()).visibleIf(islandLafProperty)
-
-          link(message("ide.islands.share.feedback")) {
-            BrowserUtil.browse(IslandsFeedback.getFeedbackUrl())
-          }
-            .visibleIf(islandLafProperty)
-            .component.setExternalLinkIcon()
-
           checkBox(message("preferred.theme.autodetect.selector"))
             .bindSelected(syncThemeProperty)
             .visible(lafManager.autodetectSupported)
@@ -241,6 +243,10 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
             }
           }
         }
+
+        row {
+          checkBox(cdDifferentToolwindowBackground).comment(message("different.toolwindow.background.comment"))
+        }.topGap(TopGap.SMALL).visibleIf(islandLafProperty)
 
         disposable?.whenDisposed {
           colorAndFontsOptions.disposeUIResources()
@@ -411,8 +417,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
             yield { checkBox(cdDnDWithAlt) }
             yield {
               checkBox(cdSmoothScrolling)
-                .gap(RightGap.SMALL)
-              contextHelp(message("checkbox.smooth.scrolling.description"))
+                .contextHelp(message("checkbox.smooth.scrolling.description"))
             }
           }
           if (ProjectWindowCustomizerService.getInstance().isAvailable()) {
@@ -435,8 +440,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
             yield { checkBox(cdDnDWithAlt) }
             yield {
               checkBox(cdSmoothScrolling)
-                .gap(RightGap.SMALL)
-              contextHelp(message("checkbox.smooth.scrolling.description"))
+                .contextHelp(message("checkbox.smooth.scrolling.description"))
             }
           }
           yield { checkBox(cdEnableControlsMnemonics) }
@@ -534,8 +538,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
             twoColumnsRow(
               {
                 checkBox(cdWidescreenToolWindowLayout)
-                  .gap(RightGap.SMALL)
-                contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
+                  .contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
               },
               { checkBox(cdRememberSizeForEachToolWindowNewUI) },
             )
@@ -544,8 +547,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
             twoColumnsRow(
               {
                 checkBox(cdWidescreenToolWindowLayout)
-                  .gap(RightGap.SMALL)
-                contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
+                  .contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
               },
               { checkBox(cdRightToolWindowLayout) },
             )
@@ -558,8 +560,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           twoColumnsRow(
             {
               checkBox(cdWidescreenToolWindowLayout)
-                .gap(RightGap.SMALL)
-              contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
+                .contextHelp(message("checkbox.widescreen.tool.window.layout.description"))
             },
             { checkBox(cdRightToolWindowLayout) },
           )

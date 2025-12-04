@@ -2,6 +2,7 @@
 package org.jetbrains.intellij.build.bazel
 
 import com.intellij.openapi.util.NlsSafe
+import org.jetbrains.jps.model.JpsGlobal
 import org.jetbrains.jps.model.JpsSimpleElement
 import org.jetbrains.jps.model.java.JpsJavaDependencyScope
 import org.jetbrains.jps.model.library.JpsMavenRepositoryLibraryDescriptor
@@ -43,10 +44,7 @@ internal data class ModuleDeps(
   @JvmField val exports: List<BazelLabel>,
   @JvmField val associates: List<BazelLabel>,
   @JvmField val plugins: List<String>,
-) {
-  val depsModuleSet = deps.mapNotNull { it.module }.toSet()
-  val runtimeDepsModuleSet = runtimeDeps.mapNotNull { it.module }.toSet()
-}
+)
 
 internal fun generateDeps(
   m2Repo: Path,
@@ -61,9 +59,14 @@ internal fun generateDeps(
   val runtimeDeps = mutableListOf<BazelLabel>()
   val provided = mutableListOf<BazelLabel>()
 
-  if (isTest && module.sources.isNotEmpty()) {
-    // associates also is a dependency
-    associates.add(BazelLabel(":${module.targetName}", module))
+  if (isTest) {
+    if (hasSources && module.sources.isNotEmpty()) {
+      // associates also is a dependency
+      associates.add(BazelLabel(":${module.targetName}", module))
+    }
+    else if (module.sources.isNotEmpty() || module.resources.isNotEmpty()) {
+      runtimeDeps.add(BazelLabel(":${module.targetName}", module))
+    }
   }
 
   val testModuleProperties = context.javaExtensionService.getTestModuleProperties(module.module)
@@ -101,6 +104,13 @@ internal fun generateDeps(
       )
     }
     else if (element is JpsLibraryDependency) {
+      if (element.libraryReference.parentReference.resolve() is JpsGlobal) {
+        // <orderEntry type="library" name="Python 3.9 interpreter library" level="application" />
+        // application level references are something we should not handle (it's outside the current project model anyway)
+        println("WARN: application-level library reference '${element.libraryReference}' in module ${module.module.name}, ignored")
+        continue
+      }
+
       val jpsLibrary = element.library ?: error("library dependency '$element' from module ${module.module.name} is not resolved")
       val files: List<Path> = jpsLibrary.getPaths(JpsOrderRootType.COMPILED)
       val repositoryJpsLibrary = jpsLibrary.asTyped(JpsRepositoryLibraryType.INSTANCE)
@@ -109,11 +119,16 @@ internal fun generateDeps(
                                                 context.ultimateRoot?.let { ultimateRoot -> !it.startsWith(ultimateRoot) } ?: true }
       val isSnapshotVersion = isSnapshotOutsideOfTree ||
                               repositoryJpsLibrary?.properties?.data?.version?.endsWith("-SNAPSHOT") == true
+      val isKotlinDevVersionAsSnapshotOutsideOfTree = System.getenv("JPS_TO_BAZEL_TREAT_KOTLIN_DEV_VERSION_AS_SNAPSHOT")?.let { kotlinCompilerCliVersion ->
+        val m2OrgJetBrainsKotlin = m2Repo.resolve("org").resolve("jetbrains").resolve("kotlin")
+        files.any { it.name.endsWith("-$kotlinCompilerCliVersion.jar") } && files.all { it.startsWith(m2OrgJetBrainsKotlin) }
+      } ?: false
       val targetNameSuffix = if (isProvided) PROVIDED_SUFFIX else ""
-      val isModuleLibrary = element.libraryReference.parentReference is JpsModuleReference
+      val parentLibraryReference = element.libraryReference.parentReference
+      val moduleLibraryModuleName = if (parentLibraryReference is JpsModuleReference) parentLibraryReference.moduleName else null
       when {
-        // Library from .m2 or from any other place with a snapshot version
-        isSnapshotVersion -> {
+        // Library from .m2 or from any other place with a snapshot version, or repository kotlin dev libraries treated as snapshot
+        isSnapshotVersion || isKotlinDevVersionAsSnapshotOutsideOfTree -> {
           val firstFile = files.first()
           val libraryContainer = context.getLibraryContainer(module.isCommunity)
           val libSnapshotsDir = libraryContainer.buildFile.parent.resolve("snapshots").createDirectories()
@@ -132,7 +147,7 @@ internal fun generateDeps(
             targetName = targetName,
             container = libraryContainer,
             jpsName = jpsLibrary.name,
-            isModuleLibrary = false,
+            moduleLibraryModuleName = null,
           )
           context.addLocalLibrary(
             lib = LocalLibrary(
@@ -181,7 +196,7 @@ internal fun generateDeps(
             targetName = targetName,
             container = libraryContainer,
             jpsName = jpsLibrary.name,
-            isModuleLibrary = isModuleLibrary,
+            moduleLibraryModuleName = moduleLibraryModuleName,
           )
 
           val bazelFileDir = getLocalLibBazelFileDir(files, communityRoot = context.communityRoot)
@@ -262,7 +277,7 @@ internal fun generateDeps(
               jars = repositoryJpsLibrary.getPaths(JpsOrderRootType.COMPILED).map { getFileMavenFileDescription(m2Repo, repositoryJpsLibrary, it) },
               sourceJars = repositoryJpsLibrary.getPaths(JpsOrderRootType.SOURCES).map { getFileMavenFileDescription(m2Repo, repositoryJpsLibrary, it) },
               javadocJars = repositoryJpsLibrary.getPaths(JpsOrderRootType.DOCUMENTATION).map { getFileMavenFileDescription(m2Repo, repositoryJpsLibrary, it) },
-              target = LibraryTarget(targetName = targetName, container = libraryContainer, jpsName = jpsLibrary.name, isModuleLibrary = isModuleLibrary),
+              target = LibraryTarget(targetName = targetName, container = libraryContainer, jpsName = jpsLibrary.name, moduleLibraryModuleName = moduleLibraryModuleName),
             ),
             isProvided = isProvided,
           ).target.container
@@ -316,7 +331,7 @@ internal fun generateDeps(
       .filter { it.value.size > 1 }
       .map { it.key.label }
       .sorted()
-    error("Duplicate $listMoniker ${duplicates} for module '${module.module.name}',\ncheck ${module.imlFile}")
+    error("Duplicate $listMoniker $duplicates for module '${module.module.name}',\ncheck ${module.imlFile}")
   }
 
   val plugins = TreeSet<String>()
@@ -328,6 +343,11 @@ internal fun generateDeps(
     else if (it.name.startsWith("rpc-compiler-plugin-") && it.name.endsWith(".jar")) {
       if (module.module.name == "fleet.rpc") {  // other modules use exported_compiler_plugins
         plugins.add("@lib//:rpc-plugin")
+      }
+    }
+    else if (it.name.startsWith("noria-compiler-plugin-") && it.name.endsWith(".jar")) {
+      if (module.module.name == "fleet.noria.cells") {
+        plugins.add("@lib//:noria-plugin")
       }
     }
   }
@@ -380,14 +400,48 @@ private fun getFileMavenFileDescription(m2Repo: Path, lib: JpsTypedLibrary<JpsSi
   val version = jarSubPath.getName(jarSubPath.nameCount - 2).toString()
   val artifactId = jarSubPath.getName(jarSubPath.nameCount - 3).toString()
 
-  val libraryDescriptor = lib.properties.data
-  for (verification in libraryDescriptor.artifactsVerification) {
-    if (JpsPathUtil.urlToNioPath(verification.url) == jar) {
-      return MavenFileDescription(groupId, artifactId, version, path = jar, sha256checksum = verification.sha256sum)
-    }
+  val classifier = jar.name
+    .removePrefixStrict("$artifactId-$version")
+    .removeSuffixStrict(".jar")
+    .removePrefix("-")
+    .ifEmpty { null }
+
+  val coordinates = MavenCoordinates(
+    groupId = groupId,
+    artifactId = artifactId,
+    version = version,
+    classifier = classifier,
+  )
+
+  val sha256sum = lib.properties.data.artifactsVerification
+    .firstOrNull { JpsPathUtil.urlToNioPath(it.url) == jar }
+    ?.sha256sum
+
+  return MavenFileDescription(mavenCoordinates = coordinates, path = jar, sha256checksum = sha256sum)
+}
+
+private fun String.removeSuffixStrict(suffix: String): String {
+  require(suffix.isNotEmpty()) {
+    "suffix must not be empty"
   }
 
-  return MavenFileDescription(groupId, artifactId, version, path = jar, sha256checksum = null)
+  val result = removeSuffix(suffix)
+  require(result != this) {
+    "String must end with $suffix: $this"
+  }
+  return result
+}
+
+private fun String.removePrefixStrict(prefix: String): String {
+  require(prefix.isNotEmpty()) {
+    "prefix must not be empty"
+  }
+
+  val result = removePrefix(prefix)
+  require(result != this) {
+    "String must start with $prefix: $this"
+  }
+  return result
 }
 
 private fun isTestFriend(
@@ -414,25 +468,67 @@ private fun addDep(
   isExported: Boolean,
 ) {
   if (isTest) {
+    val hasProductionDependentModule = dependentModule.sources.isNotEmpty() || dependentModule.resources.isNotEmpty()
     when (scope) {
       JpsJavaDependencyScope.COMPILE -> {
-        deps.add(dependencyLabel)
+        if (hasSources) {
+          deps.add(dependencyLabel)
+        }
+        else if (!hasProductionDependentModule) {
+          runtimeDeps.add(dependencyLabel)
+        }
         if (isExported) {  // e.g. //debugger/intellij.java.debugger.rpc.tests:java-debugger-rpc-tests_test_lib
           exports.add(dependencyLabel)
         }
 
         if (dependencyModuleDescriptor != null && !dependencyModuleDescriptor.testSources.isEmpty()) {
           if (needsBackwardCompatibleTestDependency(dependencyModuleDescriptor.module.name, dependentModule)) {
-            deps.add(getLabelForTest(dependencyLabel))
+            if (hasSources) {
+              deps.add(getLabelForTest(dependencyLabel))
+            }
+            else {
+              runtimeDeps.add(getLabelForTest(dependencyLabel))
+            }
             if (isExported) {  // e.g. //CIDR-appcode/appcode-coverage:appcode-coverage_test_lib
               exports.add(getLabelForTest(dependencyLabel))
             }
           }
         }
       }
-      JpsJavaDependencyScope.TEST, JpsJavaDependencyScope.PROVIDED -> {
+      JpsJavaDependencyScope.PROVIDED -> {
+        // ignore deps if no sources, as `exports` in Bazel means "compile" scope
+        if (hasSources) {
+          if (dependencyModuleDescriptor == null) {
+            // lib supports `provided`
+            deps.add(dependencyLabel)
+            if (isExported) {
+              exports.add(dependencyLabel)
+            }
+          }
+          else {
+            if (dependencyModuleDescriptor.sources.isNotEmpty() || dependencyModuleDescriptor.resources.isNotEmpty()) {  // e.g. v2 module library
+              provided.add(dependencyLabel)
+              if (isExported) {
+                exports.add(dependencyLabel)
+              }
+            }
+            if (dependencyModuleDescriptor.testSources.isNotEmpty()) {
+              provided.add(getLabelForTest(dependencyLabel))
+              if (isExported) {
+                exports.add(getLabelForTest(dependencyLabel))
+              }
+            }
+          }
+        }
+      }
+      JpsJavaDependencyScope.TEST -> {
         if (dependencyModuleDescriptor == null) {
-          deps.add(dependencyLabel)
+          if (hasSources) {
+            deps.add(dependencyLabel)
+          }
+          else {
+            runtimeDeps.add(dependencyLabel)
+          }
           if (isExported) {  // e.g. //python/junit5Tests:junit5Tests_test_lib
             exports.add(dependencyLabel)
           }
@@ -447,19 +543,30 @@ private fun addDep(
           }
           else {
             val hasTestSource = !dependencyModuleDescriptor.testSources.isEmpty()
+            val hasTestResources = dependencyModuleDescriptor.testResources.isNotEmpty()
 
             if (isExported && hasTestSource) {
               println("Do not export test dependency (module=${dependentModule.module.name}, exported=${dependencyModuleDescriptor.module.name})")
             }
 
             if (!dependencyModuleDescriptor.sources.isEmpty() || !hasTestSource) {
-              deps.add(dependencyLabel)
+              if (hasSources) {
+                deps.add(dependencyLabel)
+              }
+              else {
+                runtimeDeps.add(dependencyLabel)
+              }
               if (isExported) {  // e.g. @community//python/python-venv:community-impl-venv_test_lib
                 exports.add(dependencyLabel)
               }
             }
-            if (hasTestSource) {
-              deps.add(getLabelForTest(dependencyLabel))
+            if (hasTestSource || hasTestResources) {
+              if (hasSources) {
+                deps.add(getLabelForTest(dependencyLabel))
+              }
+              else {
+                runtimeDeps.add(getLabelForTest(dependencyLabel))
+              }
               if (isExported) {  // e.g. //remote-dev/cwm-guest/plugins/java-frontend:java-frontend-split_test_lib
                 exports.add(getLabelForTest(dependencyLabel))
               }
@@ -468,7 +575,7 @@ private fun addDep(
         }
       }
       JpsJavaDependencyScope.RUNTIME -> {
-        if (dependentModule.sources.isEmpty()) {
+        if (!hasProductionDependentModule) {
           runtimeDeps.add(dependencyLabel)
         }
       }
@@ -531,17 +638,6 @@ private fun needsBackwardCompatibleTestDependency(
     // See: https://youtrack.jetbrains.com/issue/IJI-2851/ (auto-add dependency on test target only for existing bad modules and forbid it for everything else).
     return true
   }
-}
-
-private fun addSuffix(s: BazelLabel, @Suppress("SameParameterValue") labelSuffix: String): BazelLabel {
-  val lastSlashIndex = s.label.lastIndexOf('/')
-  val labelWithSuffix = (if (s.label.indexOf(':', lastSlashIndex) == -1) {
-    s.label + ":" + s.label.substring(lastSlashIndex + 1)
-  }
-  else {
-    s.label
-  }) + labelSuffix
-  return s.copy(label = labelWithSuffix)
 }
 
 internal fun hasOnlyTestResources(moduleDescriptor: ModuleDescriptor): Boolean {

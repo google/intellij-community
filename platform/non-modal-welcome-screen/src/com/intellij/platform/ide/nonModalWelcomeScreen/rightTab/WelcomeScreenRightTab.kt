@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.awtTransferable
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.Dp
 import com.intellij.ide.dnd.FileCopyPasteUtil
 import java.awt.datatransfer.DataFlavor
 import com.intellij.openapi.application.EDT
@@ -45,6 +49,8 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.jewel.bridge.JewelComposePanel
 import org.jetbrains.jewel.bridge.createVerticalBrush
 import org.jetbrains.jewel.bridge.retrieveColorOrUnspecified
+import org.jetbrains.jewel.foundation.modifier.onActivated
+import org.jetbrains.jewel.foundation.modifier.trackComponentActivation
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.component.styling.*
@@ -78,11 +84,19 @@ class WelcomeScreenRightTab(
         }
       }
     }
+    val focusRequester = remember { FocusRequester() }
 
     Box(
       modifier = Modifier
         .fillMaxSize()
         .background(color = panelBackgroundColor)
+        .focusRequester(focusRequester)
+        .trackComponentActivation(component)
+        .onActivated { activated ->
+          if (activated) {
+            focusRequester.requestFocus(FocusDirection.Enter)
+          }
+        }
         .dragAndDropTarget(
           shouldStartDragAndDrop = { event ->
             event.awtTransferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
@@ -127,13 +141,15 @@ class WelcomeScreenRightTab(
                horizontalAlignment = Alignment.CenterHorizontally) {
           SwitchPanel()
 
-          CheckboxRow(text = NonModalWelcomeScreenBundle.message("welcome.screen.right.tab.always.show.on.startup"),
-                      textStyle = TextStyle(color = fontColor),
-                      modifier = Modifier.padding(vertical = 12.dp),
-                      checked = showOnStartup, onCheckedChange = {
-            showOnStartup = it
-            isRightTabEnabled = it
-          })
+          if (contentProvider.isDisableOptionVisible) {
+            CheckboxRow(text = NonModalWelcomeScreenBundle.message("welcome.screen.enabled.checkbox"),
+                        textStyle = TextStyle(color = fontColor),
+                        modifier = Modifier.padding(bottom = 12.dp),
+                        checked = showOnStartup, onCheckedChange = {
+              showOnStartup = it
+              isRightTabEnabled = it
+            })
+          }
         }
       }
     }
@@ -165,6 +181,13 @@ class WelcomeScreenRightTab(
     }
   }
 
+  @Stable
+  private inline val WelcomeRightTabContentProvider.FeatureButtonSize.dp: Dp
+    get() = when (this) {
+      WelcomeRightTabContentProvider.FeatureButtonSize.COMMON -> 112
+      WelcomeRightTabContentProvider.FeatureButtonSize.LARGE -> 125
+    }.dp
+
   @Composable
   private fun FeatureButton(model: WelcomeRightTabContentProvider.FeatureButtonModel, scope: CoroutineScope) {
     WelcomeScreenCustomButton(
@@ -172,7 +195,7 @@ class WelcomeScreenRightTab(
         model.onClick(project, scope)
       },
       style = CustomButtonStyle(),
-      modifier = Modifier.size(112.dp, 87.dp),
+      modifier = Modifier.size(contentProvider.featureButtonSize.dp, 87.dp),
     ) {
       Column {
         Icon(key = model.icon, contentDescription = model.text, tint = model.tint,
@@ -187,7 +210,7 @@ class WelcomeScreenRightTab(
 
   @Composable
   fun SwitchPanel() {
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
       InfoPanelItem(themeIconKey,
                     NonModalWelcomeScreenBundle.message("welcome.screen.right.tab.theme.switch.prefix"),
                     ThemeModel())

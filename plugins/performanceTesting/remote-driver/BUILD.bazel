@@ -30,9 +30,10 @@ jvm_library(
     "//libraries/jsoup",
     "//platform/remote-driver/core:driver-impl",
     "//platform/remote-driver/client",
-    "@lib//:jcef",
+    "//libraries/jcef",
     "//platform/platform-impl:ide-impl",
     "//platform/ui.jcef",
+    "//platform/core-ui",
   ],
   exports = [
     "//platform/remote-driver/core:driver-impl",

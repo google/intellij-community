@@ -40,18 +40,9 @@ _implicit_deps = {
     ),
 }
 
-common_attr = add_dicts(
+kmp_attr = add_dicts(
     _implicit_deps,
     {
-        "deps": attr.label_list(
-            doc = """A list of dependencies of this rule.See general comments about `deps` at
-        [Attributes common to all build rules](https://docs.bazel.build/versions/master/be/common-definitions.html#common-attributes).""",
-            providers = [
-                [JavaInfo],
-                [_KtJvmInfo],
-            ],
-            allow_files = False,
-        ),
         "runtime_deps": attr.label_list(
             doc = """Libraries to make available to the final binary or test at runtime only. Like ordinary deps, these will
         appear on the runtime classpath, but unlike them, not on the compile-time classpath.""",
@@ -62,13 +53,6 @@ common_attr = add_dicts(
             doc = """The list of files needed by this rule at runtime. See general comments about `data` at
         [Attributes common to all build rules](https://docs.bazel.build/versions/master/be/common-definitions.html#common-attributes).""",
             allow_files = True,
-        ),
-        "associates": attr.label_list(
-            doc = """Kotlin deps who should be considered part of the same module/compilation-unit
-            for the purposes of "internal" access. Such deps must all share the same module space
-            and so a target cannot associate to two deps from two different modules.""",
-            default = [],
-            providers = [JavaInfo, _KtJvmInfo],
         ),
         "plugins": attr.label_list(
             default = [],
@@ -88,6 +72,28 @@ common_attr = add_dicts(
             default = "//:default-kotlinc-opts",
             providers = [KotlincOptions],
         ),
+    },
+)
+
+common_attr = add_dicts(
+    kmp_attr,
+    {
+        "deps": attr.label_list(
+            doc = """A list of dependencies of this rule.See general comments about `deps` at
+        [Attributes common to all build rules](https://docs.bazel.build/versions/master/be/common-definitions.html#common-attributes).""",
+            providers = [
+                [JavaInfo],
+                [_KtJvmInfo],
+            ],
+            allow_files = False,
+        ),
+        "associates": attr.label_list(
+            doc = """Kotlin deps who should be considered part of the same module/compilation-unit
+            for the purposes of "internal" access. Such deps must all share the same module space
+            and so a target cannot associate to two deps from two different modules.""",
+            default = [],
+            providers = [JavaInfo, _KtJvmInfo],
+        ),
         "javac_opts": attr.label(
             doc = """Javac options to be used when compiling this target. These opts if provided will
             be used instead of the ones provided to the toolchain.
@@ -96,7 +102,9 @@ common_attr = add_dicts(
             default = "//:default-javac-opts",
             providers = [JavacOptions],
         ),
-        "_jvm_builder": attr.label(
+        "jvm_builder": attr.label(
+            doc = """Worker code to use. Usually this is not needed, but can be used to override the default
+            worker to build compiler plugins used in default worker.""",
             default = "//:jvm-builder",
             allow_single_file = True,
             cfg = scrubbed_host_platform_transition,

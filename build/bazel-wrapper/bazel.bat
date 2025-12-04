@@ -2,8 +2,8 @@
 
 setlocal
 
-call "%~dp0common.bat"
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-"%BAZEL_REAL%" %OUTPUT_USER_ROOT_OPT% %*
+set OUTER_BAZEL_REAL=%BAZEL_REAL%
+set BAZEL_REAL=
+set BAZELISK_SKIP_WRAPPER=
+"%OUTER_BAZEL_REAL%" %*
 exit /b %ERRORLEVEL%

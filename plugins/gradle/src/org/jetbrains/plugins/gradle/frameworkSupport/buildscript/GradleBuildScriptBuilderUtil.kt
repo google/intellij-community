@@ -79,16 +79,20 @@ fun isKotlinSupported(gradleVersion: GradleVersion): Boolean {
   return GradleVersionUtil.isGradleAtLeast(gradleVersion, "5.6.2")
 }
 
+fun isKotlinDslScriptsModelImportSupported(gradleVersion: GradleVersion): Boolean {
+  return GradleVersionUtil.isGradleAtLeast(gradleVersion, "6.0")
+}
+
 fun isJunit5Supported(gradleVersion: GradleVersion): Boolean {
   return GradleVersionUtil.isGradleAtLeast(gradleVersion, "4.7")
 }
 
-fun isSpockSupported(gradleVersion: GradleVersion): Boolean {
-  return GradleVersionUtil.isGradleAtLeast(gradleVersion, "5.6")
+fun isGroovy5Supported(gradleVersion: GradleVersion): Boolean {
+  return GradleVersionUtil.isGradleAtLeast(gradleVersion, "7.0")
 }
 
-fun isRobolectricSupported(gradleVersion: GradleVersion): Boolean {
-  return GradleVersionUtil.isGradleAtLeast(gradleVersion, "4.6")
+fun isSpockSupported(gradleVersion: GradleVersion): Boolean {
+  return GradleVersionUtil.isGradleAtLeast(gradleVersion, "5.6")
 }
 
 fun isTopLevelJavaConventionsSupported(gradleVersion: GradleVersion): Boolean {

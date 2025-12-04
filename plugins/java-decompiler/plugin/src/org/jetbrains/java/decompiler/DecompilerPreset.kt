@@ -1,8 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.java.decompiler
 
-import com.intellij.application.options.CodeStyle
-import com.intellij.ide.highlighter.JavaFileType
+import com.intellij.psi.codeStyle.CodeStyleDefaults
 import org.jetbrains.annotations.Nls
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences
 
@@ -25,7 +24,7 @@ private val basePreset: Map<String, String> = mapOf(
   // Appearance-specific options
   IFernflowerPreferences.BANNER to IDEA_DECOMPILER_BANNER,
   IFernflowerPreferences.NEW_LINE_SEPARATOR to "1",
-  IFernflowerPreferences.INDENT_STRING to " ".repeat(CodeStyle.getDefaultSettings().getIndentOptions(JavaFileType.INSTANCE).INDENT_SIZE),
+  IFernflowerPreferences.INDENT_STRING to " ".repeat(CodeStyleDefaults.DEFAULT_INDENT_SIZE),
 
   IFernflowerPreferences.MAX_PROCESSING_METHOD to "60",
   IFernflowerPreferences.IGNORE_INVALID_BYTECODE to "1",
@@ -43,7 +42,8 @@ private val highPreset: Map<String, String> = basePreset + mapOf(
   IFernflowerPreferences.DECOMPILE_CLASS_1_4 to "1",
   IFernflowerPreferences.DECOMPILE_ASSERTIONS to "1",
   IFernflowerPreferences.HIDE_EMPTY_SUPER to "1",
-  IFernflowerPreferences.HIDE_DEFAULT_CONSTRUCTOR to "1",
+  //it is better to show it because it is hard to skip it in the stub builder
+  IFernflowerPreferences.HIDE_DEFAULT_CONSTRUCTOR to "0",
   IFernflowerPreferences.DECOMPILE_GENERIC_SIGNATURES to "1",
   IFernflowerPreferences.NO_EXCEPTIONS_RETURN to "1",
   IFernflowerPreferences.DECOMPILE_ENUM to "1",

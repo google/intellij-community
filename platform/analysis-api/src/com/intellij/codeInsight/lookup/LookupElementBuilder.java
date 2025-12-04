@@ -4,6 +4,7 @@ package com.intellij.codeInsight.lookup;
 
 import com.intellij.codeInsight.completion.InsertHandler;
 import com.intellij.codeInsight.completion.InsertionContext;
+import com.intellij.model.Symbol;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiNamedElement;
@@ -38,7 +39,9 @@ public final class LookupElementBuilder extends LookupElement {
   private final @Nullable LookupElementPresentation myHardcodedPresentation;
   private final @NotNull Set<String> myAllLookupStrings;
 
-  private LookupElementBuilder(@NotNull String lookupString, @NotNull Object object, @Nullable InsertHandler<LookupElement> insertHandler,
+  private LookupElementBuilder(@NotNull String lookupString,
+                               @NotNull Object object,
+                               @Nullable InsertHandler<LookupElement> insertHandler,
                                @Nullable LookupElementRenderer<LookupElement> renderer,
                                @Nullable LookupElementRenderer<LookupElement> expensiveRenderer,
                                @Nullable LookupElementPresentation hardcodedPresentation,
@@ -79,6 +82,10 @@ public final class LookupElementBuilder extends LookupElement {
                                     SmartPointerManager.getInstance(element.getProject()).createSmartPsiElementPointer(element));
   }
 
+  public static @NotNull LookupElementBuilder createWithSymbolPointer(@NotNull String lookupString, @NotNull Symbol symbol) {
+    return new LookupElementBuilder(lookupString, symbol.createPointer());
+  }
+
   public static @NotNull LookupElementBuilder create(@NotNull PsiNamedElement element) {
     PsiUtilCore.ensureValid(element);
     return new LookupElementBuilder(StringUtil.notNullize(element.getName()), element);
@@ -96,7 +103,8 @@ public final class LookupElementBuilder extends LookupElement {
     return new LookupElementBuilder(lookupString, lookupObject);
   }
 
-  private @NotNull LookupElementBuilder cloneWithUserData(@NotNull String lookupString, @NotNull Object object,
+  private @NotNull LookupElementBuilder cloneWithUserData(@NotNull String lookupString,
+                                                          @NotNull Object object,
                                                           @Nullable InsertHandler<LookupElement> insertHandler,
                                                           @Nullable LookupElementRenderer<LookupElement> renderer,
                                                           @Nullable LookupElementRenderer<LookupElement> expensiveRenderer,

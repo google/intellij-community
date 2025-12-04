@@ -48,7 +48,7 @@ import com.jetbrains.python.psi.resolve.PyResolveContext
 import com.jetbrains.python.psi.resolve.PyResolveUtil
 import com.jetbrains.python.psi.types.*
 import com.jetbrains.python.psi.types.PyTypeVarType.Variance
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 
 class PyTypeHintsInspection : PyInspection() {
 
@@ -71,7 +71,7 @@ class PyTypeHintsInspection : PyInspection() {
       val calleeQName = callee?.let { PyResolveUtil.resolveImportedElementQNameLocally(it) } ?: emptyList()
 
       if (QualifiedName.fromDottedString(PyTypingTypeProvider.TYPE_VAR) in calleeQName ||
-        QualifiedName.fromDottedString(PyTypingTypeProvider.TYPE_VAR_EXT) in calleeQName) {
+          QualifiedName.fromDottedString(PyTypingTypeProvider.TYPE_VAR_EXT) in calleeQName) {
         val target = getTargetFromAssignment(node)
 
         checkTypeVarPlacement(node, target)
@@ -135,7 +135,8 @@ class PyTypeHintsInspection : PyInspection() {
       val typeExpression = node.typeExpression ?: return
       if (!isValidTypeHint(typeExpression, myTypeEvalContext)) {
         registerProblem(typeExpression, PyPsiBundle.message("INSP.type.hints.type.hint.is.not.valid"))
-      } else {
+      }
+      else {
         val typeExpression = node.typeExpression
         if (typeExpression != null) {
           if (PyTypingTypeProvider.getType(typeExpression, myTypeEvalContext) == null) {
@@ -200,6 +201,7 @@ class PyTypeHintsInspection : PyInspection() {
         if (type is PyTypeParameterType && type.scopeOwner == null && !isInsideTypeParameterDefault(node)) {
           registerProblem(node, PyPsiBundle.message("INSP.type.hints.unbound.type.variable"))
         }
+        checkSelfType(node)
       }
 
       if (!insideTypeHint) {
@@ -207,7 +209,8 @@ class PyTypeHintsInspection : PyInspection() {
       }
 
       if (node.referencedName == PyNames.CANONICAL_SELF) {
-        val typeName = myTypeEvalContext.getType(node)?.name
+        val refType = myTypeEvalContext.getType(node)
+        val typeName = (if (refType is PySelfType) refType.scopeClassType else refType)?.name
         if (typeName != null && typeName != PyNames.CANONICAL_SELF) {
           registerProblem(node, PyPsiBundle.message("INSP.type.hints.invalid.type.self"), ProblemHighlightType.GENERIC_ERROR, null,
                           ReplaceWithTypeNameQuickFix(typeName))
@@ -227,6 +230,27 @@ class PyTypeHintsInspection : PyInspection() {
       }
       else if (resolvesToAnyOfQualifiedNames(node, PyTypingTypeProvider.TYPE_ALIAS, PyTypingTypeProvider.TYPE_ALIAS_EXT)) {
         registerProblem(node, PyPsiBundle.message("INSP.type.hints.type.alias.must.be.used.as.standalone.type.hint"))
+      }
+    }
+
+    private fun checkSelfType(node: PyReferenceExpression) {
+      if (resolvesToAnyOfQualifiedNames(node, PyTypingTypeProvider.SELF, PyTypingTypeProvider.SELF_EXT)) {
+        val selfType = Ref.deref(PyTypingTypeProvider.getType(node, myTypeEvalContext)) as? PySelfType
+        if (selfType == null) { // we don't infer Self type outside a class
+          registerProblem(node, PyPsiBundle.message("INSP.type.hints.self.use.outside.class"))
+          return
+        }
+        else {
+          val argList = PsiTreeUtil.getParentOfType(node, PyArgumentList::class.java)
+          if (argList != null && argList.parent is PyClass) {
+            registerProblem(node, PyPsiBundle.message("INSP.type.hints.self.cannot.use.self.in.this.context"))
+            return
+          }
+          if (selfType.scopeClassType.getAncestorTypes(myTypeEvalContext)
+              .contains(PyBuiltinCache.getInstance(node).typeType?.toClass())) {
+            registerProblem(node, PyPsiBundle.message("INSP.type.hints.self.cannot.use.self.in.metaclass"))
+          }
+        }
       }
     }
 
@@ -323,11 +347,6 @@ class PyTypeHintsInspection : PyInspection() {
         selves.forEach {
           registerProblem(it, message)
         }
-      }
-
-      val classParent = PsiTreeUtil.getParentOfType(node, PyClass::class.java)
-      if (classParent == null) {
-        registerProblemForSelves(PyPsiBundle.message("INSP.type.hints.self.use.outside.class"))
       }
 
       val functionParent = PsiTreeUtil.getParentOfType(node, PyFunction::class.java)
@@ -666,7 +685,7 @@ class PyTypeHintsInspection : PyInspection() {
                         PyPsiBundle.message("INSP.type.hints.typed.dict.type.cannot.be.used.in.isinstance.tests"),
                         ProblemHighlightType.GENERIC_ERROR)
       }
-      if (type is PyTypingNewType) {
+      if (Ref.deref(PyTypingTypeProvider.getType(base, myTypeEvalContext)) is PyTypingNewType) {
         registerProblem(base,
                         PyPsiBundle.message("INSP.type.hints.new.type.type.cannot.be.used.in.isinstance.tests"),
                         ProblemHighlightType.GENERIC_ERROR)

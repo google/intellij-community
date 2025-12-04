@@ -40,7 +40,7 @@ jvm_library(
     "//xml/xml-psi-impl:psi-impl",
     "//platform/platform-api:ide",
     "//libraries/asm",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "@lib//:kotlin-stdlib",
     "//java/openapi:java",
     "//platform/util:util-ui",
@@ -56,6 +56,7 @@ jvm_library(
     "//java/codeserver/core",
     "//platform/refactoring",
     "//xml/xml-analysis-api:analysis",
+    "//libraries/jsoup",
   ],
   exports = [
     "//platform/analysis-impl",

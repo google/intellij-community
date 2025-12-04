@@ -20,6 +20,12 @@ resourcegroup(
 )
 
 jvm_library(
+  name = "ui-tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "ui-tests_test_lib",
   module_name = "intellij.platform.jewel.uiTests",
   visibility = ["//visibility:public"],
@@ -27,7 +33,7 @@ jvm_library(
   resources = [":ui-tests_test_resources"],
   kotlinc_opts = ":custom_ui-tests",
   deps = [
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "@lib//:jetbrains-annotations",
     "//libraries/skiko",
     "//platform/jewel/foundation",

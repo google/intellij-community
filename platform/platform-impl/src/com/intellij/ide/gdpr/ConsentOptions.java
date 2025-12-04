@@ -30,8 +30,8 @@ import java.util.stream.Stream;
 public final class ConsentOptions implements ModificationTracker {
   private static final Logger LOG = Logger.getInstance(ConsentOptions.class);
 
-  private static final String CONSENTS_CONFIRMATION_PROPERTY = "jb.consents.confirmation.enabled";
-  private static final String RECONFIRM_CONSENTS_PROPERTY = "test.force.reconfirm.consents";
+  public static final String CONSENTS_CONFIRMATION_PROPERTY = "jb.consents.confirmation.enabled";
+  public static final String RECONFIRM_CONSENTS_PROPERTY = "test.force.reconfirm.consents";
   private static final String STATISTICS_OPTION_ID = "rsch.send.usage.stat";
   private static final String EAP_FEEDBACK_OPTION_ID = "eap";
   private static final String AI_DATA_COLLECTION_OPTION_ID = "ai.data.collection.and.use.policy";
@@ -56,81 +56,90 @@ public final class ConsentOptions implements ModificationTracker {
       .resolve("consentOptions/cached");
   }
 
-  private static Path getConfirmedConsentsFile() {
+  public static Path getConfirmedConsentsFile() {
     return PathManager.getCommonDataPath().resolve("consentOptions/accepted");
   }
 
-  private static Locale getCurrentLocale() {
+  public static Locale getCurrentLocale() {
     return LocalizationUtil.INSTANCE.getLocale();
   }
   
-  private static Locale getDefaultLocale() {
+  public static Locale getDefaultLocale() {
     return LocalizationUtil.INSTANCE.getDefaultLocale();
   }
 
-  private static final class InstanceHolder {
-    static final ConsentOptions ourInstance = new ConsentOptions(new IOBackend() {
-      @Override
-      public void writeDefaultConsents(@NotNull String data) throws IOException {
-        var defaultConsentsFile = getDefaultConsentsFile();
-        Files.createDirectories(defaultConsentsFile.getParent());
-        Files.writeString(defaultConsentsFile, data);
-      }
+  public static class IOBackendImpl implements IOBackend {
+    private final String myBundledResourcePath;
+    private final Path myConfirmedConsentsFile;
 
-      @Override
-      public @NotNull String readDefaultConsents() throws IOException {
-        return loadText(Files.newInputStream(getDefaultConsentsFile()));
-      }
+    public IOBackendImpl(String bundledResourcePath, Path confirmedConsentsFile) {
+      myBundledResourcePath = bundledResourcePath;
+      myConfirmedConsentsFile = confirmedConsentsFile;
+    }
 
-      @Override
-      public @NotNull String readBundledConsents() {
-        return loadText(ConsentOptions.class.getClassLoader().getResourceAsStream(getBundledResourcePath()));
-      }
+    @Override
+    public void writeDefaultConsents(@NotNull String data) throws IOException {
+      var defaultConsentsFile = getDefaultConsentsFile();
+      Files.createDirectories(defaultConsentsFile.getParent());
+      Files.writeString(defaultConsentsFile, data);
+    }
 
-      @Override
-      public @Nullable String readLocalizedBundledConsents() {
-        if (getCurrentLocale() == getDefaultLocale()) {
-          return null;
-        }
+    @Override
+    public @NotNull String readDefaultConsents() throws IOException {
+      return loadText(Files.newInputStream(getDefaultConsentsFile()));
+    }
 
-        for (var localizedPath : LocalizationUtil.INSTANCE.getLocalizedPaths(getBundledResourcePath(), getCurrentLocale())) {
-          var loadedText = loadText(ConsentOptions.class.getClassLoader().getResourceAsStream(localizedPath));
-          if (!loadedText.isEmpty()) {
-            return loadedText;
-          }
-        }
+    @Override
+    public @NotNull String readBundledConsents() {
+      return loadText(ConsentOptions.class.getClassLoader().getResourceAsStream(myBundledResourcePath));
+    }
+
+    @Override
+    public @Nullable String readLocalizedBundledConsents() {
+      if (getCurrentLocale() == getDefaultLocale()) {
         return null;
       }
 
-      @Override
-      public void writeConfirmedConsents(@NotNull String data) throws IOException {
-        var confirmedConsentsFile = getConfirmedConsentsFile();
-        Files.createDirectories(confirmedConsentsFile.getParent());
-        Files.writeString(confirmedConsentsFile, data);
-        if (LoadingState.COMPONENTS_REGISTERED.isOccurred()) {
-          ApplicationManager.getApplication().getMessageBus()
-            .syncPublisher(DataSharingSettingsChangeListener.TOPIC)
-            .consentWritten();
+      for (var localizedPath : LocalizationUtil.INSTANCE.getLocalizedPaths(myBundledResourcePath, getCurrentLocale())) {
+        var loadedText = loadText(ConsentOptions.class.getClassLoader().getResourceAsStream(localizedPath));
+        if (!loadedText.isEmpty()) {
+          return loadedText;
         }
       }
+      return null;
+    }
 
-      @Override
-      public @NotNull String readConfirmedConsents() throws IOException {
-        return loadText(Files.newInputStream(getConfirmedConsentsFile()));
+    @Override
+    public void writeConfirmedConsents(@NotNull String data) throws IOException {
+      Files.createDirectories(myConfirmedConsentsFile.getParent());
+      Files.writeString(myConfirmedConsentsFile, data);
+      if (LoadingState.COMPONENTS_REGISTERED.isOccurred()) {
+        ApplicationManager.getApplication().getMessageBus()
+          .syncPublisher(DataSharingSettingsChangeListener.TOPIC)
+          .consentWritten();
       }
+    }
 
-      private static String loadText(InputStream stream) {
-        if (stream != null) {
-          try (var inputStream = CharsetToolkit.inputStreamSkippingBOM(stream)) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-          }
-          catch (IOException e) {
-            LOG.info(e);
-          }
+    @Override
+    public @NotNull String readConfirmedConsents() throws IOException {
+      return loadText(Files.newInputStream(myConfirmedConsentsFile));
+    }
+
+    private static String loadText(InputStream stream) {
+      if (stream != null) {
+        try (var inputStream = CharsetToolkit.inputStreamSkippingBOM(stream)) {
+          return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
-        return "";
+        catch (IOException e) {
+          LOG.info(e);
+        }
       }
-    });
+      return "";
+    }
+  }
+
+  private static final class InstanceHolder {
+    static final ConsentOptions ourInstance = new ConsentOptions(new IOBackendImpl(getBundledResourcePath(), getConfirmedConsentsFile()));
 
     private static String getBundledResourcePath() {
       if ("JetBrains".equals(System.getProperty("idea.vendor.name"))) {
@@ -200,16 +209,22 @@ public final class ConsentOptions implements ModificationTracker {
     return consent -> AI_DATA_COLLECTION_OPTION_ID.equals(consent.getId());
   }
 
+  /**
+   * Should only be used to limit the visibility of the outdated TRACE consent in the settings.
+   */
   public static @NotNull Predicate<Consent> condTraceDataCollectionNonComConsent() {
     return consent -> TRACE_DATA_COLLECTION_NON_COM_OPTION_ID.equals(consent.getId());
   }
 
+  /**
+   * Should only be used to limit the visibility of the outdated TRACE consent in the settings.
+   */
   public static @NotNull Predicate<Consent> condTraceDataCollectionComConsent() {
     return consent -> TRACE_DATA_COLLECTION_COM_OPTION_ID.equals(consent.getId());
   }
 
   /**
-   * Should only be used to limit the visibility of the outdated TRACE content in the settings.
+   * Should only be used to limit the visibility of the outdated TRACE consent in the settings.
    */
   public static @NotNull Predicate<Consent> condTraceDataCollectionConsent() {
     return consent -> TRACE_DATA_COLLECTION_OPTION_ID.equals(consent.getId());
@@ -238,22 +253,6 @@ public final class ConsentOptions implements ModificationTracker {
   @TestOnly
   public void setAiDataCollectionPermission(boolean permitted) {
     setPermission(AI_DATA_COLLECTION_OPTION_ID, permitted);
-  }
-
-  public @NotNull Permission getTraceDataCollectionNonComPermission() {
-    return getPermission(TRACE_DATA_COLLECTION_NON_COM_OPTION_ID);
-  }
-
-  public void setTraceDataCollectionNonComPermission(boolean permitted) {
-    setPermission(TRACE_DATA_COLLECTION_NON_COM_OPTION_ID, permitted);
-  }
-
-  public @NotNull Permission getTraceDataCollectionComPermission() {
-    return getPermission(TRACE_DATA_COLLECTION_COM_OPTION_ID);
-  }
-
-  public void setTraceDataCollectionComPermission(boolean permitted) {
-    setPermission(TRACE_DATA_COLLECTION_COM_OPTION_ID, permitted);
   }
 
   private Permission getPermission(String consentId) {
@@ -586,6 +585,10 @@ public final class ConsentOptions implements ModificationTracker {
 
   private void notifyConsentsUpdated() {
     myModificationCount.incrementAndGet();
+    updateConsentListeners();
+  }
+
+  public static void updateConsentListeners() {
     if (LoadingState.COMPONENTS_REGISTERED.isOccurred()) {
       ApplicationManager.getApplication().getMessageBus().syncPublisher(DataSharingSettingsChangeListener.TOPIC).consentsUpdated();
     }

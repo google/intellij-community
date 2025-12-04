@@ -72,27 +72,10 @@ class ProductInfoData private constructor(
       fileExtensions: List<String>,
       flavors: List<ProductFlavorData>,
       layout: List<ProductInfoLayoutItem>,
-    ): ProductInfoData {
-      return ProductInfoData(
-        name = name,
-        version = version,
-        versionSuffix = versionSuffix,
-        buildNumber = buildNumber,
-        productCode = productCode,
-        envVarBaseName = envVarBaseName,
-        dataDirectoryName = dataDirectoryName,
-        svgIconPath = svgIconPath,
-        productVendor = productVendor,
-        majorVersionReleaseDate = majorVersionReleaseDate,
-        launch = launch,
-        customProperties = customProperties,
-        bundledPlugins = bundledPlugins,
-        modules = modules,
-        fileExtensions = fileExtensions,
-        flavors = flavors,
-        layout = layout
-      )
-    }
+    ): ProductInfoData = ProductInfoData(
+      name, version, versionSuffix, buildNumber, productCode, envVarBaseName, dataDirectoryName, svgIconPath, productVendor,
+      majorVersionReleaseDate, launch, customProperties, bundledPlugins, modules, fileExtensions, flavors, layout
+    )
   }
 }
 
@@ -134,24 +117,15 @@ class ProductInfoLaunchData private constructor(
       mainClass: String,
       startupWmClass: String? = null,
       customCommands: List<CustomCommandLaunchData> = emptyList(),
-    ): ProductInfoLaunchData {
-      return ProductInfoLaunchData(
-        os = os,
-        arch = arch,
-        launcherPath = launcherPath,
-        javaExecutablePath = javaExecutablePath,
-        vmOptionsFilePath = vmOptionsFilePath,
-        startupWmClass = startupWmClass,
-        bootClassPathJarNames = bootClassPathJarNames,
-        additionalJvmArguments = additionalJvmArguments,
-        mainClass = mainClass,
-        customCommands = customCommands
-      )
-    }
+    ): ProductInfoLaunchData = ProductInfoLaunchData(
+      os, arch, launcherPath, javaExecutablePath, vmOptionsFilePath, startupWmClass, bootClassPathJarNames, additionalJvmArguments,
+      mainClass, customCommands
+    )
   }
 }
 
 @Serializable
+@Suppress("unused")
 class CustomCommandLaunchData @ApiStatus.Internal constructor(
   val commands: List<String>,
   val vmOptionsFilePath: String? = null,
@@ -170,13 +144,11 @@ class CustomProperty @ApiStatus.Internal constructor(
 
 @Serializer(forClass = LocalDate::class)
 private object LocalDateSerializer : KSerializer<LocalDate> {
-  private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+  private val formatter = DateTimeFormatter.ofPattern(@Suppress("SpellCheckingInspection") "yyyyMMdd")
 
   override fun serialize(encoder: Encoder, value: LocalDate) {
     encoder.encodeString(value.format(formatter))
   }
 
-  override fun deserialize(decoder: Decoder): LocalDate {
-    return LocalDate.parse(decoder.decodeString(), formatter)
-  }
+  override fun deserialize(decoder: Decoder): LocalDate = LocalDate.parse(decoder.decodeString(), formatter)
 }

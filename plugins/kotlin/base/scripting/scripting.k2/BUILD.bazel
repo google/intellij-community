@@ -1,18 +1,18 @@
-### auto-generated section `build kotlin.base.scripting.k2` start
+### auto-generated section `build intellij.kotlin.base.scripting` start
 load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 resourcegroup(
-  name = "scripting.k2_resources",
+  name = "kotlin-base-scripting_resources",
   srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
 
 jvm_library(
-  name = "scripting.k2",
-  module_name = "kotlin.base.scripting.k2",
+  name = "kotlin-base-scripting",
+  module_name = "intellij.kotlin.base.scripting",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":scripting.k2_resources"],
+  resources = [":kotlin-base-scripting_resources"],
   deps = [
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
@@ -25,7 +25,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-common",
     "@lib//:kotlinc-kotlin-scripting-jvm",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//plugins/kotlin/base/compiler-configuration",
     "//platform/util/progress",
     "//platform/workspace/storage",
@@ -63,14 +63,16 @@ jvm_library(
     "//plugins/kotlin/base/scripting/scripting.shared",
     "//plugins/kotlin/highlighting/highlighting-shared:kotlin-highlighting-shared",
     "//platform/lang-core",
+    "//platform/backend/observation",
+    "//platform/execution",
   ]
 )
 
 jvm_library(
-  name = "scripting.k2_test_lib",
+  name = "kotlin-base-scripting_test_lib",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  associates = [":scripting.k2"],
+  associates = [":kotlin-base-scripting"],
   deps = [
     "//plugins/kotlin/plugin/k2",
     "//platform/core-api:core",
@@ -84,7 +86,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-common",
     "@lib//:kotlinc-kotlin-scripting-jvm",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "@lib//:junit5",
     "//plugins/kotlin/base/compiler-configuration",
     "//platform/util/progress",
@@ -114,6 +116,7 @@ jvm_library(
     "//platform/collaboration-tools",
     "//platform/collaboration-tools:collaboration-tools_test_lib",
     "//java/java-impl:impl",
+    "//java/java-impl:impl_test_lib",
     "//platform/backend/workspace",
     "//plugins/kotlin/code-insight/utils",
     "//platform/workspace/jps",
@@ -130,15 +133,18 @@ jvm_library(
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/test:test_test_lib",
+    "//platform/backend/observation",
+    "//platform/backend/observation:observation_test_lib",
+    "//platform/execution",
   ]
 )
-### auto-generated section `build kotlin.base.scripting.k2` end
+### auto-generated section `build intellij.kotlin.base.scripting` end
 
-### auto-generated section `test kotlin.base.scripting.k2` start
+### auto-generated section `test intellij.kotlin.base.scripting` start
 load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
-  name = "scripting.k2_test",
-  runtime_deps = [":scripting.k2_test_lib"]
+  name = "kotlin-base-scripting_test",
+  runtime_deps = [":kotlin-base-scripting_test_lib"]
 )
-### auto-generated section `test kotlin.base.scripting.k2` end
+### auto-generated section `test intellij.kotlin.base.scripting` end

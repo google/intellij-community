@@ -51,7 +51,6 @@ com.intellij.ide.FrameStateListener
 - onFrameDeactivated():V
 - onFrameDeactivated(com.intellij.openapi.wm.IdeFrame):V
 c:com.intellij.ide.HelpTooltip
-- psf:INFO_COLOR:java.awt.Color
 - p:createIsOverTipMouseListener():java.awt.event.MouseListener
 - p:shouldForceHiding():Z
 pc:com.intellij.ide.HelpTooltip$OverTipMouseListener
@@ -159,6 +158,9 @@ com.intellij.ide.warmup.WarmupConfigurator
 - a:runWarmup(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 com.intellij.ide.warmup.WarmupStatus
 - sf:Companion:com.intellij.ide.warmup.WarmupStatus$Companion
+a:com.intellij.ide.wizard.AbstractWizard
+- p:getHelpID():java.lang.String
+- p:getHelpId():java.lang.String
 com.intellij.internal.inspector.UiInspectorTreeRendererContextProvider
 - a:getUiInspectorContext(javax.swing.JTree,java.lang.Object,I):java.util.List
 com.intellij.openapi.GitRepositoryInitializer
@@ -239,6 +241,8 @@ com.intellij.openapi.actionSystem.Toggleable
 com.intellij.openapi.actionSystem.ex.ActionPopupMenuListener
 - actionPopupMenuCreated(com.intellij.openapi.actionSystem.ActionPopupMenu):V
 - actionPopupMenuReleased(com.intellij.openapi.actionSystem.ActionPopupMenu):V
+f:com.intellij.openapi.actionSystem.ex.ActionUtil
+- sf:POPUP_AD_TEXT:com.intellij.openapi.util.Key
 com.intellij.openapi.actionSystem.ex.TooltipDescriptionProvider
 com.intellij.openapi.actionSystem.ex.TooltipLinkProvider
 - a:getTooltipLink(javax.swing.JComponent):com.intellij.openapi.actionSystem.ex.TooltipLinkProvider$TooltipLink
@@ -409,6 +413,7 @@ com.intellij.openapi.options.colors.ColorAndFontDescriptorsProvider
 - a:getAttributeDescriptors():com.intellij.openapi.options.colors.AttributesDescriptor[]
 - a:getColorDescriptors():com.intellij.openapi.options.colors.ColorDescriptor[]
 - a:getDisplayName():java.lang.String
+- getId():java.lang.String
 com.intellij.openapi.options.colors.ColorSettingsPage
 - com.intellij.openapi.options.colors.ColorAndFontDescriptorsProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
@@ -661,6 +666,7 @@ com.intellij.openapi.ui.popup.IdePopupEventDispatcher
 - setRestoreFocusSilently():V
 com.intellij.openapi.ui.popup.ListPopupStepEx
 - com.intellij.openapi.ui.popup.ListPopupStep
+- getAdText():java.lang.String
 - getSecondaryIconFor(java.lang.Object):javax.swing.Icon
 - getSecondaryTextFor(java.lang.Object):java.lang.String
 - a:getTooltipTextFor(java.lang.Object):java.lang.String
@@ -903,6 +909,9 @@ com.intellij.ui.SimpleColoredComponent$FragmentTextClipper
 - a:clipText(com.intellij.ui.SimpleColoredComponent,java.awt.Graphics2D,I,java.lang.String,I):java.lang.String
 com.intellij.ui.SimpleListCellRenderer$Customizer
 - a:customize(com.intellij.ui.components.JBLabel,java.lang.Object,I):V
+c:com.intellij.ui.components.AnActionLink
+- <init>(java.lang.String,com.intellij.openapi.actionSystem.AnAction,java.lang.String,com.intellij.openapi.actionSystem.Presentation):V
+f:com.intellij.ui.components.BulkListModelKt
 com.intellij.ui.components.Interpolable
 - a:getTargetValue():I
 - a:getValue():I
@@ -913,6 +922,60 @@ c:com.intellij.ui.components.JBLoadingPanel
 com.intellij.ui.components.JBLoadingPanelListener
 - a:onLoadingFinish():V
 - a:onLoadingStart():V
+c:com.intellij.ui.components.JBScrollPane
+- javax.swing.JScrollPane
+- sf:IGNORE_SCROLLBAR_IN_INSETS:com.intellij.openapi.util.Key
+- sf:IGNORE_SCROLL_LATCHING:com.intellij.openapi.util.Key
+- <init>():V
+- <init>(I):V
+- <init>(I,I):V
+- <init>(java.awt.Component):V
+- <init>(java.awt.Component,I,I):V
+- s:canBePreprocessed(java.awt.event.MouseEvent,javax.swing.JScrollBar):Z
+- createHorizontalScrollBar():javax.swing.JScrollBar
+- s:createIndentBorder():com.intellij.ui.components.JBScrollPane$ViewportBorder
+- createVerticalScrollBar():javax.swing.JScrollBar
+- p:createViewport():javax.swing.JViewport
+- getBackground():java.awt.Color
+- getStatusComponent():javax.swing.JComponent
+- isOptimizedDrawingEnabled():Z
+- isOverlappingScrollBar():Z
+- paint(java.awt.Graphics):V
+- p:paintBorder(java.awt.Graphics):V
+- p:paintChildren(java.awt.Graphics):V
+- p:processMouseWheelEvent(java.awt.event.MouseWheelEvent):V
+- setOverlappingScrollBar(Z):V
+- setStatusComponent(javax.swing.JComponent):V
+- setUI(javax.swing.plaf.ScrollPaneUI):V
+- p:setupCorners():V
+- verticalScrollBarNeedsSpace():Z
+e:com.intellij.ui.components.JBScrollPane$Alignment
+- java.lang.Enum
+- sf:BOTTOM:com.intellij.ui.components.JBScrollPane$Alignment
+- sf:LEFT:com.intellij.ui.components.JBScrollPane$Alignment
+- sf:RIGHT:com.intellij.ui.components.JBScrollPane$Alignment
+- sf:TOP:com.intellij.ui.components.JBScrollPane$Alignment
+- s:get(javax.swing.JComponent):com.intellij.ui.components.JBScrollPane$Alignment
+- s:valueOf(java.lang.String):com.intellij.ui.components.JBScrollPane$Alignment
+- s:values():com.intellij.ui.components.JBScrollPane$Alignment[]
+e:com.intellij.ui.components.JBScrollPane$Flip
+- java.lang.Enum
+- sf:BOTH:com.intellij.ui.components.JBScrollPane$Flip
+- sf:HORIZONTAL:com.intellij.ui.components.JBScrollPane$Flip
+- sf:NONE:com.intellij.ui.components.JBScrollPane$Flip
+- sf:VERTICAL:com.intellij.ui.components.JBScrollPane$Flip
+- s:valueOf(java.lang.String):com.intellij.ui.components.JBScrollPane$Flip
+- s:values():com.intellij.ui.components.JBScrollPane$Flip[]
+c:com.intellij.ui.components.JBScrollPane$Layout
+- javax.swing.ScrollPaneLayout
+- <init>():V
+- addLayoutComponent(java.lang.String,java.awt.Component):V
+- layoutContainer(java.awt.Container):V
+- preferredLayoutSize(java.awt.Container):java.awt.Dimension
+- syncWithScrollPane(javax.swing.JScrollPane):V
+c:com.intellij.ui.components.JBScrollPane$ViewportBorder
+- javax.swing.border.LineBorder
+- paintBorder(java.awt.Component,java.awt.Graphics,I,I,I,I):V
 com.intellij.ui.components.Magnificator
 - sf:CLIENT_PROPERTY_KEY:com.intellij.openapi.util.Key
 - a:magnify(D,java.awt.Point):java.awt.Point
@@ -1101,6 +1164,7 @@ com.intellij.ui.tabs.JBEditorTabsBase
 - com.intellij.ui.tabs.JBTabs
 com.intellij.ui.tabs.JBTabPainter
 - sf:Companion:com.intellij.ui.tabs.JBTabPainter$Companion
+- fillBackground(java.awt.Component,java.awt.Graphics2D,java.awt.Rectangle):V
 - a:fillBackground(java.awt.Graphics2D,java.awt.Rectangle):V
 - a:getBackgroundColor():java.awt.Color
 - getCustomBackground(java.awt.Color,Z,Z,Z):java.awt.Color
@@ -1161,6 +1225,7 @@ com.intellij.ui.tabs.JBTabsEx
 - a:sortTabs(java.util.Comparator):V
 - a:updateTabActions(Z):V
 com.intellij.ui.tabs.JBTabsPresentation
+- a:getShowBorder():Z
 - a:getTabsPosition():com.intellij.ui.tabs.JBTabsPosition
 - a:isHideTabs():Z
 - a:setAlphabeticalMode(Z):com.intellij.ui.tabs.JBTabsPresentation
@@ -1171,6 +1236,7 @@ com.intellij.ui.tabs.JBTabsPresentation
 - a:setInnerInsets(java.awt.Insets):com.intellij.ui.tabs.JBTabsPresentation
 - a:setPaintBlocked(Z,Z):V
 - a:setPaintFocus(Z):com.intellij.ui.tabs.JBTabsPresentation
+- a:setShowBorder(Z):V
 - a:setSideComponentBefore(Z):com.intellij.ui.tabs.JBTabsPresentation
 - a:setSideComponentOnTabs(Z):com.intellij.ui.tabs.JBTabsPresentation
 - a:setSideComponentVertical(Z):com.intellij.ui.tabs.JBTabsPresentation

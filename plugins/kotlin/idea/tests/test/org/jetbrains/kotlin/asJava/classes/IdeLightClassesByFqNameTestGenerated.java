@@ -120,6 +120,11 @@ public abstract class IdeLightClassesByFqNameTestGenerated extends AbstractIdeLi
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/compilationErrors/JvmPackageName.kt"));
         }
 
+        @TestMetadata("localClassApproximation.kt")
+        public void testLocalClassApproximation() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/compilationErrors/localClassApproximation.kt"));
+        }
+
         @TestMetadata("LocalInAnnotation.kt")
         public void testLocalInAnnotation() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/compilationErrors/LocalInAnnotation.kt"));
@@ -918,6 +923,11 @@ public abstract class IdeLightClassesByFqNameTestGenerated extends AbstractIdeLi
         @TestMetadata("SuperTypeWithBoundKotlinCollection.kt")
         public void testSuperTypeWithBoundKotlinCollection() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/SuperTypeWithBoundKotlinCollection.kt"));
+        }
+
+        @TestMetadata("SuspendFunctionTypeAsAnnotationArgument.kt")
+        public void testSuspendFunctionTypeAsAnnotationArgument() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/SuspendFunctionTypeAsAnnotationArgument.kt"));
         }
 
         @TestMetadata("Throws.kt")

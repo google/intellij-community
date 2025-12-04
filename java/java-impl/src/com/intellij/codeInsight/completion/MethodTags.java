@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion;
 
 import com.intellij.codeInsight.lookup.LookupElement;
@@ -89,7 +89,7 @@ public final class MethodTags {
     }
 
     @Override
-    public Set<String> getAllLookupStrings() {
+    public @NotNull Set<String> getAllLookupStrings() {
       Set<String> all = new HashSet<>(super.getAllLookupStrings());
       all.addAll(myTags);
       return all;
@@ -196,17 +196,17 @@ public final class MethodTags {
     if (referenceName == null) {
       return Collections.emptySet();
     }
-    String[] strings = NameUtilCore.nameToWords(referenceName);
-    if (strings.length == 0) {
+    List<@NotNull String> strings = NameUtilCore.nameToWordList(referenceName);
+    if (strings.isEmpty()) {
       return Collections.emptySet();
     }
-    Tag[] canBeFirst = getTags(strings[0]);
+    Tag[] canBeFirst = getTags(strings.getFirst());
     Set<Tag> result = new HashSet<>();
     for (Tag firstPart : canBeFirst) {
       StringJoiner joiner = new StringJoiner("");
       joiner.add(firstPart.name);
-      for (int i = 1; i < strings.length; i++) {
-        String string = strings[i];
+      for (int i = 1; i < strings.size(); i++) {
+        String string = strings.get(i);
         joiner.add(string);
       }
       result.add(new Tag(joiner.toString(), firstPart.matcher));

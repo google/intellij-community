@@ -25,6 +25,7 @@ import com.intellij.usages.ChunkExtractor;
 import org.jetbrains.annotations.*;
 
 import java.nio.charset.Charset;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -56,9 +57,11 @@ public final class NonAsciiCharactersInspection extends LocalInspectionTool {
 
   @Override
   public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly, @NotNull LocalInspectionToolSession session) {
-    PsiFile file = session.getFile();
-    if (!isFileWorthIt(file)) return PsiElementVisitor.EMPTY_VISITOR;
-    SyntaxHighlighter syntaxHighlighter = SyntaxHighlighterFactory.getSyntaxHighlighter(file.getFileType(), file.getProject(), file.getVirtualFile());
+    PsiFile psiFile = session.getFile();
+    if (!isFileWorthIt(psiFile)) {
+      return PsiElementVisitor.EMPTY_VISITOR;
+    }
+    SyntaxHighlighter syntaxHighlighter = SyntaxHighlighterFactory.getSyntaxHighlighter(psiFile.getFileType(), psiFile.getProject(), psiFile.getVirtualFile());
     return new PsiElementVisitor() {
       @Override
       public void visitElement(@NotNull PsiElement element) {
@@ -203,7 +206,13 @@ public final class NonAsciiCharactersInspection extends LocalInspectionTool {
   }
 
   private static boolean isFileWorthIt(@NotNull PsiFile file) {
-    if (InjectedLanguageManager.getInstance(file.getProject()).isInjectedFragment(file)) return false;
+    if (InjectedLanguageManager.getInstance(file.getProject()).isInjectedFragment(file)) {
+      Language language = file.getLanguage();
+      language = Objects.requireNonNullElse(language.getBaseLanguage(), language);
+      if (!language.getID().equals("RegExp")) {
+        return false;
+      }
+    }
     VirtualFile virtualFile = file.getVirtualFile();
     if (virtualFile == null) return false;
     CharSequence text = file.getViewProvider().getContents();

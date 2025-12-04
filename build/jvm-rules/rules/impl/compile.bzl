@@ -24,6 +24,7 @@ load(
 load("//:rules/common-attrs.bzl", "add_dicts")
 load("//:rules/impl/associates.bzl", "get_associates")
 load("//:rules/impl/builder-args.bzl", "init_builder_args")
+load("//:rules/impl/compiler-plugins.bzl", "collect_compiler_plugins_for_export", "compiler_plugins_from", "exported_compiler_plugins_from")
 load("//:rules/impl/javac-options.bzl", "JavacOptions")
 load("//:rules/impl/kotlinc-options.bzl", "KotlincOptions")
 load("//:rules/resource.bzl", "ResourceGroupInfo")
@@ -89,99 +90,6 @@ def _jvm_deps(ctx, associated_targets, deps, runtime_deps):
         runtime_deps = [_java_info(d) for d in runtime_deps],
     )
 
-def _exported_plugins(deps):
-    """Encapsulates compiler dependency metadata."""
-    plugins = []
-    for dep in deps:
-        if KotlinInfo in dep and dep[KotlinInfo] != None:
-            plugins.extend(dep[KotlinInfo].exported_compiler_plugins.to_list())
-    return plugins
-
-def _collect_plugins_for_export(local, exports):
-    """Collects into a depset. """
-    return depset(
-        local,
-        transitive = [
-            e[KotlinInfo].exported_compiler_plugins
-            for e in exports
-            if KotlinInfo in e and e[KotlinInfo]
-        ],
-    )
-
-def _new_plugins_from(targets):
-    """Returns a struct containing the plugin metadata for the given targets.
-
-    Args:
-        targets: A list of targets.
-    Returns:
-        A struct containing the plugins for the given targets in the format:
-        {
-            stubs_phase = {
-                classpath = depset,
-                options= List[KtCompilerPluginOption],
-            ),
-            compile = {
-                classpath = depset,
-                options = List[KtCompilerPluginOption],
-            },
-        }
-    """
-
-    all_plugins = {}
-    plugins_without_phase = []
-    for t in targets:
-        if _KtCompilerPluginInfo not in t:
-            continue
-        plugin = t[_KtCompilerPluginInfo]
-        if not (plugin.stubs or plugin.compile):
-            plugins_without_phase.append("%s: %s" % (t.label, plugin.id))
-
-        existing = all_plugins.get(plugin.id)
-        if existing:
-            if existing != plugin:
-                fail("has multiple plugins with the same id: %s." % plugin.id)
-        else:
-            all_plugins[plugin.id] = plugin
-
-    if plugins_without_phase:
-        fail("has plugin without a phase defined: %s" % cfgs_without_plugin)
-
-    plugin_id_to_configuration = {}
-    cfgs_without_plugin = []
-    for t in targets:
-        if _KtPluginConfiguration not in t:
-            continue
-        cfg = t[_KtPluginConfiguration]
-        if cfg.id not in all_plugins:
-            cfgs_without_plugin.append("%s: %s" % (t.label, cfg.id))
-        plugin_id_to_configuration[cfg.id] = cfg
-
-    if cfgs_without_plugin:
-        fail("has plugin configurations without corresponding plugins: %s" % cfgs_without_plugin)
-
-    return struct(
-        stubs_phase = [],
-        compile_phase = _new_plugin_from(plugin_id_to_configuration, [p for p in all_plugins.values() if p.compile]),
-    )
-
-def _new_plugin_from(plugin_id_to_configuration, plugins_for_phase):
-    classpath = {}
-    options = {}
-    for p in plugins_for_phase:
-        if p.id in plugin_id_to_configuration:
-            cfg = plugin_id_to_configuration[p.id]
-            classpath[p.id] = depset(transitive = p.classpath + cfg.classpath)
-            options[p.id] = p.options + cfg.options
-        else:
-            classpath[p.id] = p.classpath
-            if p.options:
-                options[p.id] = p.options
-
-    return struct(
-        classpath = classpath,
-        options = options,
-    )
-
 def kt_jvm_produce_jar_actions(ctx, isTest = False):
     """Sets up a compile action for a jar.
 
@@ -201,7 +109,7 @@ def kt_jvm_produce_jar_actions(ctx, isTest = False):
     )
 
     perTargetPlugins = ctx.attr.plugins if hasattr(ctx.attr, "plugins") else []
-    plugins = _new_plugins_from(perTargetPlugins + _exported_plugins(ctx.attr.deps))
+    plugins = compiler_plugins_from(perTargetPlugins + exported_compiler_plugins_from(ctx.attr.deps))
 
     output_jar = ctx.actions.declare_file(ctx.label.name + ".jar")
 
@@ -244,7 +152,7 @@ def kt_jvm_produce_jar_actions(ctx, isTest = False):
             srcs = ctx.files.srcs,
             module_name = associates.module_name,
             module_jars = associates.jars,
-            exported_compiler_plugins = _collect_plugins_for_export(ctx.attr.exported_compiler_plugins, ctx.attr.exports) if not isTest else depset(),
+            exported_compiler_plugins = collect_compiler_plugins_for_export(ctx.attr.exported_compiler_plugins, ctx.attr.exports) if not isTest else depset(),
             # intellij aspect needs this
             outputs = struct(
                 jars = [struct(
@@ -313,7 +221,7 @@ def _run_jvm_builder(
         },
         inputs = depset(srcs.all_srcs + all_resources, transitive = transitiveInputs),
         outputs = outputs,
-        tools = [ctx.file._jvm_builder_launcher, ctx.file._jvm_builder],
+        tools = [ctx.file._jvm_builder_launcher, ctx.file.jvm_builder],
         executable = java_runtime.java_executable_exec_path,
         execution_requirements = {
             "supports-workers": "1",
@@ -324,7 +232,7 @@ def _run_jvm_builder(
         },
         arguments = ctx.attr._jvm_builder_jvm_flags[BuildSettingInfo].value + [
             ctx.file._jvm_builder_launcher.path,
-            ctx.file._jvm_builder.path,
+            ctx.file.jvm_builder.path,
             args,
         ],
         progress_message = "compile %%{label} (kt: %d, java: %d%s}" % (len(srcs.kt), javaCount, "" if isIncremental else ", non-incremental"),

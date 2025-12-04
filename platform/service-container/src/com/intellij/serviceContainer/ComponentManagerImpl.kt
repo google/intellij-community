@@ -631,8 +631,8 @@ abstract class ComponentManagerImpl(
 
     val adapter = getComponentOrServiceAdapter(key, lookupService)
     if (adapter == null) {
-      checkCanceledIfNotInClassInit()
       if (containerState.get() == ContainerState.DISPOSE_COMPLETED) {
+        checkCanceledIfNotInClassInit()
         throwAlreadyDisposedError(key.name, this)
       }
       return null
@@ -1105,7 +1105,7 @@ abstract class ComponentManagerImpl(
   ) {
   }
 
-  protected open suspend fun preloadService(service: ServiceDescriptor, serviceInterface: String) {
+  protected suspend fun preloadService(service: ServiceDescriptor, serviceInterface: String) {
     serviceContainer.getInstanceHolder(keyClassName = serviceInterface)
       ?.takeIf(InstanceHolder::isStatic)
       ?.getInstanceInCallerContext(keyClass = null)
@@ -1451,7 +1451,7 @@ internal fun doLoadClass(name: String, pluginDescriptor: PluginDescriptor, check
     catch (e: ClassNotFoundException) {
       if (checkCoreSubModules && pluginDescriptor.pluginId == PluginManagerCore.CORE_ID && pluginDescriptor is PluginMainDescriptor) {
         for (module in pluginDescriptor.contentModules) {
-          if (module.packagePrefix == null && !module.moduleId.id.startsWith("intellij.libraries.")) {
+          if (module.packagePrefix == null && !module.moduleId.name.startsWith("intellij.libraries.")) {
             val pluginClassLoader = module.classLoader as? PluginAwareClassLoader ?: continue
             pluginClassLoader.loadClassInsideSelf(name)?.let {
               assert(it.isAnnotationPresent(InternalIgnoreDependencyViolation::class.java))

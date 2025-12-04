@@ -1252,6 +1252,34 @@
       "description": "Selection background"
     },
     {
+      "key": "ParameterInfo.matchedOverloadBackgroundBase",
+      "description": "Matched overload background blend base. Default is green. Should match with ParameterInfo.mismatchedParameterBackgroundBase, which by default is red. The color is blended onto ParameterInfo.background using ParameterInfo.matchedOverloadBackgroundOpacity."
+    },
+    {
+      "key": "ParameterInfo.matchedOverloadBackgroundOpacity",
+      "description": "Matched overload opacity percentage in range 0 - 100. It is used to control how much should ParameterInfo.currentOverloadBackgroundBase color blend with the ParameterInfo.background color."
+    },
+    {
+      "key": "ParameterInfo.mismatchedParameterBackgroundBase",
+      "description": "Mismatched parameter background blend base. Default is red. Should match with ParameterInfo.matchedOverloadBackgroundBase, which by default is green. The color is blended onto ParameterInfo.background using ParameterInfo.mismatchedParameterBackgroundOpacity."
+    },
+    {
+      "key": "ParameterInfo.mismatchedParameterBackgroundOpacity",
+      "description": "Mismatched parameter background opacity percentage in range 0 - 100. It is used to control how much should ParameterInfo.mismatchedParameterBackgroundBase color blend with the ParameterInfo.background color."
+    },
+    {
+      "key": "ParameterInfo.mismatchedOverloadOpacity",
+      "description": "Opacity percentage in range 0 - 100. It is used to control how opaque should non-matching signature be."
+    },
+    {
+      "key": "ParameterInfo.defaultValueOpacity",
+      "description": "Opacity percentage in range 0 - 100. It is used to control how opaque should parameter default values be."
+    },
+    {
+      "key": "ParameterInfo.notCurrentParameterOpacity",
+      "description": "Opacity percentage in range 0 - 100. It is used to control how opaque should a not current parameter be. A current parameter is that under the cursor and it has 100% opacity."
+    },
+    {
       "key": "ParameterInfo.currentParameterForeground"
     },
     {
@@ -1707,6 +1735,11 @@
       "since": "2023.1"
     },
     {
+      "key": "StatusBar.Widget.hoverInsets",
+      "description": "Insets of the hover area around status bar widgets",
+      "since": "2025.3"
+    },
+    {
       "key": "StripeToolbar.Button.size",
       "description": "Tool window stripe button size",
       "since": "2023.1"
@@ -1717,9 +1750,34 @@
       "since": "2023.1"
     },
     {
-      "key": "StripeToolbar.Button.iconPadding",
-      "description": "Tool window stripe button icon padding",
-      "since": "2023.1"
+      "key": "StripeToolbar.Button.leftStripeIcon.padding",
+      "description": "Tool window left stripe button icon padding",
+      "since": "2025.3"
+    },
+    {
+      "key": "StripeToolbar.Button.rightStripeIcon.padding",
+      "description": "Tool window right stripe button icon padding",
+      "since": "2025.3"
+    },
+    {
+      "key": "StripeToolbar.Button.leftStripeIconWithName.padding",
+      "description": "Tool window left stripe button icon padding with tool window names on",
+      "since": "2025.3"
+    },
+    {
+      "key": "StripeToolbar.Button.rightStripeIconWithName.padding",
+      "description": "Tool window right stripe button icon padding with tool window names on",
+      "since": "2025.3"
+    },
+    {
+      "key": "StripeToolbar.Button.leftStripeTextOffset",
+      "description": "The horizontal text offset for tool window names on the left stripe",
+      "since": "2025.3"
+    },
+    {
+      "key": "StripeToolbar.Button.rightStripeTextOffset",
+      "description": "The horizontal text offset for tool window names on the right stripe",
+      "since": "2025.3"
     },
     {
       "key": "List.hoverBackground",
@@ -1848,6 +1906,16 @@
       "key": "TitlePane.Button.preferredSize",
       "description": "Borderless mode. Window buttons (close, minimize, maximize, restore) size",
       "since": "2023.1"
+    },
+    {
+      "key": "TitlePane.Dialog.Button.preferredWidth",
+      "description": "Dialog additional title pane actions (maximize, restore) width",
+      "since": "2026.1"
+    },
+    {
+      "key": "TitlePane.Dialog.Button.insets",
+      "description": "Dialog additional title pane actions (maximize, restore) insets",
+      "since": "2026.1"
     },
     {
       "key": "TitlePane.inactiveBackground",
@@ -2388,6 +2456,11 @@
       "description": "Tab list and side panel background"
     },
     {
+      "key": "WelcomeScreen.Banner.background",
+      "description": "Promotional banner background",
+      "since": "2025.3"
+    },
+    {
       "key": "WelcomeScreen.Details.background",
       "description": "Associated panel for selected tab background"
     },
@@ -2406,6 +2479,15 @@
     {
       "key": "WelcomeScreen.LearnTab.CourseCard.hover",
       "description": ""
+    },
+    {
+      "key": "WelcomeScreen.Frame.DisclosureButton.defaultBackground"
+    },
+    {
+      "key": "WelcomeScreen.Frame.DisclosureButton.hoverOverlay"
+    },
+    {
+      "key": "WelcomeScreen.Frame.DisclosureButton.pressedOverlay"
     },
     {
       "key": "Window.border",
@@ -2690,6 +2772,91 @@
     },
     {
       "key": "LicenseDialog.freeBadgeBackground",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.regularBounds",
+      "description": "Regular Span’s left and right bounds.",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.regularFillStart",
+      "description": "Regular Span’s fill start color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.regularFillEnd",
+      "description": "Regular Span’s fill end color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.selectedBounds",
+      "description": "Selected Span’s left and right bounds.",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.selectedFillStart",
+      "description": "Selected Span’s fill start color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "OpenTelemetry.Span.selectedFillEnd",
+      "description": "Selected Span’s fill end color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardBackground",
+      "description": "Recap card's background color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardBorderColor",
+      "description": "Recap card's 1px border color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardHeaderTitle",
+      "description": "Recap card's title color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardHeaderLinkBackground",
+      "description": "",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardHeaderSubtitle",
+      "description": "Recap card's description color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.cardFooterForeground",
+      "description": "Recap card's description footer text color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.chroniclesBackground",
+      "description": "Recap card's history element's background color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.chroniclesBorderColor",
+      "description": "Recap card's history element's border color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.chroniclesBackgroundHovered",
+      "description": "Recap card's history element's background color while hovered.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.chroniclesForeground",
+      "description": "Recap card's history element's text color.",
+      "since": "2025.3"
+    },
+    {
+      "key": "Recap.chroniclesForegroundGreyed",
+      "description": "Recap card's history element's muted text color.",
       "since": "2025.3"
     }
   ]

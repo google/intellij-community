@@ -6,7 +6,6 @@ import com.intellij.platform.eel.EelPlatform
 import com.intellij.platform.ijent.IjentApi
 import com.intellij.platform.ijent.IjentSession
 import com.intellij.platform.ijent.IjentSessionRegistry
-import java.nio.file.Path
 
 /**
  * Given that there is some IJent process launched, this extension gets handles to stdin+stdout of the process and returns

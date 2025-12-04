@@ -4,26 +4,25 @@ package com.intellij.xdebugger.impl.ui.tree.actions;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.Presentation;
-import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.platform.debugger.impl.shared.SplitDebuggerAction;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XReferrersProvider;
 import com.intellij.xdebugger.frame.XValue;
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.frame.XValueMarkers;
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
 import com.intellij.xdebugger.impl.ui.tree.XInspectDialog;
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl;
-import com.intellij.xdebugger.impl.util.MonolithUtils;
+import com.intellij.xdebugger.impl.util.XDebugMonolithUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class ShowReferringObjectsAction extends XDebuggerTreeActionBase
-  implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
+public class ShowReferringObjectsAction extends XDebuggerTreeActionBase implements SplitDebuggerAction {
 
   @Override
   public @NotNull ActionUpdateThread getActionUpdateThread() {
@@ -70,7 +69,7 @@ public class ShowReferringObjectsAction extends XDebuggerTreeActionBase
       XValue referringObjectsRoot = referrersProvider.getReferringObjectsValue();
       DialogWrapper dialog;
       // TODO ReferrersTreeCustomizer is supported only in monolith
-      XDebugSession xDebugSession = MonolithUtils.findSessionById(session.getId());
+      XDebugSession xDebugSession = XDebugMonolithUtils.findSessionById(session.getId());
       if (xDebugSession != null && referringObjectsRoot instanceof ReferrersTreeCustomizer referrersTreeCustomizer) {
         dialog = referrersTreeCustomizer.getDialog(xDebugSession, nodeName, position, markers);
       }

@@ -8,7 +8,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl;
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.frame.XWatchesViewImpl;
 import com.intellij.xdebugger.impl.ui.XDebugSessionTab;
 import org.jetbrains.annotations.ApiStatus;
@@ -64,7 +64,7 @@ public class XAddToWatchesFromEditorActionHandler extends XDebuggerActionHandler
       .onSuccess(text -> {
         if (text == null) return;
         UIUtil.invokeLaterIfNeeded(() -> {
-          XDebugSessionTab tab = session.getSessionTab();
+          XDebugSessionTab tab = (XDebugSessionTab)session.getSessionTab();
           if (tab != null) {
             ((XWatchesViewImpl)tab.getWatchesView()).addWatchExpression(XExpressionImpl.fromText(text), -1, true, true);
           }

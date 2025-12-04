@@ -1,10 +1,12 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.refactoring.rename.impl
 
 import com.intellij.codeInsight.actions.VcsFacade
+import com.intellij.find.usages.api.DynamicUsage
 import com.intellij.model.Pointer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.impl.TestOnlyThreading
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.undo.UndoManager
@@ -161,7 +163,10 @@ private suspend fun processUsages(usageChannel: ReceiveChannel<UsagePointer>, ne
     usagePointers += pointer
     val forcePreview: Boolean? = readAction {
       pointer.dereference()?.let { renameUsage ->
-        renameUsage !is ModifiableRenameUsage || renameUsage is TextRenameUsage || renameUsage.conflicts(newName).isNotEmpty()
+        renameUsage !is ModifiableRenameUsage ||
+        (renameUsage is DynamicUsage && renameUsage.isDynamic) ||
+        renameUsage is TextRenameUsage ||
+        renameUsage.conflicts(newName).isNotEmpty()
       }
     }
     if (forcePreview == true) {
@@ -320,7 +325,9 @@ fun renameAndWait(project: Project, target: RenameTarget, newName: String) {
     withTimeout(timeMillis = 1000 * 60 * 10) {
       val renameJob = rename(cs = this@withTimeout, project, targetPointer, newName, options, preview = false)
       while (renameJob.isActive) {
-        UIUtil.dispatchAllInvocationEvents()
+        TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
+          UIUtil.dispatchAllInvocationEvents()
+        }
         delay(timeMillis = 10)
       }
     }

@@ -1,7 +1,10 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl.view;
 
+import com.intellij.diagnostic.PluginException;
+import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.application.AccessToken;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
@@ -17,6 +20,7 @@ import com.intellij.openapi.editor.impl.*;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapDrawingType;
 import com.intellij.openapi.editor.markup.*;
 import com.intellij.openapi.editor.markup.TextAttributesEffectsBuilder.EffectDescriptor;
+import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
@@ -54,6 +58,8 @@ import java.util.function.Consumer;
 //@ApiStatus.Internal
 public final class EditorPainter implements TextDrawingCallback {
 
+  private static final Logger LOG = Logger.getInstance(EditorPainter.class);
+
   private static final Color CARET_LIGHT = Gray._255;
   private static final Color CARET_DARK = Gray._0;
   private static final int CARET_DIRECTION_MARK_SIZE = 3;
@@ -89,6 +95,40 @@ public final class EditorPainter implements TextDrawingCallback {
 
   void paint(Graphics2D g) {
     new Session(myView, g).paint();
+  }
+
+  @ApiStatus.Internal
+  public static void fillRectExact(final Graphics2D g, final Rectangle2D r, final Color color) {
+    var transform = g.getTransform();
+
+    Point2D topLeft = transform.transform(new Point2D.Double(r.getX(), r.getY()), null);
+    Point2D bottomRight = transform.transform(new Point2D.Double(r.getX() + r.getWidth(), r.getY() + r.getHeight()), null);
+
+    int left   = (int) Math.floor(topLeft.getX());
+    int top    = (int) Math.floor(topLeft.getY());
+    int right  = (int) Math.ceil(bottomRight.getX());
+    int bottom = (int) Math.ceil(bottomRight.getY());
+
+    int pWidth  = right - left;
+    int pHeight = bottom - top;
+    if (pWidth <= 0 || pHeight <= 0) return;
+
+    var oldAA = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+    var oldComposite = g.getComposite();
+    g.setTransform(new AffineTransform());
+    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+    g.setComposite(AlphaComposite.Src);
+
+    g.setColor(color);
+    g.fillRect(left, top, pWidth, pHeight);
+
+    g.setTransform(transform);
+    g.setComposite(oldComposite);
+    if (oldAA != null) {
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA);
+    } else {
+      g.getRenderingHints().remove(RenderingHints.KEY_ANTIALIASING);
+    }
   }
 
   void repaintCarets() {
@@ -604,8 +644,12 @@ public final class EditorPainter implements TextDrawingCallback {
 
     private void paintBackground(Color color, float x, int y, float width, int height) {
       if (width <= 0 || color == null || color.equals(myDefaultBackgroundColor) || color.equals(myBackgroundColor)) return;
-      myGraphics.setColor(color);
-      myGraphics.fill(new Rectangle2D.Float(x, y, width, height));
+
+      fillRectExact(
+        myGraphics,
+        new Rectangle2D.Float(x, y, width, height),
+        color
+      );
     }
 
     private void paintCustomRenderers(MarkupModelEx markupModel) {
@@ -633,7 +677,12 @@ public final class EditorPainter implements TextDrawingCallback {
           CustomHighlighterRenderer customRenderer = highlighter.getCustomRenderer();
           if (customRenderer == null) continue;
           try (AccessToken ignore = SlowOperations.reportOnceIfViolatedFor(customRenderer)) {
-            customRenderer.paint(myEditor, highlighter, myGraphics);
+            try {
+              customRenderer.paint(myEditor, highlighter, myGraphics);
+            } catch (Exception e) {
+              PluginDescriptor descriptor =  PluginManager.getPluginByClass(customRenderer.getClass());
+              LOG.error(new PluginException("Failed to perform custom painting", e, descriptor != null ? descriptor.getPluginId() : null));
+            }
           }
         }
         myGraphics.translate(0, -myYShift);

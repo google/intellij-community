@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.ui
 
+import com.intellij.collaboration.action.findFocusedThreadId
 import com.intellij.collaboration.async.combineState
 import com.intellij.collaboration.async.flatMapLatestEach
 import com.intellij.collaboration.async.launchNow
@@ -10,6 +11,9 @@ import com.intellij.collaboration.ui.codereview.editor.CodeReviewEditorGutterCon
 import com.intellij.collaboration.ui.codereview.editor.CodeReviewEditorInlaysModel
 import com.intellij.diff.util.LineRange
 import com.intellij.diff.util.Side
+import com.intellij.ide.IdeTooltip
+import com.intellij.ide.IdeTooltipManager
+import com.intellij.openapi.editor.CustomFoldRegion
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.event.EditorMouseListener
@@ -18,40 +22,51 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.RangeHighlighter
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.Balloon
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.IdeGlassPaneUtil
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.util.asDisposable
+import com.intellij.util.asSafely
+import com.intellij.util.ui.FocusUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.jetbrains.plugins.github.i18n.GithubBundle
 import org.jetbrains.plugins.github.pullrequest.ui.comment.CommentedCodeFrameRenderer
 import org.jetbrains.plugins.github.pullrequest.ui.editor.GHPREditorMappedComponentModel
 import java.awt.*
+import java.beans.PropertyChangeListener
 import javax.swing.JComponent
+import javax.swing.JLabel
 import javax.swing.JLayer
+import javax.swing.SwingUtilities
 import javax.swing.plaf.LayerUI
-import kotlin.math.abs
 
 internal object GHPRInlayUtils {
   internal fun installInlayHoverOutline(
     parentCs: CoroutineScope,
     editor: Editor,
-    side: Side?,
+    isUnifiedDiff: Boolean,
     locationToLine: ((DiffLineLocation) -> Int?)?,
     vm: GHPREditorMappedComponentModel,
   ) {
     val cs: CoroutineScope = parentCs.childScope("Comment inlay hover controller")
+
     var activeLineHighlighter: RangeHighlighter? = null
-    val frameResizer = if (vm is GHPREditorMappedComponentModel.NewComment<*>) {
-      val frameResizer = ResizingFrameListener(editor, vm)
-      editor.addEditorMouseMotionListener(frameResizer)
-      editor.addEditorMouseListener(frameResizer)
-      frameResizer
+    val multilineCommentsDisabled = Registry.get("github.pr.new.multiline.comments.disabled").asBoolean()
+    val frameResizer = if (vm is GHPREditorMappedComponentModel.NewComment<*> && !(isUnifiedDiff && multilineCommentsDisabled)) {
+      ResizingFrameListener(editor, vm).also {
+        editor.addEditorMouseMotionListener(it)
+        editor.addEditorMouseListener(it)
+      }
     }
     else null
+
     cs.launchNow {
       vm.shouldShowOutline.combineState(vm.range, ::Pair).collectLatest { (shouldShowOutline, range) ->
         activeLineHighlighter?.let { editor.markupModel.removeHighlighter(it) }
@@ -71,13 +86,15 @@ internal object GHPRInlayUtils {
         }
         val startOffset = editor.document.getLineStartOffset(commentRange.first)
         val endOffset = editor.document.getLineEndOffset(commentRange.last)
-        val renderer = CommentedCodeFrameRenderer(commentRange.first, commentRange.last, side)
+        val editorSide = if ((editor as? EditorEx)?.verticalScrollbarOrientation == EditorEx.VERTICAL_SCROLLBAR_LEFT) Side.LEFT else Side.RIGHT
+        val renderer = CommentedCodeFrameRenderer(commentRange.first, commentRange.last, editorSide)
         activeLineHighlighter = editor.markupModel.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.LAST, null, HighlighterTargetArea.LINES_IN_RANGE).also { highlighter ->
           highlighter.customRenderer = renderer
           highlighter.lineMarkerRenderer = renderer
         }
       }
     }
+
     cs.launch {
       try {
         awaitCancellation()
@@ -95,12 +112,23 @@ internal object GHPRInlayUtils {
     }
   }
 
-  private class ResizingFrameListener(val editor: Editor, val vm: GHPREditorMappedComponentModel.NewComment<*>) : EditorMouseListener, EditorMouseMotionListener {
+  private const val OUTLINE_OUTSIDE_DETECTION_MARGIN = 3
+  private const val OUTLINE_DETECTION_LINE_FRACTION = 0.3f
+
+  private class ResizingFrameListener(
+    private val editor: Editor,
+    private val vm: GHPREditorMappedComponentModel.NewComment<*>,
+  ) : EditorMouseListener, EditorMouseMotionListener {
     private val editorEx = editor as EditorEx
-    private val model = editorEx.getUserData(CodeReviewCommentableEditorModel.KEY) as? CodeReviewEditorGutterControlsModel.WithMultilineComments
+    private val model: CodeReviewEditorGutterControlsModel.WithMultilineComments?
+      get() = editorEx.getUserData(CodeReviewCommentableEditorModel.KEY) as? CodeReviewEditorGutterControlsModel.WithMultilineComments
 
     private var isDraggingFrame: Boolean = false
-    private var dragStart: Int = 0
+      set(value) {
+        vm.isHidden(value)
+        field = value
+      }
+
     private var edge: Edge? = Edge.TOP
     private var oldRange: LineRange? = null
 
@@ -111,16 +139,23 @@ internal object GHPRInlayUtils {
       Cursor.getDefaultCursor()
     }
 
+    private var currentTooltip: IdeTooltip? = null
+
+    init {
+      SwingUtilities.invokeLater {
+        val gutterComponent = editorEx.gutterComponentEx
+        val gutterMousePos = gutterComponent.mousePosition ?: return@invokeLater
+        val yBorders = getYAxisBorders() ?: return@invokeLater
+
+        if (gutterMousePos.getEdge(yBorders) != null) {
+          gutterComponent.cursor = resizeCursor
+        }
+      }
+    }
+
     override fun mouseDragged(e: EditorMouseEvent) {
       if (!isDraggingFrame || edge == null || oldRange == null) return
       e.consume() // to prevent selecting text while dragging
-      val mouseY = e.mouseEvent.y.toFloat()
-      val dragDelta = mouseY - dragStart
-      val direction = if (dragDelta > 0) 1 else -1
-
-      val startVisual = editor.yToVisualLine(dragStart)
-      val currentVisual = editor.yToVisualLine(mouseY.toInt())
-      val stepCount = abs(currentVisual - startVisual)
 
       val range = vm.range.value ?: return
       var newStart = range.second.first
@@ -128,13 +163,11 @@ internal object GHPRInlayUtils {
 
       when (edge) {
         Edge.TOP -> {
-          val start = oldRange?.start ?: return
-          newStart = (start + direction * stepCount)
+          newStart = editor.xyToLogicalPosition(e.mouseEvent.point).line
             .coerceIn(0, newEnd)
         }
         Edge.BOTTOM -> {
-          val end = oldRange?.end ?: return
-          newEnd = (end + direction * stepCount)
+          newEnd = editor.xyToLogicalPosition(e.mouseEvent.point).line
             .coerceIn(newStart, editor.document.lineCount - 1)
         }
         else -> Unit
@@ -146,11 +179,11 @@ internal object GHPRInlayUtils {
     }
 
     override fun mouseReleased(e: EditorMouseEvent) {
-      isDraggingFrame = false
-      if (oldRange != null && model != null) {
+      if (oldRange != null && isDraggingFrame) {
+        isDraggingFrame = false
         val range = vm.range.value?.second ?: return
-        model.updateCommentLines(oldRange!!, LineRange(range.first, range.last))
-        vm.isHidden(false)
+        model?.updateCommentLines(oldRange!!, LineRange(range.first, range.last)) ?: return
+        vm.vm.requestFocus()
         editorEx.setCustomCursor(this, null)
       }
     }
@@ -161,19 +194,25 @@ internal object GHPRInlayUtils {
       edge = point.getEdge(yBordersPositions) ?: return
       val range = vm.range.value?.second ?: return
       oldRange = LineRange(range.first, range.last)
-      dragStart = when (edge) {
-        Edge.TOP -> yBordersPositions.first
-        Edge.BOTTOM -> yBordersPositions.second - 1
-        else -> return
-      }.toInt()
       isDraggingFrame = true
-      vm.isHidden(true)
+    }
+
+    override fun mouseEntered(e: EditorMouseEvent) {
+      if (isDraggingFrame) return
+      val yBorders = getYAxisBorders() ?: return
+      val point = e.mouseEvent.point
+      val onEdge = point.getEdge(yBorders) != null
+      if (onEdge) {
+        showTooltip(e.mouseEvent.component, point)
+      }
     }
 
     override fun mouseMoved(e: EditorMouseEvent) {
       val yBorders = getYAxisBorders() ?: return
-      val onEdge = e.mouseEvent.point.getEdge(yBorders) != null
+      val point = e.mouseEvent.point
+      val onEdge = point.getEdge(yBorders) != null
       val gutterGlassComp = IdeGlassPaneUtil.find(editorEx.gutterComponentEx)
+
       if (onEdge) {
         editorEx.setCustomCursor(this, resizeCursor)
         gutterGlassComp.setCursor(resizeCursor, this)
@@ -182,25 +221,60 @@ internal object GHPRInlayUtils {
         editorEx.setCustomCursor(this, null)
         gutterGlassComp.setCursor(null, this)
       }
+
+      if (onEdge && !isDraggingFrame) {
+        showTooltip(e.mouseEvent.component, point)
+      }
+      else {
+        hideTooltip()
+      }
+    }
+
+    override fun mouseExited(event: EditorMouseEvent) {
+      hideTooltip()
     }
 
     private fun Point.getEdge(frameCoords: Pair<Float, Float>): Edge? {
       val topY = frameCoords.first
       val botY = frameCoords.second
+
       if (this.x.toFloat() !in 0f..editor.contentComponent.width.toFloat()) return null
-      if (this.y.toFloat() in (topY - 3).coerceAtLeast(0f)..topY + editor.lineHeight / 2) return Edge.TOP
-      if (this.y.toFloat() in botY - editor.lineHeight / 2..botY + 3) return Edge.BOTTOM
+      if (this.y.toFloat() in (topY - OUTLINE_OUTSIDE_DETECTION_MARGIN).coerceAtLeast(0f)..topY + editor.lineHeight * OUTLINE_DETECTION_LINE_FRACTION) return Edge.TOP
+      if (this.y.toFloat() in botY - editor.lineHeight * OUTLINE_DETECTION_LINE_FRACTION..botY + OUTLINE_OUTSIDE_DETECTION_MARGIN) return Edge.BOTTOM
+
       return null
     }
 
     private fun getYAxisBorders(): Pair<Float, Float>? {
       val range = vm.range.value?.second ?: return null
-      val doc = editor.document
-      val topOffset = doc.getLineStartOffset(range.first)
-      val bottomOffset = doc.getLineEndOffset(range.last)
-      val topY = editor.visualLineToY(editor.offsetToVisualPosition(topOffset).line).toFloat()
-      val bottomY = editor.visualLineToY(editor.offsetToVisualPosition(bottomOffset).line).toFloat() + editor.lineHeight
-      return topY to bottomY
+      val startLine = range.first
+      val endLine = range.last
+      return editor.yRangeForLogicalLineRange(startLine, endLine).let {
+        it.first.toFloat() to it.last.toFloat()
+      }
+    }
+
+    private fun showTooltip(component: Component, point: Point) {
+      val offsetPoint = Point(point.x, point.y + editor.lineHeight) // offset for tooltip placement
+      currentTooltip?.let {
+        it.component = component
+        it.point = offsetPoint
+      }
+
+      if (currentTooltip == null) {
+        val label = JLabel(GithubBundle.message("pull.request.review.new.comment.code.outline.tooltip"))
+        currentTooltip = IdeTooltip(component, offsetPoint, label)
+          .setPreferredPosition(Balloon.Position.below)
+          .setShowCallout(false)
+      }
+      IdeTooltipManager.getInstance().show(currentTooltip!!, false)
+    }
+
+    private fun hideTooltip() {
+      currentTooltip?.let {
+        IdeTooltipManager.getInstance().hide(it)
+      }
+      currentTooltip = null
     }
 
     private enum class Edge {
@@ -208,9 +282,29 @@ internal object GHPRInlayUtils {
     }
   }
 
+  internal fun installInlaysFocusTracker(cs: CoroutineScope, model: CodeReviewEditorInlaysModel<*>, project: Project) {
+    val focusedThreadFlow: Flow<String?> = callbackFlow {
+      val focusListener = PropertyChangeListener { evt ->
+        if (evt.propertyName == "focusOwner") {
+          trySend(findFocusedThreadId(project))
+        }
+      }
+
+      FocusUtil.addFocusOwnerListener(cs.asDisposable(), focusListener)
+      send(findFocusedThreadId(project))
+      awaitClose()
+    }
+    cs.launch {
+      model.inlays
+        .map { it.filterIsInstance<GHPREditorMappedComponentModel>() }
+        .combine(focusedThreadFlow) { inlays, focusedThreadId ->
+          inlays.forEach { it.setFocused(it.key == focusedThreadId) }
+        }.collect()
+    }
+  }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  fun installInlaysDimming(cs: CoroutineScope, model: CodeReviewEditorInlaysModel<*>) {
+  fun installInlaysDimming(cs: CoroutineScope, model: CodeReviewEditorInlaysModel<*>, locationToLine: ((DiffLineLocation) -> Int?)?) {
     cs.launchNow {
       model.inlays
         .map { it.filterIsInstance<GHPREditorMappedComponentModel>() }
@@ -223,13 +317,25 @@ internal object GHPRInlayUtils {
           val rangesToDim = inlayStates
             .filter { it.shouldShowOutline }
             .mapNotNull {
-              val (_, lines) = it.range ?: return@mapNotNull null
-              lines.first..<lines.last
+              val (side, lines) = it.range ?: return@mapNotNull null
+              if (locationToLine != null) {
+                val startLine = locationToLine(side to lines.first) ?: return@mapNotNull null
+                val endLine = locationToLine(side to lines.last) ?: return@mapNotNull null
+                startLine..<endLine
+              }
+              else {
+                lines.first..<lines.last
+              }
             }
 
           inlayStates.forEach { (vm, _, range) ->
-            val (_, lines) = range ?: return@forEach
-            val onLine = lines.last
+            val (side, lines) = range ?: return@forEach
+            val onLine = if (locationToLine != null) {
+              locationToLine(side to lines.last) ?: return@forEach
+            }
+            else {
+              lines.last
+            }
 
             vm.setDimmed(rangesToDim.any { dimRange -> dimRange.contains(onLine) })
           }
@@ -242,6 +348,19 @@ internal object GHPRInlayUtils {
     val shouldShowOutline: Boolean,
     val range: Pair<Side, IntRange>?,
   )
+}
+
+internal fun Editor.yRangeForLogicalLineRange(startLine: Int, endLine: Int): IntRange {
+  val startOffset = document.getLineStartOffset(startLine.coerceAtLeast(0))
+  val endOffset = document.getLineEndOffset(endLine.coerceAtMost(document.lineCount - 1))
+
+  val startY = offsetToXY(startOffset).y
+
+  val foldRegion = foldingModel.getCollapsedRegionAtOffset(endOffset - 1).asSafely<CustomFoldRegion>()
+  val endY = foldRegion?.location?.let { it.y + foldRegion.heightInPixels }
+             ?: (offsetToXY(endOffset).y + lineHeight)
+
+  return startY..endY
 }
 
 internal class FadeLayerUI : LayerUI<JComponent>() {

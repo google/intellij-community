@@ -1054,17 +1054,6 @@ c:com.intellij.ide.util.DelegatingProgressIndicator
 - start():V
 - startNonCancelableSection():V
 - stop():V
-f:com.intellij.ide.util.PropertiesComponentExKt
-- sf:propComponentProperty(com.intellij.openapi.project.Project,I):kotlin.properties.ReadWriteProperty
-- sf:propComponentProperty(com.intellij.openapi.project.Project,java.lang.String):kotlin.properties.ReadWriteProperty
-- sf:propComponentProperty(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):kotlin.properties.ReadWriteProperty
-- sf:propComponentProperty(com.intellij.openapi.project.Project,java.lang.String,Z):kotlin.properties.ReadWriteProperty
-- sf:propComponentProperty(com.intellij.openapi.project.Project,Z):kotlin.properties.ReadWriteProperty
-- bs:propComponentProperty$default(com.intellij.openapi.project.Project,I,I,java.lang.Object):kotlin.properties.ReadWriteProperty
-- bs:propComponentProperty$default(com.intellij.openapi.project.Project,java.lang.String,I,java.lang.Object):kotlin.properties.ReadWriteProperty
-- bs:propComponentProperty$default(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,I,java.lang.Object):kotlin.properties.ReadWriteProperty
-- bs:propComponentProperty$default(com.intellij.openapi.project.Project,java.lang.String,Z,I,java.lang.Object):kotlin.properties.ReadWriteProperty
-- bs:propComponentProperty$default(com.intellij.openapi.project.Project,Z,I,java.lang.Object):kotlin.properties.ReadWriteProperty
 c:com.intellij.ide.util.treeView.NodeRenderer
 - com.intellij.ui.ColoredTreeCellRenderer
 - <init>():V
@@ -3871,18 +3860,19 @@ a:com.intellij.openapi.ui.panel.ComponentPanel
 - a:setCommentText(java.lang.String):V
 c:com.intellij.openapi.ui.panel.ComponentPanelBuilder
 - com.intellij.openapi.ui.panel.GridBagPanelBuilder
+- sf:Companion:com.intellij.openapi.ui.panel.ComponentPanelBuilder$Companion
 - sf:MAX_COMMENT_WIDTH:I
 - <init>(javax.swing.JComponent):V
 - addToPanel(javax.swing.JPanel,java.awt.GridBagConstraints,Z):V
 - anchorLabelOn(com.intellij.util.ui.UI$Anchor):com.intellij.openapi.ui.panel.ComponentPanelBuilder
-- s:computeCommentInsets(javax.swing.JComponent,Z):java.awt.Insets
+- sf:computeCommentInsets(javax.swing.JComponent,Z):java.awt.Insets
 - constrainsValid():Z
-- s:createCommentComponent(java.lang.String,Z):javax.swing.JLabel
-- s:createCommentComponent(java.lang.String,Z,I):javax.swing.JLabel
-- s:createCommentComponent(java.lang.String,Z,I,Z):javax.swing.JLabel
-- s:createNonWrappingCommentComponent(java.lang.String):javax.swing.JLabel
+- sf:createCommentComponent(java.lang.String,Z):javax.swing.JLabel
+- sf:createCommentComponent(java.lang.String,Z,I):javax.swing.JLabel
+- sf:createCommentComponent(java.lang.String,Z,I,Z):javax.swing.JLabel
+- sf:createNonWrappingCommentComponent(java.lang.String):javax.swing.JLabel
 - createPanel():javax.swing.JPanel
-- s:getCommentFont(java.awt.Font):java.awt.Font
+- sf:getCommentFont(java.awt.Font):java.awt.Font
 - gridWidth():I
 - moveCommentRight():com.intellij.openapi.ui.panel.ComponentPanelBuilder
 - moveLabelOnTop():com.intellij.openapi.ui.panel.ComponentPanelBuilder
@@ -3896,6 +3886,13 @@ c:com.intellij.openapi.ui.panel.ComponentPanelBuilder
 - withTooltip(java.lang.String):com.intellij.openapi.ui.panel.ComponentPanelBuilder
 - withTooltipLink(java.lang.String,java.lang.Runnable):com.intellij.openapi.ui.panel.ComponentPanelBuilder
 - withTopRightComponent(javax.swing.JComponent):com.intellij.openapi.ui.panel.ComponentPanelBuilder
+f:com.intellij.openapi.ui.panel.ComponentPanelBuilder$Companion
+- f:computeCommentInsets(javax.swing.JComponent,Z):java.awt.Insets
+- f:createCommentComponent(java.lang.String,Z):javax.swing.JLabel
+- f:createCommentComponent(java.lang.String,Z,I):javax.swing.JLabel
+- f:createCommentComponent(java.lang.String,Z,I,Z):javax.swing.JLabel
+- f:createNonWrappingCommentComponent(java.lang.String):javax.swing.JLabel
+- f:getCommentFont(java.awt.Font):java.awt.Font
 c:com.intellij.openapi.ui.panel.PanelGridBuilder
 - com.intellij.openapi.ui.panel.PanelBuilder
 - <init>():V
@@ -4951,7 +4948,6 @@ f:com.intellij.ui.CommonActionsPanel
 - javax.swing.JPanel
 - addNotify():V
 - getAnAction(com.intellij.ui.CommonActionsPanel$Buttons):com.intellij.openapi.actionSystem.AnAction
-- getAnActionButton(com.intellij.ui.CommonActionsPanel$Buttons):com.intellij.ui.AnActionButton
 - s:getCommonShortcut(com.intellij.ui.CommonActionsPanel$Buttons):com.intellij.openapi.actionSystem.ShortcutSet
 - getPosition():com.intellij.openapi.actionSystem.ActionToolbarPosition
 - getPreferredPopupPoint(com.intellij.openapi.actionSystem.AnAction):com.intellij.ui.awt.RelativePoint
@@ -5801,7 +5797,6 @@ a:com.intellij.ui.PopupHandler
 - s:installPopupMenu(javax.swing.JComponent,java.lang.String,java.lang.String):com.intellij.ui.PopupHandler
 - s:installRowSelectionTablePopup(javax.swing.JTable,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String):com.intellij.ui.PopupHandler
 - s:installSelectionListPopup(javax.swing.JList,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String):com.intellij.ui.PopupHandler
-- s:installUnknownPopupHandler(javax.swing.JComponent,com.intellij.openapi.actionSystem.ActionGroup):java.awt.event.MouseListener
 - s:installUnknownPopupHandler(javax.swing.JComponent,com.intellij.openapi.actionSystem.ActionGroup,com.intellij.openapi.actionSystem.ActionManager):java.awt.event.MouseListener
 - a:invokePopup(java.awt.Component,I,I):V
 - mouseClicked(java.awt.event.MouseEvent):V
@@ -6469,7 +6464,6 @@ c:com.intellij.ui.components.DropDownLink
 - <init>(java.lang.Object,java.util.List,java.util.function.Consumer,Z):V
 - <init>(java.lang.Object,kotlin.jvm.functions.Function1):V
 - createRenderer():javax.swing.ListCellRenderer
-- f:getPopupState():com.intellij.ui.popup.PopupState
 - f:getSelectedItem():java.lang.Object
 - getSelectedObjects():java.lang.Object[]
 - p:itemToString(java.lang.Object):java.lang.String
@@ -6692,6 +6686,7 @@ c:com.intellij.ui.components.JBOptionButton
 - sf:getDefaultShowPopupShortcut():com.intellij.openapi.actionSystem.CustomShortcutSet
 - sf:getDefaultTooltip():java.lang.String
 - f:getHideDisabledOptions():Z
+- f:getOptionAdText():java.lang.String
 - f:getOptionTooltipText():java.lang.String
 - f:getOptions():javax.swing.Action[]
 - f:getPopupBackgroundColor():java.awt.Color
@@ -6704,6 +6699,7 @@ c:com.intellij.ui.components.JBOptionButton
 - f:isSimpleButton():Z
 - f:setAddSeparator(Z):V
 - f:setHideDisabledOptions(Z):V
+- f:setOptionAdText(java.lang.String):V
 - f:setOptionTooltipText(java.lang.String):V
 - f:setOptions(java.util.List):V
 - f:setOptions(javax.swing.Action[]):V
@@ -6775,62 +6771,6 @@ c:com.intellij.ui.components.JBScrollBar
 - setValue(I):V
 - toggle(Z):V
 - updateUI():V
-c:com.intellij.ui.components.JBScrollPane
-- javax.swing.JScrollPane
-- sf:IGNORE_SCROLLBAR_IN_INSETS:com.intellij.openapi.util.Key
-- sf:IGNORE_SCROLL_LATCHING:com.intellij.openapi.util.Key
-- p:statusComponent:javax.swing.JComponent
-- <init>():V
-- <init>(I):V
-- <init>(I,I):V
-- <init>(java.awt.Component):V
-- <init>(java.awt.Component,I,I):V
-- s:canBePreprocessed(java.awt.event.MouseEvent,javax.swing.JScrollBar):Z
-- createHorizontalScrollBar():javax.swing.JScrollBar
-- s:createIndentBorder():com.intellij.ui.components.JBScrollPane$ViewportBorder
-- createVerticalScrollBar():javax.swing.JScrollBar
-- p:createViewport():javax.swing.JViewport
-- getBackground():java.awt.Color
-- getStatusComponent():javax.swing.JComponent
-- isOptimizedDrawingEnabled():Z
-- isOverlappingScrollBar():Z
-- s:isScrollEvent(java.awt.event.MouseWheelEvent):Z
-- paint(java.awt.Graphics):V
-- p:paintBorder(java.awt.Graphics):V
-- p:paintChildren(java.awt.Graphics):V
-- p:processMouseWheelEvent(java.awt.event.MouseWheelEvent):V
-- setOverlappingScrollBar(Z):V
-- setStatusComponent(javax.swing.JComponent):V
-- setUI(javax.swing.plaf.ScrollPaneUI):V
-- p:setupCorners():V
-e:com.intellij.ui.components.JBScrollPane$Alignment
-- java.lang.Enum
-- sf:BOTTOM:com.intellij.ui.components.JBScrollPane$Alignment
-- sf:LEFT:com.intellij.ui.components.JBScrollPane$Alignment
-- sf:RIGHT:com.intellij.ui.components.JBScrollPane$Alignment
-- sf:TOP:com.intellij.ui.components.JBScrollPane$Alignment
-- s:get(javax.swing.JComponent):com.intellij.ui.components.JBScrollPane$Alignment
-- s:valueOf(java.lang.String):com.intellij.ui.components.JBScrollPane$Alignment
-- s:values():com.intellij.ui.components.JBScrollPane$Alignment[]
-e:com.intellij.ui.components.JBScrollPane$Flip
-- java.lang.Enum
-- sf:BOTH:com.intellij.ui.components.JBScrollPane$Flip
-- sf:HORIZONTAL:com.intellij.ui.components.JBScrollPane$Flip
-- sf:NONE:com.intellij.ui.components.JBScrollPane$Flip
-- sf:VERTICAL:com.intellij.ui.components.JBScrollPane$Flip
-- s:valueOf(java.lang.String):com.intellij.ui.components.JBScrollPane$Flip
-- s:values():com.intellij.ui.components.JBScrollPane$Flip[]
-c:com.intellij.ui.components.JBScrollPane$Layout
-- javax.swing.ScrollPaneLayout
-- p:statusComponent:java.awt.Component
-- <init>():V
-- addLayoutComponent(java.lang.String,java.awt.Component):V
-- layoutContainer(java.awt.Container):V
-- preferredLayoutSize(java.awt.Container):java.awt.Dimension
-- syncWithScrollPane(javax.swing.JScrollPane):V
-c:com.intellij.ui.components.JBScrollPane$ViewportBorder
-- javax.swing.border.LineBorder
-- paintBorder(java.awt.Component,java.awt.Graphics,I,I,I,I):V
 c:com.intellij.ui.components.JBSlider
 - javax.swing.JSlider
 - <init>():V
@@ -7201,12 +7141,6 @@ c:com.intellij.ui.components.labels.BoldLabel
 - <init>(javax.swing.Icon):V
 - <init>(javax.swing.Icon,I):V
 - setText(java.lang.String):V
-c:com.intellij.ui.components.labels.DropDownLink
-- com.intellij.ui.components.labels.LinkLabel
-- <init>(java.lang.Object,java.lang.Runnable):V
-- <init>(java.lang.Object,java.util.List,com.intellij.util.Consumer,Z):V
-- <init>(java.lang.Object,java.util.function.Function):V
-- getChosenItem():java.lang.Object
 c:com.intellij.ui.components.labels.LinkLabel
 - javax.swing.JLabel
 - p:myPaintUnderline:Z
@@ -7512,8 +7446,6 @@ f:com.intellij.ui.dsl.builder.VerticalComponentGap
 - hashCode():I
 f:com.intellij.ui.dsl.builder.VerticalComponentGap$Companion
 f:com.intellij.ui.dsl.gridLayout.Gaps
-- sf:Companion:com.intellij.ui.dsl.gridLayout.Gaps$Companion
-- sf:EMPTY:com.intellij.ui.dsl.gridLayout.Gaps
 - <init>():V
 - <init>(I,I,I,I):V
 - b:<init>(I,I,I,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
@@ -7529,10 +7461,6 @@ f:com.intellij.ui.dsl.gridLayout.Gaps
 - f:getRight():I
 - f:getTop():I
 - hashCode():I
-f:com.intellij.ui.dsl.gridLayout.Gaps$Companion
-f:com.intellij.ui.dsl.gridLayout.GapsKt
-- bsf:JBGaps(I,I,I,I):com.intellij.ui.dsl.gridLayout.Gaps
-- bs:JBGaps$default(I,I,I,I,I,java.lang.Object):com.intellij.ui.dsl.gridLayout.Gaps
 com.intellij.ui.dsl.gridLayout.Grid
 - a:getColumnsGaps():java.util.List
 - a:getResizableColumns():java.util.Set
@@ -8339,14 +8267,6 @@ f:com.intellij.ui.tabs.UiDecorator$UiDecoration
 - f:getLabelFont():java.awt.Font
 - f:getLabelInsets():java.awt.Insets
 - hashCode():I
-c:com.intellij.ui.tabs.impl.DefaultEditorTabsPainter
-- com.intellij.ui.tabs.impl.JBEditorTabsPainter
-- <init>(com.intellij.ui.tabs.impl.JBEditorTabs):V
-- doPaintBackground(java.awt.Graphics2D,java.awt.Rectangle,Z,java.awt.Rectangle):V
-- doPaintInactive(java.awt.Graphics2D,java.awt.Rectangle,I,I,I,I,java.awt.Color,I,I,Z):V
-- getBackgroundColor():java.awt.Color
-- p:getDefaultTabColor():java.awt.Color
-- p:getInactiveMaskColor():java.awt.Color
 f:com.intellij.ui.tabs.impl.DefaultTabPainterAdapter
 - com.intellij.ui.tabs.impl.TabPainterAdapter
 - <init>(com.intellij.ui.tabs.JBTabPainter):V
@@ -8398,19 +8318,6 @@ c:com.intellij.ui.tabs.impl.JBEditorTabs
 - uiSettingsChanged(com.intellij.ide.ui.UISettings):V
 - useSmallLabels():Z
 f:com.intellij.ui.tabs.impl.JBEditorTabs$Companion
-a:com.intellij.ui.tabs.impl.JBEditorTabsPainter
-- psf:BORDER_COLOR:java.awt.Color
-- psf:DEFAULT_TAB_COLOR:java.awt.Color
-- psf:INACTIVE_MASK_COLOR:java.awt.Color
-- psf:UNDERLINE_COLOR:java.awt.Color
-- p:myDefaultTabColor:java.awt.Color
-- pf:myTabs:com.intellij.ui.tabs.impl.JBEditorTabs
-- <init>(com.intellij.ui.tabs.impl.JBEditorTabs):V
-- a:doPaintBackground(java.awt.Graphics2D,java.awt.Rectangle,Z,java.awt.Rectangle):V
-- a:doPaintInactive(java.awt.Graphics2D,java.awt.Rectangle,I,I,I,I,java.awt.Color,I,I,Z):V
-- a:getBackgroundColor():java.awt.Color
-- getEmptySpaceColor():java.awt.Color
-- setDefaultTabColor(java.awt.Color):V
 a:com.intellij.ui.tabs.impl.ShapeTransform
 - p:myPath:java.awt.geom.GeneralPath
 - p:<init>(java.awt.Rectangle,I,I,Z):V
@@ -8596,15 +8503,6 @@ a:com.intellij.ui.tabs.impl.multiRow.TabsRow
 - f:getInfos():java.util.List
 - f:getWithEntryPointToolbar():Z
 - f:getWithTitle():Z
-f:com.intellij.ui.tabs.impl.table.TablePassInfo
-- f:invisible:java.util.List
-- f:tabRectangle:java.awt.Rectangle
-- f:toFitRec:java.awt.Rectangle
-- getHeaderRectangle():java.awt.Rectangle
-- getRequiredLength():I
-- getRowCount():I
-- getScrollExtent():I
-- isInSelectionRow(com.intellij.ui.tabs.TabInfo):Z
 c:com.intellij.ui.tabs.impl.themes.DefaultTabTheme
 - com.intellij.ui.tabs.impl.themes.TabTheme
 - <init>():V
@@ -9291,9 +9189,6 @@ f:com.intellij.util.net.IOExceptionDialog
 - com.intellij.openapi.ui.DialogWrapper
 - <init>(java.lang.String,java.lang.String):V
 - s:showErrorDialog(java.lang.String,java.lang.String):Z
-f:com.intellij.util.net.IdeProxyAuthenticator
-- java.net.Authenticator
-- <init>(com.intellij.util.net.ProxyAuthentication):V
 f:com.intellij.util.net.IdeProxySelector
 - java.net.ProxySelector
 - sf:Companion:com.intellij.util.net.IdeProxySelector$Companion

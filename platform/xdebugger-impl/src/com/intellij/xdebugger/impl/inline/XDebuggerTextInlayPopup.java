@@ -6,18 +6,16 @@ import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.registry.Registry;
+import com.intellij.platform.debugger.impl.shared.XDebuggerWatchesManager;
 import com.intellij.ui.AppUIUtil;
-import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerBundle;
-import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XValue;
-import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
-import com.intellij.xdebugger.impl.XDebuggerWatchesManager;
 import com.intellij.xdebugger.impl.evaluate.quick.XDebuggerTreeCreator;
 import com.intellij.xdebugger.impl.evaluate.quick.common.DebuggerTreeCreator;
 import com.intellij.xdebugger.impl.evaluate.quick.common.XDebuggerTextPopup;
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -96,8 +94,7 @@ public class XDebuggerTextInlayPopup<D> extends XDebuggerTextPopup<D> {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       InlineWatchNodeImpl watch = (InlineWatchNodeImpl)myValueNode;
-      XDebuggerWatchesManager watchesManager =
-        ((XDebuggerManagerImpl)XDebuggerManager.getInstance(mySession.getProject())).getWatchesManager();
+      XDebuggerWatchesManager watchesManager = XDebugManagerProxy.getInstance().getWatchesManager(mySession.getProject());
       watchesManager.inlineWatchesRemoved(Collections.singletonList(watch.getWatch()), null);
       watchesManager.showInplaceEditor(watch.getPosition(), myEditor, mySession, watch.getExpression());
       hideTextPopup();
@@ -119,8 +116,7 @@ public class XDebuggerTextInlayPopup<D> extends XDebuggerTextPopup<D> {
           return Promises.resolvedPromise(expr);
         }).onSuccess(expr -> {
           AppUIUtil.invokeOnEdt(() -> {
-            XDebuggerWatchesManager manager =
-              ((XDebuggerManagerImpl)XDebuggerManager.getInstance(mySession.getProject())).getWatchesManager();
+            XDebuggerWatchesManager manager = XDebugManagerProxy.getInstance().getWatchesManager(mySession.getProject());
             manager.showInplaceEditor(myPosition, myEditor, mySession, expr);
             hideTextPopup();
           });

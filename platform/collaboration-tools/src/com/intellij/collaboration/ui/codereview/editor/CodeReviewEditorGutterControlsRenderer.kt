@@ -263,9 +263,13 @@ private constructor(
       repaintColumn(editor)
     }
   private val LogicalLineData.startNewCommentAction
-    get() = GutterAction(AllIcons.General.InlineAdd, GutterAction.ActionType.START_NEW_COMMENT, AllIcons.General.InlineAddHover) { requestNewComment(logicalLine) }
+    get() = GutterAction(AllIcons.General.InlineAdd, GutterAction.ActionType.START_NEW_COMMENT, AllIcons.General.InlineAddHover) {
+      requestNewComment(logicalLine)
+    }
 
   private fun requestNewComment(logicalLine: Int) {
+    if (editor.caretModel.logicalPosition.line != logicalLine)
+      editor.caretModel.moveToOffset(editor.document.getLineEndOffset(logicalLine))
     if (model is CodeReviewCommentableEditorModel.WithMultilineComments) {
       val selectedRange = selectedRangeForMultilineComment
       if (selectedRange != null && logicalLine == selectedRange.end && model.canCreateComment(selectedRange)) {

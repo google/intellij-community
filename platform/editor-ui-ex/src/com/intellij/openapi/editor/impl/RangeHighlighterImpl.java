@@ -12,8 +12,10 @@ import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.RangeHighlighterEx;
 import com.intellij.openapi.editor.ex.RangeMarkerEx;
 import com.intellij.openapi.editor.markup.*;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressIndicatorProvider;
+import com.intellij.openapi.progress.impl.NonCancelableIndicator;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.EmptyRunnable;
 import com.intellij.util.BitUtil;
 import com.intellij.util.Consumer;
 import org.intellij.lang.annotations.MagicConstant;
@@ -29,7 +31,8 @@ import java.util.Objects;
  * Implementation of the markup element for the editor and document.
  */
 @ApiStatus.Internal
-public sealed class RangeHighlighterImpl extends RangeMarkerImpl implements RangeHighlighterEx permits PersistentRangeHighlighterImpl {
+public sealed class RangeHighlighterImpl extends RangeMarkerImpl implements RangeHighlighterEx
+  permits PersistentRangeHighlighterImpl {
   private static final Logger LOG = Logger.getInstance(RangeHighlighterImpl.class);
   @SuppressWarnings({"InspectionUsingGrayColors", "UseJBColor"})
   private static final Color NULL_COLOR = new Color(0, 0, 0); // must be a new instance to work as a sentinel
@@ -82,8 +85,8 @@ public sealed class RangeHighlighterImpl extends RangeMarkerImpl implements Rang
     myModel = model;
 
     registerInTree((DocumentEx)model.getDocument(), start, end, greedyToLeft, greedyToRight, layer);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("RangeHighlighterImpl: create " + this);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("RangeHighlighterImpl: create " + this+"; "+getId()+(ProgressIndicatorProvider.getGlobalProgressIndicator() == null ? "" : "; progress=" +ProgressIndicatorProvider.getGlobalProgressIndicator()));
     }
   }
 
@@ -363,7 +366,7 @@ public sealed class RangeHighlighterImpl extends RangeMarkerImpl implements Rang
 
   @Override
   public void fireChanged(boolean renderersChanged, boolean fontStyleChanged, boolean foregroundColorChanged) {
-    runUnderWriteLock(EmptyRunnable.getInstance()); // throw exception if changed under read lock
+    myNode.getTree().assertMayModify();
     if (isFlagSet(IN_BATCH_CHANGE_MASK)) {
       // under IN_BATCH_CHANGE_MASK, do not fire events, just add flags above
       int changedFlags = CHANGED_MASK|RENDERERS_CHANGED_MASK|FONT_STYLE_CHANGED_MASK|FOREGROUND_COLOR_CHANGED_MASK;
@@ -456,8 +459,10 @@ public sealed class RangeHighlighterImpl extends RangeMarkerImpl implements Rang
 
   @Override
   public void dispose() {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("RangeHighlighterImpl: dispose " + this);
+    if (LOG.isTraceEnabled()) {
+      ProgressIndicator progress = ProgressIndicatorProvider.getGlobalProgressIndicator();
+      LOG.trace("RangeHighlighterImpl: dispose " + this + "; (" + myId + ")" +
+                (progress == null || progress instanceof NonCancelableIndicator ? "" : "; progress=" + progress));
     }
     super.dispose();
     GutterIconRenderer renderer = getGutterIconRenderer();

@@ -1,4 +1,4 @@
-### auto-generated section `build kotlin.jvm-debugger.coroutines` start
+### auto-generated section `build intellij.kotlin.jvm.debugger.coroutines` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
 load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
@@ -19,7 +19,7 @@ resourcegroup(
 
 jvm_library(
   name = "coroutines",
-  module_name = "kotlin.jvm-debugger.coroutines",
+  module_name = "intellij.kotlin.jvm.debugger.coroutines",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   resources = [":coroutines_resources"],
@@ -35,7 +35,9 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
     "//platform/core-api:core",
+    "//platform/lang-api:lang",
     "//platform/editor-ui-api:editor-ui",
+    "//platform/platform-api:ide",
     "//platform/lang-core",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
@@ -47,6 +49,7 @@ jvm_library(
     "//plugins/kotlin/jvm-debugger/core",
     "//platform/lang-impl",
     "//platform/xdebugger-impl:debugger-impl",
+    "//platform/xdebugger-impl/shared",
     "//platform/execution-impl",
     "//platform/external-system-impl:externalSystem-impl",
     "//platform/core-ui",
@@ -64,7 +67,8 @@ jvm_library(
     "//libraries/kotlinx/serialization/json",
     "//java/java-impl:impl",
     "//java/debugger/shared",
-    "//platform/xdebugger-impl/shared",
+    "//platform/xdebugger-impl/rpc",
+    "//platform/execution",
   ]
 )
-### auto-generated section `build kotlin.jvm-debugger.coroutines` end
+### auto-generated section `build intellij.kotlin.jvm.debugger.coroutines` end

@@ -6,6 +6,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.QualifiedName;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.FunctionParameter;
+import com.jetbrains.python.PyNames;
 import com.jetbrains.python.codeInsight.controlflow.ScopeOwner;
 import com.jetbrains.python.psi.resolve.PyResolveContext;
 import com.jetbrains.python.psi.resolve.PyResolveUtil;
@@ -16,8 +17,10 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 import static com.jetbrains.python.psi.PyKnownDecorator.*;
 
@@ -54,6 +57,11 @@ public final class PyKnownDecoratorUtil {
   public static @NotNull List<PyKnownDecorator> asKnownDecorators(@NotNull PyDecorator decorator, @NotNull TypeEvalContext context) {
     final QualifiedName qualifiedName = decorator.getQualifiedName();
     if (qualifiedName == null) {
+      return Collections.emptyList();
+    }
+    // Avoid resolving property accessor decorators to prevent an infinite recursion
+    String lastComponent = qualifiedName.getLastComponent();
+    if (PyNames.GETTER.equals(lastComponent) || PyNames.SETTER.equals(lastComponent) || PyNames.DELETER.equals(lastComponent)) {
       return Collections.emptyList();
     }
     if (context.maySwitchToAST(decorator)) {
@@ -135,21 +143,6 @@ public final class PyKnownDecoratorUtil {
   public static boolean hasUnknownOrChangingSignatureDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {
     final List<PyKnownDecorator> decorators = getKnownDecorators(decoratable, context);
     return !allDecoratorsAreKnown(decoratable, decorators) || decorators.contains(UNITTEST_MOCK_PATCH);
-  }
-
-  public static boolean hasUnknownOrChangingReturnTypeDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {
-    final List<PyKnownDecorator> decorators = getKnownDecorators(decoratable, context);
-
-    if (!allDecoratorsAreKnown(decoratable, decorators)) {
-      return true;
-    }
-
-    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH);
-  }
-
-  public static boolean hasChangingReturnTypeDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {
-    final List<PyKnownDecorator> decorators = getKnownDecorators(decoratable, context);
-    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH);
   }
 
   public static boolean hasUnknownOrUpdatingAttributesDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {

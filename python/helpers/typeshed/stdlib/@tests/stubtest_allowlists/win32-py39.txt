@@ -1,4 +1,12 @@
 # =======
+# <= 3.12
+# =======
+
+# Added in Python 3.9.23 (parameter `escapable`)
+html.parser.HTMLParser.set_cdata_mode
+
+
+# =======
 # <= 3.11
 # =======
 
@@ -52,6 +60,7 @@ xml.parsers.expat.XMLParserType.GetReparseDeferralEnabled
 xml.parsers.expat.XMLParserType.SetReparseDeferralEnabled
 xml.sax.expatreader.ExpatParser.flush
 zipfile.ZipInfo.__slots__
+
 
 # =============================================================
 # Allowlist entries that cannot or should not be fixed; <= 3.12

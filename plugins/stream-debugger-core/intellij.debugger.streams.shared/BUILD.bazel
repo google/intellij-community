@@ -20,10 +20,11 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui",
     "//platform/kernel/shared:kernel",
     "//platform/platform-impl/rpc",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/xdebugger-impl:debugger-impl",
+    "//platform/xdebugger-impl/rpc",
     "//platform/xdebugger-impl/shared",
   ]
 )

@@ -36,7 +36,7 @@ jvm_library(
     "//platform/refactoring",
     "//platform/ide-core-impl",
     "//platform/ide-core/plugins",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/util/concurrency",
     "//platform/observable",
     "//platform/util-ex",
@@ -44,14 +44,14 @@ jvm_library(
     "//libraries/fastutil",
     "//platform/core-ui",
     "//platform/platform-util-io-impl:ide-util-io-impl",
-    "@lib//:jediterm-core",
-    "@lib//:jediterm-ui",
-    "@lib//:pty4j",
+    "//libraries/jediterm-core",
+    "//libraries/jediterm-ui",
+    "//libraries/pty4j",
     "//platform/execution",
     "//platform/wsl-impl",
     "//platform/util/jdom",
     "//platform/workspace/storage",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "@lib//:jna",
     "//libraries/hash4j",
     "//platform/workspace/jps",
@@ -59,6 +59,7 @@ jvm_library(
     "//platform/diagnostic",
     "//platform/ijent",
     "//platform/ijent/impl",
+    "//platform/forms_rt:java-guiForms-rt",
     "@lib//:rd-core",
     "//platform/rd-platform-community:rd-community",
     "//platform/util/coroutines",
@@ -68,6 +69,7 @@ jvm_library(
     "//platform/kernel/shared:kernel",
     "//platform/project/shared:project",
     "//platform/platform-impl/rpc",
+    "//platform/remote-topics/shared:rpc-topics",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.impl` end
@@ -97,8 +99,11 @@ jvm_library(
     "//platform/util/concurrency:concurrency_test_lib",
     "@lib//:assert_j",
     "//platform/core-ui",
-    "@lib//:jediterm-core",
-    "@lib//:jediterm-ui",
+    "//libraries/jediterm-core",
+    "//libraries/jediterm-ui",
+    "//platform/eel",
+    "//platform/eel-provider",
+    "//platform/forms_rt:java-guiForms-rt",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.tests` end

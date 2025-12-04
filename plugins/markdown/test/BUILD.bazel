@@ -24,6 +24,7 @@ jvm_library(
     "//plugins/markdown/fenceInjection",
     "//plugins/markdown/frontmatter",
     "//plugins/markdown/frontmatter/toml",
+    "//platform/core-impl",
     "//plugins/markdown/frontmatter/yaml",
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -55,10 +56,10 @@ jvm_library(
     "//xml/langInjection",
     "//platform/platform-tests:tests_test_lib",
     "//libraries/jsoup",
-    "@lib//:jcef",
+    "//libraries/jcef",
     "@lib//:assert_j",
     "//platform/util-ex",
-    "@lib//:jetbrains-markdown",
+    "//libraries/markdown",
     "//plugins/toml",
     "//plugins/toml/core",
     "//plugins/yaml/backend",
@@ -66,6 +67,7 @@ jvm_library(
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
     "//xml/testFramework",
+    "//platform/lang-api:lang",
   ]
 )
 ### auto-generated section `build intellij.markdown.tests` end

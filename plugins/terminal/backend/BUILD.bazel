@@ -20,9 +20,9 @@ jvm_library(
     "//platform/ide-core-impl",
     "//platform/projectModel-api:projectModel",
     "//plugins/terminal",
-    "@lib//:jediterm-core",
-    "@lib//:jediterm-ui",
-    "@lib//:pty4j",
+    "//libraries/jediterm-core",
+    "//libraries/jediterm-ui",
+    "//libraries/pty4j",
     "//platform/util/coroutines",
     "//platform/kernel/backend",
     "//platform/project/shared:project",
@@ -31,6 +31,9 @@ jvm_library(
     "//platform/statistics",
     "//platform/core-ui",
     "//platform/lang-api:lang",
+    "//platform/eel",
+    "//platform/eel-provider",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.terminal.backend` end

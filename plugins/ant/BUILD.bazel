@@ -17,11 +17,14 @@ jvm_library(
     "//java/openapi:java",
     "@lib//ant/lib:ant-antlr",
     "//platform/analysis-api:analysis",
+    "//xml/xml-analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/ide-core-impl",
+    "//platform/forms_rt:java-guiForms-rt",
     "//java/compiler/impl",
     "//platform/indexing-api:indexing",
+    "//platform/core-impl",
     "//platform/lang-core",
     "//platform/lvcs-api:lvcs",
     "//platform/macro",
@@ -44,7 +47,7 @@ jvm_library(
     "//xml/dom-impl",
     "//plugins/properties/properties-psi-api:psi",
     "//platform/util/nanoxml",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/statistics",
     "//libraries/fastutil",
     "//platform/external-system-api:externalSystem",
@@ -54,6 +57,7 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io",
     "//platform/util/jdom",
     "//xml/xml-psi-api:psi",
+    "//platform/execution",
   ]
 )
 
@@ -68,11 +72,14 @@ jvm_library(
     "@lib//:junit4",
     "@lib//ant/lib:ant-antlr",
     "//platform/analysis-api:analysis",
+    "//xml/xml-analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/ide-core-impl",
+    "//platform/forms_rt:java-guiForms-rt",
     "//java/compiler/impl",
     "//platform/indexing-api:indexing",
+    "//platform/core-impl",
     "//platform/lang-core",
     "//platform/lvcs-api:lvcs",
     "//platform/macro",
@@ -97,7 +104,7 @@ jvm_library(
     "//xml/dom-impl",
     "//plugins/properties/properties-psi-api:psi",
     "//platform/util/nanoxml",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/statistics",
     "//platform/statistics:statistics_test_lib",
     "//libraries/fastutil",
@@ -111,6 +118,7 @@ jvm_library(
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//xml/xml-psi-api:psi",
     "//xml/testFramework",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.ant` end

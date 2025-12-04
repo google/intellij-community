@@ -36,12 +36,13 @@ jvm_library(
     "//java/java-runtime:rt",
     "@lib//:junit5",
     "@lib//:junit5Launcher",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/platform-util-io:ide-util-io",
     "@lib//:junit5Jupiter",
     "@lib//:junit5Vintage",
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.junit.v5.rt.tests` end

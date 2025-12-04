@@ -221,7 +221,7 @@ public class UsageViewImpl implements UsageViewEx {
 
     myUsageViewTreeCellRenderer = new UsageViewTreeCellRenderer(this);
     if (!myPresentation.isDetachedMode()) {
-      UIUtil.invokeLaterIfNeeded(() -> WriteIntentReadAction.run((Runnable)() -> initInEDT()));
+      UIUtil.invokeLaterIfNeeded(() -> WriteIntentReadAction.run(() -> initInEDT()));
     }
     myExclusionHandler = new ExclusionHandlerEx<>() {
       @Override
@@ -1086,6 +1086,9 @@ public class UsageViewImpl implements UsageViewEx {
     appendUsagesInBulk(allUsages).thenRun(() -> SwingUtilities.invokeLater(() -> {
       if (isDisposed()) return;
       if (myTree != null) {
+        if (!myPresentation.isDetachedMode()) {
+          expandTreeAfterReset();
+        }
         excludeUsages(excludedUsages.toArray(Usage.EMPTY_ARRAY));
         restoreUsageExpandState(states);
         updateImmediately();
@@ -1148,6 +1151,10 @@ public class UsageViewImpl implements UsageViewEx {
 
   private void expandTree(int levels) {
     doExpandingCollapsing(() -> TreeUtil.expand(myTree, levels));
+  }
+
+  private void expandTreeAfterReset() {
+    expandTree(2);
   }
 
   private void doExpandingCollapsing(@NotNull Runnable task) {
@@ -1247,6 +1254,9 @@ public class UsageViewImpl implements UsageViewEx {
 
   public void refreshUsages() {
     reset();
+    if (!myPresentation.isDetachedMode()) {
+      SwingUtilities.invokeLater(() -> expandTreeAfterReset());
+    }
     doReRun();
   }
 
@@ -1278,10 +1288,6 @@ public class UsageViewImpl implements UsageViewEx {
     myBuilder.reset();
     synchronized (modelToSwingNodeChanges) {
       modelToSwingNodeChanges.clear();
-    }
-
-    if (!myPresentation.isDetachedMode()) {
-      SwingUtilities.invokeLater(() -> expandTree(2));
     }
   }
 
@@ -1731,7 +1737,7 @@ public class UsageViewImpl implements UsageViewEx {
     addButtonToLowerPane(new AbstractAction(UIUtil.replaceMnemonicAmpersand(text)) {
       @Override
       public void actionPerformed(ActionEvent e) {
-        runnable.run();
+        WriteIntentReadAction.run(runnable);
       }
     });
   }
@@ -1896,8 +1902,11 @@ public class UsageViewImpl implements UsageViewEx {
   }
 
   private @Nullable Navigatable getNavigatableForNode(@NotNull DefaultMutableTreeNode node, boolean allowRequestFocus) {
-    Object userObject = node.getUserObject();
-    if (userObject instanceof Navigatable navigatable) {
+    Object maybeNavigatable = node;
+    if (!(maybeNavigatable instanceof Navigatable)) {
+      maybeNavigatable = node.getUserObject();
+    }
+    if (maybeNavigatable instanceof Navigatable navigatable) {
       return navigatable.canNavigate() ? new Navigatable() {
         @Override
         public void navigate(boolean requestFocus) {
@@ -1933,9 +1942,7 @@ public class UsageViewImpl implements UsageViewEx {
         protected Navigatable createDescriptorForNode(@NotNull DefaultMutableTreeNode node) {
           if (node.getChildCount() > 0) return null;
           if (node instanceof Node n && n.isExcluded()) return null;
-          try (AccessToken ignore = SlowOperations.knownIssue("IJPL-162332")) {
-            return getNavigatableForNode(node, !myPresentation.isReplaceMode());
-          }
+          return getNavigatableForNode(node, !myPresentation.isReplaceMode());
         }
 
         @Override

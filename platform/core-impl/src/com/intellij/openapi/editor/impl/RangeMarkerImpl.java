@@ -21,15 +21,17 @@ import com.intellij.util.ObjectUtils;
 import com.intellij.util.diff.FilesTooBigForDiffException;
 import org.jetbrains.annotations.*;
 
+import java.util.function.Supplier;
+
 @ApiStatus.Internal
-public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx {
+public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx, Supplier<RangeMarkerEx> {
   private static final Logger LOG = Logger.getInstance(RangeMarkerImpl.class);
 
   private final @NotNull Object myDocumentOrFile; // either VirtualFile (if any) or DocumentEx if no file associated
   @ApiStatus.Internal
   protected volatile RangeMarkerTree.RMNode<RangeMarkerEx> myNode;
-
-  private volatile long myId;
+  @ApiStatus.Internal
+  protected volatile long myId;
   private static final StripedIDGenerator counter = new StripedIDGenerator();
 
   @ApiStatus.Internal
@@ -479,5 +481,10 @@ public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx
     int endOffset = Math.max(startOffset, TextRangeScalarUtil.endOffset(range));
     // piggyback myId to store offsets, to conserve memory
     myId = TextRangeScalarUtil.toScalarRange(startOffset, endOffset); // avoid invalid range
+  }
+
+  @Override
+  public RangeMarkerEx get() {
+    return this;
   }
 }

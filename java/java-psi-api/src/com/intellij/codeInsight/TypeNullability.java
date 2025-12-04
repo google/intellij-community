@@ -4,7 +4,6 @@ package com.intellij.codeInsight;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.PsiTypeParameter;
 import com.intellij.util.containers.ContainerUtil;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,7 +16,6 @@ import java.util.stream.Collectors;
 /**
  * A class that represents nullability of a type, including the nullability itself, and the nullability source.
  */
-@ApiStatus.Experimental
 public final class TypeNullability {
   /**
    * Unknown nullability without the source 
@@ -27,6 +25,10 @@ public final class TypeNullability {
    * Mandated not-null nullability
    */
   public static final TypeNullability NOT_NULL_MANDATED = new TypeNullability(Nullability.NOT_NULL, NullabilitySource.Standard.MANDATED);
+  /**
+   * Known not-null nullability
+   */
+  public static final TypeNullability NOT_NULL_KNOWN = new TypeNullability(Nullability.NOT_NULL, NullabilitySource.Standard.KNOWN);
   /**
    * Mandated nullable nullability
    */
@@ -107,7 +109,7 @@ public final class TypeNullability {
   public @NotNull TypeNullability meet(@NotNull TypeNullability other) {
     if (this.nullability() == other.nullability()) {
       if (this.source().equals(other.source())) return this;
-      return new TypeNullability(Nullability.NOT_NULL, NullabilitySource.multiSource(Arrays.asList(this.source(), other.source())));
+      return new TypeNullability(this.nullability(), NullabilitySource.multiSource(Arrays.asList(this.source(), other.source())));
     }
     if (this.nullability() == Nullability.NOT_NULL) {
       return this;
@@ -125,9 +127,13 @@ public final class TypeNullability {
     }
     NullableNotNullManager manager = NullableNotNullManager.getInstance(parameter.getProject());
     if (manager != null) {
+      NullabilityAnnotationInfo effective = manager.findOwnNullabilityInfo(parameter);
+      if (effective != null) {
+        return effective.toTypeNullability().inherited();
+      }
       NullabilityAnnotationInfo typeUseNullability = manager.findDefaultTypeUseNullability(parameter);
       if (typeUseNullability != null) {
-        return typeUseNullability.toTypeNullability();
+        return typeUseNullability.toTypeNullability().inherited();
       }
     }
     return UNKNOWN;

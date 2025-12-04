@@ -1,12 +1,14 @@
 import sys
-
-from _pydevd_bundle.pydevd_constants import PANDAS_MAX_ROWS, PANDAS_MAX_COLS, PANDAS_MAX_COLWIDTH
-from _pydevd_bundle.pydevd_extension_api import TypeResolveProvider, StrPresentationProvider
+from _pydevd_bundle.custom.pydevd_repr_utils import get_value_repr
+from _pydevd_bundle.pydevd_constants import PANDAS_MAX_ROWS, PANDAS_MAX_COLS, \
+    PANDAS_MAX_COLWIDTH
+from _pydevd_bundle.pydevd_extension_api import TypeResolveProvider, \
+    StrPresentationProvider
 from _pydevd_bundle.pydevd_resolver import inspect, MethodWrapperType
 from _pydevd_bundle.pydevd_utils import Timer
-
-from .pydevd_helpers import find_mod_attr
 from contextlib import contextmanager
+
+from .pydevd_helpers import find_mod_attr, get_contents_debug_adapter_protocol_container
 
 
 def _get_dictionary(obj, replacements):
@@ -88,13 +90,16 @@ class PandasDataFrameTypeResolveProvider(object):
         replacements = {
             # This actually calls: DataFrame.transpose(), which can be expensive, so,
             # let's just add some string representation for it.
-            "T": "<transposed dataframe -- debugger:skipped eval>",
+            # "T": "<transposed dataframe -- debugger:skipped eval>",
             # This creates a whole new dict{index: Series) for each column. Doing a
             # subsequent repr() from this dict can be very slow, so, don't return it.
             "_series": "<dict[index:Series] -- debugger:skipped eval>",
             "style": "<pandas.io.formats.style.Styler -- debugger: skipped eval>",
         }
         return _get_dictionary(obj, replacements)
+
+    def get_contents_debug_adapter_protocol(self, value, fmt):
+        return get_contents_debug_adapter_protocol_container(self, value, fmt)
 
     def get_str_in_context(self, df, context: str):
         """
@@ -109,9 +114,18 @@ class PandasDataFrameTypeResolveProvider(object):
             return repr(df)
         return self.get_str(df)
 
-    def get_str(self, df):
-        with customize_pandas_options():
-            return repr(df)
+    def _to_str_no_trim(self, val):
+        return str(val.tolist()).replace('\n', ',').strip()
+
+    def get_str(self, val, do_trim=True):
+        if do_trim:
+            return get_value_repr(val)
+        try:
+            import numpy as np
+            with np.printoptions(threshold=sys.maxsize):
+                return self._to_str_no_trim(val)
+        except:
+            return self._to_str_no_trim(val)
 
 
 class PandasSeriesTypeResolveProvider(object):
@@ -126,13 +140,16 @@ class PandasSeriesTypeResolveProvider(object):
         replacements = {
             # This actually calls: DataFrame.transpose(), which can be expensive, so,
             # let's just add some string representation for it.
-            "T": "<transposed dataframe -- debugger:skipped eval>",
+            # "T": "<transposed dataframe -- debugger:skipped eval>",
             # This creates a whole new dict{index: Series) for each column. Doing a
             # subsequent repr() from this dict can be very slow, so, don't return it.
             "_series": "<dict[index:Series] -- debugger:skipped eval>",
             "style": "<pandas.io.formats.style.Styler -- debugger: skipped eval>",
         }
         return _get_dictionary(obj, replacements)
+
+    def get_contents_debug_adapter_protocol(self, value, fmt):
+        return get_contents_debug_adapter_protocol_container(self, value, fmt)
 
     def get_str_in_context(self, df, context: str):
         """
@@ -147,9 +164,18 @@ class PandasSeriesTypeResolveProvider(object):
             return repr(df)
         return self.get_str(df)
 
-    def get_str(self, series):
-        with customize_pandas_options():
-            return repr(series)
+    def _to_str_no_trim(self, val):
+        return str(val.tolist()).replace('\n', ',').strip()
+
+    def get_str(self, val, do_trim=True):
+        if do_trim:
+            return get_value_repr(val)
+        try:
+            import numpy as np
+            with np.printoptions(threshold=sys.maxsize):
+                return self._to_str_no_trim(val)
+        except:
+            return self._to_str_no_trim(val)
 
 
 class PandasStylerTypeResolveProvider(object):

@@ -22,7 +22,7 @@ import com.jetbrains.python.packaging.management.hasInstalledPackage
 import com.jetbrains.python.packaging.requirementsTxt.PythonRequirementsTxtManager
 import com.jetbrains.python.packaging.setupPy.SetupPyManager
 import com.jetbrains.python.psi.LanguageLevel
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import com.jetbrains.python.statistics.version
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -117,15 +117,12 @@ class PipManagementInstaller(private val sdk: Sdk, private val manager: PythonPa
     return executeCommand(commandArguments)
   }
 
-  private fun executeCommand(commandArguments: List<String>): Boolean =
-    try {
-      val processHandler = CapturingProcessHandler(GeneralCommandLine(commandArguments))
-      val output: ProcessOutput = processHandler.runProcess()
-      output.exitCode == 0
-    }
-    catch (ex: Exception) {
-      throw ExecutionException(ex.message, ex)
-    }
+  private fun executeCommand(commandArguments: List<String>): Boolean {
+    val processHandler = CapturingProcessHandler(GeneralCommandLine(commandArguments))
+    val output: ProcessOutput = processHandler.runProcess()
+    return output.exitCode == 0
+  }
+
 
   private suspend fun hasPip(): Boolean = manager.hasInstalledPackage(PIP_PACKAGE)
 

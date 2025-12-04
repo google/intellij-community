@@ -1,10 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.ui.editor
 
-import com.intellij.collaboration.async.combineState
-import com.intellij.collaboration.async.mapState
-import com.intellij.collaboration.async.mapStatefulToStateful
-import com.intellij.collaboration.async.stateInNow
+import com.intellij.collaboration.async.*
 import com.intellij.collaboration.ui.codereview.editor.*
 import com.intellij.collaboration.util.ExcludingApproximateChangedRangesShifter
 import com.intellij.collaboration.util.Hideable
@@ -41,14 +38,14 @@ internal class GHPRReviewFileEditorModel internal constructor(
 
   override var shouldHighlightDiffRanges: Boolean by settings::highlightDiffLinesInEditor
 
+  override val canNavigate: Boolean get() = true
+
   @OptIn(ExperimentalCoroutinesApi::class)
   private val linesWithNewCommentsFlow: StateFlow<Set<Int>> =
-    fileVm.newComments.flatMapLatest { vms ->
-      if (vms.isEmpty()) flowOf(emptySet())
-      else combine(vms.map { it.location.map { loc -> loc.lineIdx } }) { lines ->
-        lines.toSet()
-      }
-    }.stateInNow(cs, emptySet())
+    fileVm.newComments.flatMapLatestEach { vm ->
+      vm.location.map { loc -> loc.lineIdx }
+    }.map { it.toSet() }
+      .stateInNow(cs, emptySet())
 
   override val gutterControlsState: StateFlow<CodeReviewEditorGutterControlsModel.ControlsState?> =
     combine(postReviewRanges, fileVm.linesWithComments, linesWithNewCommentsFlow) { postReviewRanges, linesWithComments, newCommentsLines ->
@@ -212,23 +209,23 @@ internal class GHPRReviewFileEditorModel internal constructor(
 
   private inner class ShiftedNewComment(cs: CoroutineScope, vm: GHPRReviewFileEditorNewCommentViewModel)
     : GHPREditorMappedComponentModel.NewComment<GHPRReviewNewCommentEditorViewModel>(vm) {
-    private val originalLocation: GHPRReviewCommentLocation = vm.location.value
-    override val key: Any = "NEW_$originalLocation"
+    private val location: StateFlow<GHPRReviewCommentLocation> = vm.position.mapState { it.location }
+    override val key: Any = "NEW_${location.value}"
     override val isVisible: StateFlow<Boolean> = MutableStateFlow(true)
 
     private val cs = cs.childScope("${this::class.simpleName}")
     private val _range = MutableStateFlow(
-      when (originalLocation) {
+      when (val loc = location.value) {
         is GHPRReviewCommentLocation.SingleLine -> {
-          Side.RIGHT to originalLocation.lineIdx.shiftLineToAfter().let { it..it }
+          Side.RIGHT to loc.lineIdx.shiftLineToAfter().let { it..it }
         }
         is GHPRReviewCommentLocation.MultiLine -> {
-          Side.RIGHT to (originalLocation.startLineIdx.shiftLineToAfter()..originalLocation.lineIdx.shiftLineToAfter())
+          Side.RIGHT to (loc.startLineIdx.shiftLineToAfter()..loc.lineIdx.shiftLineToAfter())
         }
       }
     )
     override val range: StateFlow<Pair<Side, IntRange>?> = _range.asStateFlow()
-    override val line: StateFlow<Int?> = range.mapState { it?.second?.last }
+    override val line: StateFlow<Int?> = location.mapState { it.lineIdx.shiftLineToAfter() }
 
     private val manualRange = MutableStateFlow(range.value)
     private var isManualUpdate = false

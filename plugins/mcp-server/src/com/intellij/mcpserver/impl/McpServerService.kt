@@ -43,6 +43,7 @@ import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
+import io.modelcontextprotocol.kotlin.sdk.server.ServerSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -63,6 +64,11 @@ private val IJ_MCP_AUTH_TOKEN: String = ::IJ_MCP_AUTH_TOKEN.name
 
 @Service(Service.Level.APP)
 class McpServerService(val cs: CoroutineScope) {
+  companion object {
+    fun getInstance(): McpServerService = service()
+    suspend fun getInstanceAsync(): McpServerService = serviceAsync()
+  }
+
   enum class AskCommandExecutionMode {
     ASK,
     DONT_ASK,
@@ -72,12 +78,8 @@ class McpServerService(val cs: CoroutineScope) {
      */
     RESPECT_GLOBAL_SETTINGS,
   }
-  class McpSessionOptions(val commandExecutionMode: AskCommandExecutionMode)
 
-  companion object {
-    fun getInstance(): McpServerService = service()
-    suspend fun getInstanceAsync(): McpServerService = serviceAsync()
-  }
+  class McpSessionOptions(val commandExecutionMode: AskCommandExecutionMode)
 
   private val server = MutableStateFlow(startGlobalServerIfEnabled())
   @OptIn(ExperimentalAtomicApi::class)
@@ -88,8 +90,14 @@ class McpServerService(val cs: CoroutineScope) {
   val isRunning: Boolean
     get() = server.value != null
 
+  private val connectionAddressProvider: McpServerConnectionAddressProvider
+    get() = service()
+
   val serverSseUrl: String
-    get() = "http://127.0.0.1:${port}/sse"
+    get() = connectionAddressProvider.serverSseUrl
+
+  val serverStreamUrl: String
+    get() = connectionAddressProvider.serverStreamUrl
 
   fun start() {
     McpServerSettings.getInstance().state.enableMcpServer = true
@@ -143,16 +151,20 @@ class McpServerService(val cs: CoroutineScope) {
     }
   }
 
-  private fun isKnownToken(token: String): Boolean {
-    return activeAuthorizedSessions.containsKey(token)
-  }
+  private fun isKnownToken(token: String): Boolean = activeAuthorizedSessions.containsKey(token)
 
   private fun getSessionOptions(token: String?): McpSessionOptions {
-    return token?.let { activeAuthorizedSessions[token] } ?: McpSessionOptions(commandExecutionMode = AskCommandExecutionMode.RESPECT_GLOBAL_SETTINGS)
+    return token?.let { activeAuthorizedSessions[it] }
+           ?: McpSessionOptions(commandExecutionMode = AskCommandExecutionMode.RESPECT_GLOBAL_SETTINGS)
   }
 
   val port: Int
     get() = (server.value ?: error("MCP Server is not enabled")).engineConfig.connectors.first().port
+
+  internal fun resolvedConnectorHost(): String? {
+    val currentServer = server.value ?: return null
+    return currentServer.engineConfig.connectors.firstOrNull()?.host?.takeUnless { it.isBlank() }
+  }
 
   internal fun settingsChanged(enabled: Boolean) {
     server.update { currentServer ->
@@ -222,9 +234,9 @@ class McpServerService(val cs: CoroutineScope) {
             finish()
           }
         }
-      }) {
-        // this is added because now Kotlin MCP client doesn't support header adjusting for each request, only for initial one, see McpStdioRunner
-        val projectPath = call.request.headers[IJ_MCP_SERVER_PROJECT_PATH]
+      }) { applicationCall, transport ->
+        // this is added because now a Kotlin MCP client doesn't support header adjusting for each request, only for initial one, see McpStdioRunner
+        val projectPath = applicationCall.request.headers[IJ_MCP_SERVER_PROJECT_PATH]
         val mcpServer = Server(
           Implementation(
             name = "${ApplicationNamesInfo.getInstance().fullProductName} MCP Server",
@@ -235,24 +247,30 @@ class McpServerService(val cs: CoroutineScope) {
               //prompts = ServerCapabilities.Prompts(listChanged = true),
               //resources = ServerCapabilities.Resources(subscribe = true, listChanged = true),
               tools = ServerCapabilities.Tools(listChanged = true),
+              logging = null,
+              experimental = null,
+              sampling = null,
+              prompts = null,
+              resources = null,
             )
           )
         )
-        mcpServer.setRequestHandler<LoggingMessageNotification.SetLevelRequest>(Method.Defined.LoggingSetLevel) { request, extra ->
-          // Workaround inspector failure
-          return@setRequestHandler EmptyRequestResult()
-        }
+        val session = mcpServer.createSession(transport)
+        //session.setRequestHandler<LoggingMessageNotification.SetLevelRequest>(Method.Defined.LoggingSetLevel) { _, _ ->
+        //  // Workaround inspector failure
+        //  return@setRequestHandler EmptyRequestResult()
+        //}
         launch {
           var previousTools: List<McpTool>? = null
           mcpTools.collectLatest { updatedTools ->
             previousTools?.forEach { previousTool ->
               mcpServer.removeTool(previousTool.descriptor.name)
             }
-            mcpServer.addTools(updatedTools.map { it.mcpToolToRegisteredTool(mcpServer, projectPath) })
+            mcpServer.addTools(updatedTools.map { it.mcpToolToRegisteredTool(mcpServer, session, projectPath) })
             previousTools = updatedTools
           }
         }
-        return@mcpPatched mcpServer
+        return@mcpPatched session
       }
     }.start(wait = false)
   }
@@ -267,12 +285,13 @@ class McpServerService(val cs: CoroutineScope) {
     }
   }
 
-  private fun McpTool.mcpToolToRegisteredTool(server: Server, projectPathFromInitialRequest: String?): RegisteredTool {
+  private fun McpTool.mcpToolToRegisteredTool(server: Server, session: ServerSession, projectPathFromInitialRequest: String?): RegisteredTool {
     val tool = toSdkTool()
     return RegisteredTool(tool) { request ->
       val httpRequest = currentCoroutineContext().httpRequestOrNull
       val projectPathFromHeaders = httpRequest?.headers?.get(IJ_MCP_SERVER_PROJECT_PATH) ?: (request._meta[IJ_MCP_SERVER_PROJECT_PATH] as? JsonPrimitive)?.content ?: projectPathFromInitialRequest
       val projectPathFromMcpRequest = (request.arguments[projectPathParameterName] as? JsonPrimitive)?.content
+      @Suppress("IncorrectCancellationExceptionHandling")
       val project = try {
         if (!projectPathFromMcpRequest.isNullOrBlank()) {
           logger.trace { "Project path specified in MCP request: $projectPathFromMcpRequest" }
@@ -287,6 +306,15 @@ class McpServerService(val cs: CoroutineScope) {
         else {
           null
         }
+      }
+      catch (tce: TimeoutCancellationException) {
+        logger.trace { "Calling of tool '${descriptor.name}' has been timed out: ${tce.message}" }
+        return@RegisteredTool McpToolCallResult.error(errorMessage = "Calling of tool '${descriptor.name}' has been timed out: ${tce.message}").toSdkToolCallResult()
+      }
+      // handle it here because it incorrectly handled in the MCP SDK
+      catch (ce: CancellationException) {
+        //logger.trace { "Calling of tool '${descriptor.name}' has been cancelled: ${ce.message}" }
+        return@RegisteredTool McpToolCallResult.error(errorMessage = "Calling of tool '${descriptor.name}' has been cancelled: ${ce.message}").toSdkToolCallResult()
       }
       catch (mcpError: McpExpectedError) {
         return@RegisteredTool McpToolCallResult.error(errorMessage = mcpError.mcpErrorText, structuredContent = mcpError.mcpErrorStructureContent).toSdkToolCallResult()
@@ -303,7 +331,7 @@ class McpServerService(val cs: CoroutineScope) {
 
       val vfsEvent = CopyOnWriteArrayList<VFileEvent>()
       val initialDocumentContents = ConcurrentHashMap<Document, String>()
-      val clientVersion = server.clientVersion ?: Implementation("Unknown MCP client", "Unknown version")
+      val clientVersion = session.clientVersion ?: Implementation("Unknown MCP client", "Unknown version")
 
       val additionalData = McpCallInfo(
         callId = callId.getAndAdd(1),
@@ -476,6 +504,7 @@ private fun McpTool.toSdkTool(): Tool {
   }
   else null
   val tool = Tool(name = descriptor.name,
+                  title = null,
                   description = descriptor.description,
                   inputSchema = Tool.Input(
                     properties = descriptor.inputSchema.propertiesSchema,

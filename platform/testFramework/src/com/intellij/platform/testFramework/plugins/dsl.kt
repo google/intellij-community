@@ -1,7 +1,8 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.plugins
 
-import com.intellij.ide.plugins.ModuleLoadingRule
+import com.intellij.ide.plugins.asParserElement
+import com.intellij.platform.plugins.parser.impl.elements.ModuleLoadingRuleValue
 import org.intellij.lang.annotations.Language
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -36,22 +37,41 @@ fun DependenciesScope.plugin(id: String) {
   plugin.pluginMainModuleDependencies += id
 }
 
-fun DependenciesScope.module(name: String) {
-  plugin.moduleDependencies += name
+fun DependenciesScope.module(name: String, namespace: String? = null) {
+  plugin.moduleDependencies += ModuleDependencySpec(name, namespace)
 }
 
-class ContentScope(internal val plugin: PluginSpecBuilder)
+class ContentScope(internal val plugin: PluginSpecBuilder, internal val namespace: String?)
 
-fun PluginSpecBuilder.content(body: ContentScope.() -> Unit) {
-  val scope = ContentScope(this)
+fun PluginSpecBuilder.content(namespace: String? = null, body: ContentScope.() -> Unit) {
+  val scope = ContentScope(this, namespace)
   scope.body()
 }
 
-fun ContentScope.module(moduleId: String, loadingRule: ModuleLoadingRule = ModuleLoadingRule.OPTIONAL, body: PluginSpecBuilder.() -> Unit) {
+fun ContentScope.module(
+  moduleId: String,
+  loadingRule: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL,
+  requiredIfAvailable: String? = null,
+  body: PluginSpecBuilder.() -> Unit,
+) {
   val moduleBuilder = PluginSpecBuilder()
   moduleBuilder.body()
-  plugin.content += ContentModuleSpec(moduleId, loadingRule, moduleBuilder.build())
+  if (namespace != null) {
+    if (plugin.namespace != null && plugin.namespace != namespace) {
+      error("Only one namespace is allowed in a plugin, but two namespaces ('${plugin.namespace}' and '$namespace') are specified for '${plugin.id}'")
+    }
+    plugin.namespace = namespace
+  }
+  plugin.content += ContentModuleSpec(moduleId, loadingRule, requiredIfAvailable, moduleBuilder.build())
 }
+
+@Deprecated("use overload with ModuleLoadingRuleValue instead")
+fun ContentScope.module(
+  moduleId: String,
+  loadingRule: com.intellij.ide.plugins.ModuleLoadingRule,
+  requiredIfAvailable: String? = null,
+  body: PluginSpecBuilder.() -> Unit,
+): Unit = module(moduleId, loadingRule.asParserElement(), requiredIfAvailable, body)
 
 fun PluginSpecBuilder.extensions(@Language("XML") xml: String, ns: String = "com.intellij") {
   extensions += ExtensionsSpec(ns, xml)

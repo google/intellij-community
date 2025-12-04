@@ -22,6 +22,7 @@ jvm_library(
     "//platform/util",
     "//platform/util-ex",
     "//platform/analysis-impl",
+    "//platform/core-impl",
     "//json/backend",
     "//platform/lang-api:lang",
     "//platform/platform-impl:ide-impl",
@@ -30,8 +31,9 @@ jvm_library(
     "//platform/configuration-store-impl:configurationStore-impl",
     "//platform/object-serializer",
     "//platform/service-container",
-    "@lib//:snakeyaml-engine",
+    "//libraries/snakeyaml-engine",
     "//platform/util/jdom",
+    "//platform/execution",
   ]
 )
 
@@ -51,6 +53,7 @@ jvm_library(
     "//platform/util-ex",
     "//platform/analysis-impl",
     "@lib//:assert_j",
+    "//platform/core-impl",
     "//json/backend",
     "//platform/lang-api:lang",
     "//platform/platform-impl:ide-impl",
@@ -67,8 +70,9 @@ jvm_library(
     "//libraries/jackson/jackson",
     "//platform/service-container",
     "//platform/service-container:service-container_test_lib",
-    "@lib//:snakeyaml-engine",
+    "//libraries/snakeyaml-engine",
     "//platform/util/jdom",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.configurationScript` end
@@ -100,6 +104,7 @@ jvm_library(
     "//java/execution/impl",
     "@lib//:kotlin-stdlib",
     "//platform/lang-core",
+    "//platform/execution",
     "//platform/projectModel-api:projectModel",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",

@@ -142,7 +142,7 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
           element instanceof PyTargetExpression && e != null && PyUtil.inSameFile(element, e) && PyPsiUtils.isBefore(element, e)) {
         continue;
       }
-      results.add(changePropertyMethodToSameNameGetter(r, name));
+      results.add(changePropertyMethodToSameNameGetter(r, name, element));
     }
     return results;
   }
@@ -160,7 +160,19 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
     return false;
   }
 
-  private static @NotNull RatedResolveResult changePropertyMethodToSameNameGetter(@NotNull RatedResolveResult resolveResult, @NotNull String name) {
+  private static @NotNull RatedResolveResult changePropertyMethodToSameNameGetter(@NotNull RatedResolveResult resolveResult,
+                                                                                  @NotNull String name,
+                                                                                  @NotNull PsiElement referenceElement) {
+    PyCallExpression propertyCall = PsiTreeUtil.getParentOfType(referenceElement, PyCallExpression.class);
+    if (propertyCall != null) {
+      // Avoid converting function to property getter when the reference we are resolving sits inside a property(...) call (e.g., property(__getX))
+      // In such context we actually need the bare function, not the property
+      PyCallExpression propertyCallSite = PropertyBunch.findPropertyCallSite(propertyCall);
+      if (propertyCallSite != null) {
+        return resolveResult;
+      }
+    }
+
     final PsiElement element = resolveResult.getElement();
     if (element instanceof PyFunction) {
       final Property property = ((PyFunction)element).getProperty();
@@ -344,7 +356,7 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
   }
 
   private static @Nullable PyClass outermostNestedClass(@NotNull ScopeOwner referenceOwner, @NotNull ScopeOwner resolvedOwner) {
-    PyClass current  = PyUtil.as(referenceOwner, PyClass.class);
+    PyClass current = PyUtil.as(referenceOwner, PyClass.class);
     ScopeOwner outer = ScopeUtil.getScopeOwner(current);
 
     while (outer != resolvedOwner) {
@@ -467,8 +479,8 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
     return null;
   }
 
-   @Override
-   public boolean isReferenceTo(@NotNull PsiElement element) {
+  @Override
+  public boolean isReferenceTo(@NotNull PsiElement element) {
     if (element instanceof PsiFileSystemItem) {
       // may be import via alias, so don't check if names match, do simple resolve check instead
       PsiElement resolveResult = resolve();
@@ -546,7 +558,7 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
       }
       if (PsiTreeUtil.isAncestor(theirContainer, ourContainer, true)) {
         if (ourContainer instanceof PyComprehensionElement && containsDeclaration((PyComprehensionElement)ourContainer, elementName)) {
-            return false;
+          return false;
         }
 
         ScopeOwner owner = ourScopeOwner;
@@ -621,10 +633,12 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
   }
 
   protected boolean resolvesToWrapper(PsiElement element, PsiElement resolveResult) {
-    if (element instanceof PyFunction && ((PyFunction) element).getContainingClass() != null && resolveResult instanceof PyTargetExpression) {
+    if (element instanceof PyFunction &&
+        ((PyFunction)element).getContainingClass() != null &&
+        resolveResult instanceof PyTargetExpression) {
       final PyExpression assignedValue = ((PyTargetExpression)resolveResult).findAssignedValue();
       if (assignedValue instanceof PyCallExpression call) {
-        final Pair<String,PyFunction> functionPair = PyCallExpressionHelper.interpretAsModifierWrappingCall(call);
+        final Pair<String, PyFunction> functionPair = PyCallExpressionHelper.interpretAsModifierWrappingCall(call);
         if (functionPair != null && functionPair.second == element) {
           return true;
         }
@@ -690,7 +704,8 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
       // if we're a normal module, add module's attrs
       if (PyPsiUtils.getRealContext(element).getContainingFile() instanceof PyFile) {
         for (String name : PyModuleType.getPossibleInstanceMembers()) {
-          ret.add(LookupElementBuilder.create(name).withIcon(IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Field)));
+          ret.add(
+            LookupElementBuilder.create(name).withIcon(IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Field)));
         }
       }
 

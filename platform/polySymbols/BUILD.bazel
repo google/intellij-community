@@ -20,6 +20,7 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
+    "//platform/util-ex",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/core-api:core",
     "//libraries/jackson/databind",
@@ -27,7 +28,7 @@ jvm_library(
     "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
     "//libraries/fastutil",
     "//libraries/commons/compress",
-    "@lib//:jetbrains-markdown",
+    "//libraries/markdown",
     "//libraries/gson",
     "//platform/projectModel-api:projectModel",
     "//platform/markdown-utils",
@@ -60,7 +61,7 @@ jvm_library(
     "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
     "//libraries/fastutil",
     "//libraries/commons/compress",
-    "@lib//:jetbrains-markdown",
+    "//libraries/markdown",
     "//libraries/gson",
     "//platform/markdown-utils",
     "//platform/testFramework",
@@ -77,6 +78,12 @@ resourcegroup(
 )
 
 jvm_library(
+  name = "polySymbols-tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "polySymbols-tests_test_lib",
   module_name = "intellij.platform.polySymbols.tests",
   visibility = ["//visibility:public"],
@@ -87,6 +94,7 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/editor-ui-ex:editor-ex",
     "@lib//:junit4",
     "//platform/core-api:core",
@@ -98,7 +106,7 @@ jvm_library(
     "//libraries/jackson/module-kotlin:libraries-jackson-module-kotlin",
     "//libraries/fastutil",
     "//libraries/commons/compress",
-    "@lib//:jetbrains-markdown",
+    "//libraries/markdown",
     "//libraries/gson",
     "//platform/markdown-utils",
     "//platform/markdown-utils:markdown-utils_test_lib",

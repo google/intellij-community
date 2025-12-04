@@ -3,6 +3,8 @@
 package com.intellij.xdebugger;
 
 import com.intellij.execution.configurations.RunProfile;
+import com.intellij.execution.configurations.RunProfileState;
+import com.intellij.execution.runners.AsyncProgramRunner;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.RunContentDescriptor;
@@ -28,7 +30,7 @@ import javax.swing.event.HyperlinkListener;
 
 /**
  * Instances of this class are created by the debugging subsystem
- * when the {@link XDebuggerManager#startSession} or {@link XDebuggerManager#startSessionAndShowTab} method is called.
+ * when the {@link XDebugSessionBuilder#startSession()} method is called.
  * It isn't supposed to be implemented by a plugin.
  * <p>
  * An instance of this class can be obtained from the {@link XDebugProcess#getSession()} method
@@ -166,6 +168,17 @@ public interface XDebugSession extends AbstractDebuggerSession {
   @NlsContexts.TabTitle
   String getSessionName();
 
+  /**
+   * @deprecated Do not use.
+   * <ul>
+   *   <li>Use {@link XSessionStartedResult#getRunContentDescriptor()} to return {@link RunContentDescriptor} instance into {@link AsyncProgramRunner#execute(ExecutionEnvironment, RunProfileState)}.</li>
+   *   <li>Use {@link XDebugProcess#getProcessHandler()} to access {@link com.intellij.execution.process.ProcessHandler}.</li>
+   *   <li>Use {@link XDebugSession#getExecutionEnvironment()} to access execution ID.</li>
+   *   <li>Use {@link XDebugSession#getConsoleView()} as disposable instead.</li>
+   *   <li>See {@link XDebugSession#getUI()} to access UI components.</li>
+   * </ul>
+   */
+  @Deprecated
   @NotNull
   RunContentDescriptor getRunContentDescriptor();
 
@@ -186,6 +199,18 @@ public interface XDebugSession extends AbstractDebuggerSession {
 
   ConsoleView getConsoleView();
 
+  /**
+   * Tab UI should not be configured from a backend session.
+   * <p>
+   * By using this method in RemDev, the tabs are passed to the frontend as LUXed UI.
+   * <p>
+   * To migrate, please use one of the following approaches:
+   * <ul>
+   *   <li>Use {@link XDebugProcess#createTabLayouter()} to create static tabs. Note that this option still uses LUX.</li>
+   *   <li>Use {@link com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy#getSessionTab()} to add a tab on the frontend.</li>
+   * </ul>
+   */
+  @ApiStatus.Obsolete
   @Nullable RunnerLayoutUi getUI();
 
   @ApiStatus.Internal

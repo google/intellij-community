@@ -1,12 +1,14 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.codeInsight.inspections.shared.coroutines
 
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
-internal object CoroutinesIds {
+@ApiStatus.Internal
+object CoroutinesIds {
     val PACKAGE: FqName = FqName("kotlinx.coroutines")
 
     object Job {
@@ -59,7 +61,18 @@ internal object CoroutinesIds {
     object Flows {
         val PACKAGE: FqName = FqName("kotlinx.coroutines.flow")
 
+        object Flow {
+            val ID: ClassId = ClassId(PACKAGE, Name.identifier("Flow"))
+        }
+
+        val count: CallableId = CallableId(PACKAGE, Name.identifier("count"))
+        val filter: CallableId = CallableId(PACKAGE, Name.identifier("filter"))
+        val filterNotNull: CallableId = CallableId(PACKAGE, Name.identifier("filterNotNull"))
+        val first: CallableId = CallableId(PACKAGE, Name.identifier("first"))
+        val firstOrNull: CallableId = CallableId(PACKAGE, Name.identifier("firstOrNull"))
         val flowOn: CallableId = CallableId(PACKAGE, Name.identifier("flowOn"))
+        val map: CallableId = CallableId(PACKAGE, Name.identifier("map"))
+        val mapNotNull: CallableId = CallableId(PACKAGE, Name.identifier("mapNotNull"))
     }
     
     object CoroutineDispatcher {

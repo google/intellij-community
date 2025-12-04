@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_STATIC_FQ_NAME
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 import org.jetbrains.kotlin.utils.SmartList
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.uast.*
@@ -56,9 +57,9 @@ open class KotlinUMethod(
 
     override val psi: PsiMethod = unwrap<UMethod, PsiMethod>(psi)
 
-    override val javaPsi = psi
+    override val javaPsi: PsiMethod = psi
 
-    override fun getSourceElement() = sourcePsi ?: this
+    override fun getSourceElement(): NavigatablePsiElement = sourcePsi ?: this
 
     private val kotlinOrigin = getKotlinMemberOrigin(psi.originalElement) ?: sourcePsi
 
@@ -67,7 +68,7 @@ open class KotlinUMethod(
         return unwrapFakeFileForLightClass(psi.containingFile)
     }
 
-    override fun getNameIdentifier() = UastLightIdentifier(psi, kotlinOrigin)
+    override fun getNameIdentifier(): UastLightIdentifier = UastLightIdentifier(psi, kotlinOrigin)
 
     override val uAnnotations: List<UAnnotation>
         get() = uAnnotationsPart.getOrBuild {
@@ -122,7 +123,7 @@ open class KotlinUMethod(
                 if (!isConstructor && returnType != PsiTypes.voidType()) {
                     append("return ")
                 }
-                append(jvmOverload!!.name)
+                append(jvmOverload!!.name.quoteIfNeeded())
                 callArguments.joinTo(this, prefix = "(", postfix = ")", separator = ", ")
             }
         val trampoline = KtPsiFactory.contextual(sourcePsi ?: javaPsi).createExpression(trampolineText)

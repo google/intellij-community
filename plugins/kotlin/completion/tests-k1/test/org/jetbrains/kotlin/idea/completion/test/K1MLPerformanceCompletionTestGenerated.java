@@ -734,6 +734,16 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/constructor/MultipleConstructors.kt");
             }
 
+            @TestMetadata("NestedEnum.kt")
+            public void testNestedEnum() throws Exception {
+                runTest("../testData/basic/common/constructor/NestedEnum.kt");
+            }
+
+            @TestMetadata("NestedObject.kt")
+            public void testNestedObject() throws Exception {
+                runTest("../testData/basic/common/constructor/NestedObject.kt");
+            }
+
             @TestMetadata("PreferConstructorInReturn.kt")
             public void testPreferConstructorInReturn() throws Exception {
                 runTest("../testData/basic/common/constructor/PreferConstructorInReturn.kt");
@@ -3875,6 +3885,11 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("NoEnumMembersFromImplicitQualifier.kt")
             public void testNoEnumMembersFromImplicitQualifier() throws Exception {
                 runTest("../testData/basic/common/NoEnumMembersFromImplicitQualifier.kt");
+            }
+
+            @TestMetadata("NoExtensionForNull.kt")
+            public void testNoExtensionForNull() throws Exception {
+                runTest("../testData/basic/common/NoExtensionForNull.kt");
             }
 
             @TestMetadata("NoExtensionsAfterQualifier.kt")

@@ -5,7 +5,6 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
 import com.intellij.ide.HelpTooltip;
 import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -17,6 +16,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.debugger.impl.shared.SplitDebuggerAction;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XStackFramesListColorsCache;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.scope.NonProjectFilesScope;
@@ -36,21 +38,19 @@ import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.*;
 import com.intellij.xdebugger.XDebugSession;
-import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XDropFrameHandler;
 import com.intellij.xdebugger.frame.XStackFrame;
+import com.intellij.xdebugger.impl.proxy.MonolithSessionProxyKt;
 import com.intellij.xml.util.XmlStringUtil;
-import kotlinx.coroutines.CoroutineScope;
+import kotlin.Unit;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.Border;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
 import javax.swing.plaf.FontUIResource;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -63,7 +63,6 @@ import static com.intellij.xdebugger.impl.XDebuggerUtilImpl.wrapKeepEditorAreaFo
 public class XDebuggerFramesList extends DebuggerFramesList implements UiCompatibleDataProvider {
   private final Project myProject;
   private final XStackFramesListColorsCache myFileColorsCache;
-  private final @NotNull XFramesAsyncPresentationHandler myPresentationHandler;
   private static final DataKey<XDebuggerFramesList> FRAMES_LIST = DataKey.create("FRAMES_LIST");
 
   private void copyStack() {
@@ -109,16 +108,16 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
   }
 
   public XDebuggerFramesList(@NotNull Project project, @NotNull XDebugSession session) {
-    this(project, XDebugSessionProxyKeeperKt.asProxy(session));
+    this(project, MonolithSessionProxyKt.asProxy(session));
   }
 
   @ApiStatus.Internal
   public XDebuggerFramesList(@NotNull Project project, @Nullable XDebugSessionProxy sessionProxy) {
     myProject = project;
-    myFileColorsCache = sessionProxy == null
-                        ? new OldFileColorsCache(project)
-                        : sessionProxy.createFileColorsCache(this);
-    myPresentationHandler = XFramesAsyncPresentationManager.getInstance(project).createFor(this);
+    myFileColorsCache = sessionProxy == null ? new OldFileColorsCache() : sessionProxy.createFileColorsCache(() -> {
+      SwingUtilities.invokeLater(this::repaint);
+      return Unit.INSTANCE;
+    });
     doInit();
 
     // This is a workaround for the performance issue IDEA-187063
@@ -143,7 +142,6 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
         }
       }
     });
-    getModel().addListDataListener(new PresentationScheduler());
   }
 
   @Override
@@ -245,10 +243,6 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     return position != null ? position.createNavigatable(myProject) : null;
   }
 
-  public void sessionStopped() {
-    myPresentationHandler.sessionStopped();
-  }
-
   private static @Nullable VirtualFile getFile(XStackFrame frame) {
     XSourcePosition position = frame.getSourcePosition();
     return position != null ? position.getFile() : null;
@@ -263,7 +257,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     if (stackFrame instanceof ItemWithCustomBackgroundColor) {
       return ((ItemWithCustomBackgroundColor)stackFrame).getBackgroundColor();
     }
-    return myFileColorsCache.get(stackFrame);
+    return myFileColorsCache.get(stackFrame, myProject);
   }
 
   private class XDebuggerGroupedFrameListRenderer extends GroupedItemsListRenderer {
@@ -386,7 +380,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
         mySelectionForeground = getForeground();
       }
 
-      myPresentationHandler.customizePresentation(stackFrame, this);
+      stackFrame.customizePresentation(this);
 
       // override icon which is set by customizePresentation if needed
       if ((hovered && canDropSomething)
@@ -448,27 +442,23 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
    * @deprecated Only used in old code that doesn't provide a session
    */
   @Deprecated
-  private class OldFileColorsCache extends XStackFramesListColorsCache {
+  private class OldFileColorsCache implements XStackFramesListColorsCache {
     private static final Color NULL_COLOR = JBColor.marker("NULL_COLOR");
     private static final Color COMPUTING_COLOR = JBColor.marker("COMPUTING_COLOR");
     private volatile Map<VirtualFile, Color> myFileColors = new HashMap<>();
 
-    OldFileColorsCache(Project project) {
-      super(project);
-    }
-
     @Override
-    public @Nullable Color get(@NotNull XStackFrame stackFrame) {
+    public @Nullable Color get(@NotNull XStackFrame stackFrame, @NotNull Project project) {
       VirtualFile file = getFile(stackFrame);
       if (file == null) {
         return null;
       }
-      return get(file);
+      return get(file, project);
     }
 
     @RequiresEdt
     @Nullable
-    Color get(@Nullable VirtualFile virtualFile) {
+    Color get(@Nullable VirtualFile virtualFile, @NotNull Project project) {
       if (virtualFile != null) {
         Color res = myFileColors.get(virtualFile);
         if (res != null) {
@@ -479,7 +469,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
           fileColors.put(virtualFile, COMPUTING_COLOR);
           ApplicationManager.getApplication().executeOnPooledThread(() -> {
             if (fileColors == myFileColors) { // check if it is obsolete already
-              Color color = ReadAction.compute(() -> getColorsManager().getFileColor(virtualFile));
+              Color color = ReadAction.compute(() -> FileColorManager.getInstance(project).getFileColor(virtualFile));
               EdtExecutorService.getInstance().execute(() -> {
                 if (fileColors == myFileColors) { // check if it is obsolete already
                   fileColors.put(virtualFile, color == null ? NULL_COLOR : color);
@@ -493,7 +483,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
         }
       }
       else {
-        return getColorsManager().getScopeColor(NonProjectFilesScope.NAME);
+        return FileColorManager.getInstance(project).getScopeColor(NonProjectFilesScope.NAME);
       }
       return null;
     }
@@ -519,7 +509,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     Color getBackgroundColor();
   }
 
-  public static class CopyStackAction extends DumbAwareAction implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
+  public static class CopyStackAction extends DumbAwareAction implements SplitDebuggerAction {
     @Override
     public void update(@NotNull AnActionEvent e) {
       XDebuggerFramesList framesList = e.getData(FRAMES_LIST);
@@ -762,7 +752,7 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
     return session.getDropFrameHandler();
   }
 
-  private static class ResetFrameAction extends DumbAwareAction implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
+  private static class ResetFrameAction extends DumbAwareAction implements SplitDebuggerAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       var inputEvent = e.getInputEvent();
@@ -789,37 +779,6 @@ public class XDebuggerFramesList extends DebuggerFramesList implements UiCompati
           inputEvent.consume();
         }
       }
-    }
-  }
-
-  private class PresentationScheduler implements ListDataListener {
-    @Override
-    public void intervalAdded(ListDataEvent e) {
-      schedulePresentations(e);
-    }
-
-    @Override
-    public void contentsChanged(ListDataEvent e) {
-      schedulePresentations(e);
-    }
-
-    @Override
-    public void intervalRemoved(ListDataEvent e) {
-      if (getModel().isEmpty()) {
-        myPresentationHandler.clear();
-      }
-    }
-
-    private void schedulePresentations(ListDataEvent e) {
-      ArrayList<XStackFrame> frames = new ArrayList<>();
-      for (int i = e.getIndex0(); i <= e.getIndex1(); i++) {
-        Object item = getModel().getElementAt(i);
-        if (item instanceof XStackFrame frame) {
-          frames.add(frame);
-        }
-      }
-      if (frames.isEmpty()) return;
-      myPresentationHandler.scheduleForFrames(frames);
     }
   }
 }

@@ -4,7 +4,6 @@ import com.intellij.codeInsight.highlighting.BackgroundHighlightingUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.application.runReadAction
-import com.intellij.openapi.diagnostic.ExceptionWithAttachments
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
@@ -22,12 +21,14 @@ import com.intellij.util.AwaitCancellationAndInvoke
 import com.intellij.util.awaitCancellationAndInvoke
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.TerminalFontSettingsListener
 import org.jetbrains.plugins.terminal.TerminalFontSettingsService
 import org.jetbrains.plugins.terminal.TerminalFontSizeProviderImpl
 import org.jetbrains.plugins.terminal.block.ui.*
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils
+import java.awt.event.HierarchyEvent
 import javax.swing.JScrollPane
 
 @ApiStatus.Internal
@@ -106,23 +107,28 @@ object TerminalEditorFactory {
     coroutineScope: CoroutineScope,
   ): EditorImpl {
     val editor = TerminalUiUtils.createOutputEditor(document, project, settings, installContextMenu = false)
+    editor.settings.isBlockCursor = false // we paint our own cursor, but this setting affects mouse selection subtly (IJPL-190533)
     editor.contentComponent.focusTraversalKeysEnabled = false
     editor.contextMenuGroupId = "Terminal.ReworkedTerminalContextMenu"
     configureSoftWraps(editor)
     CopyOnSelectionHandler.install(editor, settings)
 
     coroutineScope.awaitCancellationAndInvoke(Dispatchers.UiWithModelAccess) {
-      try {
+      // Check two things:
+      // 1. If it is already disposed by the platform logic (for example, in case of project closing).
+      // 2. Do not dispose if it is still showing because then it will be painted green.
+      if (!editor.isDisposed && !editor.component.isShowing) {
         EditorFactory.getInstance().releaseEditor(editor)
       }
-      catch (ex: Exception) {
-        val details = if (ex is ExceptionWithAttachments) {
-          ex.attachments.map { "${it.path}\n${it.displayText}" }
+    }
+
+    // Since we do not dispose the editor on scope cancellation if it is still showing,
+    // we need to listen for its hiding and dispose it in case the coroutine scope is canceled.
+    editor.component.addHierarchyListener { e ->
+      if (e.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L) {
+        if (!editor.component.isShowing && !editor.isDisposed && !coroutineScope.coroutineContext.isActive) {
+          EditorFactory.getInstance().releaseEditor(editor)
         }
-        else emptyList()
-        // For some reason the call with passing attachments' array doesn't print all of them.
-        // So, pass the attachments as detail strings.
-        LOG.error("Error releasing editor", ex, *details.toTypedArray())
       }
     }
     return editor

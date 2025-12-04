@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplacePutWithAssignment", "ReplaceGetOrSet")
 
 package com.intellij.ide.ui.search
@@ -16,7 +16,7 @@ import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
 import com.intellij.ide.plugins.PluginManagerConfigurable
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader
-import com.intellij.ide.plugins.contentModuleId
+import com.intellij.ide.plugins.contentModuleName
 import com.intellij.ide.ui.search.SearchableOptionsRegistrar.SEARCHABLE_OPTIONS_XML_NAME
 import com.intellij.idea.AppMode
 import com.intellij.l10n.LocalizationUtil
@@ -164,11 +164,16 @@ private suspend fun saveResults(outDir: Path, roots: Map<OptionSetId, List<Confi
                        "-" + SEARCHABLE_OPTIONS_XML_NAME + ".json"
         val file = outDir.resolve(fileName)
         try {
+          val localizableIds = mutableListOf<String>()
           Files.newBufferedWriter(file).use { writer ->
             hash.putInt(value.size)
             for (entry in value) {
+              val id = getKeyByMessage(entry.id)
+              if (id != entry.id) {
+                localizableIds.add(entry.id)
+              }
               val modifiedEntry = entry.copy(
-                id = getKeyByMessage(entry.id),
+                id = id,
                 name = getKeyByMessage(entry.name),
                 entries = entry.entries.mapTo(mutableListOf()) { optionEntry ->
                   optionEntry.copy(
@@ -192,6 +197,9 @@ private suspend fun saveResults(outDir: Path, roots: Map<OptionSetId, List<Confi
               writer.write(encoded)
               writer.append('\n')
             }
+          }
+          if (localizableIds.isNotEmpty()) {
+            println("Searchable options index contains ${localizableIds.size} localizable configurable ids")
           }
         }
         catch (e: CancellationException) {
@@ -365,7 +373,7 @@ private fun getSetIdByPluginDescriptor(pluginDescriptor: PluginDescriptor): Opti
   else {
     return OptionSetId(
       pluginId = pluginDescriptor.pluginId,
-      moduleName = (pluginDescriptor as IdeaPluginDescriptorImpl).contentModuleId?.takeIf { !it.contains('/') },
+      moduleName = (pluginDescriptor as IdeaPluginDescriptorImpl).contentModuleName?.takeIf { !it.contains('/') },
     )
   }
 }

@@ -23,12 +23,14 @@ import org.jetbrains.plugins.terminal.block.completion.TerminalCompletionUtil
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellDataGenerators
 import org.jetbrains.plugins.terminal.block.completion.spec.impl.TerminalCommandCompletionServices
 import org.jetbrains.plugins.terminal.block.reworked.TerminalAliasesStorage
-import org.jetbrains.plugins.terminal.block.reworked.TerminalBlocksModel
-import org.jetbrains.plugins.terminal.block.reworked.TerminalOutputModel
+import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.isReworkedTerminalEditor
 import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils.isSuppressCompletion
 import org.jetbrains.plugins.terminal.exp.completion.TerminalShellSupport
 import org.jetbrains.plugins.terminal.util.ShellType
+import org.jetbrains.plugins.terminal.view.TerminalOutputModel
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalBlocksModel
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandBlock
 
 internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContributor(), DumbAware {
 
@@ -36,8 +38,8 @@ internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContribu
     if (!parameters.editor.isReworkedTerminalEditor) return
     val outputModel = parameters.editor.getUserData(TerminalOutputModel.KEY) ?: return
     val blocksModel = parameters.editor.getUserData(TerminalBlocksModel.KEY) ?: return
-    val lastBlock = blocksModel.blocks.lastOrNull() ?: return
-    val commandStartOffset = lastBlock.commandStartOffset ?: return
+    val commandBlock = blocksModel.activeBlock as? TerminalCommandBlock ?: return
+    val commandStartOffset = commandBlock.commandStartOffset ?: return
 
     if (parameters.completionType != CompletionType.BASIC) {
       return
@@ -66,7 +68,12 @@ internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContribu
 
     val document = parameters.editor.document
     val caretOffset = parameters.editor.caretModel.offset
-    val command = outputModel.getText(commandStartOffset, outputModel.startOffset + caretOffset.toLong())
+    val command = outputModel.getText(commandStartOffset, outputModel.startOffset + caretOffset.toLong()).toString()
+
+    // Save the original command to use in other contexts
+    val completionProcess = parameters.process as? CompletionProcessEx
+    completionProcess?.putUserData(TerminalCommandCompletion.COMPLETING_COMMAND_KEY, command)
+
     val tokens = shellSupport.getCommandTokens(parameters.editor.project!!, command) ?: return
     val allTokens = if (caretOffset != 0 && document.getText(TextRange.create(caretOffset - 1, caretOffset)) == " ") {
       tokens + ""  // user inserted space after the last token, so add empty incomplete token as last
@@ -74,12 +81,20 @@ internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContribu
     else {
       tokens
     }
-    val aliasesStorage = parameters.editor.getUserData(TerminalAliasesStorage.KEY)
 
     if (allTokens.isEmpty()) {
       return
     }
+
+    val prefix = allTokens.last()
+    if (parameters.isAutoPopup && prefix.startsWith("-") && prefix.length <= 2) {
+      // Do not show the completion popup automatically for short options like `-a` or `-h`
+      // Most probably, it will cause only distraction.
+      return
+    }
+
     val suggestions = runBlockingCancellable {
+      val aliasesStorage = parameters.editor.getUserData(TerminalAliasesStorage.KEY)
       val expandedTokens = expandAliases(context, allTokens, aliasesStorage)
       computeSuggestions(expandedTokens, context, parameters.isAutoPopup)
     }
@@ -97,13 +112,13 @@ internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContribu
     val prefix = allTokens.last().substring(prefixReplacementIndex)
     val resultSet = result.withPrefixMatcher(PlainPrefixMatcher(prefix, true))
 
-    // A partial pop-up implementation is required, as users find automatic pop-ups intrusive.
-    // This approach makes the pop-up discoverable while being less disruptive.
-    // The pop-up is triggered only when entering a command's argument
-    // (e.g., file after `ls`, folder after `cd`, branch after `git checkout`).
+    // todo: need to find a better place for checking it
+    //  because determining the context and checking the prefix can be done before computing the completion suggestions.
     if (isAutoPopup && TerminalOptionsProvider.instance.commandCompletionShowingMode == TerminalCommandCompletionShowingMode.ONLY_PARAMETERS) {
-      val containsShellCommand = suggestions.any { it.type == ShellSuggestionType.COMMAND }
-      if (containsShellCommand) {
+      // If ONLY_PARAMETERS mode is specified, show the completion popup only in specific contexts:
+      // when completing command options and arguments (for example, files after `ls`, branches after `git checkout`).
+      // It will make the completion popup less intrusive.
+      if (!isSuggestingParameters(suggestions)) {
         return
       }
     }
@@ -114,6 +129,11 @@ internal class TerminalCommandSpecCompletionContributorGen2 : CompletionContribu
     if (elements.isNotEmpty()) {
       resultSet.stopHere()
     }
+  }
+
+  private fun isSuggestingParameters(suggestions: List<ShellCompletionSuggestion>): Boolean {
+    // Show the popup only if there are no suggestions for subcommands (only options and arguments).
+    return suggestions.none { it.type == ShellSuggestionType.COMMAND }
   }
 
   private suspend fun computeSuggestions(tokens: List<String>, context: TerminalCompletionContext, isAutoPopup: Boolean): List<ShellCompletionSuggestion> {

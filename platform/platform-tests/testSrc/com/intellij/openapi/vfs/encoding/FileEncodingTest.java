@@ -789,7 +789,7 @@ public class FileEncodingTest implements TestDialog {
   public void testUndoChangeEncoding() throws IOException {
     VirtualFile file = createTempFile("txt", NO_BOM, "xxx", StandardCharsets.UTF_8);
     file.setCharset(StandardCharsets.UTF_8);
-    UIUtil.dispatchAllInvocationEvents();
+    PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
     assertEquals(StandardCharsets.UTF_8, file.getCharset());
 
     FileDocumentManager documentManager = FileDocumentManager.getInstance();
@@ -803,7 +803,7 @@ public class FileEncodingTest implements TestDialog {
     assertEquals(StandardCharsets.UTF_8, file.getCharset());
 
     globalUndo();
-    UIUtil.dispatchAllInvocationEvents();
+    PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
 
     assertEquals(WINDOWS_1251, file.getCharset());
     requireNonNull(document.getText());
@@ -1090,7 +1090,7 @@ public class FileEncodingTest implements TestDialog {
       }
       encodingManager.waitAllTasksExecuted();
       UIUtil.dispatchAllInvocationEvents();
-    }).start();
+    }).runAsStressTest().start();
   }
 
   @Test

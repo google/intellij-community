@@ -16,9 +16,12 @@ class RawPluginDescriptor(
 
   val version: String?,
   val sinceBuild: String?,
-  @Deprecated("Deprecated since 2025.2, the value is disregarded if its major part is at least 251. " +
-              "Nonetheless, IDE consults since-until constraints taken directly from the Marketplace, so they can be set there if you need it.")
+  /**
+   * 'until-build' attribute will be deprecated and ignored in future IDE versions.
+   * 'strict-until-build' ([strictUntilBuild]) will be used instead.
+   */
   val untilBuild: String?,
+  val strictUntilBuild: String?,
 
   val `package`: String?,
   val isSeparateJar: Boolean,
@@ -64,7 +67,7 @@ class RawPluginDescriptor(
   val contentModules: List<ContentModuleElement>,
 
   /** Specifies the visibility of this content module. Irrelevant for a main plugin descriptor or config-file in a `<depends>` tag */
-  val moduleVisibility: ModuleVisibility,
+  val moduleVisibility: ModuleVisibilityValue,
 
   val dependencies: List<DependenciesElement>,
 )

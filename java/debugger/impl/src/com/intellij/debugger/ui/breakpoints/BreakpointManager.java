@@ -43,7 +43,11 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.*;
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
 import com.intellij.xdebugger.impl.actions.EditBreakpointAction;
-import com.intellij.xdebugger.impl.breakpoints.*;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerImpl;
+import com.intellij.xdebugger.impl.breakpoints.XDependentBreakpointManager;
+import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointImpl;
+import com.intellij.xdebugger.impl.proxy.MonolithBreakpointProxyKt;
 import com.jetbrains.jdi.EventRequestManagerImpl;
 import com.sun.jdi.InternalException;
 import com.sun.jdi.ThreadReference;
@@ -53,7 +57,6 @@ import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.InvalidRequestStateException;
 import one.util.streamex.StreamEx;
 import org.jdom.Element;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -151,7 +154,7 @@ public class BreakpointManager {
         if (highlighter != null) {
           GutterIconRenderer renderer = highlighter.getGutterIconRenderer();
           if (renderer != null) {
-            EditBreakpointAction.HANDLER.editBreakpoint(myProject, editor, XBreakpointProxyKt.asProxy(xLineBreakpoint), renderer);
+            EditBreakpointAction.HANDLER.editBreakpoint(myProject, editor, MonolithBreakpointProxyKt.asProxy(xLineBreakpoint), renderer);
           }
         }
       }
@@ -249,15 +252,6 @@ public class BreakpointManager {
       }
       return null;
     });
-  }
-
-  /**
-   * @deprecated use {@link #addExceptionBreakpoint(String)}
-   */
-  @ApiStatus.Internal
-  @Deprecated(forRemoval = true)
-  public @Nullable ExceptionBreakpoint addExceptionBreakpoint(final @NotNull String exceptionClassName, final String packageName) {
-    return addExceptionBreakpoint(exceptionClassName);
   }
 
   public @Nullable MethodBreakpoint addMethodBreakpoint(Document document, int lineIndex) {

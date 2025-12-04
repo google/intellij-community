@@ -33,10 +33,12 @@ class PyDataclassInspection : PyInspection() {
     }
   }
 
-  override fun buildVisitor(holder: ProblemsHolder,
-                            isOnTheFly: Boolean,
-                            session: LocalInspectionToolSession): PsiElementVisitor = Visitor(
-    holder,PyInspectionVisitor.getContext(session))
+  override fun buildVisitor(
+    holder: ProblemsHolder,
+    isOnTheFly: Boolean,
+    session: LocalInspectionToolSession,
+  ): PsiElementVisitor = Visitor(
+    holder, PyInspectionVisitor.getContext(session))
 
   private class Visitor(holder: ProblemsHolder, context: TypeEvalContext) : PyInspectionVisitor(holder, context) {
 
@@ -227,7 +229,7 @@ class PyDataclassInspection : PyInspection() {
       if (StreamEx
           .of(cls).append(cls.getAncestorClasses(myTypeEvalContext))
           .mapNotNull { parseDataclassParameters(it, myTypeEvalContext) }
-          .any { it.frozen }) {
+          .any { it.frozen == true }) {
         registerProblem(expression,
                         PyPsiBundle.message("INSP.dataclasses.object.attribute.read.only", cls.name, expression.name),
                         ProblemHighlightType.GENERIC_ERROR)
@@ -318,7 +320,7 @@ class PyDataclassInspection : PyInspection() {
                         ProblemHighlightType.GENERIC_ERROR)
       }
 
-      if (dataclassParameters.frozen && mutatingMethodsExist) {
+      if (dataclassParameters.frozen == true && mutatingMethodsExist) {
         registerProblem(dataclassParameters.frozenArgument,
                         PyPsiBundle.message("INSP.dataclasses.frozen.attribute.should.be.false.if.class.defines.setattr.or.delattr"),
                         ProblemHighlightType.GENERIC_ERROR)
@@ -359,7 +361,8 @@ class PyDataclassInspection : PyInspection() {
           "__repr__" -> reprMethod = it
           "__str__" -> strMethod = it
           "__eq__",
-          in ORDER_OPERATORS -> cmpMethods.add(it)
+          in ORDER_OPERATORS,
+            -> cmpMethods.add(it)
           "__setattr__", "__delattr__" -> mutatingMethods.add(it)
           PyNames.HASH -> hashMethod = it
         }
@@ -386,7 +389,7 @@ class PyDataclassInspection : PyInspection() {
         cmpMethods.forEach { problems.add(it to "cmp/order") }
       }
 
-      if (dataclassParameters.frozen && mutatingMethods.isNotEmpty()) {
+      if (dataclassParameters.frozen == true && mutatingMethods.isNotEmpty()) {
         mutatingMethods.forEach { problems.add(it to "frozen") }
       }
 
@@ -402,7 +405,7 @@ class PyDataclassInspection : PyInspection() {
         }
       }
 
-      if (dataclassParameters.order && dataclassParameters.frozen && hashMethod != null) {
+      if (dataclassParameters.order && dataclassParameters.frozen == true && hashMethod != null) {
         registerProblem(hashMethod?.nameIdentifier,
                         PyPsiBundle.message("INSP.dataclasses.hash.ignored.if.class.already.defines.cmp.or.order.or.frozen.parameters"),
                         ProblemHighlightType.GENERIC_ERROR_OR_WARNING)
@@ -474,9 +477,11 @@ class PyDataclassInspection : PyInspection() {
         sameAttrInitializers
           .asSequence()
           .drop(1)
-          .forEach { registerProblem(it.nameIdentifier,
-                                     PyPsiBundle.message("INSP.dataclasses.attribute.default.set.using.method", first.name),
-                                     ProblemHighlightType.GENERIC_ERROR) }
+          .forEach {
+            registerProblem(it.nameIdentifier,
+                            PyPsiBundle.message("INSP.dataclasses.attribute.default.set.using.method", first.name),
+                            ProblemHighlightType.GENERIC_ERROR)
+          }
       }
     }
 
@@ -596,10 +601,12 @@ class PyDataclassInspection : PyInspection() {
       }
     }
 
-    private fun processPostInitDefinition(cls: PyClass,
-                                          postInit: PyFunction,
-                                          dataclassParameters: PyDataclassParameters,
-                                          localInitVars: List<PyType?>) {
+    private fun processPostInitDefinition(
+      cls: PyClass,
+      postInit: PyFunction,
+      dataclassParameters: PyDataclassParameters,
+      localInitVars: List<PyType?>,
+    ) {
       if (!dataclassParameters.init) {
         registerProblem(postInit.nameIdentifier,
                         PyPsiBundle.message("INSP.dataclasses.post.init.would.not.be.called.until.init.parameter.set.to.true"),

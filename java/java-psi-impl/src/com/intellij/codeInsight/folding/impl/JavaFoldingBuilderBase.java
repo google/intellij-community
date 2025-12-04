@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.folding.impl;
 
 import com.intellij.codeInsight.daemon.impl.CollectHighlightsUtil;
@@ -113,15 +113,9 @@ public abstract class JavaFoldingBuilderBase extends CustomFoldingBuilder implem
   }
 
   private static @NotNull TextRange annotationRange(@NotNull PsiAnnotation annotation) {
-    PsiElement element = annotation;
-    int startOffset = element.getTextRange().getStartOffset();
-    PsiElement last = element;
-    while (element instanceof PsiAnnotation) {
-      last = element;
-      element = PsiTreeUtil.skipWhitespacesAndCommentsForward(element);
-    }
-
-    return new TextRange(startOffset, last.getTextRange().getEndOffset());
+    TextRange parameterListRange = annotation.getParameterList().getTextRange();
+    int startOffset = parameterListRange.getStartOffset();
+    return new TextRange(startOffset, parameterListRange.getEndOffset());
   }
 
   public static boolean hasErrorElementsNearby(@NotNull PsiFile file, int startOffset, int endOffset) {
@@ -162,20 +156,19 @@ public abstract class JavaFoldingBuilderBase extends CustomFoldingBuilder implem
                                            @NotNull Document document) {
     if (modifierList == null) return;
     PsiElement[] children = modifierList.getChildren();
-    for (int i = 0; i < children.length; i++) {
+    for (int i = 0; i < children.length;) {
       PsiElement child = children[i];
       if (child instanceof PsiAnnotation) {
         PsiAnnotation annotation = (PsiAnnotation)child;
-        addToFold(list, annotation, document, false, "@{...}", annotationRange(annotation), JavaCodeFoldingSettings.getInstance().isCollapseAnnotations());
-        int j;
-        for (j = i + 1; j < children.length; j++) {
-          PsiElement nextChild = children[j];
-          if (nextChild instanceof PsiModifier) break;
-        }
-
-        //noinspection AssignmentToForLoopParameter
-        i = j;
+        addToFold(list, annotation, document, false, "(...)", annotationRange(annotation), JavaCodeFoldingSettings.getInstance().isCollapseAnnotations());
+        annotation.acceptChildren(new NestedAnnotationsVisitor(list, document));
       }
+      int j;
+      for (j = i + 1; j < children.length; j++) {
+        PsiElement nextChild = children[j];
+        if (nextChild instanceof PsiModifier || nextChild instanceof PsiAnnotation) break;
+      }
+      i = j;
     }
   }
 
@@ -195,20 +188,23 @@ public abstract class JavaFoldingBuilderBase extends CustomFoldingBuilder implem
                                        @NotNull PsiComment comment,
                                        @NotNull Document document,
                                        @NotNull Set<? super PsiElement> processedComments) {
-    final FoldingDescriptor commentDescriptor = CommentFoldingUtil.getCommentDescriptor(comment, document, processedComments,
-                                                                                        element -> isCustomRegionElement(element),
-                                                                                        isCollapseCommentByDefault(comment));
-    if (commentDescriptor != null) {
-      if (comment instanceof PsiDocComment && ((PsiDocComment)comment).isMarkdownComment()) {
-        // Hack: Markdown comments aren't documented in the Commenter for the Java language
-        // To avoid the `/** */` tokens, we remove them
-        String placeHolderText = commentDescriptor.getPlaceholderText();
-        if (placeHolderText != null) {
-          placeHolderText = StringUtil.trimEnd(StringUtil.trimStart(placeHolderText, "/**"), "*/");
-          commentDescriptor.setPlaceholderText(placeHolderText);
-        }
-      }
+    final FoldingDescriptor commentDescriptor;
+    if (comment instanceof PsiDocComment && ((PsiDocComment)comment).isMarkdownComment()) {
+      // FIXME: inline documentation comments aren't supported in the Commenter interface
+      if (!processedComments.add(comment)) return;
+      String placeholder = CommentFoldingUtil.getCommentPlaceholder(document, JavaDocElementType.DOC_COMMENT, comment.getTextRange());
+      if (placeholder == null) placeholder = "/// ...";
+      // Hack: Markdown comments aren't documented in the Commenter for the Java language
+      // To avoid the `/** */` tokens, we remove them
+      placeholder = StringUtil.trimEnd(StringUtil.trimStart(placeholder, "/**"), "*/");
+      commentDescriptor = new FoldingDescriptor(comment.getNode(), comment.getTextRange(), null, placeholder, isCollapseCommentByDefault(comment), Collections.emptySet());
+    } else {
+      commentDescriptor = CommentFoldingUtil.getCommentDescriptor(comment, document, processedComments,
+                                                                  element -> isCustomRegionElement(element),
+                                                                  isCollapseCommentByDefault(comment));
+    }
 
+    if (commentDescriptor != null) {
       list.add(commentDescriptor);
     }
   }
@@ -432,7 +428,7 @@ public abstract class JavaFoldingBuilderBase extends CustomFoldingBuilder implem
       // So, our point is to preserve fold descriptor referencing javadoc PSI element.
       if (candidate != null && candidate.getTextRange().equals(range)) {
         ASTNode node = candidate.getNode();
-        if (node != null && node.getElementType() == JavaDocElementType.DOC_COMMENT) {
+        if (node != null && JavaDocElementType.DOC_COMMENT_TOKENS.contains(node.getElementType())) {
           anchorElementToUse = candidate;
         }
       }
@@ -755,5 +751,20 @@ public abstract class JavaFoldingBuilderBase extends CustomFoldingBuilder implem
       return parent == null || parent.getElementType() != JavaElementType.CLASS;
     }
     return nodeType == JavaElementType.CODE_BLOCK;
+  }
+
+  private static class NestedAnnotationsVisitor extends JavaRecursiveElementWalkingVisitor {
+    @NotNull private final List<? super FoldingDescriptor> myList;
+    @NotNull private final Document myDocument;
+
+    private NestedAnnotationsVisitor(@NotNull List<? super FoldingDescriptor> list, @NotNull Document document) {
+      myList = list;
+      myDocument = document;
+    }
+
+    @Override
+    public void visitAnnotation(@NotNull PsiAnnotation annotation) {
+      addToFold(myList, annotation, myDocument, false, "(...)", annotationRange(annotation), JavaCodeFoldingSettings.getInstance().isCollapseAnnotations());
+    }
   }
 }

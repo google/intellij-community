@@ -9,10 +9,8 @@ import org.jetbrains.annotations.Nullable;
 
 public final class JavaPluginUtil {
 
-  private static final boolean is82OrBetter = GradleVersionUtil.isCurrentGradleAtLeast("8.2");
-
   private static @NotNull JavaPluginAccessor getJavaPluginAccessor(@NotNull Project p) {
-    if (is82OrBetter) {
+    if (GradleVersionUtil.isCurrentGradleAtLeast("8.2")) {
       return new ExtensionJavaPluginAccessor(p);
     }
     else {

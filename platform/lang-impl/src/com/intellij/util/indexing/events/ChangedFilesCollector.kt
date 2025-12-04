@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing.events
 
 import com.intellij.history.LocalHistory
@@ -36,6 +36,12 @@ import kotlin.concurrent.withLock
 
 private val LOG = logger<ChangedFilesCollector>()
 
+private const val MIN_CHANGES_TO_PROCESS_ASYNC = 20
+
+/**
+ * Collects file changes supplied from VFS via [AsyncFileListener] into [eventMerger].
+ * Collected changes could be accessed via [getEventMerger]
+ */
 @ApiStatus.Internal
 class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope) : IndexedFilesListener() {
   val dirtyFiles: DirtyFiles = DirtyFiles()
@@ -46,6 +52,7 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
     override fun onAdvance(phase: Int, registeredParties: Int): Boolean = false
   }
 
+  /** Used in [ensureUpToDateAsync] to process changes asynchronously */
   private val vfsEventsExecutor = createBoundedTaskExecutor("FileBasedIndex Vfs Event Processor", coroutineScope)
   private val scheduledVfsEventsWorkers = AtomicInteger()
   private val fileBasedIndex = FileBasedIndex.getInstance() as FileBasedIndexImpl
@@ -73,7 +80,7 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
         // so we don't need to clear collectors.
         return@runReadAction
       }
-      processFilesInReadAction(VfsEventProcessor { true })
+      processFilesInReadAction { true }
     }
   }
 
@@ -136,7 +143,7 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
   }
 
   fun ensureUpToDateAsync() {
-    if (eventMerger.approximateChangesCount < 20 || !scheduledVfsEventsWorkers.compareAndSet(0, 1)) {
+    if (eventMerger.approximateChangesCount < MIN_CHANGES_TO_PROCESS_ASYNC || !scheduledVfsEventsWorkers.compareAndSet(0, 1)) {
       return
     }
 
@@ -145,7 +152,7 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
       return
     }
 
-    vfsEventsExecutor.execute(Runnable {
+    vfsEventsExecutor.execute {
       try {
         processFilesInReadActionWithYieldingToWriteAction()
 
@@ -166,7 +173,7 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
       finally {
         scheduledVfsEventsWorkers.decrementAndGet()
       }
-    })
+    }
   }
 
   fun processFilesToUpdateInReadAction() {
@@ -176,35 +183,38 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
 
       override fun process(info: VfsEventsMerger.ChangeInfo): Boolean {
         LOG.debug("Processing ", info)
+        val fileId = info.fileId
         try {
           val fileId = info.getFileId()
           val file = info.file
-          val dirtyQueueProjects = dirtyFiles.getProjects(info.getFileId())
+          val dirtyQueueProjects = dirtyFiles.getProjects(fileId)
           if (info.isTransientStateChanged) {
             fileBasedIndex.doTransientStateChangeForFile(fileId, file, dirtyQueueProjects)
           }
           if (info.isContentChanged) {
-            fileBasedIndex.scheduleFileForIncrementalIndexing(fileId, file, true, dirtyQueueProjects)
+            fileBasedIndex.scheduleFileForIncrementalIndexing(fileId, file, /*onlyContentChanged: */true, dirtyQueueProjects)
           }
           if (info.isFileRemoved) {
-            fileBasedIndex.doInvalidateIndicesForFile(fileId, file, emptySet(), dirtyQueueProjects)
+            fileBasedIndex.doInvalidateIndicesForFile(fileId, file, /*containingProjects: */emptySet(), dirtyQueueProjects)
           }
           if (info.isFileAdded) {
-            fileBasedIndex.scheduleFileForIncrementalIndexing(fileId, file, false, dirtyQueueProjects)
+            fileBasedIndex.scheduleFileForIncrementalIndexing(fileId, file, /*onlyContentChanged: */false, dirtyQueueProjects)
           }
+
+
           if (StubIndexImpl.PER_FILE_ELEMENT_TYPE_STUB_CHANGE_TRACKING_SOURCE ==
             StubIndexImpl.PerFileElementTypeStubChangeTrackingSource.ChangedFilesCollector) {
             perFileElementTypeUpdateProcessor.processUpdate(file)
           }
         }
         catch (t: Throwable) {
-          if (LOG.isDebugEnabled()) {
+          if (LOG.isDebugEnabled()) {//FIXME RC: what if it is PCE? -- must be re-thrown without logging
             LOG.debug("Exception while processing $info", t)
           }
           throw t
         }
         finally {
-          dirtyFiles.removeFile(info.getFileId())
+          dirtyFiles.removeFile(fileId)
         }
         return true
       }
@@ -235,12 +245,12 @@ class ChangedFilesCollector internal constructor(coroutineScope: CoroutineScope)
         override fun process(changeInfo: VfsEventsMerger.ChangeInfo): Boolean {
           withLock(fileBasedIndex.writeLock) {
             try {
-              ProgressManager.getInstance().executeNonCancelableSection(Runnable {
+              ProgressManager.getInstance().executeNonCancelableSection {
                 processor.process(changeInfo)
-              })
+              }
             }
             finally {
-              IndexingStamp.flushCache(changeInfo.getFileId())
+              IndexingStamp.flushCache(changeInfo.fileId)
             }
           }
           return true

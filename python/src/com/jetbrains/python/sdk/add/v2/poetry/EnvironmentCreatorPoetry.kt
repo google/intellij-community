@@ -5,30 +5,26 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.*
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.observable.properties.ObservableMutableProperty
+import com.intellij.openapi.observable.properties.ObservableProperty
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.ui.validation.DialogValidationRequestor
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.python.community.impl.poetry.poetryPath
+import com.intellij.python.community.impl.poetry.common.poetryPath
 import com.intellij.python.pyproject.PyProjectToml
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bindSelected
-import com.intellij.util.text.nullize
 import com.jetbrains.python.PyBundle
-import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.errorProcessing.ErrorSink
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.newProjectWizard.collector.PythonNewProjectWizardCollector
 import com.jetbrains.python.poetry.PoetryPyProjectTomlPythonVersionsService
 import com.jetbrains.python.poetry.findPoetryToml
-import com.jetbrains.python.sdk.add.v2.CustomNewEnvironmentCreator
+import com.jetbrains.python.sdk.add.v2.*
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMethod.SELECT_EXISTING
-import com.jetbrains.python.sdk.add.v2.PythonMutableTargetAddInterpreterModel
 import com.jetbrains.python.sdk.add.v2.PythonSupportedEnvironmentManagers.POETRY
 import com.jetbrains.python.sdk.add.v2.PythonSupportedEnvironmentManagers.PYTHON
 import com.jetbrains.python.sdk.add.v2.VenvExistenceValidationState.Error
 import com.jetbrains.python.sdk.add.v2.VenvExistenceValidationState.Invisible
-import com.jetbrains.python.sdk.add.v2.getBasePath
 import com.jetbrains.python.sdk.basePath
 import com.jetbrains.python.sdk.poetry.configurePoetryEnvironment
 import com.jetbrains.python.sdk.poetry.createNewPoetrySdk
@@ -42,16 +38,19 @@ import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.exists
-import kotlin.io.path.pathString
 
-internal class EnvironmentCreatorPoetry(
-  model: PythonMutableTargetAddInterpreterModel,
+internal class EnvironmentCreatorPoetry<P : PathHolder>(
+  model: PythonMutableTargetAddInterpreterModel<P>,
   private val module: Module?,
   errorSink: ErrorSink,
-) : CustomNewEnvironmentCreator("poetry", model, errorSink) {
+) : CustomNewEnvironmentCreator<P>("poetry", model, errorSink) {
   override val interpreterType: InterpreterType = InterpreterType.POETRY
-  override val executable: ObservableMutableProperty<String> = model.state.poetryExecutable
+  override val toolValidator: ToolValidator<P> = model.poetryViewModel.toolValidator
   override val installationVersion: String = "1.8.0"
+  override val toolExecutable: ObservableProperty<ValidatedPath.Executable<P>?> = model.poetryViewModel.poetryExecutable
+  override val toolExecutablePersister: suspend (P) -> Unit = { pathHolder ->
+    savePathForEelOnly(pathHolder) { path -> PropertiesComponent.getInstance().poetryPath = path.toString() }
+  }
 
   private val isInProjectEnvFlow = MutableStateFlow(service<PoetryConfigService>().state.isInProjectEnv)
   private val isInProjectEnvProp = propertyGraph.property(isInProjectEnvFlow.value)
@@ -69,6 +68,8 @@ internal class EnvironmentCreatorPoetry(
   }
 
   override fun onShown(scope: CoroutineScope) {
+    super.onShown(scope)
+
     scope.launch(Dispatchers.IO) {
       val moduleDir = model.getBasePath(module).let { VirtualFileManager.getInstance().findFileByNioPath(it) }
 
@@ -102,18 +103,12 @@ internal class EnvironmentCreatorPoetry(
     }
   }
 
-  override fun savePathToExecutableToProperties(path: Path?) {
-    val savingPath = path?.pathString ?: executable.get().nullize() ?: return
-    PropertiesComponent.getInstance().poetryPath = savingPath
-  }
-
-  override suspend fun setupEnvSdk(moduleBasePath: Path, baseSdks: List<Sdk>, basePythonBinaryPath: PythonBinary?, installPackages: Boolean): PyResult<Sdk> {
+  override suspend fun setupEnvSdk(moduleBasePath: Path, baseSdks: List<Sdk>, basePythonBinaryPath: P?, installPackages: Boolean): PyResult<Sdk> {
     module?.let { service<PoetryConfigService>().setInProjectEnv(it) }
-    return createNewPoetrySdk(moduleBasePath,  baseSdks, basePythonBinaryPath, installPackages)
-  }
-
-  override suspend fun detectExecutable() {
-    model.detectPoetryExecutable()
+    return when (basePythonBinaryPath) {
+      is PathHolder.Eel -> createNewPoetrySdk(moduleBasePath, baseSdks, basePythonBinaryPath.path, installPackages)
+      else -> return PyResult.localizedError(PyBundle.message("target.is.not.supported", basePythonBinaryPath))
+    }
   }
 
   override fun onVenvSelectExisting() {

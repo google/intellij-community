@@ -11,6 +11,7 @@
     <extensionPoint qualifiedName="com.intellij.database.datagrid.valueEditorTab" interface="com.intellij.database.run.ui.ValueEditorTab" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.database.datagrid.cellViewerFactory" interface="com.intellij.database.run.ui.CellViewerFactory" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.database.minimizedFormatDetector" interface="com.intellij.database.run.ui.MinimizedFormatDetector" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.database.datagrid.customToolbarProvider" interface="com.intellij.database.datagrid.CustomGridToolbarProvider" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -30,6 +31,10 @@
                  description="Factor for cache size for rendered table cells"/>
     <registryKey key="database.grid.show.chart.tab" defaultValue="true" restartRequired="false"
                  description="Adds 'Show Chart' action to DG tables in editor, inlay and services."/>
+    <uiDataRule implementation="com.intellij.database.run.ui.TableResultPanelUIDataRule"
+                id="TableResultPanelDataRule" order="before BasicUiDataRule"/>
+    <uiDataRule implementation="com.intellij.database.run.ui.InnerEditorsTableResultPanelUIDataRule"
+                id="InnerEditorsTableResultPanelUIDataRule" order="before TableResultPanelDataRule"/>
     <applicationService serviceInterface="com.intellij.database.extensions.ExtensionsService" serviceImplementation="com.intellij.database.extensions.ExtensionsServiceImpl"/>
     <database.datagrid.valueEditorTab implementation="com.intellij.database.run.ui.AggregateValueEditorTab"/>
     <database.datagrid.valueEditorTab implementation="com.intellij.database.run.ui.EditorValueEditorTab"/>

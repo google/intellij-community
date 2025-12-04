@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.NlsActions;
 import com.intellij.platform.execution.serviceView.ServiceModel.ServiceViewItem;
 import com.intellij.ui.ClientProperty;
 import com.intellij.ui.PopupHandler;
@@ -42,6 +43,7 @@ public final class ServiceViewActionProvider {
   private static final @NonNls String SERVICE_VIEW_TREE_TOOLBAR = "ServiceViewTreeToolbar";
 
   static final DataKey<List<ServiceViewItem>> SERVICES_SELECTED_ITEMS = DataKey.create("services.selected.items");
+  static final DataKey<List<ServiceViewDescriptorId>> SERVICES_SELECTED_DESCRIPTOR_IDS = DataKey.create("services.selected.descriptor.ids");
 
   private static final ServiceViewActionProvider ourInstance = new ServiceViewActionProvider();
 
@@ -269,7 +271,7 @@ public final class ServiceViewActionProvider {
     }
   };
 
-  public static final class DefaultFrontendServiceViewActionGroup extends DefaultActionGroup
+  public static class DefaultFrontendServiceViewActionGroup extends DefaultActionGroup
     implements ActionRemoteBehaviorSpecification.Frontend {
 
     public DefaultFrontendServiceViewActionGroup() {
@@ -281,6 +283,10 @@ public final class ServiceViewActionProvider {
 
     public DefaultFrontendServiceViewActionGroup(@NotNull List<? extends AnAction> actions) {
       super(actions);
+    }
+
+    public DefaultFrontendServiceViewActionGroup(@Nullable @NlsActions.ActionText String name, boolean popup) {
+      super(name, popup);
     }
   }
 

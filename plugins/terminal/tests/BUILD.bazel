@@ -8,6 +8,12 @@ resourcegroup(
 )
 
 jvm_library(
+  name = "tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "tests_test_lib",
   module_name = "intellij.terminal.tests",
   visibility = ["//visibility:public"],
@@ -40,13 +46,19 @@ jvm_library(
     "//plugins/sh/plugin",
     "//platform/code-style-api:codeStyle",
     "@lib//:assert_j",
-    "@lib//:jediterm-core",
-    "@lib//:jediterm-ui",
-    "@lib//:pty4j",
+    "//libraries/jediterm-core",
+    "//libraries/jediterm-ui",
+    "//libraries/pty4j",
     "//libraries/guava",
     "@lib//:junit4",
     "//platform/eel-provider",
     "//platform/lang-impl",
+    "//platform/testFramework/junit5/eel",
+    "//platform/testFramework/junit5/eel:eel_test_lib",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/platform-impl/eel:ide-impl-wsl",
+    "//platform/execution",
   ]
 )
 ### auto-generated section `build intellij.terminal.tests` end

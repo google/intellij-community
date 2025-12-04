@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.actions.searcheverywhere;
 
 import com.intellij.accessibility.TextFieldWithListAccessibleContext;
@@ -190,7 +190,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     myListFactory = new MixedListFactory();
 
     if (myMlService != null) {
-      myMlService.onSessionStarted(myProject, new SearchEverywhereMixedListInfo(myListFactory));
+      myMlService.onSessionStarted(myProject, myHeader.getSelectedTab().getID(), new SearchEverywhereMixedListInfo(myListFactory));
     }
 
     init();
@@ -434,12 +434,18 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     boolean isIncomplete = !myProject.getService(IncompleteDependenciesService.class).getState().isComplete();
     if (!isDumb && !isIncomplete) return null;
 
-    boolean containsPSIContributors = ContainerUtil.exists(contributors, c -> c instanceof AbstractGotoSEContributor ||
-                                                                              c instanceof PSIPresentationBgRendererWrapper);
-    if (!containsPSIContributors) return null;
+    boolean containsPSIOrActionContributors = ContainerUtil.exists(contributors, c -> c instanceof AbstractGotoSEContributor ||
+                                                                              c instanceof PSIPresentationBgRendererWrapper ||
+                                                                              c instanceof ActionSearchEverywhereContributor);
+
+    if (!containsPSIOrActionContributors) return null;
 
     return isDumb
-           ? new Pair<>(IdeBundle.message("dumb.mode.results.might.be.incomplete"), IdeBundle.message("dumb.mode.results.might.be.incomplete.during.project.analysis"))
+           ? ContainerUtil.all(contributors, c -> c instanceof ActionSearchEverywhereContributor)
+             ? new Pair<>(IdeBundle.message("dumb.mode.analyzing.project"),
+                          IdeBundle.message("dumb.mode.some.actions.might.be.unavailable.during.project.analysis"))
+             : new Pair<>(IdeBundle.message("dumb.mode.analyzing.project"),
+                          IdeBundle.message("dumb.mode.results.might.be.incomplete.during.project.analysis"))
            : new Pair<>(IdeBundle.message("incomplete.mode.results.might.be.incomplete"), null);
   }
 
@@ -510,6 +516,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     sink.set(CommonDataKeys.PROJECT, myProject);
     sink.set(SELECTED_ITEM_INFO, onlyItem);
     sink.set(PlatformCoreDataKeys.SELECTED_ITEM, onlyItem == null ? null : onlyItem.getElement());
+    sink.set(CommonDataKeys.LANGUAGE, SearchEverywhereLanguage.INSTANCE);
     sink.set(PlatformCoreDataKeys.SELECTED_ITEMS,
              ContainerUtil.map2Array(selection, Object.class, SearchEverywhereFoundElementInfo::getElement));
     sink.lazy(PlatformCoreDataKeys.PSI_ELEMENT_ARRAY, () -> {
@@ -729,7 +736,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
 
     OnePixelSplitter splitter = new OnePixelSplitter(true, .33f);
     splitter.setSplitterProportionKey(SPLITTER_SERVICE_KEY);
-    splitter.getDivider().setBackground(OnePixelDivider.BACKGROUND);
+    splitter.getDivider().setBackground(JBUI.CurrentTheme.Separator.color());
     splitter.setFirstComponent(resultScroll);
     splitter.setSecondComponent(myUsagePreviewPanel);
 
@@ -849,9 +856,9 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     String tabId = myHeader.getSelectedTab().getID();
     if (myMlService != null) {
       myMlService.onSearchRestart(
-        myProject, tabId, reason,
+        tabId, reason,
         mySearchTypingListener.mySymbolKeysTyped, mySearchTypingListener.myBackspacesTyped, namePattern,
-        () -> myListModel.getFoundElementsInfo(),
+        myListModel.getFoundElementsInfo(),
         getSelectedSearchScope(myHeader.getSelectedTab()), myHeader.isEverywhere()
       );
     }
@@ -962,7 +969,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     registerSelectItemAction();
 
     AnAction escape = ActionManager.getInstance().getAction("EditorEscape");
-    DumbAwareAction.create(__ -> sendStatisticsAndClose())
+    DumbAwareAction.create(__ -> closePopup())
       .registerCustomShortcutSet(escape == null ? CommonShortcuts.ESCAPE : escape.getShortcutSet(), this);
 
     mySearchField.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -1064,11 +1071,12 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
     Component oppositeComponent = e.getOppositeComponent();
     if (!isHintComponent(oppositeComponent) && !UIUtil.haveCommonOwner(this, oppositeComponent)) {
-      sendStatisticsAndClose();
+      closePopup();
     }
   }
 
-  static boolean isExtendedInfoEnabled() {
+  @ApiStatus.Internal
+  public static boolean isExtendedInfoEnabled() {
     return Registry.is("search.everywhere.footer.extended.info") || ApplicationManager.getApplication().isInternal();
   }
 
@@ -1076,7 +1084,8 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     return SearchEverywhereManager.getInstance(myProject).isPreviewEnabled();
   }
 
-  private static boolean isPreviewActive() {
+  @ApiStatus.Internal
+  public static boolean isPreviewActive() {
     return UISettings.getInstance().getShowPreviewInSearchEverywhere();
   }
 
@@ -1324,7 +1333,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
       var tabId = myHeader.getSelectedTab().getID();
       var correctIndexes = hasNotificationElement ? Arrays.stream(indexes).map(i -> (i - 1)).toArray() : indexes;
       myMlService.onItemSelected(
-        myProject, tabId, correctIndexes, selectedItems, () -> myListModel.getFoundElementsInfo(), closePopup, searchText);
+        tabId, correctIndexes, selectedItems, ContainerUtil.copyList(myListModel.getFoundElementsInfo()), searchText);
     }
 
     for (int i : indexes) {
@@ -1380,20 +1389,14 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
   }
 
-  @VisibleForTesting
-  public void sendStatisticsAndClose() {
-    if (isShowing() || ApplicationManager.getApplication().isUnitTestMode()) {
-      if (myMlService != null) {
-        myMlService.onSearchFinished(
-          myProject, () -> myListModel.getFoundElementsInfo()
-        );
-      }
-    }
-    closePopup();
-  }
-
   @Override
   public void closePopup() {
+    if (isShowing() || ApplicationManager.getApplication().isUnitTestMode()) {
+      if (myMlService != null) {
+        myMlService.onSearchFinished(ContainerUtil.copyList(myListModel.getFoundElementsInfo()));
+      }
+    }
+
     ActionMenu.showDescriptionInStatusBar(true, myResultsList, null);
     stopSearching();
     searchFinishedHandler.run();
@@ -1562,7 +1565,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
       else {
         showInFindWindow(targets, usages, presentation);
       }
-      sendStatisticsAndClose();
+      closePopup();
     }
 
     private static void fillUsages(Collection<Object> foundElements,

@@ -100,6 +100,7 @@ public final class ThreadLeakTracker {
       JVMResponsivenessMonitor.MONITOR_THREAD_NAME,
       "Keep-Alive-SocketCleaner", // Thread[Keep-Alive-SocketCleaner,8,InnocuousThreadGroup], JBR-11
       "Keep-Alive-Timer",
+      "LocalEventBusServerThread", // com.intellij.tools.ide.starter.bus.shared.server.LocalEventBusServer
       "main",
       "Monitor Ctrl-Break",
       "Netty ",
@@ -251,6 +252,8 @@ public final class ThreadLeakTracker {
            || isStarterTestFramework(stackTrace)
            || isJMXRemoteCall(stackTrace)
            || isBuildLogCall(stackTrace)
+           || isVirtualThreadUnblocker(stackTrace)
+           || isJfrPeriodicTasks(stackTrace)
            || isIjentMediatorThread(stackTrace)
            || windowsCompletionPortLeakForDocker(stackTrace)
            || isSwingAccessibilityThread(stackTrace);
@@ -417,6 +420,32 @@ public final class ThreadLeakTracker {
 
     return ContainerUtil.exists(stackTrace, element -> element.getClassName().contains("org.jetbrains.intellij.build.ConsoleSpanExporter"));
   }
+
+  /**
+   * Virtual thread unblocker is a special physical thread that tries to unblock virtual threads that are stuck on monitor acquisition.
+   */
+  private static boolean isVirtualThreadUnblocker(StackTraceElement[] stackTrace) {
+    // at java.base/java.lang.VirtualThread.takeVirtualThreadListToUnblock(Native Method)
+    // at java.base/java.lang.VirtualThread.unblockVirtualThreads(VirtualThread.java:1507)
+    // at java.base/java.lang.Thread.run(Thread.java:1474)
+    // at java.base/jdk.internal.misc.InnocuousThread.run(InnocuousThread.java:148)
+    return stackTrace[0].getClassName().equals("java.lang.VirtualThread") && stackTrace[0].getMethodName().equals("takeVirtualThreadListToUnblock")
+      && stackTrace[1].getClassName().equals("java.lang.VirtualThread") && stackTrace[1].getMethodName().equals("unblockVirtualThreads");
+  }
+
+  /**
+   * JFR threads just sleep ignoring InterruptedException.
+   */
+  private static boolean isJfrPeriodicTasks(StackTraceElement[] stackTrace) {
+    // at java.base/java.lang.Object.wait0(Native Method)
+    // at java.base/java.lang.Object.wait(Object.java:366)
+    // at jdk.jfr/jdk.jfr.internal.PlatformRecorder.takeNap(PlatformRecorder.java:559)
+    // at jdk.jfr/jdk.jfr.internal.PlatformRecorder.periodicTask(PlatformRecorder.java:527)
+    // at jdk.jfr/jdk.jfr.internal.PlatformRecorder.lambda$startDiskMonitor$1(PlatformRecorder.java:446)
+    // at java.base/java.lang.Thread.run(Thread.java:1583)
+    return stackTrace.length >= 3 && stackTrace[2].getClassName().equals("jdk.jfr.internal.PlatformRecorder") && stackTrace[2].getMethodName().equals("takeNap");
+  }
+
 
   /**
    * We permit leaking IJent threads if IJent is intended to be shared for the whole application

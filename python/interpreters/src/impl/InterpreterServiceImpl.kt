@@ -7,19 +7,21 @@ import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.python.community.execService.ExecService
 import com.intellij.python.community.execService.python.advancedApi.ExecutablePython
-import com.intellij.python.community.execService.python.advancedApi.validatePythonAndGetVersion
+import com.intellij.python.community.execService.python.advancedApi.validatePythonAndGetInfo
 import com.intellij.python.community.interpreters.Interpreter
 import com.intellij.python.community.interpreters.InterpreterService
 import com.intellij.python.community.interpreters.impl.PyInterpreterBundle.message
 import com.intellij.python.community.interpreters.spi.InterpreterProvider
 import com.jetbrains.python.PyToolUIInfo
+import com.jetbrains.python.PythonInfo
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
-import com.jetbrains.python.sdk.PythonSdkUtil
 import com.jetbrains.python.sdk.flavors.PyFlavorData
 import com.jetbrains.python.sdk.getOrCreateAdditionalData
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil.isPythonSdk
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import kotlin.io.path.Path
@@ -28,25 +30,21 @@ internal object InterpreterServiceImpl : InterpreterService {
   private val logger = fileLogger()
   override suspend fun getInterpreters(projectDir: Path): List<Interpreter> {
 
-    val sdkAndDatas = PythonSdkUtil.getAllSdks()
-      .map { Pair(it.getOrCreateAdditionalData(), it) }
-      .filter { (data, _) -> sdkApplicableToThePath(data, projectDir) }
+    val interpreters = PythonSdkUtil.getAllSdks().mapNotNull { pythonSdk ->
+      val data = pythonSdk.getOrCreateAdditionalData()
+      if (!sdkApplicableToThePath(data, projectDir)) return@mapNotNull null
 
-
-    val result = mutableListOf<Interpreter>()
-    for ((additionalData, sdk) in sdkAndDatas) {
-      val interpreter = findInterpreter(additionalData, sdk)
-      result.add(interpreter)
+      findInterpreter(data, pythonSdk)
     }
-    return result
+
+    return interpreters
   }
 
   override suspend fun getForModule(module: Module): Interpreter? {
-    val sdk = ModuleRootManager.getInstance(module).sdk ?: return null
-    if (sdk.sdkAdditionalData !is PythonSdkAdditionalData) {
-      return null
-    }
-    return findInterpreter(sdk.getOrCreateAdditionalData(), sdk)
+    val pythonSdk = PythonSdkUtil.findPythonSdk(module)?.takeIf { isPythonSdk(it) } ?: return null
+    val data = pythonSdk.getOrCreateAdditionalData()
+
+    return findInterpreter(data, pythonSdk)
   }
 
   private suspend fun findInterpreter(
@@ -91,11 +89,11 @@ private suspend fun <T : PyFlavorData> createInterpreter(provider: InterpreterPr
     }
     is Result.Success -> {
       val executablePython = r.result
-      val languageLevel = sdk.versionString?.let { LanguageLevel.fromPythonVersionSafe(it) }
-                          ?: ExecService().validatePythonAndGetVersion(executablePython).getOr {
-                            return InvalidInterpreterImpl(SdkMixin(sdk, additionalData), message("py.interpreter.no.version", it.error.message))
-                          }
-      return ValidInterpreterImpl(languageLevel, executablePython, SdkMixin(sdk, additionalData), provider.ui)
+      val pythonInfo = sdk.versionString?.let { LanguageLevel.fromPythonVersionSafe(it) }?.let { PythonInfo(it) }
+                       ?: ExecService().validatePythonAndGetInfo(executablePython).getOr {
+                         return InvalidInterpreterImpl(SdkMixin(sdk, additionalData), message("py.interpreter.no.version", it.error.message))
+                       }
+      return ValidInterpreterImpl(pythonInfo, executablePython, SdkMixin(sdk, additionalData), provider.ui)
     }
   }
 }

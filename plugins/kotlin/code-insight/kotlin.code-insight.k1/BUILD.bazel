@@ -20,12 +20,13 @@ jvm_library(
     "//platform/core-api:core",
     "//plugins/kotlin/base/fe10/analysis",
     "//plugins/kotlin/base/code-insight",
+    "//platform/core-impl",
     "//plugins/kotlin/idea",
     "//plugins/kotlin/core",
     "@lib//:kotlinc-kotlin-compiler-fe10",
     "//java/java-psi-api:psi",
     "//platform/lang-impl",
-    "//plugins/kotlin/kotlin.ide:ide",
+    "//plugins/kotlin/kotlin.ide",
   ]
 )
 
@@ -42,6 +43,7 @@ jvm_library(
     "//plugins/kotlin/base/fe10/analysis",
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
+    "//platform/core-impl",
     "//plugins/kotlin/idea",
     "//plugins/kotlin/core",
     "@lib//:kotlinc-kotlin-compiler-fe10",
@@ -57,7 +59,7 @@ jvm_library(
     "//plugins/kotlin/tests-common:tests-common_test_lib",
     "//plugins/kotlin/plugin/k1",
     "//platform/lang-impl",
-    "//plugins/kotlin/kotlin.ide:ide",
+    "//plugins/kotlin/kotlin.ide",
   ]
 )
 ### auto-generated section `build kotlin.code-insight.k1` end

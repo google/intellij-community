@@ -5,6 +5,7 @@
 
 package com.intellij.openapi.wm.impl
 
+import com.intellij.codeWithMe.ClientId
 import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.PluginException
@@ -13,10 +14,10 @@ import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.UiActivity
 import com.intellij.ide.UiActivityMonitor
 import com.intellij.ide.actions.ActivateToolWindowAction
-import com.intellij.ide.actions.MaximizeActiveDialogAction
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.plugins.PluginManager
 import com.intellij.ide.ui.UISettings
+import com.intellij.ide.ui.toggleMaximized
 import com.intellij.internal.statistic.collectors.fus.actions.persistence.ToolWindowCollector
 import com.intellij.notification.impl.NotificationsManagerImpl
 import com.intellij.openapi.Disposable
@@ -184,6 +185,18 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       var ratio = partSize.toFloat() / totalSize
       ratio += (((partSize.toFloat() + direction) / totalSize) - ratio) / 2
       return ratio
+    }
+
+    @ApiStatus.Internal
+    fun applyAltColors() {
+      for (frameHelper in WindowManager.getInstance().allProjectFrames) {
+        val manager = getInstance(frameHelper.project ?: continue) as ToolWindowManagerEx
+        for (toolwindow in manager.toolWindows) {
+          if (toolwindow is ToolWindowImpl) {
+            toolwindow.updateContentBackgroundColors()
+          }
+        }
+      }
     }
   }
 
@@ -465,8 +478,12 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       for (entry in idToEntry.values) {
         if (entry.readOnlyWindowInfo.isVisible) {
           val decorator = entry.toolWindow.decorator ?: continue
-          decorator.repaint()
-          decorator.updateActiveAndHoverState()
+          // The tool window can be split, so we need to update the hover state in all cells.
+          val cells = decorator.getOrderedCells()
+          for (cell in cells) {
+            cell.repaint()
+            cell.updateActiveAndHoverState()
+          }
         }
       }
       revalidateStripeButtons()
@@ -580,6 +597,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
     connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
       override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+        if (!ClientId.isCurrentlyUnderLocalId) return
         coroutineScope.launch(Dispatchers.EDT) {
           focusManager.doWhenFocusSettlesDown(ExpirableRunnable.forProject(project) {
             if (!FileEditorManager.getInstance(project).hasOpenFiles()) {
@@ -1691,34 +1709,21 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       SwingUtilities.invokeLater(show)
     }
   }
+  
+  fun getToolWindowButton(toolWindowId: String): JComponent? {
+    val entry = idToEntry.get(toolWindowId) ?: return null
+    return findBallonAlignment(entry, toolWindowId).first
+  }
 
   private fun notifySquareButtonByBalloon(options: ToolWindowBalloonShowOptions) {
     val entry = idToEntry.get(options.toolWindowId)!!
     entry.balloon?.let(Disposer::dispose)
 
+    val (button, position) = findBallonAlignment(entry, options.toolWindowId)
+    
     val anchor = entry.readOnlyWindowInfo.anchor
-    var position = when (anchor) {
-      ToolWindowAnchor.TOP -> Balloon.Position.atRight
-      ToolWindowAnchor.RIGHT -> Balloon.Position.atRight
-      ToolWindowAnchor.BOTTOM -> Balloon.Position.atLeft
-      ToolWindowAnchor.LEFT -> Balloon.Position.atLeft
-      else -> Balloon.Position.atLeft
-    }
-
     val balloon = createBalloon(options, entry)
     val toolWindowPane = getToolWindowPane(entry.readOnlyWindowInfo.safeToolWindowPaneId)
-    val buttonManager = toolWindowPane.buttonManager as ToolWindowPaneNewButtonManager
-    var button = buttonManager.getSquareStripeFor(entry.readOnlyWindowInfo.anchor).getButtonFor(options.toolWindowId)?.getComponent()
-    if (button == null && entry.readOnlyWindowInfo.anchor == ToolWindowAnchor.BOTTOM) {
-      button = buttonManager.getSquareStripeFor(ToolWindowAnchor.RIGHT).getButtonFor(options.toolWindowId)?.getComponent()
-      if (button != null && button.isShowing) {
-        position = Balloon.Position.atRight
-      }
-    }
-    if (button == null || !button.isShowing) {
-      button = buttonManager.getMoreButton(getMoreButtonSide())
-      position = Balloon.Position.atLeft
-    }
     val show = Runnable {
       val tracker: PositionTracker<Balloon>
       if (entry.toolWindow.isVisible &&
@@ -1757,6 +1762,36 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     else {
       SwingUtilities.invokeLater(show)
     }
+  }
+
+  private fun findBallonAlignment(
+    entry: ToolWindowEntry,
+    toolWindowId: String,
+  ): Pair<JComponent, Balloon.Position> {
+    val anchor = entry.readOnlyWindowInfo.anchor
+    var position = when (anchor) {
+      ToolWindowAnchor.TOP -> Balloon.Position.atRight
+      ToolWindowAnchor.RIGHT -> Balloon.Position.atRight
+      ToolWindowAnchor.BOTTOM -> Balloon.Position.atLeft
+      ToolWindowAnchor.LEFT -> Balloon.Position.atLeft
+      else -> Balloon.Position.atLeft
+    }
+
+    val toolWindowPane = getToolWindowPane(entry.readOnlyWindowInfo.safeToolWindowPaneId)
+    val buttonManager = toolWindowPane.buttonManager as ToolWindowPaneNewButtonManager
+    var button = buttonManager.getSquareStripeFor(anchor).getButtonFor(toolWindowId)?.getComponent()
+    if (button == null && anchor == ToolWindowAnchor.BOTTOM) {
+      button = buttonManager.getSquareStripeFor(ToolWindowAnchor.RIGHT).getButtonFor(toolWindowId)?.getComponent()
+      if (button != null && button.isShowing) {
+        position = Balloon.Position.atRight
+      }
+    }
+    if (button == null || !button.isShowing) {
+      button = buttonManager.getMoreButton(getMoreButtonSide())
+      position = Balloon.Position.atLeft
+    }
+
+    return Pair<JComponent, Balloon.Position>(button, position)
   }
 
   private fun createPositionTracker(component: Component, anchor: ToolWindowAnchor): PositionTracker<Balloon> {
@@ -2136,7 +2171,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   override fun setMaximized(window: ToolWindow, maximized: Boolean) {
     if (window.type == ToolWindowType.FLOATING && window is ToolWindowImpl) {
-      MaximizeActiveDialogAction.doMaximize(idToEntry.get(window.id)?.floatingDecorator)
+      idToEntry.get(window.id)?.floatingDecorator?.toggleMaximized()
       return
     }
 

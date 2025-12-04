@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.service.project;
 
-import com.intellij.build.events.MessageEvent;
 import com.intellij.execution.configurations.ParametersList;
 import com.intellij.gradle.toolingExtension.impl.model.sourceSetDependencyModel.DefaultGradleSourceSetDependencyModel;
 import com.intellij.gradle.toolingExtension.impl.model.sourceSetModel.DefaultGradleSourceSetModel;
@@ -45,18 +44,19 @@ import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.model.ProjectModel;
 import org.gradle.tooling.model.build.BuildEnvironment;
+import org.gradle.tooling.model.dsl.GradleDslBaseScriptModel;
 import org.gradle.tooling.model.idea.IdeaModule;
 import org.gradle.tooling.model.idea.IdeaProject;
 import org.jetbrains.annotations.*;
-import org.jetbrains.plugins.gradle.issue.DeprecatedGradleVersionIssue;
-import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix;
 import org.jetbrains.plugins.gradle.model.*;
 import org.jetbrains.plugins.gradle.model.data.BuildParticipant;
 import org.jetbrains.plugins.gradle.model.data.BuildScriptClasspathData;
 import org.jetbrains.plugins.gradle.model.data.CompositeBuildData;
 import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData;
 import org.jetbrains.plugins.gradle.remote.impl.GradleLibraryNamesMixer;
-import org.jetbrains.plugins.gradle.service.execution.*;
+import org.jetbrains.plugins.gradle.service.execution.GradleExecutionHelper;
+import org.jetbrains.plugins.gradle.service.execution.GradleInitScriptUtil;
+import org.jetbrains.plugins.gradle.service.execution.GradleWrapperHelper;
 import org.jetbrains.plugins.gradle.service.modelAction.GradleIdeaModelHolder;
 import org.jetbrains.plugins.gradle.service.modelAction.GradleModelFetchActionRunner;
 import org.jetbrains.plugins.gradle.service.syncAction.impl.GradleSyncProjectConfigurator;
@@ -283,15 +283,14 @@ public final class GradleProjectResolver implements ExternalSystemProjectResolve
       .spanBuilder("GradleCall")
       .startSpan();
     try (Scope ignore = gradleCallSpan.makeCurrent()) {
+      if (GradleVersionUtil.isGradleAtLeast(resolverContext.getGradleVersion(), "9.2")) {
+        var scriptModel = GradleExecutionHelper.getModel(connection, resolverContext, GradleDslBaseScriptModel.class);
+        models.addRootModel(GradleDslBaseScriptModel.class, scriptModel);
+        GradleSyncProjectConfigurator.runScriptBasePhase(resolverContext);
+      }
+
       var modelFetchActionResultHandler = GradleSyncProjectConfigurator.createModelFetchResultHandler(resolverContext);
       GradleModelFetchActionRunner.runAndTraceBuildAction(connection, resolverContext, buildAction, modelFetchActionResultHandler);
-
-      var gradleVersion = resolverContext.getGradleVersion();
-      if (GradleJvmSupportMatrix.isGradleDeprecatedByIdea(gradleVersion)) {
-        var projectPath = resolverContext.getProjectPath();
-        var issue = new DeprecatedGradleVersionIssue(gradleVersion, projectPath);
-        resolverContext.report(MessageEvent.Kind.WARNING, issue);
-      }
     }
     catch (Throwable t) {
       gradleCallErrorsCount += 1;

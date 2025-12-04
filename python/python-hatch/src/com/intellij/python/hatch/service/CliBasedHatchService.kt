@@ -7,6 +7,7 @@ import com.intellij.platform.eel.getOr
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.python.hatch.*
 import com.intellij.python.hatch.cli.ENV_TYPE_VIRTUAL
 import com.intellij.python.hatch.cli.HatchEnvironment
@@ -61,7 +62,7 @@ internal class CliBasedHatchService private constructor(
     }
   }
 
-  override suspend fun isHatchManagedProject(): PyResult<Boolean> {
+  override suspend fun isHatchManagedProject(): Boolean {
     val isHatchManaged = withContext(Dispatchers.IO) {
       when {
         workingDirectoryPath.resolve("hatch.toml").exists() -> true
@@ -72,7 +73,7 @@ internal class CliBasedHatchService private constructor(
         }
       }
     }
-    return Result.success(isHatchManaged)
+    return isHatchManaged
   }
 
 
@@ -92,6 +93,9 @@ internal class CliBasedHatchService private constructor(
 
     return Result.success(available)
   }
+
+  override suspend fun findDefaultVirtualEnvironmentOrNull(): PyResult<HatchVirtualEnvironment?> =
+    findVirtualEnvironments().mapSuccess { envs -> envs.singleOrNull { it.hatchEnvironment == HatchEnvironment.DEFAULT } }
 
 
   override suspend fun createNewProject(projectName: String): PyResult<ProjectStructure> {
@@ -138,6 +142,7 @@ private fun HatchEnvironments.getAvailableVirtualHatchEnvironments(): List<Hatch
         HatchEnvironment(
           name = envName,
           type = type,
+          features = features,
           dependencies = dependencies,
           environmentVariables = environmentVariables,
           scripts = scripts,

@@ -228,15 +228,12 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
 
     final PyExpression qualifier = getQualifier();
     if (qualifier == null) return null;
-    
+
     final String attrName = getName();
     if (attrName == null) return null;
 
     final PyType qualifierType = context.getType(qualifier);
 
-    final PyType dunderClassType = getDunderClassType(qualifierType, attrName);
-    if (dunderClassType != null) return Ref.create(dunderClassType);
-    
     final Ref<PyType> typeOfProperty = getTypeOfProperty(qualifierType, attrName, context);
     if (typeOfProperty != null) {
       return typeOfProperty;
@@ -259,12 +256,12 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
     // - PyTypingTypeProvider checks if qualifier's class has a type annotation for 'this_name'
     //   and returns that annotated type if found
     // - If no providers return a type, falls back to returning the type of the assigned value
-    
+
     final PyType typeByControlFlow = getQualifiedReferenceTypeByControlFlow(context);
     if (typeByControlFlow != null) {
       return Ref.create(typeByControlFlow);
     }
-    
+
     return null;
   }
 
@@ -272,10 +269,9 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
     final PyExpression qualifier = getQualifier();
     assert qualifier != null;
 
-    final PyType qType = context.getType(qualifier);
-    if (qType instanceof PyClassType classType) {
+    if (context.getType(qualifier) instanceof PyClassLikeType classLikeType) {
       final ResolveResult getattr = ContainerUtil.getFirstItem(
-        classType.resolveMember(PyNames.GETATTR, qualifier, AccessDirection.READ, PyResolveContext.defaultContext(context)));
+        classLikeType.resolveMember(PyNames.GETATTR, qualifier, AccessDirection.READ, PyResolveContext.defaultContext(context)));
       if (getattr != null && getattr.getElement() instanceof PyCallable method) {
         return context.getReturnType(method);
       }
@@ -360,14 +356,6 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
     return null;
   }
 
-  private static @Nullable PyType getDunderClassType(@Nullable PyType qualifierType, @NotNull String attrName) {
-    if (qualifierType instanceof PyClassType classType && PyNames.__CLASS__.equals(attrName)) {
-      // PyInstantiableType#toClass() does not work here, as we also need to remove generic parameters
-      return new PyClassTypeImpl(classType.getPyClass(), true);
-    }
-    return null;
-  }
-
   private @Nullable PyType getTypeFromProviders(@NotNull TypeEvalContext context) {
     for (PyTypeProvider provider : PyTypeProvider.EP_NAME.getExtensionList()) {
       try {
@@ -441,7 +429,7 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
       if (scopeOwner != null &&
           name != null &&
           (!ScopeUtil.getElementsOfAccessType(name, scopeOwner, ReadWriteInstruction.ACCESS.ASSERTTYPE).isEmpty()
-            || target instanceof PyTargetExpression || target instanceof PyNamedParameter)) {
+           || target instanceof PyTargetExpression || target instanceof PyNamedParameter)) {
         final PyType type = getTypeByControlFlow(name, context, anchor, scopeOwner);
         if (type != null) {
           return type;
@@ -489,8 +477,7 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
                                                              @NotNull TypeEvalContext context,
                                                              @NotNull PyReferenceExpression anchor) {
     if (type instanceof PyFunctionType functionType && context.maySwitchToAST(anchor) && anchor.getQualifier() != null) {
-      PyType qualifierType = context.getType(anchor.getQualifier());
-      if (qualifierType instanceof PyClassLikeType classLikeType && classLikeType.isDefinition() &&
+      if (context.getType(anchor.getQualifier()) instanceof PyClassLikeType classLikeType && classLikeType.isDefinition() &&
           functionType.getModifier() != PyAstFunction.Modifier.CLASSMETHOD) {
         return type;
       }
@@ -572,7 +559,8 @@ public class PyReferenceExpressionImpl extends PyElementImpl implements PyRefere
       myQualifiers = qualifiers;
     }
 
-    public static @NotNull MultiFollowQueueNode create(@Nullable MultiFollowQueueNode previous, @NotNull PyReferenceExpression referenceExpression) {
+    public static @NotNull MultiFollowQueueNode create(@Nullable MultiFollowQueueNode previous,
+                                                       @NotNull PyReferenceExpression referenceExpression) {
       final PyExpression qualifier = referenceExpression.getQualifier();
       final List<PyExpression> previousQualifiers = previous == null ? Collections.emptyList() : previous.myQualifiers;
       final List<PyExpression> newQualifiers = qualifier == null ? previousQualifiers : ContainerUtil.append(previousQualifiers, qualifier);

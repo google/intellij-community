@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.pycharm.community.ide.impl.newProjectWizard.welcome
 
 import com.intellij.execution.RunManager
@@ -31,6 +31,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
+import com.intellij.openapi.wm.ex.WelcomeScreenProjectProvider
 import com.intellij.platform.DirectoryProjectConfigurator
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
@@ -52,12 +53,12 @@ import org.jetbrains.annotations.CalledInAny
 import org.jetbrains.concurrency.CancellablePromise
 import java.util.concurrent.Callable
 
-internal class PyWelcomeConfigurator : DirectoryProjectConfigurator {
+private class PyWelcomeConfigurator : DirectoryProjectConfigurator {
   override val isEdtRequired: Boolean
     get() = false
 
   override fun configureProject(project: Project, baseDir: VirtualFile, moduleRef: Ref<Module>, isProjectCreatedWithWizard: Boolean) {
-    if (isProjectCreatedWithWizard || isInsideTempDirectory(baseDir)) {
+    if (isProjectCreatedWithWizard || isInsideTempDirectory(baseDir) || WelcomeScreenProjectProvider.isWelcomeScreenProject(project)) {
       return
     }
 

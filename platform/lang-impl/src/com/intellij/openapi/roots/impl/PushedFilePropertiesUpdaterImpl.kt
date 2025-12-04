@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.roots.impl
 
 import com.intellij.ide.plugins.DynamicPluginListener
@@ -100,11 +100,11 @@ class PushedFilePropertiesUpdaterImpl(private val myProject: Project) : PushedFi
 
     // this is useful for debugging. Especially in integration tests: it is often clear why large file sets have changed
     // (e.g. imported modules or jdk), but it is often unclear why small file sets change and what these files are.
-    if (LOG.isDebugEnabled && events.size < 20) {
-      for (event in events) LOG.debug("""
-  File changed: ${event.path}.
-  event:$event
-  """.trimIndent())
+    if (LOG.isDebugEnabled) {
+      LOG.debug("${events.size} file(s) changed")
+      if (events.size < 20) {
+        for (event in events) LOG.debug("File changed: ${event.path}.\nrequestor:${event.requestor}\nevent:$event")
+      }
     }
 
     for (event in events) {

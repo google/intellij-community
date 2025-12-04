@@ -298,7 +298,21 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
   }
 
   public void testNotNullTypeArgumentWithNullableSuperType() {
+    myInspection.REPORT_NOT_ANNOTATED_INSTANTIATION_NOT_NULL_TYPE = true;
     setupTypeUseAnnotations("typeUse", myFixture);
+    doTest();
+  }
+
+  public void testUnannotatedInstantiationOfNonNullTypeParameter() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
+  }
+
+  public void testUnannotatedInstantiationOfNonNullTypeParameterOn() {
+    myInspection.REPORT_NOT_ANNOTATED_INSTANTIATION_NOT_NULL_TYPE = true;
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
     doTest();
   }
 
@@ -383,6 +397,7 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
   }
 
   public void testQuickFixOnTypeArgument() {
+    myInspection.REPORT_NOT_ANNOTATED_INSTANTIATION_NOT_NULL_TYPE = true;
     setupTypeUseAnnotations("typeUse", myFixture);
     doTestWithFix("Annotate as '@NotNull'");
   }
@@ -439,7 +454,18 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
   public void testRedundantNotNull() {
     doTest();
   }
-  
+
+  public void testRedundantNotNullDisabled() {
+    boolean previousValue = myInspection.REPORT_REDUNDANT_NULLABILITY_ANNOTATION_IN_THE_SCOPE_OF_ANNOTATED_CONTAINER;
+    try {
+      myInspection.REPORT_REDUNDANT_NULLABILITY_ANNOTATION_IN_THE_SCOPE_OF_ANNOTATED_CONTAINER = false;
+      doTest();
+    }
+    finally {
+      myInspection.REPORT_REDUNDANT_NULLABILITY_ANNOTATION_IN_THE_SCOPE_OF_ANNOTATED_CONTAINER = previousValue;
+    }
+  }
+
   public void testRedundantNotNull2() {
     doTest();
   }
@@ -466,6 +492,12 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
     doTest();
   }
   
+  public void testStreamFilterPatching() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
+  }
+
   public void testNullableExtendsNullable() {
     addJSpecifyNullMarked(myFixture);
     setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
@@ -479,7 +511,18 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
 
   public void testReturnIncompatibilitiesWithGeneric() {
     myInspection.REPORT_NOT_NULL_TO_NULLABLE_CONFLICTS_IN_ASSIGNMENTS = true;
+    addJSpecifyNullMarked(myFixture);
     setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
+  }
+
+  public void testArrayUnderContainerAnnotation() {
+    myInspection.REPORT_NOT_ANNOTATED_INSTANTIATION_NOT_NULL_TYPE = true;
+    addJSpecifyNullMarked(myFixture);
+    doTest();
+  }
+  
+  public void testDefaultNotNullTypeParameterOverrides() {
     doTest();
   }
 }

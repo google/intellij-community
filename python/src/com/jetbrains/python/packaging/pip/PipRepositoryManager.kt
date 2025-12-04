@@ -4,9 +4,11 @@ package com.jetbrains.python.packaging.pip
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
+import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.cache.PythonSimpleRepositoryCache
 import com.jetbrains.python.packaging.common.PythonPackageDetails
 import com.jetbrains.python.packaging.repository.PyPIPackageRepository
@@ -42,13 +44,17 @@ internal class PipRepositoryManager(override val project: Project) : PythonRepos
 
   @Throws(IOException::class)
   override suspend fun initCaches() {
-    service<PypiPackageCache>().reloadCache().orThrow()
+    service<PypiPackageCache>().reloadCache().onFailure {
+      thisLogger().warn("Failed to load PyPI packages cache", it)
+    }.orThrow()
 
     val repositoryService = service<PyPackageRepositories>()
     val repositoryCache = service<PythonSimpleRepositoryCache>()
     if (repositoryService.repositories.isNotEmpty() && repositoryCache.isEmpty()) {
       repositoryCache.refresh()
     }
+    thisLogger().debug("Pip repository cache initialized with ${service<PypiPackageCache>().packages.size} packages" +
+                       "and ${repositoryCache.repositories.size} repositories")
   }
 
   @Throws(IOException::class)

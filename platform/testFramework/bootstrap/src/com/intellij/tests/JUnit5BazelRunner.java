@@ -38,6 +38,7 @@ public final class JUnit5BazelRunner {
   private static final int EXIT_CODE_TEST_RUNNER_FAILURE = 2;
   private static final int EXIT_CODE_TEST_FAILURE_OOM = 137;
 
+  private static final String bazelEnvRunfilesManifestOnly = "RUNFILES_MANIFEST_ONLY";
   private static final String bazelEnvSelfLocation = "SELF_LOCATION";
   private static final String bazelEnvTestTmpDir = "TEST_TMPDIR";
   private static final String bazelEnvRunFilesDir = "RUNFILES_DIR";
@@ -50,7 +51,6 @@ public final class JUnit5BazelRunner {
   private static final String jbEnvPrintTestSrcDirContent = "JB_TEST_PRINT_TEST_SRCDIR_CONTENT";
   private static final String jbEnvPrintEnv = "JB_TEST_PRINT_ENV";
   private static final String jbEnvPrintSystemProperties = "JB_TEST_PRINT_SYSTEM_PROPERTIES";
-  // true by default. try as much as possible to run tests in sandbox
   private static final String jbEnvSandbox = "JB_TEST_SANDBOX";
   private static final String jbEnvXmlOutputFile = "JB_XML_OUTPUT_FILE";
   // Enable IntelliJ Service Messages stream from test process
@@ -138,7 +138,11 @@ public final class JUnit5BazelRunner {
       Path tempDir = getBazelTempDir();
 
       String jbEnvSandboxValue = System.getenv(jbEnvSandbox);
-      boolean sandbox = Boolean.parseBoolean(jbEnvSandboxValue != null ? jbEnvSandboxValue : "true");
+      if (jbEnvSandboxValue == null) {
+        throw new RuntimeException("Missing " + jbEnvSandbox + " env variable in bazel test environment");
+      }
+
+      boolean sandbox = Boolean.parseBoolean(jbEnvSandboxValue);
       System.err.println("Use sandbox: " + sandbox);
 
       if (sandbox) {
@@ -419,8 +423,11 @@ public final class JUnit5BazelRunner {
   }
 
   private static Boolean isBazelTestRun() {
-    return Stream.of(bazelEnvSelfLocation, bazelEnvTestTmpDir, bazelEnvRunFilesDir, bazelEnvJavaRunFilesDir)
+    return Stream.of(bazelEnvTestTmpDir, bazelEnvRunFilesDir, bazelEnvJavaRunFilesDir)
       .allMatch(bazelTestEnv -> {
+        var bazelTestEnvValue = System.getenv(bazelTestEnv);
+        return bazelTestEnvValue != null && !bazelTestEnvValue.isBlank();
+      }) && Stream.of(bazelEnvSelfLocation, bazelEnvRunfilesManifestOnly).anyMatch(bazelTestEnv -> {
         var bazelTestEnvValue = System.getenv(bazelTestEnv);
         return bazelTestEnvValue != null && !bazelTestEnvValue.isBlank();
       });
@@ -494,6 +501,10 @@ public final class JUnit5BazelRunner {
     List<Path> paths = (List<Path>)getBaseUrls.invoke(classLoader);
 
     String bazelTestSelfLocation = System.getenv(bazelEnvSelfLocation);
+    // the relevant jars are expected to be next to the classloader when no SELF_LOCATION is set (singlejar, windows runs)
+    if (bazelTestSelfLocation == null || bazelTestSelfLocation.isBlank()) {
+      return new HashSet<>(paths);
+    }
     Path bazelTestSelfLocationDir = Path.of(bazelTestSelfLocation).getParent().toAbsolutePath();
     return paths.stream()
       .filter(p -> bazelTestSelfLocationDir.equals(p.toAbsolutePath().getParent()))

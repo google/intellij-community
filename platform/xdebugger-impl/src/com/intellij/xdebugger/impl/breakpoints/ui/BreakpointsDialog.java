@@ -14,6 +14,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsActions;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.platform.debugger.impl.rpc.XBreakpointId;
 import com.intellij.ui.*;
 import com.intellij.ui.popup.util.DetailController;
 import com.intellij.ui.popup.util.DetailViewImpl;
@@ -26,16 +27,15 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.tree.TreeUtil;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointGroupingRule;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerProxy;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointTypeProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointTypeProxy;
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointsDialogState;
 import com.intellij.xdebugger.impl.breakpoints.ui.grouping.XBreakpointCustomGroup;
 import com.intellij.xdebugger.impl.breakpoints.ui.tree.BreakpointItemNode;
 import com.intellij.xdebugger.impl.breakpoints.ui.tree.BreakpointItemsTreeController;
 import com.intellij.xdebugger.impl.breakpoints.ui.tree.BreakpointsCheckboxTree;
 import com.intellij.xdebugger.impl.breakpoints.ui.tree.BreakpointsGroupNode;
-import com.intellij.xdebugger.impl.rpc.XBreakpointId;
 import kotlin.Unit;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -102,6 +102,11 @@ public class BreakpointsDialog extends DialogWrapper {
 
     collectGroupingRules();
 
+    // First subscribe, then collect — we shouldn't skip any changes.
+    myBreakpointManager.subscribeOnBreakpointsChanges(myListenerDisposable, () -> {
+      myRebuildAlarm.cancelAndRequest();
+      return Unit.INSTANCE;
+    });
     collectItems();
 
     setTitle(XDebuggerBundle.message("xbreakpoints.dialog.title"));
@@ -354,11 +359,6 @@ public class BreakpointsDialog extends DialogWrapper {
     myTreeController.buildTree(myBreakpointItems);
 
     initSelection(myBreakpointItems);
-
-    myBreakpointManager.subscribeOnBreakpointsChanges(myListenerDisposable, () -> {
-      myRebuildAlarm.cancelAndRequest();
-      return Unit.INSTANCE;
-    });
 
     return decoratorPanel;
   }

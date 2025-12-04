@@ -65,8 +65,11 @@ public final class ListTemplatesHandler implements CodeInsightActionHandler {
     showTemplatesLookup(project, editor, psiFile, matchingTemplates, customTemplatesLookupElements);
   }
 
-  public static Map<TemplateImpl, String> filterTemplatesByPrefix(@NotNull Collection<? extends TemplateImpl> templates, @NotNull Editor editor,
-                                                                  int offset, boolean fullMatch, boolean searchInDescription) {
+  public static @NotNull Map<TemplateImpl, String> filterTemplatesByPrefix(@NotNull Collection<? extends TemplateImpl> templates,
+                                                                           @NotNull Editor editor,
+                                                                           int offset,
+                                                                           boolean fullMatch,
+                                                                           boolean searchInDescription) {
     if (offset > editor.getDocument().getTextLength()) {
       LOG.error("Cannot filter templates, index out of bounds. Offset: " + offset,
                 CoreAttachmentFactory.createAttachment(editor.getDocument()));
@@ -163,7 +166,7 @@ public final class ListTemplatesHandler implements CodeInsightActionHandler {
   private static LiveTemplateLookupElement createTemplateElement(final TemplateImpl template) {
     return new LiveTemplateLookupElementImpl(template, false) {
       @Override
-      public @Unmodifiable Set<String> getAllLookupStrings() {
+      public @Unmodifiable @NotNull Set<String> getAllLookupStrings() {
         String description = template.getDescription();
         if (description == null) {
           return super.getAllLookupStrings();

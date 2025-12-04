@@ -3251,4 +3251,17 @@ public class NormalCompletionTest extends NormalCompletionTestCase {
     myFixture.completeBasic();
     assertTrue(myFixture.getLookupElementStrings().contains("A"));
   }
+
+  @NeedsIndex.ForStandardLibrary
+  public void testAmbiguousCallLeastUpperBound() {
+    configureByTestName();
+    myFixture.completeBasic();
+    myFixture.checkResultByFile(getTestName(false) + "_after.java");
+  }
+
+  public void testDotInsideConstructor() {
+    configureByTestName();
+    myFixture.completeBasic();
+    myFixture.checkResultByFile(getTestName(false) + "_after.java");
+  }
 }

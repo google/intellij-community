@@ -10,10 +10,7 @@ import com.intellij.ui.icons.toStrokeIcon
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBValue
-import java.awt.Color
-import java.awt.Graphics
-import java.awt.Insets
-import java.awt.Rectangle
+import java.awt.*
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.UIManager
@@ -23,18 +20,19 @@ import javax.swing.UIManager
  */
 internal open class SquareStripeButtonLook(private val button: ActionButton) : IdeaActionButtonLook() {
   companion object {
-    val ICON_PADDING: Insets
-      get() {
-        return JBUI.CurrentTheme.Toolbar.stripeToolbarButtonIconPadding(UISettings.Companion.getInstance().compactMode,
-                                                                        ResizeStripeManager.isShowNames())
-      }
+    fun getIconPadding(isLeft: Boolean): Insets {
+      return JBUI.CurrentTheme.Toolbar.stripeToolbarButtonIconPadding(
+        isLeft,
+        ResizeStripeManager.isShowNames()
+      )
+    }
   }
 
   override fun paintBackground(g: Graphics, component: JComponent, state: Int) {
     val initialColor = getStateBackground(component, state) ?: return
     val rect = Rectangle(component.size).also {
       JBInsets.removeFrom(it, component.insets)
-      JBInsets.removeFrom(it, ICON_PADDING)
+      JBInsets.removeFrom(it, getIconPadding(component.isOnTheLeftStripe()))
     }
 
     val color = getBackgroundColor(initialColor)
@@ -63,7 +61,7 @@ internal open class SquareStripeButtonLook(private val button: ActionButton) : I
 
     val rect = Rectangle(component.size).also {
       JBInsets.removeFrom(it, component.insets)
-      JBInsets.removeFrom(it, ICON_PADDING)
+      JBInsets.removeFrom(it, getIconPadding(component.isOnTheLeftStripe()))
     }
 
     val color = if (state == ActionButtonComponent.PUSHED) JBUI.CurrentTheme.ActionButton.pressedBorder()
@@ -79,6 +77,15 @@ internal open class SquareStripeButtonLook(private val button: ActionButton) : I
     return color
   }
 
+  override fun getIconPosition(actionButton: ActionButtonComponent, icon: Icon): Point {
+    val rect = Rectangle(actionButton.getWidth(), actionButton.getHeight())
+    JBInsets.removeFrom(rect, actionButton.insets)
+    JBInsets.removeFrom(rect, getIconPadding(button.isOnTheLeftStripe()))
+    val x = rect.x + (rect.width - icon.iconWidth) / 2
+    val y = rect.y + (rect.height - icon.iconHeight) / 2
+    return Point(x, y)
+  }
+
   override fun paintIcon(g: Graphics?, actionButton: ActionButtonComponent?, icon: Icon) {
     val color = UIManager.getColor("ToolWindow.Button.selectedForeground")
     if (actionButton !is SquareStripeButton || !actionButton.isFocused() || color == null) {
@@ -89,5 +96,5 @@ internal open class SquareStripeButtonLook(private val button: ActionButton) : I
     super.paintIcon(g, actionButton, toStrokeIcon(icon, UIManager.getColor("ToolWindow.Button.selectedForeground")))
   }
 
-  override fun getButtonArc() = JBValue.UIInteger("Button.ToolWindow.arc", if (UISettings.Companion.getInstance().compactMode) 8 else 12)
+  override fun getButtonArc() = JBUI.CurrentTheme.Toolbar.stripeButtonArc(UISettings.getInstance().compactMode)
 }

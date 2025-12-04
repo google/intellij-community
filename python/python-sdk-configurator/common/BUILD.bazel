@@ -26,7 +26,7 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/platform-impl:ide-impl",
     "//platform/kernel/shared:kernel",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/platform-impl/rpc",
@@ -35,6 +35,7 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/project/shared:project",
     "//platform/remote-topics/shared:rpc-topics",
+    "//python/common",
   ]
 )
 ### auto-generated section `build intellij.python.sdkConfigurator.common` end

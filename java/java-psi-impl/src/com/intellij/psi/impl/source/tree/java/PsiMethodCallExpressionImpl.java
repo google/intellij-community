@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source.tree.java;
 
+import com.intellij.codeInsight.JavaExpressionTypeNullabilityPatcher;
 import com.intellij.codeInsight.daemon.impl.analysis.JavaGenericsUtil;
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.diagnostic.Logger;
@@ -164,11 +165,13 @@ public class PsiMethodCallExpressionImpl extends ExpressionPsiElement implements
           theOnly = type;
         }
         else if (!theOnly.equals(type)) {
-          return null;
+          theOnly = GenericsUtil.getLeastUpperBound(type, theOnly, file.getManager());
+          if (theOnly == null) return null;
         }
       }
 
-      return PsiClassImplUtil.correctType(theOnly, file.getResolveScope());
+      PsiType correctedType = PsiClassImplUtil.correctType(theOnly, file.getResolveScope());
+      return correctedType == null ? null : JavaExpressionTypeNullabilityPatcher.patchTypeNullability(call, correctedType);
     }
 
     private static @Nullable PsiType getResultType(@NotNull PsiMethodCallExpression call,

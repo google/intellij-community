@@ -12,8 +12,11 @@ import org.jetbrains.plugins.gradle.model.ExternalProject
 import org.jetbrains.plugins.gradle.model.GradleLightBuild
 import org.jetbrains.plugins.gradle.model.GradleLightProject
 import org.jetbrains.plugins.gradle.model.projectModel.GradleBuildEntity
+import org.jetbrains.plugins.gradle.model.projectModel.GradleBuildEntityBuilder
 import org.jetbrains.plugins.gradle.model.projectModel.GradleModuleEntity
 import org.jetbrains.plugins.gradle.model.projectModel.GradleProjectEntity
+import org.jetbrains.plugins.gradle.model.projectModel.GradleProjectEntityBuilder
+import org.jetbrains.plugins.gradle.model.projectModel.gradleBuilds
 import org.jetbrains.plugins.gradle.model.projectModel.gradleModuleEntity
 import org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil
 import org.jetbrains.plugins.gradle.service.project.ProjectResolverContext
@@ -54,7 +57,7 @@ internal class GradleContentRootSyncContributor : GradleSyncContributor {
   private fun createModuleEntity(
     context: ProjectResolverContext,
     contentRootData: GradleContentRootData,
-  ): ModuleEntity.Builder {
+  ): ModuleEntityBuilder {
     val projectModel = contentRootData.projectModel
     val externalProject = contentRootData.externalProject
     val entitySource = contentRootData.entitySource
@@ -84,7 +87,7 @@ internal class GradleContentRootSyncContributor : GradleSyncContributor {
   private fun createModuleOptionsEntity(
     context: ProjectResolverContext,
     sourceRootData: GradleContentRootData,
-  ): ExternalSystemModuleOptionsEntity.Builder {
+  ): ExternalSystemModuleOptionsEntityBuilder {
     val externalProject = sourceRootData.externalProject
     return ExternalSystemModuleOptionsEntity(
       entitySource = sourceRootData.entitySource
@@ -116,32 +119,26 @@ internal class GradleContentRootSyncContributor : GradleSyncContributor {
     context: ProjectResolverContext,
   ) {
     val entitySource = GradleProjectModelEntitySource(context.projectPath, phase)
-    val externalProjectBuilder = ExternalProjectEntity(context.externalProjectPath, entitySource)
-    storage addEntity externalProjectBuilder
-
-    for (buildModel in context.allBuilds) {
-      val buildEntityBuilder = createGradleBuildEntity(buildModel, externalProjectBuilder, context, entitySource)
-      storage addEntity buildEntityBuilder
-
-      for (projectModel in buildModel.projects) {
-        val projectEntityBuilder = createGradleProjectEntity(projectModel, buildModel, context, entitySource)
-        storage addEntity projectEntityBuilder
+    storage addEntity ExternalProjectEntity(context.externalProjectPath, entitySource) {
+      gradleBuilds = context.allBuilds.map { buildModel ->
+        createGradleBuildEntity(buildModel, context, entitySource)
       }
     }
   }
 
   private fun createGradleBuildEntity(
     buildModel: GradleLightBuild,
-    externalProjectBuilder: ExternalProjectEntity.Builder,
     context: ProjectResolverContext,
     entitySource: GradleProjectModelEntitySource,
-  ): GradleBuildEntity.Builder = GradleBuildEntity(
+  ): GradleBuildEntityBuilder = GradleBuildEntity(
     externalProjectId = context.externalProjectEntityId,
     name = buildModel.name,
     url = buildModel.buildUrl(context),
     entitySource = entitySource
   ) {
-    externalProject = externalProjectBuilder
+    projects = buildModel.projects.map { projectModel ->
+      createGradleProjectEntity(projectModel, buildModel, context, entitySource)
+    }
   }
 
   private fun createGradleProjectEntity(
@@ -149,7 +146,7 @@ internal class GradleContentRootSyncContributor : GradleSyncContributor {
     buildModel: GradleLightBuild,
     context: ProjectResolverContext,
     entitySource: GradleProjectModelEntitySource,
-  ): GradleProjectEntity.Builder = GradleProjectEntity(
+  ): GradleProjectEntityBuilder = GradleProjectEntity(
     buildId = buildModel.buildEntityId(context),
     name = projectModel.name,
     path = projectModel.path,

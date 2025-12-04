@@ -5,17 +5,17 @@ import com.intellij.execution.RunContentDescriptorIdImpl
 import com.intellij.execution.rpc.ProcessHandlerDto
 import com.intellij.ide.rpc.AnActionId
 import com.intellij.ide.rpc.FrontendDocumentId
+import com.intellij.ide.rpc.util.TextRangeId
 import com.intellij.ide.ui.icons.IconId
-import com.intellij.ide.vfs.VirtualFileId
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.rpc.UID
 import com.intellij.xdebugger.evaluation.EvaluationMode
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider
 import com.intellij.xdebugger.frame.XDescriptor
-import com.intellij.xdebugger.impl.rpc.*
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.core.DeferredSerializer
@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Nls
 @Rpc
 interface XDebugSessionApi : RemoteApi<Unit> {
   suspend fun createDocument(frontendDocumentId: FrontendDocumentId, sessionId: XDebugSessionId, expression: XExpressionDto, sourcePosition: XSourcePositionDto?, evaluationMode: EvaluationMode): XExpressionDocumentDto?
+  suspend fun supportedLanguages(projectId: ProjectId, editorsProviderId: XDebuggerEditorsProviderId, sourcePositionDto: XSourcePositionDto?): List<LanguageDto>
 
   suspend fun resume(sessionId: XDebugSessionId)
 
@@ -54,18 +55,15 @@ interface XDebugSessionApi : RemoteApi<Unit> {
 
   suspend fun triggerUpdate(sessionId: XDebugSessionId)
 
-  suspend fun updateExecutionPosition(sessionId: XDebugSessionId)
-
   suspend fun setCurrentStackFrame(sessionId: XDebugSessionId, executionStackId: XExecutionStackId, frameId: XStackFrameId, isTopFrame: Boolean, changedByUser: Boolean = false)
 
   suspend fun computeExecutionStacks(suspendContextId: XSuspendContextId): Flow<XExecutionStacksEvent>
 
-  suspend fun getFileColorsFlow(sessionId: XDebugSessionId): Flow<XFileColorDto>
-  suspend fun scheduleFileColorComputation(sessionId: XDebugSessionId, virtualFileId: VirtualFileId)
-
-  suspend fun switchToTopFrame(sessionId: XDebugSessionId)
+  suspend fun computeRunningExecutionStacks(sessionId: XDebugSessionId): Flow<XExecutionStacksEvent>
 
   suspend fun muteBreakpoints(sessionDataId: XDebugSessionDataId, muted: Boolean)
+
+  suspend fun getUiUpdateEventsFlow(sessionId: XDebugSessionId): Flow<Unit>
 
   companion object {
     @JvmStatic
@@ -113,15 +111,13 @@ data class XExecutionStackDto(
   val executionStackId: XExecutionStackId,
   val displayName: @Nls String,
   val icon: IconId?,
-  @Serializable(with = DeferredSerializer::class) val descriptor: Deferred<XDescriptor>?
+  @Serializable(with = DeferredSerializer::class) val descriptor: Deferred<XDescriptor>?,
+  @Serializable(with = DeferredSerializer::class) val topFrame: Deferred<XStackFrameDto?>,
 )
 
-// TODO: should be moved to platform
 @ApiStatus.Internal
 @Serializable
-data class KillableProcessInfo(
-  val canKillProcess: Boolean = true,
-)
+data class XDebugSessionDataId(override val uid: UID) : Id
 
 @ApiStatus.Internal
 @Serializable
@@ -147,7 +143,12 @@ data class XDebugSessionState(
 
 @ApiStatus.Internal
 @Serializable
+data class XDebuggerEditorsProviderId(override val uid: UID) : Id
+
+@ApiStatus.Internal
+@Serializable
 data class XDebuggerEditorsProviderDto(
+  val id: XDebuggerEditorsProviderId,
   val fileTypeId: String,
   // TODO[IJPL-160146]: support [XDebuggerEditorsProvider] for local case in the same way as for remote
   @Transient val editorsProvider: XDebuggerEditorsProvider? = null,
@@ -180,8 +181,7 @@ data class XSmartStepIntoTargetDto(
   val iconId: IconId?,
   val text: @NlsSafe String,
   val description: @Nls String?,
-  // TODO serialize TextRange directly
-  val textRange: Pair<Int, Int>?,
+  val textRange: TextRangeId?,
   val needsForcedSmartStepInto: Boolean,
 )
 

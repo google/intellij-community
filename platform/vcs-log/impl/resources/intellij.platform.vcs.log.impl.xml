@@ -4,6 +4,7 @@
     <module name="intellij.platform.vcs.log"/>
     <module name="intellij.platform.vcs.log.graph.impl"/>
     <module name="intellij.platform.vcs.impl.shared"/>
+    <module name="intellij.libraries.kotlinx.coroutines.guava"/>
   </dependencies>
 
   <extensionPoints>
@@ -23,6 +24,9 @@
                     dynamic="true"/>
     <extensionPoint name="fileHistoryPerformanceListener"
                     interface="com.intellij.vcs.log.history.FileHistoryPerformanceListener"
+                    dynamic="true"/>
+    <extensionPoint name="vcsLogChangesTreeBuilder"
+                    interface="com.intellij.vcs.log.ui.frame.VcsLogChangesTreeModifier"
                     dynamic="true"/>
   </extensionPoints>
 
@@ -63,6 +67,8 @@
     <projectService serviceInterface="com.intellij.vcs.log.impl.VcsProjectLog"
                     serviceImplementation="com.intellij.vcs.log.impl.IdeVcsProjectLog"/>
     <postStartupActivity implementation="com.intellij.vcs.log.impl.IdeVcsProjectLog$InitLogStartupActivity"/>
+
+    <postStartupActivity implementation="com.intellij.vcs.log.impl.VcsLogToolWindowMaximizedStateHandler"/>
 
     <cachesInvalidator implementation="com.intellij.vcs.log.impl.VcsLogCachesInvalidator"/>
 

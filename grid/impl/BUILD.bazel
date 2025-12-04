@@ -56,7 +56,9 @@ jvm_library(
     "//platform/refactoring",
     "//platform/code-style-impl:codeStyle-impl",
     "//xml/xml-psi-api:psi",
+    "//platform/projectModel-impl",
     "//platform/editor-ui-ex:editor-ex",
+    "//platform/core-impl",
     "//platform/ide-core/plugins",
     "//platform/execution-impl",
     "//platform/platform-api:ide",
@@ -64,7 +66,10 @@ jvm_library(
     "//platform/util/coroutines",
     "//libraries/microba",
     "//platform/platform-impl/ui",
-    "@lib//:kotlinx-html-jvm",
+    "//libraries/kotlinx/html",
+    "//platform/execution",
+    "//platform/lang-api:lang",
+    "//platform/forms_rt:java-guiForms-rt",
   ]
 )
 ### auto-generated section `build intellij.grid.impl` end

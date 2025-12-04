@@ -48,10 +48,7 @@ import com.intellij.xdebugger.*;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
-import com.intellij.xdebugger.frame.XDropFrameHandler;
-import com.intellij.xdebugger.frame.XStackFrame;
-import com.intellij.xdebugger.frame.XSuspendContext;
-import com.intellij.xdebugger.frame.XValueMarkerProvider;
+import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.impl.ThreadsActionsProvider;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl;
@@ -69,8 +66,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.java.debugger.JavaDebuggerEditorsProvider;
 
-import static com.intellij.xdebugger.impl.frame.XDebugSessionProxy.useFeProxy;
-
 public class JavaDebugProcess extends XDebugProcess {
   private final DebuggerSession myJavaSession;
   private final JavaDebuggerEditorsProvider myEditorsProvider;
@@ -78,6 +73,7 @@ public class JavaDebugProcess extends XDebugProcess {
   private final NodeManagerImpl myNodeManager;
   private final JvmSmartStepIntoActionHandler mySmartStepIntoActionHandler;
   private final JvmDropFrameActionHandler myDropFrameActionActionHandler;
+  private final JavaDebugSessionEventsProvider myJavaDebugSessionEventsProvider;
 
   private static final JavaBreakpointHandlerFactory[] ourDefaultBreakpointHandlerFactories = {
     process -> new JavaBreakpointHandler.JavaLineBreakpointHandler(process),
@@ -119,12 +115,13 @@ public class JavaDebugProcess extends XDebugProcess {
         if (event == DebuggerSession.Event.CONTEXT) {
           DebuggerSession debuggerSession = newContext.getDebuggerSession();
           ThreadReferenceProxyImpl steppingThreadProxy = newContext.getThreadProxy();
-          if (debuggerSession != null && steppingThreadProxy != null && debuggerSession.getState() == DebuggerSession.State.IN_STEPPING) {
+          if (debuggerSession != null && debuggerSession.getState() == DebuggerSession.State.IN_STEPPING) {
             DebugProcessImpl debugProcess = debuggerSession.getProcess();
             debugProcess.getManagerThread().schedule(new DebuggerCommandImpl() {
               @Override
               protected void action() {
-                JavaExecutionStack stack = new JavaExecutionStack(steppingThreadProxy, debugProcess, true);
+                JavaExecutionStack stack = steppingThreadProxy != null ?
+                                           new JavaExecutionStack(steppingThreadProxy, debugProcess, true) : null;
                 getSession().positionReached(new JavaSteppingSuspendContext(debugProcess, stack));
               }
             });
@@ -226,6 +223,7 @@ public class JavaDebugProcess extends XDebugProcess {
 
     mySmartStepIntoActionHandler = new JvmSmartStepIntoActionHandler(javaSession);
     myDropFrameActionActionHandler = new JvmDropFrameActionHandler(javaSession);
+    myJavaDebugSessionEventsProvider = new JavaDebugSessionEventsProvider(this);
   }
 
   private boolean shouldApplyContext(DebuggerContextImpl context) {
@@ -255,6 +253,43 @@ public class JavaDebugProcess extends XDebugProcess {
 
   public DebuggerSession getDebuggerSession() {
     return myJavaSession;
+  }
+
+  @Override
+  public XDebugSessionEventsProvider getSessionEventsProvider() {
+    return myJavaDebugSessionEventsProvider;
+  }
+
+  @Override
+  public void computeRunningExecutionStacks(XSuspendContext.XExecutionStackContainer container) {
+    var debugProcess = getDebuggerSession().getProcess();
+    var context = debugProcess.getDebuggerContext();
+    var managerThread = context.getManagerThread();
+    if (managerThread == null) {
+      container.errorOccurred(XDebuggerBundle.message("debugger.threads.not.available"));
+      return;
+    }
+    managerThread.schedule(new DebuggerCommandImpl() {
+      @Override
+      protected void action() {
+        try {
+          var currentThread = context.getThreadProxy();
+          var allThreads = debugProcess.getVirtualMachineProxy().allThreads();
+          var executionStacks = ContainerUtil.map(
+            allThreads, (thread) -> (XExecutionStack) new JavaExecutionStack(thread, debugProcess, thread.equals(currentThread))
+          );
+          container.addExecutionStack(executionStacks, true);
+        }
+        catch (Throwable e) {
+          container.errorOccurred(XDebuggerBundle.message("debugger.threads.not.available") + ": " + e.getMessage());
+        }
+      }
+
+      @Override
+      protected void commandCancelled() {
+        container.errorOccurred(XDebuggerBundle.message("debugger.threads.not.available"));
+      }
+    });
   }
 
   @Override
@@ -330,7 +365,7 @@ public class JavaDebugProcess extends XDebugProcess {
     return new XDebugTabLayouter() {
       @Override
       public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
-        if (!useFeProxy()) {
+        if (!SplitDebuggerMode.isSplitDebugger()) {
           registerThreadsPanel(ui);
         }
         registerMemoryViewPanel(ui);

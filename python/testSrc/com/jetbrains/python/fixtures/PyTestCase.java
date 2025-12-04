@@ -45,7 +45,6 @@ import com.intellij.util.CommonProcessors.CollectProcessor;
 import com.intellij.util.IncorrectOperationException;
 import com.jetbrains.python.PythonLanguage;
 import com.jetbrains.python.PythonTestUtil;
-import com.jetbrains.python.codeInsight.completion.PyModuleNameCompletionContributor;
 import com.jetbrains.python.codeInsight.typing.PyBundledStubs;
 import com.jetbrains.python.codeInsight.typing.PyTypeShed;
 import com.jetbrains.python.documentation.PyDocumentationSettings;
@@ -59,7 +58,7 @@ import com.jetbrains.python.psi.impl.PythonLanguageLevelPusher;
 import com.jetbrains.python.psi.search.PySearchUtilBase;
 import com.jetbrains.python.psi.types.PyType;
 import com.jetbrains.python.psi.types.TypeEvalContext;
-import com.jetbrains.python.sdk.PythonSdkUtil;
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.Assert;
@@ -96,7 +95,6 @@ public abstract class PyTestCase extends UsefulTestCase {
         if (myFixture.getModule() != null) {
           PyNamespacePackagesService.getInstance(myFixture.getModule()).resetAllNamespacePackages();
         }
-        PyModuleNameCompletionContributor.ENABLED = true;
         setLanguageLevel(null);
 
         myFixture.tearDown();
@@ -628,7 +626,7 @@ public abstract class PyTestCase extends UsefulTestCase {
       throw failedError;
     }
     // the fix-me test passed -> the bug/feature was fixed!
-    fail("Test (" + comment + ") FIXED!");
+    fail("Test " + comment + " was previously failing and was suppressed, but now it passes");
   }
 }
 

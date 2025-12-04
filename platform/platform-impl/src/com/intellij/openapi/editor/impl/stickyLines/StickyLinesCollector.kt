@@ -1,6 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl.stickyLines
 
+import com.intellij.codeInsight.breadcrumbs.FileBreadcrumbsCollector
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
@@ -11,21 +12,19 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.ui.components.breadcrumbs.StickyLineInfo
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresReadLock
-import com.intellij.xml.breadcrumbs.PsiFileBreadcrumbsCollector
 import org.jetbrains.annotations.ApiStatus.Internal
 
 /**
- * Responsible for collecting sticky lines based on psi file structure.
- * The implementation relies on PsiFileBreadcrumbsCollector to collect psi elements at specific document line.
+ * Responsible for collecting sticky lines based on the file structure.
+ * The implementation relies on FileBreadcrumbsCollector to collect ranges at specific document line.
  */
 @Internal
 class StickyLinesCollector(private val project: Project, private val document: Document) {
@@ -99,20 +98,14 @@ class StickyLinesCollector(private val project: Project, private val document: D
   fun collectLines(vFile: VirtualFile, progress: ProgressIndicator): Collection<StickyLineInfo> {
     ThreadingAssertions.assertReadAccess(); ThreadingAssertions.assertBackgroundThread()
 
-    val psiCollector = PsiFileBreadcrumbsCollector(project)
+    val collector = FileBreadcrumbsCollector.findBreadcrumbsCollector(project, vFile)
     val infos: MutableSet<StickyLineInfo> = HashSet()
     val lineCount: Int = document.getLineCount()
     for (line in 0 until lineCount) {
       progress.checkCanceled()
       val endOffset: Int = document.getLineEndOffset(line)
-      val psiElements: List<PsiElement> = psiCollector.computePsiElements(vFile, document, endOffset)
-      for (element: PsiElement in psiElements) {
-        infos.add(StickyLineInfo(
-          element.textOffset,
-          element.textRange.endOffset,
-          debugText(element),
-        ))
-      }
+      val stickyLineInfos: List<StickyLineInfo> = collector.computeStickyLineInfos(vFile, document, endOffset)
+      infos.addAll(stickyLineInfos)
     }
     LOG.debug { "total lines collected: ${infos.size} for ${fileName(vFile)}" }
     return infos
@@ -160,8 +153,14 @@ class StickyLinesCollector(private val project: Project, private val document: D
   ): List<StickyLine> {
     val outdatedLines: MutableList<StickyLine> = mutableListOf()
     stickyModel.processStickyLines(StickyLinesModel.SourceID.IJ) { existingLine: StickyLine ->
-      val existing = StickyLineInfo(existingLine.textRange())
-      val keepExisting = linesToAdd.remove(existing)
+      val existingRange = existingLine.textRange()
+      val keepExisting = if (existingRange.length > 0) {
+        linesToAdd.remove(StickyLineInfo(existingRange))
+      } else {
+        // typing can reduce the range from non-zero length to zero,
+        //  remove sticky line as invalid IJPL-217619
+        false
+      }
       if (!keepExisting) {
         outdatedLines.add(existingLine)
       }
@@ -173,14 +172,6 @@ class StickyLinesCollector(private val project: Project, private val document: D
   private fun fileName(vFile: VirtualFile): String {
     val psiFile: PsiFile? = PsiDocumentManager.getInstance(project).getPsiFile(document)
     return psiFile?.let { debugPsiFile(it) } ?: vFile.name
-  }
-
-  private fun debugText(element: PsiElement): String? {
-    return if (Registry.`is`("editor.show.sticky.lines.debug")) {
-      element.toString()
-    } else {
-      null
-    }
   }
 
   companion object {

@@ -4,7 +4,7 @@ package org.jetbrains.intellij.build.impl
 import com.intellij.util.io.toByteArray
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.intellij.build.BuildMessages
 import org.jetbrains.intellij.build.BuildOptions
 import org.jetbrains.intellij.build.BuildPaths
@@ -17,13 +17,19 @@ import org.jetbrains.intellij.build.io.readZipFile
 import org.jetbrains.intellij.build.moduleBased.OriginalModuleRepository
 import org.jetbrains.jps.model.module.JpsModule
 import java.io.File
+import java.io.IOException
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import kotlin.io.path.writeLines
 
-@ApiStatus.Internal
+@Internal
 class ArchivedCompilationContext(
   private val delegate: CompilationContext,
-  private val storage: ArchivedCompilationOutputStorage = ArchivedCompilationOutputStorage(paths = delegate.paths, classesOutputDirectory = delegate.classesOutputDirectory, messages = delegate.messages).apply {
+  private val storage: ArchivedCompilationOutputStorage = ArchivedCompilationOutputStorage(
+    paths = delegate.paths,
+    classesOutputDirectory = delegate.classesOutputDirectory,
+    messages = delegate.messages
+  ).apply {
     delegate.options.pathToCompiledClassesArchivesMetadata?.let {
       this.loadMetadataFile(it)
     }
@@ -44,29 +50,39 @@ class ArchivedCompilationContext(
 
   override suspend fun getOriginalModuleRepository(): OriginalModuleRepository = originalModuleRepository.await()
 
-  override suspend fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
+  override fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
     return delegate.getModuleOutputRoots(module, forTests).map { replaceWithCompressedIfNeeded(it) }
   }
 
-  override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<String> {
-    return doReplace(delegate.getModuleRuntimeClasspath(module, forTests), inputMapper = { Path.of(it) }, resultMapper = { it.toString() })
+  override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<Path> {
+    return doReplace(delegate.getModuleRuntimeClasspath(module, forTests), inputMapper = { it }, resultMapper = { it })
   }
 
-  override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
+  override fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
     val result = getModuleOutputRoots(module, forTests).mapNotNull { moduleOutput ->
       if (!moduleOutput.startsWith(archivesLocation)) {
         return delegate.readFileContentFromModuleOutput(module, relativePath)
       }
 
       var fileContent: ByteArray? = null
-      readZipFile(moduleOutput) { name, data ->
-        if (name == relativePath) {
-          fileContent = data().toByteArray()
-          ZipEntryProcessorResult.STOP
+      try {
+        readZipFile(moduleOutput) { name, data ->
+          if (name == relativePath) {
+            fileContent = data().toByteArray()
+            ZipEntryProcessorResult.STOP
+          }
+          else {
+            ZipEntryProcessorResult.CONTINUE
+          }
         }
-        else {
-          ZipEntryProcessorResult.CONTINUE
+      }
+      catch (e: IOException) {
+        // If the zip file doesn't exist, return null and let other output roots be tried
+        if (generateSequence<Throwable>(e) { it.cause }.any { it is NoSuchFileException }) {
+          return@mapNotNull null
         }
+        // re-throw unexpected I/O errors (corrupted zip, permissions, etc.)
+        throw e
       }
       return@mapNotNull fileContent
     }
@@ -81,7 +97,7 @@ class ArchivedCompilationContext(
   }
 
   @Suppress("MemberVisibilityCanBePrivate")
-  suspend fun replaceWithCompressedIfNeeded(p: Path): Path = storage.getArchived(p)
+  fun replaceWithCompressedIfNeeded(p: Path): Path = storage.getArchived(p)
 
   suspend fun replaceWithCompressedIfNeededLP(files: List<Path>): List<Path> {
     return doReplace(files, inputMapper = { it }, resultMapper = { it })
@@ -92,7 +108,7 @@ class ArchivedCompilationContext(
   }
 
   private suspend inline fun <I : Any, R : Any> doReplace(
-    files: List<I>,
+    files: Collection<I>,
     crossinline inputMapper: (I) -> Path,
     crossinline resultMapper: (Path) -> R,
   ): List<R> {

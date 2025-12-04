@@ -48,15 +48,17 @@ jvm_library(
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/refactorings/kotlin.refactorings.common:kotlin-refactorings-common",
     "//platform/platform-impl:ide-impl",
-    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-api-utils",
+    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/indices",
     "//plugins/kotlin/uast/uast-kotlin-base",
     "//platform/lang-impl",
-    "//plugins/kotlin/code-insight/impl-base",
+    "//platform/lang-api:lang",
+    "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
     "//platform/eel",
+    "//java/java-indexing-api:indexing",
   ]
 )
 ### auto-generated section `build intellij.kotlin.devkit` end

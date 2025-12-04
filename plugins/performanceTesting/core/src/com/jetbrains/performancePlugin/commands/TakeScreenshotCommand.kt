@@ -15,11 +15,14 @@ import java.awt.*
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.seconds
 
 private val LOG: Logger
   get() = logger<TakeScreenshotCommand>()
+
+private val screenshotSequence = AtomicInteger(1)
 
 /**
  * Command takes screenshot.
@@ -92,14 +95,9 @@ suspend fun captureComponent(component: Component, file: File) {
 }
 
 fun getNextFolder(base: File): File {
-  var counter = 0
-  var folder = base
-
-  while (folder.exists()) {
-    counter++
-    val name = "${base.name}_$counter"
-    folder = File(base.parentFile, name)
-  }
+  val counter = "%03d".format(screenshotSequence.getAndIncrement())
+  val name = "${counter}_${base.name}"
+  val folder = File(base.parentFile, name)
 
   folder.mkdirs()
   return folder
@@ -116,7 +114,7 @@ internal fun takeFullScreenshot(childFolder: String? = null): String? {
   // On Wayland it triggers system dialog about granting permissions each time, and it can't be disabled.
   if (StartupUiUtil.isWayland) return null
 
-  var screenshotPath = File(PathManager.getLogPath() + "/screenshots/" + (childFolder ?: "default"))
+  var screenshotPath = PathManager.getOriginalLogDir().resolve("screenshots").resolve(childFolder ?: "default").toFile()
   screenshotPath = getNextFolder(screenshotPath)
   val screenshotPathWithFile = screenshotPath.resolve("full_screen.png")
   takeScreenshotWithAwtRobot(screenshotPathWithFile.absolutePath, "png")
@@ -131,7 +129,7 @@ internal suspend fun takeScreenshotOfAllWindows(childFolder: String? = null) {
   if (ApplicationManager.getApplication().isHeadlessEnvironment) return
 
   val projects = ProjectManager.getInstance().openProjects
-  var screenshotPath = File(PathManager.getLogPath() + "/screenshots/" + (childFolder ?: "default"))
+  var screenshotPath = PathManager.getOriginalLogDir().resolve("screenshots").resolve(childFolder ?: "default").toFile()
   screenshotPath = getNextFolder(screenshotPath)
 
   for (project in projects) {

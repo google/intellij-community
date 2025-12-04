@@ -2,18 +2,15 @@
 package com.intellij.platform.debugger.impl.rpc
 
 import com.intellij.ide.rpc.DocumentPatchVersion
-import com.intellij.ide.ui.icons.IconId
 import com.intellij.ide.rpc.util.TextRangeId
+import com.intellij.ide.ui.icons.IconId
 import com.intellij.ide.vfs.VirtualFileId
-import com.intellij.openapi.editor.impl.EditorId
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.rpc.UID
 import com.intellij.xdebugger.breakpoints.SuspendPolicy
 import com.intellij.xdebugger.breakpoints.XBreakpointType
-import com.intellij.xdebugger.impl.rpc.XBreakpointId
-import com.intellij.xdebugger.impl.rpc.XBreakpointTypeId
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.core.RpcFlow
@@ -28,20 +25,11 @@ import org.jetbrains.annotations.ApiStatus
 interface XBreakpointTypeApi : RemoteApi<Unit> {
   suspend fun getBreakpointTypeList(project: ProjectId): XBreakpointTypeList
 
-  suspend fun getBreakpointsInfoForLine(projectId: ProjectId, editorId: EditorId, line: Int): XBreakpointsLineInfo
-
-  suspend fun getBreakpointsInfoForEditor(projectId: ProjectId, editorId: EditorId, start: Int, endInclusive: Int): List<XBreakpointsLineInfo>?
+  suspend fun getBreakpointsInfo(projectId: ProjectId, fileId: VirtualFileId, start: Int, endInclusive: Int): List<XBreakpointsLineInfo>?
 
   suspend fun addBreakpointThroughLux(projectId: ProjectId, typeId: XBreakpointTypeId): TimeoutSafeResult<XBreakpointDto?>
 
   suspend fun toggleLineBreakpoint(projectId: ProjectId, request: XLineBreakpointInstallationRequest): XToggleLineBreakpointResponse?
-
-  companion object {
-    @JvmStatic
-    suspend fun getInstance(): XBreakpointTypeApi {
-      return RemoteApiProviderService.resolve(remoteApiDescriptor<XBreakpointTypeApi>())
-    }
-  }
 
   suspend fun removeBreakpoint(breakpointId: XBreakpointId)
 
@@ -57,7 +45,22 @@ interface XBreakpointTypeApi : RemoteApi<Unit> {
    */
   suspend fun computeInlineBreakpointVariants(projectId: ProjectId, fileId: VirtualFileId, lines: Set<Int>, documentPatchVersion: DocumentPatchVersion?): List<InlineBreakpointVariantsOnLine>?
   suspend fun createVariantBreakpoint(projectId: ProjectId, fileId: VirtualFileId, line: Int, variantId: XInlineBreakpointVariantId)
+
+  companion object {
+    @JvmStatic
+    suspend fun getInstance(): XBreakpointTypeApi {
+      return RemoteApiProviderService.resolve(remoteApiDescriptor<XBreakpointTypeApi>())
+    }
+  }
 }
+
+@ApiStatus.Internal
+@Serializable
+data class XBreakpointTypeId(val id: String)
+
+@ApiStatus.Internal
+@Serializable
+data class XBreakpointId(override val uid: UID) : Id
 
 @ApiStatus.Internal
 @Serializable
@@ -85,6 +88,19 @@ data class XBreakpointTypeDto(
   val standardPanels: Set<XBreakpointTypeSerializableStandardPanels>,
   val isAddBreakpointButtonVisible: Boolean,
   val icons: XBreakpointTypeIcons,
+)
+
+@ApiStatus.Internal
+@Serializable
+data class XBreakpointTypeIcons(
+  val enabledIcon: IconId,
+  val disabledIcon: IconId,
+  val suspendNoneIcon: IconId,
+  val mutedEnabledIcon: IconId,
+  val mutedDisabledIcon: IconId,
+  val pendingIcon: IconId?,
+  val inactiveDependentIcon: IconId,
+  val temporaryIcon: IconId?,
 )
 
 @ApiStatus.Internal

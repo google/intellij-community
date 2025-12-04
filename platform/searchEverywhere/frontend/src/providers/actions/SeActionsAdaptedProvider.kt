@@ -26,11 +26,12 @@ import org.jetbrains.annotations.Nls
 @Internal
 class SeActionItem(
   val matchedValue: MatchedValue,
+  val weight: Int,
   override val contributor: SearchEverywhereContributor<*>,
   val extendedInfo: SeExtendedInfo?,
   val isMultiSelectionSupported: Boolean,
 ) : SeItem, SeLegacyItem {
-  override fun weight(): Int = matchedValue.matchingDegree
+  override fun weight(): Int = weight
   override suspend fun presentation(): SeItemPresentation {
     return SeActionPresentationProvider.get(matchedValue, extendedInfo, isMultiSelectionSupported)
   }
@@ -39,7 +40,7 @@ class SeActionItem(
 }
 
 @Internal
-class SeActionsAdaptedProvider(private val contributorWrapper: SeAsyncContributorWrapper<MatchedValue>) : SeWrappedLegacyContributorItemsProvider() {
+class SeActionsAdaptedProvider(private val contributorWrapper: SeAsyncContributorWrapper<MatchedValue>) : SeWrappedLegacyContributorItemsProvider(), SeExtendedInfoProvider {
   override val id: String get() = SeProviderIdUtils.ACTIONS_ID
   override val displayName: @Nls String
     get() = contributor.fullGroupName
@@ -55,7 +56,7 @@ class SeActionsAdaptedProvider(private val contributorWrapper: SeAsyncContributo
 
     contributorWrapper.fetchElements(params.inputQuery, object : AsyncProcessor<MatchedValue> {
       override suspend fun process(item: MatchedValue, weight: Int): Boolean {
-        return collector.put(SeActionItem(item, contributor, contributor.getExtendedInfo(item), contributor.isMultiSelectionSupported))
+        return collector.put(SeActionItem(item, weight, contributor, contributor.getExtendedInfo(item), contributor.isMultiSelectionSupported))
       }
     })
   }

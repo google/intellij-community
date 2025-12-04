@@ -51,21 +51,17 @@ import com.intellij.openapi.projectRoots.ProjectJdkTable;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ModuleRootEvent;
 import com.intellij.openapi.roots.ModuleRootListener;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.popup.Balloon;
-import com.intellij.openapi.ui.popup.BalloonBuilder;
-import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.ToolWindowId;
+import com.intellij.platform.debugger.impl.shared.CoroutineUtilsKt;
 import com.intellij.psi.CommonClassNames;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.ui.awt.AnchoredPoint;
 import com.intellij.ui.classFilter.ClassFilter;
 import com.intellij.ui.classFilter.DebuggerClassFilterProvider;
 import com.intellij.util.Alarm;
@@ -78,20 +74,16 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.DisposableWrapperList;
 import com.intellij.util.lang.JavaVersion;
 import com.intellij.util.system.OS;
-import com.intellij.util.ui.EDT;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
-import com.intellij.xdebugger.frame.XExecutionStack;
-import com.intellij.xdebugger.impl.CoroutineUtilsKt;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
 import com.intellij.xdebugger.impl.actions.XDebuggerActions;
-import com.intellij.xdebugger.impl.frame.XFramesView;
+import com.intellij.xdebugger.impl.frame.FrameNotificationUtils;
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
-import com.intellij.xdebugger.impl.ui.XDebugSessionTab;
 import com.jetbrains.jdi.*;
 import com.sun.jdi.*;
 import com.sun.jdi.connect.*;
@@ -109,8 +101,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.*;
 
-import javax.swing.*;
-import javax.swing.plaf.basic.BasicArrowButton;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.UnknownHostException;
@@ -173,7 +163,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   final ThreadBlockedMonitor myThreadBlockedMonitor = new ThreadBlockedMonitor(this, disposable);
 
-  final SteppingProgressTracker mySteppingProgressTracker = new SteppingProgressTracker(this);
+  @ApiStatus.Internal
+  public final SteppingProgressTracker mySteppingProgressTracker = new SteppingProgressTracker(this);
 
   protected final @NotNull RunToCursorManager myRunToCursorManager;
 
@@ -212,7 +203,10 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       public void paused(@NotNull SuspendContext suspendContext) {
         boolean isSuspendAll = suspendContext.getSuspendPolicy() == EventRequest.SUSPEND_ALL;
         if (isSuspendAll && DebuggerUtils.isNewThreadSuspendStateTracking()) {
+          mergeSuspendThreadContextToSuspendAllContext();
           resumeThreadsUnderEvaluationAndExplicitlyResumedAfterPause((SuspendContextImpl)suspendContext);
+          // It deletes suspend-thread stepping in another thread and suspend-all breakpoint is reached
+          getRequestsManager().deleteAllStepRequests();
         }
 
         myThreadBlockedMonitor.stopWatching(!isSuspendAll ? suspendContext.getThread() : null);
@@ -225,7 +219,6 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
         DebuggerStatistics.logProcessStatistics(process);
       }
     });
-    mySteppingProgressTracker.installListeners();
   }
 
   private DebuggerManagerThreadImpl createManagerThread() {
@@ -1213,6 +1206,21 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     myWaitFor.waitFor(timeout);
   }
 
+  private void mergeSuspendThreadContextToSuspendAllContext() {
+    boolean wasResumedSuspendThreadPausedContexts = false;
+    for (SuspendContextImpl anotherPausedContext : getSuspendManager().getPausedContexts()) {
+      if (anotherPausedContext.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD) {
+        getSuspendManager().resume(anotherPausedContext);
+        wasResumedSuspendThreadPausedContexts = true;
+      }
+    }
+    if (wasResumedSuspendThreadPausedContexts) {
+      XDebuggerManagerImpl.getNotificationGroup()
+        .createNotification(JavaDebuggerBundle.message("message.switched.to.suspend.all.context"), MessageType.WARNING)
+        .notify(getProject());
+    }
+    //mySteppingProgressTracker.cancelAllSteppings();
+  }
 
   private void resumeThreadsUnderEvaluationAndExplicitlyResumedAfterPause(@NotNull SuspendContextImpl suspendAllContext) {
     for (SuspendContextImpl suspendContext : mySuspendManager.getEventContexts()) {
@@ -2121,9 +2129,10 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       if (myIgnoreBreakpoints) {
         DebuggerManagerEx.getInstanceEx(project).getBreakpointManager().disableBreakpoints(DebugProcessImpl.this);
       }
-      beforeSteppingAction(context);
       LightOrRealThreadInfo threadFilterFromContext = getThreadFilterFromContext(context);
       applyThreadFilter(threadFilterFromContext);
+      // It is important to notify about the stepping after the thread filtering is set
+      beforeSteppingAction(context);
       int breakpointSuspendPolicy = context.getSuspendPolicy();
       // In the case of the isAlwaysSuspendThreadBeforeSwitch mode, the switch will be performed for all breakpoints by engine
       if (!DebuggerUtils.isAlwaysSuspendThreadBeforeSwitch()) {
@@ -2616,7 +2625,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   private void reattach(RemoteConnection connection, Runnable detachVm, Runnable attachVm) {
     if (!myIsStopped.get()) {
-      getManagerThread().schedule(new DebuggerCommandImpl() {
+      DebuggerManagerThreadImpl debuggerManagerThread = getManagerThread();
+      debuggerManagerThread.schedule(new DebuggerCommandImpl() {
         @Override
         protected void action() {
           detachVm.run();
@@ -2626,7 +2636,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
         @Override
         protected void commandCancelled() {
-          doReattach(); // if the original process is already finished
+          // if the original process is already finished
+          debuggerManagerThread.afterScopeCancellation(this::doReattach);
         }
 
         private void doReattach() {
@@ -2996,6 +3007,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     }
   }
 
+  @ApiStatus.Internal
+  public boolean isSteppingInProgress() {
+    return mySteppingProgressTracker.isSteppingInProgress();
+  }
+
   void stopWatchingMethodReturn() {
     if (myReturnValueWatcher != null) {
       myReturnValueWatcher.disable();
@@ -3018,34 +3034,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       return;
     }
     String content = JavaDebuggerBundle.message("message.other.threads.reached.breakpoints", number);
-    MessageType messageType = MessageType.INFO;
 
-    if (mySession.getXDebugSession() instanceof XDebugSessionImpl session) {
-      XDebugSessionTab tab = session.getSessionTab();
-      if (tab != null) {
-        XFramesView view = tab.getFramesView();
-        if (view != null) {
-          ComboBox<XExecutionStack> comboBox = view.getThreadComboBox();
-          BasicArrowButton arrowButton = UIUtil.findComponentOfType(comboBox, BasicArrowButton.class);
-
-          JComponent target = arrowButton != null ? arrowButton : comboBox;
-
-          BalloonBuilder balloonBuilder = JBPopupFactory.getInstance()
-            .createHtmlTextBalloonBuilder(content, messageType, null)
-            .setHideOnClickOutside(true)
-            .setDisposable(createEdtDisposable())
-            .setHideOnFrameResize(false);
-          Balloon balloon = balloonBuilder.createBalloon();
-          balloon.show(new AnchoredPoint(AnchoredPoint.Anchor.TOP, target), Balloon.Position.above);
-          return;
-        }
-      }
-    }
-
-    // Fallback to the whole toolwindow notification
-    XDebuggerManagerImpl.getNotificationGroup()
-      .createNotification(content, messageType)
-      .notify(getProject());
+    FrameNotificationUtils.showNotification(getProject(), mySession.getXDebugSession(), content);
   }
 
   String getStateForDiagnostics() {
@@ -3063,25 +3053,6 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   private record VirtualMachineData(VirtualMachineProxyImpl vm, RemoteConnection connection,
                                     DebuggerManagerThreadImpl debuggerManagerThread) {
-  }
-
-  private @NotNull Disposable createEdtDisposable() {
-    EDT.assertIsEdt();
-    Disposable result = Disposer.newCheckedDisposable();
-    boolean isSuccess = Disposer.tryRegister(disposable, new Disposable() {
-      @Override
-      public void dispose() {
-        ApplicationManager.getApplication().invokeLater(() -> {
-          Disposer.dispose(result);
-        });
-      }
-    });
-    if (!isSuccess) {
-      ApplicationManager.getApplication().invokeLater(() -> {
-        Disposer.dispose(result);
-      });
-    }
-    return result;
   }
 
   public void logError(@NotNull String message, @NotNull Attachment attachment) {

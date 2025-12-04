@@ -16,6 +16,8 @@ import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 
 class ProxyImportingTest : MavenMultiVersionImportingTestCase() {
+  override fun skipPluginResolution() = false
+
   lateinit var myRepositoryFixture: MavenHttpRepositoryServerFixture
   lateinit var myProxyFixture: MavenHttpProxyServerFixture
   lateinit var myHelper: MavenCustomRepositoryHelper
@@ -202,7 +204,10 @@ class ProxyImportingTest : MavenMultiVersionImportingTestCase() {
     removeFromLocalRepository("intellij/test/")
     setupSettingsXml(repositoryPath.toAbsolutePath(), true)
     myProxyFixture.requireAuthentication(proxyUsername, proxyPassword)
-    assertFalse("File should be deleted", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.jar").isRegularFile())
+    assertFalse("Jar file should be deleted", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.jar").isRegularFile())
+    assertFalse("Pom file should be deleted", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.pom").isRegularFile())
+    assertTrue("Jar file not found in plugin repo", myHelper.getTestData("plugins/intellij/test/maven-extension/1.0/maven-extension-1.0.jar").isRegularFile())
+    assertTrue("Pom file not found in plugin repo", myHelper.getTestData("plugins/intellij/test/maven-extension/1.0/maven-extension-1.0.pom").isRegularFile())
     importProjectAsync("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
@@ -217,9 +222,9 @@ class ProxyImportingTest : MavenMultiVersionImportingTestCase() {
                            </plugins>
                        </build>
                        """.trimIndent())
+    assertTrue("Pom file should be downloaded", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.pom").isRegularFile())
+    assertTrue("Jar file should be downloaded", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.jar").isRegularFile())
     assertContainsElements(myProxyFixture.requestedFiles, "/intellij/test/maven-extension/1.0/maven-extension-1.0.jar", "/intellij/test/maven-extension/1.0/maven-extension-1.0.pom")
-    assertTrue("File should be downloaded", myHelper.getTestData("local1/intellij/test/maven-extension/1.0/maven-extension-1.0.jar").isRegularFile())
-
   }
 
   companion object {

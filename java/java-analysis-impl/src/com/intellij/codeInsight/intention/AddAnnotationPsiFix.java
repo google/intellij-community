@@ -10,6 +10,7 @@ import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.LocalQuickFixOnPsiElement;
 import com.intellij.codeInspection.util.IntentionName;
 import com.intellij.java.analysis.JavaAnalysisBundle;
+import com.intellij.java.codeserver.core.JavaPsiAnnotationUtil;
 import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.modcommand.ActionContext;
 import com.intellij.modcommand.ModCommandExecutor;
@@ -19,11 +20,15 @@ import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.JavaCodeStyleManager;
 import com.intellij.psi.impl.light.LightElement;
-import com.intellij.psi.util.*;
+import com.intellij.psi.util.JavaElementKind;
+import com.intellij.psi.util.PsiFormatUtil;
+import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ObjectUtils;
 import com.siyeh.ig.psiutils.CommentTracker;
 import one.util.streamex.StreamEx;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -90,17 +95,21 @@ public class AddAnnotationPsiFix extends LocalQuickFixOnPsiElement implements Lo
       final String name = PsiFormatUtil.formatSimple((PsiNamedElement)modifierListOwner);
       if (name != null) {
         JavaElementKind type = JavaElementKind.fromElement(modifierListOwner).lessDescriptive();
-        if (shortName == null) {
-          return JavaAnalysisBundle.message("inspection.i18n.quickfix.annotate.element", type.object(), name);
-        }
-        return JavaAnalysisBundle
-          .message("inspection.i18n.quickfix.annotate.element.as", type.object(), name, shortName);
+        return calcText(shortName, type, name);
       }
     }
     if (shortName == null) {
       return JavaAnalysisBundle.message("inspection.i18n.quickfix.annotate");
     }
     return JavaAnalysisBundle.message("inspection.i18n.quickfix.annotate.as", shortName);
+  }
+
+  public static @Nls @NotNull String calcText(@Nullable String shortName, @NotNull JavaElementKind type, @NotNull String name) {
+    if (shortName == null) {
+      return JavaAnalysisBundle.message("inspection.i18n.quickfix.annotate.element", type.object(), name);
+    }
+    return JavaAnalysisBundle
+      .message("inspection.i18n.quickfix.annotate.element.as", type.object(), name, shortName);
   }
 
   public static @Nullable PsiModifierListOwner getContainer(PsiFile file, int offset) {

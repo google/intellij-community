@@ -11,11 +11,6 @@ object LambdaTestRoot : Root()
 @Suppress("unused")
 object LambdaTestModel : Ext(LambdaTestRoot) {
 
-  private val LambdaRdIdeInfo = structdef {
-    field("id", string)
-    field("ideType", LambdaRdIdeType)
-  }
-
   private val LambdaRdIdeType = enum {
     +"BACKEND"
     +"FRONTEND"
@@ -43,28 +38,32 @@ object LambdaTestModel : Ext(LambdaTestRoot) {
     field("cause", LambdaRdTestSessionExceptionCause.nullable)
   }
 
+  private val LambdaRdKeyValueEntry = structdef {
+    field("key", string)
+    field("value", string)
+  }
 
   private val LambdaRdTestActionParameters = structdef {
     field("reference", string)
-    field("parameters", immutableList(string).nullable)
+    // Can't use maps in struct
+    field("parameters", immutableList(LambdaRdKeyValueEntry).nullable)
   }
 
-  private val LambdaRdSerializedLambdaParameters = structdef {
-    field("clazzName", string)
-    field("methodName", string)
+  private val LambdaRdSerializedLambda = structdef {
+    field("stepName", string)
     field("serializedDataBase64", string)
+    field("classPath", immutableList(string))
+    field("parametersBase64", immutableList(string))
   }
 
   private val LambdaRdTestSession = classdef {
-    field("rdIdeInfo", LambdaRdIdeInfo)
+    field("rdIdeType", LambdaRdIdeType)
     property("ready", bool.nullable)
     signal("sendException", LambdaRdTestSessionException).async
     call("closeAllOpenedProjects", void, bool).async
     call("runLambda", LambdaRdTestActionParameters, void).async
-    call("runSerializedLambda", LambdaRdSerializedLambdaParameters, void).async
-    call("requestFocus", bool, bool).async
-    call("isFocused", void, bool).async
-    call("visibleFrameNames", void, immutableList(string)).async
+    call("runSerializedLambda", LambdaRdSerializedLambda, string).async
+    call("cleanUp", void, void).async
     call("projectsNames", void, immutableList(string)).async
     call("makeScreenshot", string, bool).async
     call("isResponding", void, bool).async

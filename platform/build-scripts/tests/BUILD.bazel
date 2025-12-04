@@ -8,6 +8,12 @@ resourcegroup(
 )
 
 jvm_library(
+  name = "tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "tests_test_lib",
   module_name = "intellij.platform.buildScripts.tests",
   visibility = ["//visibility:public"],
@@ -28,10 +34,10 @@ jvm_library(
     "//platform/testFramework/extensions:testExtensions",
     "//build/tasks",
     "//build/tasks:tasks_test_lib",
-    "@lib//:kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/commons/compress",
     "//build",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//platform/util/zip",
     "//platform/util/jdom",
     "//platform/util-ex",

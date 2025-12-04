@@ -3,14 +3,18 @@ package com.intellij.xdebugger.impl.actions
 
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification
+import com.intellij.openapi.application.EDT
+import com.intellij.platform.debugger.impl.shared.SplitDebuggerAction
 import com.intellij.xdebugger.impl.DebuggerSupport
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy
 import com.intellij.xdebugger.impl.performDebuggerActionAsync
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
-class ShowExecutionPointAction : XDebuggerActionBase(), ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
+class ShowExecutionPointAction : XDebuggerActionBase(), SplitDebuggerAction {
   override fun getHandler(debuggerSupport: DebuggerSupport): DebuggerActionHandler {
     return ourHandler
   }
@@ -24,7 +28,11 @@ class ShowExecutionPointAction : XDebuggerActionBase(), ActionRemoteBehaviorSpec
 private val ourHandler = object : XDebuggerProxySuspendedActionHandler() {
   override fun perform(session: XDebugSessionProxy, dataContext: DataContext) {
     performDebuggerActionAsync(session.project, dataContext) {
-      session.switchToTopFrame()
+      val executionStack = session.getCurrentExecutionStack() ?: return@performDebuggerActionAsync
+      val topFrame = executionStack.topFrameAsync.await() ?: return@performDebuggerActionAsync
+      withContext(Dispatchers.EDT) {
+        session.setCurrentStackFrame(executionStack, topFrame, true)
+      }
     }
   }
 }

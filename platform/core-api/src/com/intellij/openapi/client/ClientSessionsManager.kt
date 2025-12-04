@@ -1,16 +1,16 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.client
 
 import com.intellij.codeWithMe.ClientId
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.*
+import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.util.ui.EDT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -98,7 +98,14 @@ open class ClientSessionsManager<T : ClientSession>(private val scope: Coroutine
     @JvmStatic
     fun getProjectSessionOrThrow(project: Project, clientId: ClientId): ClientProjectSession {
       val session = project.service<ClientSessionsManager<ClientProjectSession>>().getSession(clientId)
-      return session ?: error("Project-level session is not set for $clientId")
+      if (session == null) {
+        val projectSessions = getProjectSessions(project, ClientKind.ALL).joinToString(", ", "existing project sessions: ", "\n")
+        val appSessions = getAppSessions(ClientKind.ALL).joinToString(", ", "existing app sessions: ", transform = {
+            (it as? ComponentManagerEx)?.debugString() ?: it.toString()
+          })
+        error("Project-level session is not set for $clientId\n $projectSessions $appSessions")
+      }
+      return session
     }
 
     /**
@@ -141,11 +148,8 @@ open class ClientSessionsManager<T : ClientSession>(private val scope: Coroutine
         // it may happen that a new session of a client is handled earlier than its previous session is disposed and removed.
         // It happens because `disposable` of the prev session is disposed with some delay in WireStorage.terminateWire (it's scheduled with launch {}).
         LOG.warn("Session $oldSession with such clientId $clientId is already registered and will be replaced with $session")
-        if (EDT.isCurrentThreadEdt()) {
-          Disposer.dispose(oldSession)
-        }
-        else {
-          scope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+        scope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+          writeIntentReadAction {
             Disposer.dispose(oldSession)
           }
         }

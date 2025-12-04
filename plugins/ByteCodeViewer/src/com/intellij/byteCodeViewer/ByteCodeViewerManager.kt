@@ -2,12 +2,13 @@
 package com.intellij.byteCodeViewer
 
 import com.intellij.ide.highlighter.JavaClassFileType
+import com.intellij.openapi.compiler.CompilerPaths
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.fileTypes.FileTypeRegistry
-import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.resolveFromRootOrRelative
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassOwner
@@ -17,6 +18,7 @@ import com.intellij.psi.util.ClassUtil
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.intellij.psi.util.parentsOfType
+import java.nio.file.Path
 import java.util.*
 
 public object ByteCodeViewerManager {
@@ -29,29 +31,34 @@ public object ByteCodeViewerManager {
       .first()
   }
 
-  public fun findClassFile(aClass: PsiClass): VirtualFile? {
-    val fileClass = aClass.containingClassFileClass()
+  public fun findClassFile(psiClass: PsiClass): VirtualFile? {
+    val fileClass = psiClass.containingClassFileClass()
     for (finder in CLASS_FINDER_EP.extensionList) {
-      val vFile = finder.findClass(aClass, fileClass)
+      val vFile = finder.findClass(psiClass, fileClass)
       if (vFile != null) {
         return vFile
       }
     }
     val file = fileClass.originalElement.containingFile.virtualFile ?: return null
-    val fileIndex = ProjectFileIndex.getInstance(aClass.project)
-    val jvmClassName = ClassUtil.getBinaryClassName(aClass) ?: return null
-    return if (FileTypeRegistry.getInstance().isFileOfType(file, JavaClassFileType.INSTANCE)) {
+    val jvmClassName = ClassUtil.getBinaryClassName(psiClass) ?: return null
+    if (FileTypeRegistry.getInstance().isFileOfType(file, JavaClassFileType.INSTANCE)) {
       // compiled class; looking for the right .class file (inner class 'A.B' is "contained" in 'A.class', but we need 'A$B.class')
-      file.parent.findChild(StringUtil.getShortName(jvmClassName) + ".class")
+      return file.parent.findChild(StringUtil.getShortName(jvmClassName) + ".class")
     }
     else {
       // source code; looking for a .class file in compiler output
-      val moduleExtension = CompilerModuleExtension.getInstance(fileIndex.getModuleForFile(file)) ?: return null
-      val classRoot = if (fileIndex.isInTestSourceContent(file)) moduleExtension.compilerOutputPathForTests
-      else moduleExtension.compilerOutputPath
-      if (classRoot == null) return null
-      return classRoot.resolveFromRootOrRelative(jvmClassName.replace('.', '/') + ".class")
+      val fileIndex = ProjectFileIndex.getInstance(psiClass.project)
+      val module = fileIndex.getModuleForFile(file) ?: return null
+      for (compilerOutputPath in CompilerPaths.getOutputPaths(arrayOf(module))) {
+        val classRoot = VirtualFileManager.getInstance().findFileByNioPath(Path.of(compilerOutputPath)) ?: continue
+        val relativeClassFilePath = jvmClassName.replace('.', '/') + ".class"
+        val classFile = classRoot.resolveFromRootOrRelative(relativeClassFilePath)
+        if (classFile != null) {
+          return classFile
+        }
+      }
     }
+    return null
   }
 
   @Deprecated(message = "Use findClassFile instead")
@@ -81,8 +88,8 @@ public object ByteCodeViewerManager {
     val queue: Queue<PsiClass> = ArrayDeque<PsiClass>(listOf<PsiClass?>(*containingFile.getClasses()))
     while (!queue.isEmpty()) {
       val c = queue.remove()
-      val navigationElement: PsiElement? = c.getNavigationElement()
-      val classRange = navigationElement?.getTextRange()
+      val navigationElement: PsiElement = c.getNavigationElement()
+      val classRange = navigationElement.getTextRange()
       if (classRange != null && classRange.contains(textRange)) {
         result = c
         queue.clear()

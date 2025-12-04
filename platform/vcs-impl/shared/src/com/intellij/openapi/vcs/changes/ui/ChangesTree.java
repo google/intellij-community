@@ -90,6 +90,7 @@ public abstract class ChangesTree extends Tree implements UiCompatibleDataProvid
   private boolean myIsModelFlat;
 
   private @NotNull InclusionModel myInclusionModel = new DefaultInclusionModel();
+  private @NotNull Set<Object> myPreviousInclusion = Collections.emptySet();
   private final @NotNull InclusionListener myInclusionModelListener = () -> {
     notifyInclusionListener();
     repaint();
@@ -510,36 +511,24 @@ public abstract class ChangesTree extends Tree implements UiCompatibleDataProvid
 
   public void selectFile(@Nullable FilePath toSelect) {
     if (toSelect == null) return;
-
-    int rowInTree = findRowContainingFile(getRoot(), toSelect);
-    if (rowInTree == -1) return;
-
-    setSelectionRow(rowInTree);
-    TreeUtil.showRowCentered(this, rowInTree, false);
+    TreeNode node = findNodeContainingFile(getRoot(), toSelect);
+    if (node != null) {
+      TreeUtil.selectNode(this, node);
+    }
   }
 
-  private int findRowContainingFile(@NotNull TreeNode root, @NotNull FilePath toSelect) {
-    TreeNode targetNode = TreeUtil.treeNodeTraverser(root).traverse(TreeTraversal.POST_ORDER_DFS).find(node -> {
-      if (node instanceof DefaultMutableTreeNode) {
-        Object userObject = ((DefaultMutableTreeNode)node).getUserObject();
-        if (userObject instanceof Change) {
-          return matches((Change)userObject, toSelect);
-        }
+  private static @Nullable TreeNode findNodeContainingFile(@NotNull TreeNode root, @NotNull FilePath toSelect) {
+    return TreeUtil.treeNodeTraverser(root).traverse(TreeTraversal.POST_ORDER_DFS).find(node -> {
+      if (node instanceof DefaultMutableTreeNode mutableTreeNode) {
+        Object userObject = mutableTreeNode.getUserObject();
+        return (userObject instanceof Change change) ?
+               ChangesUtil.matches(change, toSelect) :
+               toSelect.equals(VcsTreeModelData.mapUserObjectToFilePath(userObject));
       }
-
       return false;
     });
-    if (targetNode != null) {
-      return TreeUtil.getRowForNode(this, (DefaultMutableTreeNode)targetNode);
-    }
-    else {
-      return -1;
-    }
   }
 
-  private static boolean matches(@NotNull Change change, @NotNull FilePath toSelect) {
-    return toSelect.equals(ChangesUtil.getAfterPath(change)) || toSelect.equals(ChangesUtil.getBeforePath(change));
-  }
 
   public @NotNull ChangesBrowserNode<?> getRoot() {
     return (ChangesBrowserNode<?>)getModel().getRoot();
@@ -560,7 +549,11 @@ public abstract class ChangesTree extends Tree implements UiCompatibleDataProvid
   }
 
   private void notifyInclusionListener() {
-    if (myTreeInclusionListener != null) myTreeInclusionListener.run();
+    Set<Object> currentInclusion = myInclusionModel.getInclusion();
+    if (myTreeInclusionListener != null && !currentInclusion.equals(myPreviousInclusion)) {
+      myPreviousInclusion = currentInclusion;
+      myTreeInclusionListener.run();
+    }
   }
 
   /**

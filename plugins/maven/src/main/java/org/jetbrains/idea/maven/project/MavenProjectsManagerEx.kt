@@ -5,7 +5,6 @@ import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.internal.statistic.StructuredIdeActivity
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
@@ -52,14 +51,13 @@ import org.jetbrains.idea.maven.model.MavenWorkspaceMap
 import org.jetbrains.idea.maven.project.preimport.MavenProjectStaticImporter
 import org.jetbrains.idea.maven.project.preimport.SimpleStructureProjectVisitor
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
+import org.jetbrains.idea.maven.server.MavenServerConsoleIndicator
 import org.jetbrains.idea.maven.server.MavenWrapperDownloader
 import org.jetbrains.idea.maven.server.showUntrustedProjectNotification
 import org.jetbrains.idea.maven.telemetry.tracer
 import org.jetbrains.idea.maven.utils.MavenActivityKey
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenUtil
-import java.io.File
-import java.nio.file.Files
 
 @ApiStatus.Experimental
 interface MavenAsyncProjectsManager {
@@ -112,10 +110,6 @@ interface MavenAsyncProjectsManager {
     previewModule: Module?,
     syncProject: Boolean,
   ): List<Module>
-
-  fun projectFileExists(file: File): Boolean {
-    return Files.exists(file.toPath())
-  }
 
   suspend fun onProjectStartup()
 }
@@ -468,6 +462,10 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
       importModules(syncActivity, resolutionResult, modelsProvider, mavenEmbedderWrappers)
     }
 
+    tracer.spanBuilder("collectMavenProblems").useWithScope {
+      projectsTree.collectProblems()
+    }
+
     tracer.spanBuilder("notifyMavenProblems").useWithScope {
       MavenResolveResultProblemProcessor.notifyMavenProblems(myProject)
     }
@@ -487,7 +485,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
     // plugins and artifacts can be resolved in parallel with import
     return coroutineScope {
       val pluginResolutionJob = launchTracked(CoroutineName("pluginResolutionJob")) {
-        val pluginResolver = MavenPluginResolver(projectsTree)
+        val pluginResolver = project.service<MavenPluginResolver>()
         withBackgroundProgressTraced(myProject, "resolveMavenPlugins", MavenProjectBundle.message("maven.downloading.plugins"), true) {
           reportRawProgress { reporter ->
             project.messageBus.syncPublisher<MavenImportListener>(MavenImportListener.TOPIC).pluginResolutionStarted()
@@ -495,7 +493,17 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
               for (mavenProjects in resolutionResult.mavenProjectMap) {
                 try {
                   tracer.spanBuilder("doResolveMavenPlugins").useWithScope {
-                    pluginResolver.resolvePlugins(mavenProjects.value, mavenEmbedderWrappers, reporter, syncConsole)
+                    val mavenProjectsToResolvePlugins = mavenProjects.value.filter {
+                      !it.hasReadingErrors()
+                      && it.hasUnresolvedPlugins()
+                    }
+                    val pluginResolutionResult = pluginResolver.resolvePlugins(mavenProjectsToResolvePlugins, forceUpdateSnapshots, mavenEmbedderWrappers, reporter, syncConsole)
+                    for (mavenPluginId in pluginResolutionResult.unresolvedPluginIds) {
+                      syncConsole.showArtifactBuildIssue(MavenServerConsoleIndicator.ResolveType.PLUGIN, mavenPluginId.key, null)
+                    }
+                    for (mavenProject in mavenProjectsToResolvePlugins) {
+                      projectsTree.firePluginsResolved(mavenProject)
+                    }
                   }
                 }
                 catch (e: Exception) {
@@ -532,7 +540,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
         runMavenImportActivity(project, syncActivity, MavenImportStats.ResolvingTask) {
           project.messageBus.syncPublisher<MavenImportListener>(MavenImportListener.TOPIC).projectResolutionStarted(projectsToResolve)
           val res = tracer.spanBuilder("resolution").useWithScope {
-            val updateSnapshots = MavenProjectsManager.getInstance(myProject).forceUpdateSnapshots || generalSettings.isAlwaysUpdateSnapshots
+            val updateSnapshots = forceUpdateSnapshots || generalSettings.isAlwaysUpdateSnapshots
             resolver.resolve(spec.resolveIncrementally(),
                              projectsToResolve,
                              projectsTree,
@@ -683,8 +691,6 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
         doDownloadArtifacts(projects, artifacts, sources, docs, reporter)
       }
     }
-
-    withContext(Dispatchers.EDT) { getVirtualFileManager().asyncRefresh() }
 
     return result
   }

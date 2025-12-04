@@ -32,12 +32,13 @@ jvm_library(
     "//platform/diff-impl",
     "//platform/util/concurrency",
     "//platform/util-ex",
+    "//platform/forms_rt:java-guiForms-rt",
     "//libraries/guava",
     "//libraries/ini4j",
-    "@lib//:oro_matcher",
+    "//libraries/oro-matcher",
     "@lib//:jaxb-api",
-    "//libraries/javax-activation",
-    "@lib//:stream_ex",
+    "//libraries/javax/activation",
+    "//libraries/stream",
     "//platform/statistics",
     "//platform/lvcs-api:lvcs",
     "//libraries/fastutil",
@@ -45,6 +46,7 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io",
     "//platform/external-process-auth-helper",
     "//platform/vcs-impl/shared",
+    "//platform/core-impl",
   ],
   runtime_deps = [
     "@lib//:jaxb-runtime",
@@ -85,9 +87,10 @@ jvm_library(
     "//platform/vcs-tests:vcs-testFramework",
     "@lib//:hamcrest",
     "@lib//:kotlin-test",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/core-ui",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/forms_rt:java-guiForms-rt",
   ]
 )
 ### auto-generated section `build intellij.vcs.svn.tests` end

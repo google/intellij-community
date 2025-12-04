@@ -6,8 +6,6 @@ package com.intellij.platform.eel.fs
 
 import com.intellij.platform.eel.GeneratedBuilder
 import com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions
-import com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions.WalkDirectoryEntryOrder
-import com.intellij.platform.eel.fs.EelFileSystemApi.WalkDirectoryOptions.WalkDirectoryTraversalOrder
 import com.intellij.platform.eel.path.EelPath
 import org.jetbrains.annotations.ApiStatus
 
@@ -20,7 +18,7 @@ class WalkDirectoryOptionsBuilder(
    */
   private var path: EelPath,
 ) {
-  private var entryOrder: WalkDirectoryEntryOrder = WalkDirectoryEntryOrder.RANDOM
+  private var entryOrder: WalkDirectoryOptions.WalkDirectoryEntryOrder = WalkDirectoryOptions.WalkDirectoryEntryOrder.RANDOM
 
   private var fileContentsHash: Boolean = false
 
@@ -28,7 +26,7 @@ class WalkDirectoryOptionsBuilder(
 
   private var readMetadata: Boolean = false
 
-  private var traversalOrder: WalkDirectoryTraversalOrder = WalkDirectoryTraversalOrder.DFS
+  private var traversalOrder: WalkDirectoryOptions.WalkDirectoryTraversalOrder = WalkDirectoryOptions.WalkDirectoryTraversalOrder.DFS
 
   private var yieldDirectories: Boolean = true
 
@@ -41,15 +39,22 @@ class WalkDirectoryOptionsBuilder(
   /**
    * The default is RANDOM.
    */
-  fun entryOrder(arg: WalkDirectoryEntryOrder): WalkDirectoryOptionsBuilder = apply {
+  fun entryOrder(arg: WalkDirectoryOptions.WalkDirectoryEntryOrder): WalkDirectoryOptionsBuilder = apply {
     this.entryOrder = arg
   }
 
+  /**
+   * Yield directory entries in alphabetical order.
+   */
   fun alphabetical(): WalkDirectoryOptionsBuilder =
-    entryOrder(WalkDirectoryEntryOrder.ALPHABETICAL)
+    entryOrder(WalkDirectoryOptions.WalkDirectoryEntryOrder.ALPHABETICAL)
 
+  /**
+   * Yield directory entries in order in which they appear on the file system.
+   * If you do not care for the order of the files, this is the preferable option.
+   */
   fun random(): WalkDirectoryOptionsBuilder =
-    entryOrder(WalkDirectoryEntryOrder.RANDOM)
+    entryOrder(WalkDirectoryOptions.WalkDirectoryEntryOrder.RANDOM)
 
   /**
    * Yield hash of the regular file's contents. Contents are hashed using xxHash. Default is false.
@@ -98,15 +103,52 @@ class WalkDirectoryOptionsBuilder(
   /**
    * The default is DFS.
    */
-  fun traversalOrder(arg: WalkDirectoryTraversalOrder): WalkDirectoryOptionsBuilder = apply {
+  fun traversalOrder(arg: WalkDirectoryOptions.WalkDirectoryTraversalOrder): WalkDirectoryOptionsBuilder = apply {
     this.traversalOrder = arg
   }
 
+  /**
+   * Breadth-first traversal.
+   * ```
+   * a/
+   * |- b/
+   * |  |- c
+   * |  |- d
+   * |- e
+   * ```
+   * Returned:
+   * ```
+   * a
+   * a/b
+   * a/e
+   * a/b/c
+   * a/b/d
+   * ```
+   */
   fun bfs(): WalkDirectoryOptionsBuilder =
-    traversalOrder(WalkDirectoryTraversalOrder.BFS)
+    traversalOrder(WalkDirectoryOptions.WalkDirectoryTraversalOrder.BFS)
 
+  /**
+   * Depth-first traversal, where directory entries are yielded in order they are encountered.
+   * If you do not care for the manner of traversal, this is the preferable option.
+   * ```
+   * a/
+   * |- b/
+   * |  |- c
+   * |  |- d
+   * |- e
+   * ```
+   * Returned:
+   * ```
+   * a
+   * a/b
+   * a/b/c
+   * a/b/d
+   * a/e
+   * ```
+   */
   fun dfs(): WalkDirectoryOptionsBuilder =
-    traversalOrder(WalkDirectoryTraversalOrder.DFS)
+    traversalOrder(WalkDirectoryOptions.WalkDirectoryTraversalOrder.DFS)
 
   /**
    * Default is true.
@@ -153,12 +195,12 @@ class WalkDirectoryOptionsBuilder(
 
 @GeneratedBuilder.Result
 internal class WalkDirectoryOptionsImpl(
-  override val entryOrder: WalkDirectoryEntryOrder,
+  override val entryOrder: WalkDirectoryOptions.WalkDirectoryEntryOrder,
   override val fileContentsHash: Boolean,
   override val maxDepth: Int,
   override val path: EelPath,
   override val readMetadata: Boolean,
-  override val traversalOrder: WalkDirectoryTraversalOrder,
+  override val traversalOrder: WalkDirectoryOptions.WalkDirectoryTraversalOrder,
   override val yieldDirectories: Boolean,
   override val yieldOtherFileTypes: Boolean,
   override val yieldRegularFiles: Boolean,

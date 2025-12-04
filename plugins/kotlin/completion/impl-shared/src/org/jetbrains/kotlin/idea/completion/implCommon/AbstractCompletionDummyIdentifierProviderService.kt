@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.completion.implCommon
 
 import com.intellij.codeInsight.completion.CompletionInitializationContext
@@ -138,7 +138,7 @@ abstract class AbstractCompletionDummyIdentifierProviderService : CompletionDumm
     protected open fun handleDefaultCase(tokenBefore: PsiElement): String? = null
 
     private fun isInValueOrTypeParametersList(tokenBefore: PsiElement): String? {
-        if (tokenBefore.parents.any { it is KtTypeParameterList || it is KtParameterList || it is KtContextReceiverList }) {
+        if (tokenBefore.parents.any { it is KtTypeParameterList || it is KtParameterList || it is KtContextParameterList }) {
             return EMPTY_SUFFIX
         }
         return null
@@ -207,6 +207,11 @@ abstract class AbstractCompletionDummyIdentifierProviderService : CompletionDumm
 
     private fun specialExtensionReceiverDummyIdentifierSuffix(tokenBefore: PsiElement): String? {
         if (tokenBefore.parentOfType<KtTypeReference>() != null) return null // already parsed as type reference
+        // If we just type `val a: <caret>`, then there is no `KtTypeReference` in the PSI tree.
+        // These cases work correctly without the special treatment of this function and would break when adding `.f`.
+        // See: KTIJ-36297
+        val potentialColonBefore = tokenBefore.getPrevSiblingIgnoringWhitespaceAndComments()
+        if (potentialColonBefore.elementType == KtTokens.COLON) return null
 
         var token = tokenBefore
         var ltCount = 0

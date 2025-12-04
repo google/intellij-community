@@ -210,13 +210,8 @@ com.intellij.openapi.application.Application
 - *:isWriteThread():Z
 - *:runWriteIntentReadAction(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 f:com.intellij.openapi.application.CoroutinesKt
-- *sf:backgroundWriteAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:getEdtImmediate(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
-- *sf:getUI(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
 - *sf:getUiImmediate(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
-- *sf:getUiWithModelAccess(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
-- *sf:getUiWithModelAccessImmediate(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
-- *sf:readAndBackgroundWriteAction(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:readAndBackgroundWriteActionUndispatched(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:readAndEdtWriteActionUndispatched(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:writeAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
@@ -226,9 +221,9 @@ a:com.intellij.openapi.application.ReadAction
 *a:com.intellij.openapi.application.WriteIntentReadAction
 - <init>():V
 - *s:compute(com.intellij.openapi.util.Computable):java.lang.Object
-- *s:compute(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
-- *s:run(com.intellij.util.ThrowableRunnable):V
+- *s:computeThrowable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 - *s:run(java.lang.Runnable):V
+- *s:runThrowable(com.intellij.util.ThrowableRunnable):V
 *f:com.intellij.openapi.client.ClientSystemInfo
 - *sf:Companion:com.intellij.openapi.client.ClientSystemInfo$Companion
 - f:getMacClient():java.lang.Boolean
@@ -250,6 +245,12 @@ f:com.intellij.openapi.command.CoroutinesKt
 - *sf:writeCommandAction(com.intellij.openapi.project.Project,java.lang.String,kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.openapi.components.ServicesKt
 - *sf:serviceAsync(com.intellij.openapi.components.ComponentManager,java.lang.Class,kotlin.coroutines.Continuation):java.lang.Object
+*:com.intellij.openapi.editor.ModNavigator
+- a:getCaretOffset():I
+- a:getDocument():com.intellij.openapi.editor.Document
+- a:moveCaretTo(I):V
+- registerTabOut(com.intellij.openapi.util.TextRange,I):V
+- a:select(com.intellij.openapi.util.TextRange):V
 f:com.intellij.openapi.editor.markup.AttributesFlyweight
 - *s:create(java.awt.Color,java.awt.Color,I,java.awt.Color,com.intellij.openapi.editor.markup.EffectType,java.util.Map,java.awt.Color):com.intellij.openapi.editor.markup.AttributesFlyweight
 - *:hasEffects():Z
@@ -270,6 +271,9 @@ c:com.intellij.openapi.editor.markup.TextAttributes
 - *sf:Companion:com.intellij.openapi.fileEditor.FileDocumentManagerListenerBackgroundable$Companion
 - sf:TOPIC:com.intellij.util.messages.Topic
 *f:com.intellij.openapi.fileEditor.FileDocumentManagerListenerBackgroundable$Companion
+com.intellij.openapi.fileTypes.ex.FileTypeIdentifiableByVirtualFile
+- com.intellij.openapi.fileTypes.FileType
+- *:isAvailableForOverride():Z
 *:com.intellij.openapi.module.LoadedModuleDescription
 - com.intellij.openapi.module.ModuleDescription
 - a:getModule():com.intellij.openapi.module.Module

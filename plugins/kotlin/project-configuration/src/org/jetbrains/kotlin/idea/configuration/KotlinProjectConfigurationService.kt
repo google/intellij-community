@@ -6,6 +6,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTracker
+import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTrackerSettings
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
@@ -14,7 +15,7 @@ import com.intellij.ui.EditorNotifications
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.idea.projectConfiguration.KotlinProjectConfigurationBundle
-import org.jetbrains.kotlin.idea.statistics.KotlinJ2KOnboardingFUSCollector
+import org.jetbrains.kotlin.idea.statistics.KotlinConfigurationFUSCollector
 import org.jetbrains.kotlin.idea.util.isKotlinFileType
 import java.util.concurrent.atomic.AtomicReference
 
@@ -108,7 +109,6 @@ class KotlinProjectConfigurationService(private val project: Project, private va
     /**
      * @return true if the sync is currently in-progress by the underlying external system.
      * Also see [isSyncing] for checking if the sync is queued or in progress.
-     * Note: This method does not work for Maven and always returns false, use [isSyncing] instead.
      */
     fun isSyncInProgress(): Boolean {
         return syncState.get().level == SyncState.Level.SyncInProgress
@@ -142,6 +142,13 @@ class KotlinProjectConfigurationService(private val project: Project, private va
     suspend fun sync() {
         queueSync()
         awaitSyncFinished()
+    }
+
+    @ApiStatus.Internal
+    fun queueSyncIfPossible() {
+        if (ExternalSystemProjectTrackerSettings.getInstance(project).autoReloadType != ExternalSystemProjectTrackerSettings.AutoReloadType.NONE) {
+            queueSync()
+        }
     }
 
     /**
@@ -218,7 +225,7 @@ class KotlinProjectConfigurationService(private val project: Project, private va
                     title = KotlinProjectConfigurationBundle.message("auto.configure.kotlin.check")
                 ) {
                     val settings = autoConfigurator.calculateAutoConfigSettings(module)
-                    KotlinJ2KOnboardingFUSCollector.logCheckAutoConfigStatus(module.project, settings != null)
+                    KotlinConfigurationFUSCollector.logCheckAutoConfigStatus(module.project, settings != null)
                     settings
                 }
 

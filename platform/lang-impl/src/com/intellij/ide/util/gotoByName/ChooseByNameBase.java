@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.ide.util.gotoByName;
 
@@ -14,10 +14,13 @@ import com.intellij.ide.actions.CopyReferenceAction;
 import com.intellij.ide.actions.GotoFileAction;
 import com.intellij.ide.impl.DataValidators;
 import com.intellij.lang.LangBundle;
+import com.intellij.model.Pointer;
+import com.intellij.model.Symbol;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileTypes.UnknownFileType;
@@ -277,6 +280,11 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
           selection, o -> getElement(o));
         return PsiUtilCore.toPsiElementArray(result);
       });
+
+      sink.lazy(CommonDataKeys.SYMBOLS, () -> {
+        if (myCalcElementsThread != null) return null;
+        return selection.stream().flatMap(o -> getSymbols(o).stream()).toList();
+      });
     }
 
     private static @Nullable PsiElement getElement(Object element) {
@@ -289,6 +297,24 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
           data, CommonDataKeys.PSI_ELEMENT.getName(), element);
       }
       return null;
+    }
+
+    private static @NotNull List<Symbol> getSymbols(Object element) {
+      if (element instanceof Pointer<?>) {
+        element = ((Pointer<?>)element).dereference();
+      }
+      if (element instanceof Symbol o) {
+        return Collections.singletonList(o);
+      }
+      if (element instanceof DataProvider o) {
+        List<Symbol> data = CommonDataKeys.SYMBOLS.getData(o);
+        if (data != null) {
+          //noinspection unchecked
+          data = (List<Symbol>)DataValidators.validOrNull(data, CommonDataKeys.SYMBOLS.getName(), element);
+        }
+        return data == null ? Collections.emptyList() : data;
+      }
+      return Collections.emptyList();
     }
 
     @Override
@@ -1203,7 +1229,9 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
       int code = keyStroke.getKeyCode();
       int modifiers = keyStroke.getModifiers();
       try {
-        super.processKeyEvent(e);
+        WriteIntentReadAction.run(() -> {
+          super.processKeyEvent(e);
+        });
       }
       catch (NullPointerException e1) {
         if (!Patches.SUN_BUG_ID_6322854) {
@@ -1444,7 +1472,12 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
       LOG.assertTrue(myCalcElementsThread == this, myCalcElementsThread);
 
       if (!isProjectDisposed() && !checkDisposed()) {
-        new CalcElementsThread(myPattern, myCheckboxState, myModalityState, mySelectionPolicy, myCallback).scheduleThread();
+        CalcElementsThread thread = new CalcElementsThread(myPattern, myCheckboxState, myModalityState, mySelectionPolicy, myCallback);
+        if (EDT.isCurrentThreadEdt()) {
+          thread.scheduleThread();
+        } else {
+          ApplicationManager.getApplication().invokeLater(thread::scheduleThread);
+        }
       }
     }
 

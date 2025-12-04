@@ -8,6 +8,7 @@ import com.intellij.grazie.ide.ui.components.dsl.msg
 import com.intellij.grazie.jlanguage.Lang
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.io.DigestUtil
 import org.jetbrains.annotations.ApiStatus
@@ -30,10 +31,18 @@ object GrazieRemote {
 
   fun allAvailableLocally(languages: Collection<Lang>): Boolean = languages.all { isAvailableLocally(it) }
 
-  /** Downloads [lang] to local storage */
-  @Deprecated("Use downloadAsync(Collection<Lang>, Project) instead", replaceWith = ReplaceWith("downloadAsync(listOf(lang), project)"))
-  @ApiStatus.ScheduledForRemoval
-  fun download(lang: Lang): Boolean = LanguageDownloader.download(lang)
+  /**
+   * Downloads language to local storage synchronously. Use with extra care as
+   * some languages are GPL-licensed and require explicit user agreement before downloading
+   * 
+   * Consider using [downloadAsync] instead as it:
+   * 1. Has built-in GPL license agreement check
+   * 2. Downloads language in the background without blocking
+   * 
+   * @param lang Language to download
+   * @return true if download was successful, false otherwise
+   */
+  fun downloadWithoutLicenseCheck(lang: Lang): Boolean = LanguageDownloader.download(lang)
 
   /** Downloads [languages] asynchronously to local storage */
   fun downloadAsync(languages: Collection<Lang>, project: Project): Unit = LanguageDownloader.downloadAsync(languages, project)
@@ -47,6 +56,7 @@ object GrazieRemote {
    */
   @RequiresEdt
   fun getLanguagesBasedOnUserAgreement(languages: Collection<Lang>, project: Project): Collection<Lang> {
+    if (!Registry.`is`("grazie.show.gpl.warning")) return languages
     val gplLanguages = languages
       .filter { it.hunspellRemote?.isGplLicensed == true }
       .toList()
@@ -56,8 +66,8 @@ object GrazieRemote {
       project,
       msg("grazie.license.gpl.message", gplLanguages.joinToString { it.shortDisplayName }),
       msg("grazie.license.gpl.title"),
-      CommonBundle.getOkButtonText(),
-      if (languages.size == gplLanguages.size) CommonBundle.getCancelButtonText() else msg("grazie.license.gpl.cancel"),
+      CommonBundle.getYesButtonText(),
+      if (languages.size == gplLanguages.size) CommonBundle.getNoButtonText() else msg("grazie.license.gpl.cancel"),
       Messages.getQuestionIcon()
     ) == Messages.OK
     if (hasUserAgreement) return languages

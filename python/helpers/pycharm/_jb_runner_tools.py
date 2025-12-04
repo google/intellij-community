@@ -1,6 +1,6 @@
 # coding=utf-8
 """
-Tools to implement runners (https://confluence.jetbrains.com/display/~link/PyCharm+test+runners+protocol)
+Tools to implement runners (https://youtrack.jetbrains.com/articles/PY-A-83178089/PyCharm-test-runners-protocol)
 """
 import os
 import re
@@ -166,7 +166,7 @@ class NewTeamcityServiceMessages(_old_service_messages):
         if messageName == "testSuiteStarted" or is_test:
             self._test_suites[full_name] = TestSuiteInfo(full_name, current, parent, is_test, False)
         elif messageName == "testIgnored" and properties.get("stopped") == "true":
-            ancestors = self._test_to_list(full_name)
+            ancestors = _jb_utils.test_to_list(full_name)
             # mark ancestors as explicitly stopped
             for i in range(len(ancestors), 0, -1):
                 ancestor = ".".join(ancestors[:i])

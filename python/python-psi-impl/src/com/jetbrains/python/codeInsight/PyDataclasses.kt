@@ -176,7 +176,7 @@ fun resolvesToOmittedDefault(expression: PyExpression, type: Type): Boolean {
     val qNames = PyResolveUtil.resolveImportedElementQNameLocally(expression)
 
     return when (type.asPredefinedType) {
-      PyDataclassParameters.PredefinedType.STD, PyDataclassParameters.PredefinedType.DATACLASS_TRANSFORM -> 
+      PyDataclassParameters.PredefinedType.STD, PyDataclassParameters.PredefinedType.DATACLASS_TRANSFORM ->
         qNames.any { it.toString() == PyDataclassNames.Dataclasses.DATACLASSES_MISSING }
       PyDataclassParameters.PredefinedType.ATTRS -> qNames.any { it.toString() in PyDataclassNames.Attrs.ATTRS_NOTHING }
       else -> false
@@ -245,28 +245,28 @@ private fun parseDataclassParametersFromAST(cls: PyClass, context: TypeEvalConte
 
     for (decorator in decorators.decorators) {
       val callee = (decorator.callee as? PyReferenceExpression) ?: continue
-  
+
       for (decoratorQualifiedName in PyResolveUtil.resolveImportedElementQNameLocally(callee)) {
         val types = decoratorAndTypeAndMarkedCallee(cls.project)
         val decoratorAndTypeAndMarkedCallee = types.firstOrNull { it.first == decoratorQualifiedName } ?: continue
-  
+
         val mapping = decorator.mapArguments(
           PyCallableTypeImpl(decoratorAndTypeAndMarkedCallee.third, null),
           context ?: TypeEvalContext.codeInsightFallback(cls.project)
         )
-  
+
         val builder = PyDataclassParametersBuilder(decoratorAndTypeAndMarkedCallee.second, decoratorAndTypeAndMarkedCallee.first)
-  
+
         mapping
           .mappedParameters
           .entries
           .forEach {
             builder.update(it.value.name, it.key)
           }
-  
+
         return builder.build()
       }
-  
+
       // Process decorators that have dataclass_transform-compatible keyword arguments.
       if (decorator.qualifiedName == null) continue
       val decoratorKeywordArguments = decorator.arguments.filterIsInstance<PyKeywordArgument>()
@@ -310,7 +310,7 @@ data class PyDataclassParameters(
   val eq: Boolean,
   val order: Boolean,
   val unsafeHash: Boolean,
-  val frozen: Boolean,
+  val frozen: Boolean?,
   val matchArgs: Boolean,
   val kwOnly: Boolean,
   val slots: Boolean,
@@ -360,6 +360,9 @@ private class PyDataclassParametersBuilder(private val type: Type, private val d
   private var eq: Boolean? = null
   private var order: Boolean? = null
   private var unsafeHash: Boolean? = null
+
+  // PEP 681: A class that has been decorated with dataclass_transform is considered neither frozen nor non-frozen
+  // Spec: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics
   private var frozen: Boolean? = null
   private var matchArgs: Boolean? = null
   private var kwOnly: Boolean? = null
@@ -559,10 +562,10 @@ private fun resolveDataclassParameters(
       // TODO remove this hack, make it a proper field
       val extraArguments = mutableMapOf<String, PyExpression>()
       if (type.asPredefinedType == PyDataclassParameters.PredefinedType.ATTRS && stub.decoratorName() == PyKnownDecorator.ATTR_DATACLASS.qualifiedName) {
-        extraArguments["auto_attribs"] = 
+        extraArguments["auto_attribs"] =
           PyElementGenerator.getInstance(pyClass.project).createExpressionFromText(LanguageLevel.forElement(pyClass), PyNames.TRUE)
       }
-      
+
       return PyDataclassParameters(
         init = stub.initValue() ?: true,
         repr = stub.reprValue() ?: true,
@@ -603,9 +606,20 @@ private fun resolveDataclassParameters(
           .overStub { dtStub -> dtStub }
           .withStubBuilder(PyDataclassTransformDecoratorStub::create)
           .compute(context)
-        
-        
+
+
         if (dataclassTransformStub != null) {
+          val frozenValue = stub.frozenValue() ?: run {
+            val isOnMetaClass = isDataclassTransformOnMetaclass(dataclassTransformDecorator, pyClass, context)
+
+            if (isOnMetaClass) {
+              dataclassTransformStub.frozenDefault
+            }
+            else {
+              dataclassTransformStub.frozenDefault ?: false
+            }
+          }
+
           val resolvedFieldSpecifiers = dataclassTransformStub.fieldSpecifiers
             .flatMap { PyResolveUtil.resolveQualifiedNameInScope(it, ScopeUtil.getScopeOwner(dataclassTransformDecorator)!!, context) }
             .filterIsInstance<PyQualifiedNameOwner>()
@@ -617,7 +631,7 @@ private fun resolveDataclassParameters(
             eq = stub.eqValue() ?: dataclassTransformStub.eqDefault,
             order = stub.orderValue() ?: dataclassTransformStub.orderDefault,
             unsafeHash = stub.unsafeHashValue() ?: true,
-            frozen = stub.frozenValue() ?: dataclassTransformStub.frozenDefault,
+            frozen = frozenValue,
             matchArgs = stub.matchArgsValue() ?: true,
             kwOnly = stub.kwOnly() ?: dataclassTransformStub.kwOnlyDefault,
             slots = stub.slotsValue() ?: false,
@@ -666,6 +680,15 @@ private fun resolveDataclassParameters(
   }
 }
 
+private fun isDataclassTransformOnMetaclass(
+  decorator: PyDecorator,
+  pyClass: PyClass,
+  context: TypeEvalContext,
+): Boolean {
+  val metaclass = (pyClass.getMetaClassType(true, context) as? PyClassType)?.pyClass ?: return false
+  return metaclass.decoratorList?.decorators?.any { it == decorator } == true
+}
+
 private fun resolveDecoratorStubSafe(decorator: PyDecorator, context: TypeEvalContext): List<PsiElement> {
   val resolveContext = PyResolveContext.defaultContext(context)
   return StubAwareComputation.on(decorator)
@@ -690,7 +713,7 @@ fun resolveDataclassFieldParameters(
   context: TypeEvalContext,
 ): PyDataclassFieldParameters? {
   assert(field.containingClass == dataclass)
-  
+
   val assignedQName = field.assignedQName
   if (assignedQName != null) {
     val resolvesToMissingOrNothing = PyResolveUtil.resolveQualifiedNameInScope(assignedQName, ScopeUtil.getScopeOwner(dataclass)!!, context)
@@ -707,7 +730,7 @@ fun resolveDataclassFieldParameters(
       )
     }
   }
-  
+
   val fieldStub = if (field.stub != null) {
     // TODO access the green stub here
     field.stub.getCustomStub(PyDataclassFieldStub::class.java)
@@ -729,16 +752,16 @@ fun resolveDataclassFieldParameters(
   if (field.calleeName == null) return null
   val fieldSpecifierDeclaration = PyResolveUtil.resolveQualifiedNameInScope(field.calleeName!!, ScopeUtil.getScopeOwner(dataclass)!!, context)
     .filterIsInstance<PyQualifiedNameOwner>()
-    .firstOrNull { 
+    .firstOrNull {
       val qualifiedName = it.qualifiedName
-      qualifiedName != null && QualifiedName.fromDottedString(qualifiedName) in dataclassParams.fieldSpecifiers 
+      qualifiedName != null && QualifiedName.fromDottedString(qualifiedName) in dataclassParams.fieldSpecifiers
     }
   if (fieldSpecifierDeclaration == null) return null
   val fieldSpecifierCallable = when (fieldSpecifierDeclaration) {
     is PyClass -> fieldSpecifierDeclaration.findInitOrNew(true, context)
     is PyFunction -> fieldSpecifierDeclaration
     else -> null
-  }  
+  }
   if (fieldSpecifierCallable == null) return null
   return PyDataclassFieldParameters(
     hasDefault = fieldStub?.hasDefault() ?: false,

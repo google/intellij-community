@@ -157,8 +157,6 @@
             key="kotlin.compiler.configurable"
             parentId="project.propCompiler"/>
 
-    <errorHandler implementation="org.jetbrains.kotlin.idea.reporter.KotlinReportSubmitter"/>
-
     <pathMacroExpandableProtocol protocol="kotlin-js-meta"/>
 
     <projectPathMacroContributor implementation="org.jetbrains.kotlin.idea.macros.KotlinBundledPathMacroContributor"/>
@@ -625,6 +623,10 @@
         <action
                 id="KotlinThrowException"
                 class="org.jetbrains.kotlin.idea.actions.internal.KotlinThrowExceptionAction"/>
+
+        <action
+                id="EnableExperimentalKDocResolutionStrategy"
+                class="org.jetbrains.kotlin.idea.actions.internal.EnableExperimentalKDocResolutionStrategyToggleAction"/>
 
         <group id="KotlinCompletionBenchmarkGroup" popup="true">
           <action

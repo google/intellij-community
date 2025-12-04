@@ -13,6 +13,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSet;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.*;
 
 import java.util.ArrayList;
@@ -28,8 +29,10 @@ import java.util.function.Supplier;
  */
 public abstract class GlobalSearchScope extends SearchScope implements ProjectAwareFileFilter {
   public static final GlobalSearchScope[] EMPTY_ARRAY = new GlobalSearchScope[0];
-  private final Project myProject;
+
   private static final Key<Boolean> USE_WEAK_FILE_SCOPE = Key.create("virtual.file.use.weak.scope");
+
+  private final Project myProject;
 
   protected GlobalSearchScope(@Nullable Project project) {
     myProject = project;
@@ -41,7 +44,7 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
 
   @ApiStatus.NonExtendable
   @Override
-  public Project getProject() {
+  public @Nullable Project getProject() {
     return myProject;
   }
 
@@ -388,12 +391,20 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
       return myFiles;
     }
 
+    @NotNull
     @Override
-    public String toString() {
+    @ApiStatus.Internal
+    public String toFullString() {
       return "Files: [" +
              StringUtil.join(myFiles, ", ") +
              "]; search in libraries: " +
              (myHasFilesOutOfProjectRoots != null ? myHasFilesOutOfProjectRoots : "unknown");
+    }
+
+    @Override
+    public String toString() {
+      List<VirtualFile> files = ContainerUtil.getFirstItems(new ArrayList<>(myFiles), 20);
+      return "Files: ("+ files +"); search in libraries: " + (myHasFilesOutOfProjectRoots != null ? myHasFilesOutOfProjectRoots : "unknown");
     }
   }
 }

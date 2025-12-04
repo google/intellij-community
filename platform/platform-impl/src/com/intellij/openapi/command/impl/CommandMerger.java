@@ -7,9 +7,7 @@ import com.intellij.openapi.command.undo.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.NlsContexts.Command;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.reference.SoftReference;
-import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.concurrency.ThreadingAssertions;
@@ -32,11 +30,13 @@ public final class CommandMerger {
 
   private final boolean isLocalHistoryActivity;
   private final boolean isTransparentSupported;
+
+  private @NotNull List<CommandId> commandIds = new ArrayList<>();
   private @Nullable @Command String commandName;
   private @Nullable Reference<Object> lastGroupId; // weak reference to avoid memleaks when clients pass some exotic objects as commandId
-  private @NotNull UndoRedoList<UndoableAction> currentActions = new UndoRedoList<>();
-  private @NotNull Set<DocumentReference> allAffectedDocuments = new HashSet<>();
-  private @NotNull Set<DocumentReference> additionalAffectedDocuments = new HashSet<>();
+  private @NotNull UndoRedoList<UndoableAction> undoableActions = new UndoRedoList<>();
+  private @NotNull UndoAffectedDocuments affectedDocuments = new UndoAffectedDocuments();
+  private @NotNull UndoAffectedDocuments additionalAffectedDocuments = new UndoAffectedDocuments();
   private @NotNull UndoConfirmationPolicy undoConfirmationPolicy = UndoConfirmationPolicy.DEFAULT;
   private @Nullable EditorAndState editorStateBefore;
   private @Nullable EditorAndState editorStateAfter;
@@ -44,10 +44,9 @@ public final class CommandMerger {
   private boolean isTransparent;
   private boolean isValid = true;
 
-  CommandMerger(boolean isLocalHistoryActivity, boolean isTransparent, boolean isTransparentSupported) {
+  CommandMerger(boolean isLocalHistoryActivity, boolean isTransparentSupported) {
     this.isLocalHistoryActivity = isLocalHistoryActivity;
     this.isTransparentSupported = isTransparentSupported;
-    this.isTransparent = isTransparent;
   }
 
   boolean isUndoAvailable(@NotNull Collection<DocumentReference> refs) {
@@ -65,92 +64,74 @@ public final class CommandMerger {
     return false;
   }
 
-  @Nullable UndoCommandFlushReason shouldFlush(@Nullable Object nextGroupId, @NotNull UndoCommandData nextCommand) {
-    if (isTransparentSupported && nextCommand.isTransparent() && nextCommand.getEditorStateAfter() == null && editorStateAfter != null) {
-      return createFlushReason("NEXT_TRANSPARENT_WITHOUT_EDITOR_STATE_AFTER", nextGroupId, nextCommand);
+  @Nullable UndoCommandFlushReason shouldFlush(@NotNull PerformedCommand performedCommand) {
+    //noinspection ConstantValue
+    if (!isCompatible(performedCommand.commandId())) {
+      return createFlushReason("INCOMPATIBLE_COMMAND", performedCommand);
     }
-    if (isTransparentSupported && isTransparent() && editorStateBefore == null && nextCommand.getEditorStateBefore() != null) {
-      return createFlushReason("CURRENT_TRANSPARENT_WITHOUT_EDITOR_STATE_BEFORE", nextGroupId, nextCommand);
+    if (isTransparentSupported &&
+        performedCommand.isTransparent() &&
+        performedCommand.editorStateAfter() == null &&
+        editorStateAfter != null) {
+      return createFlushReason("NEXT_TRANSPARENT_WITHOUT_EDITOR_STATE_AFTER", performedCommand);
     }
-    if (isTransparent() || nextCommand.isTransparent()) {
+    if (isTransparentSupported &&
+        isTransparent() &&
+        editorStateBefore == null &&
+        performedCommand.editorStateBefore() != null) {
+      return createFlushReason("CURRENT_TRANSPARENT_WITHOUT_EDITOR_STATE_BEFORE", performedCommand);
+    }
+    if (isTransparent() || performedCommand.isTransparent()) {
       boolean changedDocs = hasActions() &&
-                            nextCommand.hasActions() &&
-                            !allAffectedDocuments.equals(nextCommand.getAllAffectedDocuments());
-      return changedDocs ? createFlushReason("TRANSPARENT_WITH_DIFFERENT_DOCS", nextGroupId, nextCommand) : null;
+                            performedCommand.hasActions() &&
+                            !affectedDocuments.equals(performedCommand.affectedDocuments());
+      return changedDocs ? createFlushReason("TRANSPARENT_WITH_DIFFERENT_DOCS", performedCommand) : null;
     }
-    if ((isForcedGlobal || nextCommand.isForcedGlobal()) && !isMergeGlobalCommandsAllowed()) {
-      return createFlushReason("GLOBAL", nextGroupId, nextCommand);
+    if ((isForcedGlobal || performedCommand.isForcedGlobal()) && !isMergeGlobalCommandsAllowed()) {
+      return createFlushReason("GLOBAL", performedCommand);
     }
-    boolean canMergeGroup = canMergeGroup(nextGroupId, SoftReference.dereference(lastGroupId));
-    return canMergeGroup ? null : createFlushReason("CHANGED_GROUP", nextGroupId, nextCommand);
+    boolean canMergeGroup = canMergeGroup(performedCommand.groupId(), SoftReference.dereference(lastGroupId));
+    return canMergeGroup ? null : createFlushReason("CHANGED_GROUP", performedCommand);
   }
 
   @Nullable UndoableGroup formGroup(@NotNull UndoCommandFlushReason flushReason, int commandTimestamp) {
-    UndoableGroup group;
-    if (hasActions()) {
-      if (!additionalAffectedDocuments.isEmpty()) {
-        DocumentReference[] refs = additionalAffectedDocuments.toArray(DocumentReference.EMPTY_ARRAY);
-        currentActions.add(new MyEmptyUndoableAction(refs));
-      }
-      group = new UndoableGroup(
-        commandName,
-        currentActions,
-        undoConfirmationPolicy,
-        editorStateBefore,
-        editorStateAfter,
-        flushReason,
-        commandTimestamp,
-        isLocalHistoryActivity,
-        isTransparent(),
-        isGlobal(),
-        isValid
-      );
-    }
-    else {
-      group = null;
-    }
+    UndoableGroup group = !hasActions() ? null : createUndoableGroup(flushReason, commandTimestamp);
     reset();
     return group;
   }
 
-  void merge(@Command String commandName, Object groupId, @NotNull UndoCommandData nextCommandToMerge) {
-    merge(nextCommandToMerge);
-    if (nextCommandToMerge.isTransparent() || !hasActions()) {
-      return;
-    }
-    if (groupId != SoftReference.dereference(lastGroupId)) {
-      lastGroupId = groupId == null ? null : new WeakReference<>(groupId);
-    }
-    if (this.commandName == null) {
-      this.commandName = commandName;
-    }
-  }
-
-  void setEditorStateBefore(@Nullable EditorAndState state) {
-    if (editorStateBefore == null || !hasActions()) {
-      editorStateBefore = state;
+  void mergeWithPerformedCommand(@NotNull PerformedCommand performedCommand) {
+    mergeState(performedCommand);
+    if (!performedCommand.isTransparent() && hasActions()) {
+      Object groupId = performedCommand.groupId();
+      if (groupId != SoftReference.dereference(lastGroupId)) {
+        lastGroupId = groupId == null ? null : new WeakReference<>(groupId);
+      }
+      if (commandName == null) {
+        commandName = performedCommand.commandName();
+      }
     }
   }
 
   void invalidateActionsFor(@NotNull DocumentReference ref) {
-    if (allAffectedDocuments.contains(ref)) {
+    if (affectedDocuments.affects(ref)) {
       isValid = false;
     }
   }
 
   @Nullable LocalCommandMergerSnapshot getSnapshot(@NotNull DocumentReference reference) {
-    if (isGlobal() || !additionalAffectedDocuments.isEmpty() || allAffectedDocuments.size() > 1) {
+    if (isGlobal() || additionalAffectedDocuments.size() > 0 || affectedDocuments.size() > 1) {
       return null;
     }
-    if (allAffectedDocuments.size() == 1) {
-      DocumentReference currentReference = allAffectedDocuments.iterator().next();
+    if (affectedDocuments.size() == 1) {
+      DocumentReference currentReference = affectedDocuments.firstAffected();
       if (currentReference != reference) {
         return null;
       }
     }
     return new LocalCommandMergerSnapshot(
-      allAffectedDocuments.stream().findFirst().orElse(null),
-      currentActions.snapshot(),
+      affectedDocuments.firstAffected(),
+      undoableActions.snapshot(),
       lastGroupId,
       isTransparent(),
       commandName,
@@ -161,15 +142,13 @@ public final class CommandMerger {
   }
 
   boolean resetLocalHistory(@NotNull LocalCommandMergerSnapshot snapshot) {
-    HashSet<DocumentReference> references = new HashSet<>();
-    DocumentReference reference = snapshot.getDocumentReferences();
-    if (reference != null) {
-      references.add(reference);
-    }
+    var references = new UndoAffectedDocuments();
+    references.addAffected(snapshot.getDocumentReferences());
     reset(
+      new ArrayList<>(), // TODO: snapshot me
       snapshot.getActions().toList(),
       references,
-      new HashSet<>(),
+      new UndoAffectedDocuments(),
       snapshot.getLastGroupId(),
       false,
       snapshot.getTransparent(),
@@ -188,26 +167,15 @@ public final class CommandMerger {
     // DocumentReference for document is not equal to the DocumentReference from the file of that doc, so try both
     DocumentReference refByFile = DocumentReferenceManager.getInstance().create(document);
     DocumentReference refByDoc = new DocumentReferenceByDocument(document);
-    currentActions.removeIf(action -> {
+    undoableActions.removeIf(action -> {
       // remove UndoAction only if it doesn't contain anything but `document`, to avoid messing up with (very rare) complex undo actions containing several documents
       DocumentReference[] refs = ObjectUtils.notNull(action.getAffectedDocuments(), DocumentReference.EMPTY_ARRAY);
       return ContainerUtil.and(refs, ref -> ref.equals(refByDoc) || ref.equals(refByFile));
     });
-    allAffectedDocuments.remove(refByFile);
-    allAffectedDocuments.remove(refByDoc);
-    additionalAffectedDocuments.remove(refByFile);
-    additionalAffectedDocuments.remove(refByDoc);
-  }
-
-  void mergeUndoConfirmationPolicy(@NotNull UndoConfirmationPolicy undoConfirmationPolicy) {
-    if (this.undoConfirmationPolicy == UndoConfirmationPolicy.DEFAULT) {
-      this.undoConfirmationPolicy = undoConfirmationPolicy;
-    }
-    else if (this.undoConfirmationPolicy == UndoConfirmationPolicy.DO_NOT_REQUEST_CONFIRMATION) {
-      if (undoConfirmationPolicy == UndoConfirmationPolicy.REQUEST_CONFIRMATION) {
-        this.undoConfirmationPolicy = UndoConfirmationPolicy.REQUEST_CONFIRMATION;
-      }
-    }
+    affectedDocuments.removeAffected(refByFile);
+    affectedDocuments.removeAffected(refByDoc);
+    additionalAffectedDocuments.removeAffected(refByFile);
+    additionalAffectedDocuments.removeAffected(refByDoc);
   }
 
   @Nullable String getCommandName() {
@@ -215,7 +183,7 @@ public final class CommandMerger {
   }
 
   boolean isGlobal() {
-    return isForcedGlobal || affectsMultiplePhysicalDocs();
+    return isForcedGlobal || affectedDocuments.affectsMultiplePhysical();
   }
 
   boolean isTransparent() {
@@ -230,67 +198,96 @@ public final class CommandMerger {
   }
 
   boolean hasActions() {
-    return !currentActions.isEmpty();
+    return !undoableActions.isEmpty();
   }
 
   @NotNull UndoRedoList<UndoableAction> getCurrentActions() {
-    return currentActions;
+    return undoableActions;
   }
 
   boolean isValid() {
     return isValid;
   }
 
-  @NotNull Set<DocumentReference> getAllAffectedDocuments() {
-    return allAffectedDocuments;
+  @NotNull Collection<DocumentReference> getAffectedDocuments() {
+    return affectedDocuments.asCollection();
   }
 
-  @NotNull Set<DocumentReference> getAdditionalAffectedDocuments() {
-    return additionalAffectedDocuments;
+  @NotNull Collection<DocumentReference> getAdditionalAffectedDocuments() {
+    return additionalAffectedDocuments.asCollection();
+  }
+
+  @NotNull Collection<CommandId> getCommandIds() {
+    return commandIds;
+  }
+
+  @Nullable EditorAndState getStateBefore() {
+    return editorStateBefore;
+  }
+
+  @Nullable EditorAndState getStateAfter() {
+    return editorStateAfter;
   }
 
   @NotNull String dumpState() {
     return UndoDumpUnit.fromMerger(this).toString();
   }
 
-  private boolean hasChangesOf(DocumentReference ref) {
-    for (UndoableAction action : currentActions) {
-      DocumentReference[] refs = action.getAffectedDocuments();
-      if (refs == null) {
-        return true;
+  private void setEditorStateBefore(@Nullable EditorAndState state) {
+    if (editorStateBefore == null || !hasActions()) {
+      editorStateBefore = state;
+    }
+  }
+
+  private void setEditorStateAfter(@Nullable EditorAndState state) {
+    editorStateAfter = state;
+  }
+
+  private void mergeConfirmationPolicy(@NotNull UndoConfirmationPolicy newConfirmationPolicy) {
+    if (undoConfirmationPolicy == UndoConfirmationPolicy.DEFAULT) {
+      undoConfirmationPolicy = newConfirmationPolicy;
+    }
+    else if (undoConfirmationPolicy == UndoConfirmationPolicy.DO_NOT_REQUEST_CONFIRMATION) {
+      if (newConfirmationPolicy == UndoConfirmationPolicy.REQUEST_CONFIRMATION) {
+        undoConfirmationPolicy = UndoConfirmationPolicy.REQUEST_CONFIRMATION;
       }
-      else if (ArrayUtil.contains(ref, refs)) {
+    }
+  }
+
+  private boolean hasChangesOf(DocumentReference ref) {
+    for (UndoableAction action : undoableActions) {
+      DocumentReference[] refs = action.getAffectedDocuments();
+      if (refs == null || ArrayUtil.contains(ref, refs)) {
         return true;
       }
     }
-    return hasActions() && additionalAffectedDocuments.contains(ref);
+    return hasActions() && additionalAffectedDocuments.affects(ref);
   }
 
-  private void merge(@NotNull UndoCommandData nextCommandToMerge) {
-    setEditorStateBefore(nextCommandToMerge.getEditorStateBefore());
-    editorStateAfter = nextCommandToMerge.getEditorStateAfter();
+  private void mergeState(@NotNull PerformedCommand performedCommand) {
+    if (performedCommand.shouldRecordId()) {
+      commandIds.add(performedCommand.commandId());
+    }
+    setEditorStateBefore(performedCommand.editorStateBefore());
+    setEditorStateAfter(performedCommand.editorStateAfter());
     if (isTransparent()) { // todo write test
-      if (nextCommandToMerge.hasActions()) {
-        isTransparent = nextCommandToMerge.isTransparent();
+      if (performedCommand.hasActions()) {
+        isTransparent = performedCommand.isTransparent();
       }
     } else {
       if (!hasActions()) {
-        isTransparent = nextCommandToMerge.isTransparent();
+        isTransparent = performedCommand.isTransparent();
       }
     }
-    isValid &= nextCommandToMerge.isValid();
-    isForcedGlobal |= nextCommandToMerge.isForcedGlobal();
-    currentActions.addAll(nextCommandToMerge.getUndoableActions());
-    allAffectedDocuments.addAll(nextCommandToMerge.getAllAffectedDocuments());
-    additionalAffectedDocuments.addAll(nextCommandToMerge.getAdditionalAffectedDocuments());
-    mergeUndoConfirmationPolicy(nextCommandToMerge.getUndoConfirmationPolicy());
+    isValid &= performedCommand.isValid();
+    isForcedGlobal |= performedCommand.isForcedGlobal();
+    undoableActions.addAll(performedCommand.undoableActions());
+    affectedDocuments.addAffected(performedCommand.affectedDocuments());
+    additionalAffectedDocuments.addAffected(performedCommand.additionalAffectedDocuments());
+    mergeConfirmationPolicy(performedCommand.confirmationPolicy());
   }
 
-  private @NotNull UndoCommandFlushReason createFlushReason(
-    @NotNull String reason,
-    @Nullable Object nextGroupId,
-    @NotNull UndoCommandData nextCommandToMerge
-  ) {
+  private @NotNull UndoCommandFlushReason createFlushReason(@NotNull String reason, @NotNull PerformedCommand performedCommand) {
     return UndoCommandFlushReason.cannotMergeCommands(
       reason,
       commandName,
@@ -298,17 +295,39 @@ public final class CommandMerger {
       isTransparent(),
       isForcedGlobal,
       null,
-      nextGroupId,
-      nextCommandToMerge.isTransparent(),
-      nextCommandToMerge.isGlobal()
+      performedCommand.groupId(),
+      performedCommand.isTransparent(),
+      performedCommand.isGlobal()
+    );
+  }
+
+  private @NotNull UndoableGroup createUndoableGroup(@NotNull UndoCommandFlushReason flushReason, int commandTimestamp) {
+    if (additionalAffectedDocuments.size() > 0) {
+      DocumentReference[] refs = additionalAffectedDocuments.asCollection().toArray(DocumentReference.EMPTY_ARRAY);
+      undoableActions.add(new MyEmptyUndoableAction(refs));
+    }
+    return new UndoableGroup(
+      commandIds,
+      commandName,
+      undoableActions,
+      undoConfirmationPolicy,
+      editorStateBefore,
+      editorStateAfter,
+      flushReason,
+      commandTimestamp,
+      isLocalHistoryActivity,
+      isTransparent(),
+      isGlobal(),
+      isValid
     );
   }
 
   private void reset() {
     reset(
+      new ArrayList<>(),
       new UndoRedoList<>(),
-      new HashSet<>(),
-      new HashSet<>(),
+      new UndoAffectedDocuments(),
+      new UndoAffectedDocuments(),
       null,
       false,
       false,
@@ -322,9 +341,10 @@ public final class CommandMerger {
 
   @SuppressWarnings("SameParameterValue")
   private void reset(
+    List<CommandId> commandIds,
     UndoRedoList<UndoableAction> currentActions,
-    HashSet<DocumentReference> allAffectedDocuments,
-    HashSet<DocumentReference> additionalAffectedDocuments,
+    UndoAffectedDocuments allAffectedDocuments,
+    UndoAffectedDocuments additionalAffectedDocuments,
     Reference<Object> lastGroupId,
     boolean forcedGlobal,
     boolean transparent,
@@ -334,36 +354,22 @@ public final class CommandMerger {
     EditorAndState editorStateAfter,
     UndoConfirmationPolicy undoConfirmationPolicy
   ) {
-    this.currentActions = currentActions;
-    this.allAffectedDocuments = allAffectedDocuments;
+    this.commandIds = commandIds;
+    this.undoableActions = currentActions;
+    this.affectedDocuments = allAffectedDocuments;
     this.additionalAffectedDocuments = additionalAffectedDocuments;
     this.lastGroupId = lastGroupId;
     this.isForcedGlobal = forcedGlobal;
     this.isTransparent = transparent;
     this.commandName = commandName;
     this.isValid = isValid;
-    this.editorStateAfter = editorStateAfter;
     this.editorStateBefore = editorStateBefore;
+    this.editorStateAfter = editorStateAfter;
     this.undoConfirmationPolicy = undoConfirmationPolicy;
   }
 
-  private boolean affectsMultiplePhysicalDocs() {
-    Set<VirtualFile> affectedFiles = new HashSet<>();
-    for (DocumentReference each : allAffectedDocuments) {
-      VirtualFile file = each.getFile();
-      if (isVirtualDocumentChange(file)) {
-        continue;
-      }
-      affectedFiles.add(file);
-      if (affectedFiles.size() > 1) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private boolean hasNonUndoableActions() {
-    for (UndoableAction each : currentActions) {
+    for (UndoableAction each : undoableActions) {
       if (each instanceof NonUndoableAction) {
         return true;
       }
@@ -371,12 +377,19 @@ public final class CommandMerger {
     return false;
   }
 
-  private static boolean isMergeGlobalCommandsAllowed() {
-    return ((CoreCommandProcessor)CommandProcessor.getInstance()).isMergeGlobalCommandsAllowed();
+  private boolean isCompatible(@NotNull CommandId commandId) {
+    //noinspection ConstantValue
+    if (true) { // TODO: transparent commands from the BE ruin the stack
+      return true;
+    }
+    if (commandIds.isEmpty()) {
+      return true;
+    }
+    return commandIds.getFirst().isCompatible(commandId);
   }
 
-  private static boolean isVirtualDocumentChange(VirtualFile file) {
-    return file == null || file instanceof LightVirtualFile;
+  private static boolean isMergeGlobalCommandsAllowed() {
+    return ((CoreCommandProcessor)CommandProcessor.getInstance()).isMergeGlobalCommandsAllowed();
   }
 
   private static final class MyEmptyUndoableAction extends BasicUndoableAction {

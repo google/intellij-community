@@ -13,7 +13,7 @@ import com.jetbrains.python.PyBundle
 import com.jetbrains.python.run.AbstractPythonRunConfiguration
 import com.jetbrains.python.run.configuration.PyInterpreterModeNotifier
 import com.jetbrains.python.run.configuration.PySdkComboBox
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.event.ItemEvent
@@ -155,7 +155,7 @@ class PyPluginSdkFragment<T : AbstractPythonRunConfiguration<*>> : SettingsEdito
   private fun getSelectedSdk(): Sdk? {
     if (currentMode == SDK_OF_MODULE) {
       ((modulesCombo?.selectedItem) as? Module)?.let {
-        return ModuleRootManager.getInstance(it).sdk
+        return PythonSdkUtil.findPythonSdk(it)
       }
     }
     else if (currentMode == SDK_FROM_LIST) {

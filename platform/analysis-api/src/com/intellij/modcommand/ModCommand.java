@@ -40,8 +40,8 @@ import java.util.function.Function;
  * Especially take a look at {@link #psiUpdate} methods which are helpful in most of the cases.
  */
 public sealed interface ModCommand
-  permits ModChooseAction, ModCompositeCommand, ModCopyToClipboard, ModCreateFile, ModDeleteFile, ModDisplayMessage,
-          ModEditOptions, ModHighlight, ModMoveFile, ModNavigate, ModNothing, ModOpenUrl, ModShowConflicts, ModStartRename,
+  permits ModChooseAction, ModCompositeCommand, ModCopyToClipboard, ModCreateFile, ModDeleteFile, ModDisplayMessage, ModEditOptions,
+          ModHighlight, ModMoveFile, ModNavigate, ModNothing, ModOpenUrl, ModRegisterTabOut, ModShowConflicts, ModStartRename,
           ModStartTemplate, ModUpdateFileText, ModUpdateReferences, ModUpdateSystemOptions {
 
   /**
@@ -224,7 +224,23 @@ public sealed interface ModCommand
    */
   static @NotNull ModCommand psiUpdate(@NotNull ActionContext context,
                                        @NotNull Consumer<@NotNull ModPsiUpdater> updater) {
-    return ModCommandService.getInstance().psiUpdate(context, updater);
+    return ModCommandService.getInstance().psiUpdate(context, doc -> {}, updater);
+  }
+
+  /**
+   * @param context     a context of the original action
+   * @param copyCleaner a function that updates the document to ignore intermittent changes in the original.
+   *                    This could be useful for completion when prefix is already inserted to the original document,
+   *                    but the final command should be applied to the document without prefix.
+   * @param updater     a function that accepts an updater, so it can query writable copies from it and perform modifications;
+   *                    also additional editor operation like caret positioning could be performed
+   * @return a command that will perform the corresponding update to the original elements and the editor
+   */
+  @ApiStatus.Internal
+  static @NotNull ModCommand psiUpdate(@NotNull ActionContext context,
+                                       @NotNull Consumer<@NotNull Document> copyCleaner, 
+                                       @NotNull Consumer<@NotNull ModPsiUpdater> updater) {
+    return ModCommandService.getInstance().psiUpdate(context, copyCleaner, updater);
   }
 
   /**
@@ -247,6 +263,19 @@ public sealed interface ModCommand
   static <E extends PsiElement> @NotNull ModCommand psiUpdate(@NotNull E orig,
                                                               @NotNull BiConsumer<@NotNull E, @NotNull ModPsiUpdater> updater) {
     return psiUpdate(ActionContext.from(null, orig.getContainingFile()), eu -> updater.accept(eu.getWritable(orig), eu));
+  }
+
+  /**
+   * Generates a command to inserts the specified text into the current position of the context file 
+   * and optionally moves the cursor after the inserted text.
+   *
+   * @param context the action context where the text will be inserted
+   * @param text the text to be inserted
+   * @param moveAfter whether to move the cursor after the inserted text
+   * @return a {@code ModCommand} to insert the text at the current position and optionally move the caret after it
+   */
+  static @NotNull ModCommand insertText(@NotNull ActionContext context, @NotNull String text, boolean moveAfter) {
+    return ModCommandService.getInstance().insertText(context, text, moveAfter);
   }
 
   /**

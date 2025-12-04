@@ -68,6 +68,7 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class CoverageView extends BorderLayoutPanel implements UiDataProvider, Disposable {
   private static final @NonNls String ACTION_DRILL_DOWN = "DrillDown";
@@ -113,7 +114,7 @@ public class CoverageView extends BorderLayoutPanel implements UiDataProvider, D
                                                      int row,
                                                      int column) {
         final Component component = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-        setBackground(UIUtil.getTableBackground(isSelected, myTable.hasFocus()));
+        setBackground(isSelected ? UIUtil.getTableBackground(isSelected, myTable.hasFocus()) : null);
         return component;
       }
     });
@@ -261,10 +262,11 @@ public class CoverageView extends BorderLayoutPanel implements UiDataProvider, D
             if (nodeRoot != null) {
               called = true;
               setWidth(nodeRoot);
-              ApplicationManager.getApplication().executeOnPooledThread(() -> {
+              // Postpone a bit to let the tree load
+              AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
                 resetIfAllFiltered(nodeRoot, actionToolbar);
                 logTotalCoverage(nodeRoot);
-              });
+              }, 100, TimeUnit.MILLISECONDS);
             }
           }
         }

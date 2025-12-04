@@ -6,7 +6,6 @@ import com.intellij.openapi.externalSystem.autoimport.ExternalSystemRefreshStatu
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
 import com.intellij.openapi.projectRoots.ProjectJdkTable
-import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsSafe
@@ -19,6 +18,7 @@ import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.impl.url.toVirtualFileUrl
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
+import com.intellij.python.common.tools.ToolId
 import com.intellij.python.pyproject.PyProjectToml
 import com.intellij.python.pyproject.model.api.ModelRebuiltListener
 import com.intellij.python.pyproject.model.spi.ProjectName
@@ -26,7 +26,10 @@ import com.intellij.python.pyproject.model.spi.PyProjectTomlProject
 import com.intellij.python.pyproject.model.spi.Tool
 import com.intellij.python.pyproject.model.spi.WorkspaceName
 import com.intellij.util.messages.Topic
-import com.jetbrains.python.ToolId
+import com.intellij.workspaceModel.ide.impl.legacyBridge.module.findModule
+import com.jetbrains.python.PyNames
+import com.jetbrains.python.module.PyModuleService
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import com.jetbrains.python.venvReader.Directory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -70,7 +73,7 @@ internal suspend fun linkProject(project: Project, projectModelRoot: Path) {
     val entries = generatePyProjectTomlEntries(files, excludeDirs)
 
     if (entries.isNotEmpty()) {
-      val sdks = project.modules.associate { Pair(it.name, ModuleRootManager.getInstance(it).sdk?.name) }
+      val sdks = project.modules.associate { Pair(it.name, PythonSdkUtil.findPythonSdk(it)?.name) }
       project.workspaceModel.currentSnapshot.entities(ModuleEntity::class.java)
       unlinkProjectImpl(project, externalProjectPath)
 
@@ -90,7 +93,7 @@ internal suspend fun linkProject(project: Project, projectModelRoot: Path) {
 
         // Restore SDK assoc
         for (module in project.modules) {
-          if (ModuleRootManager.getInstance(module).sdk == null) {
+          if (PythonSdkUtil.findPythonSdk(module) == null) {
             val sdkName = sdks[module.name] ?: continue
             ProjectJdkTable.getInstance().findJdk(sdkName)?.let { sdk ->
               ModuleRootModificationUtil.setModuleSdk(module, sdk)
@@ -148,6 +151,7 @@ private suspend fun generatePyProjectTomlEntries(files: Map<Path, PyProjectToml>
   val allNames = entriesByName.keys
   for (tool in Tool.EP.extensionList) {
     val (dependencies, workspaceMembers) = tool.getProjectStructure(entriesByName, namesByDir)
+                                           ?: getProjectStructureDefault(entriesByName, namesByDir)
     for ((name, deps) in dependencies) {
       val orphanNames = deps - allNames
       assert(orphanNames.isEmpty()) { "Tool $tool retuned wrong project names ${orphanNames.joinToString(", ")}" }
@@ -176,17 +180,8 @@ private suspend fun createEntityStorage(
   val fileUrlManager = project.workspaceModel.getVirtualFileUrlManager()
   val storage = MutableEntityStorage.create()
   for (pyProject in graph) {
-    val existingModuleEntity = project.workspaceModel.currentSnapshot
-      .entitiesBySource { it is PyProjectTomlEntitySource }
-      .filterIsInstance<ModuleEntity>()
-      .find { it.name == pyProject.name.name }
-    val existingSdkEntity = existingModuleEntity
-      ?.dependencies
-      ?.find { it is SdkDependency } as? SdkDependency
-    val sdkDependency = existingSdkEntity ?: InheritedSdkDependency
     val entitySource = PyProjectTomlEntitySource(pyProject.tomlFile.toVirtualFileUrl(virtualFileUrlManager))
     val moduleEntity = storage addEntity ModuleEntity(pyProject.name.name, emptyList(), entitySource) {
-      dependencies += sdkDependency
       dependencies += ModuleSourceDependency
       for (moduleName in pyProject.dependencies) {
         dependencies += ModuleDependency(ModuleId(moduleName.name), true, DependencyScope.COMPILE, false)
@@ -209,7 +204,8 @@ private suspend fun createEntityStorage(
         }
       }
 
-      pyProjectTomlEntity = PyProjectTomlWorkspaceEntity(participatedTools = participatedTools, entitySource)
+      type = PYTHON_MODULE_ID_DATA_CLASS
+      pyProjectTomlEntity = PyProjectTomlWorkspaceEntity(participatedTools = participatedTools, pyProject.tomlFile.parent.toVirtualFileUrl(fileUrlManager), entitySource)
       exModuleOptions = ExternalSystemModuleOptionsEntity(entitySource) {
         externalSystem = PYTHON_SOURCE_ROOT_TYPE.name
       }
@@ -218,6 +214,7 @@ private suspend fun createEntityStorage(
   }
   return@withContext storage
 }
+
 
 private class PyProjectTomlEntitySource(tomlFile: VirtualFileUrl) : EntitySource {
   override val virtualFileUrl: VirtualFileUrl = tomlFile
@@ -246,9 +243,14 @@ private data class PyProjectTomlBasedEntryImpl(
  * @see com.intellij.openapi.project.impl.getOrInitializeModule
  */
 private fun removeFakeModuleEntity(storage: MutableEntityStorage, modulesToRemove: Set<String>) {
+  val moduleService = PyModuleService.getInstance()
   val contentRoots = storage
     .entitiesBySource { it !is PyProjectTomlEntitySource }
     .filterIsInstance<ContentRootEntity>()
+    .filter {
+      val module = it.module.findModule(storage) ?: return@filter false
+      moduleService.isPythonModule(module)
+    }
     .toList()
   for (entity in contentRoots) {
     if (entity.module.name in modulesToRemove) {
@@ -285,3 +287,5 @@ private suspend fun findSrc(root: Directory): Set<Directory> =
     val src = root.resolve("src")
     if (src.exists()) setOf(src) else emptySet()
   }
+
+private val PYTHON_MODULE_ID_DATA_CLASS: ModuleTypeId = ModuleTypeId(PyNames.PYTHON_MODULE_ID)

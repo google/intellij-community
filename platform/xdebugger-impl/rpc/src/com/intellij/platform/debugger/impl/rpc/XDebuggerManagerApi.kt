@@ -3,23 +3,20 @@ package com.intellij.platform.debugger.impl.rpc
 
 import com.intellij.openapi.editor.impl.EditorId
 import com.intellij.platform.project.ProjectId
+import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
-import com.intellij.xdebugger.impl.rpc.XBreakpointId
-import com.intellij.xdebugger.impl.rpc.XDebugSessionId
+import com.intellij.platform.rpc.UID
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
-import fleet.rpc.core.DeferredSerializer
 import fleet.rpc.core.RpcFlow
 import fleet.rpc.remoteApiDescriptor
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 @Rpc
 interface XDebuggerManagerApi : RemoteApi<Unit> {
-  suspend fun currentSession(projectId: ProjectId): Flow<XDebugSessionId?>
+  suspend fun initialize(projectId: ProjectId, capabilities: XFrontendDebuggerCapabilities)
 
   suspend fun sessions(projectId: ProjectId): XDebugSessionsList
 
@@ -31,8 +28,6 @@ interface XDebuggerManagerApi : RemoteApi<Unit> {
 
   suspend fun sessionTabClosed(sessionId: XDebugSessionId)
 
-  suspend fun showLibraryFrames(show: Boolean)
-
   companion object {
     @JvmStatic
     suspend fun getInstance(): XDebuggerManagerApi {
@@ -40,6 +35,20 @@ interface XDebuggerManagerApi : RemoteApi<Unit> {
     }
   }
 }
+
+@ApiStatus.Internal
+@Serializable
+data class XFrontendDebuggerCapabilities(
+  val canShowImages: Boolean,
+)
+
+/**
+ * @see XDebugSessionId.findValue
+ * @see com.intellij.xdebugger.impl.XDebugSessionImpl.id
+ */
+@ApiStatus.Internal
+@Serializable
+data class XDebugSessionId(override val uid: UID) : Id
 
 @ApiStatus.Internal
 @Serializable
@@ -82,7 +91,7 @@ sealed interface XDebuggerSessionEvent {
   @Serializable
   class SessionPaused(
     override val state: XDebugSessionState,
-    @Serializable(with = DeferredSerializer::class) val suspendData: Deferred<SuspendData?>,
+    val suspendData: SuspendData?,
   ) : EventWithState
 
   @Serializable
@@ -98,8 +107,10 @@ sealed interface XDebuggerSessionEvent {
   @Serializable
   class StackFrameChanged(
     override val state: XDebugSessionState,
-    val sourcePosition: XSourcePositionDto?,
-    @Serializable(with = DeferredSerializer::class) val stackFrame: Deferred<XStackFrameDto>?,
+    val sourcePositionDto: XSourcePositionDto?,
+    val topSourcePositionDto: XSourcePositionDto?,
+    val isTopFrame: Boolean,
+    val stackFrame: XStackFrameDto?,
   ) : EventWithState
 
   @Serializable
@@ -120,8 +131,8 @@ data class SuspendData(
   val suspendContextDto: XSuspendContextDto,
   val executionStack: XExecutionStackDto?,
   val stackFrame: XStackFrameDto?,
-  val sourcePosition: XSourcePositionDto?,
-  val topSourcePosition: XSourcePositionDto?,
+  val sourcePositionDto: XSourcePositionDto?,
+  val topSourcePositionDto: XSourcePositionDto?,
 )
 
 @ApiStatus.Internal

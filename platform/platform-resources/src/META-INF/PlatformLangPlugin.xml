@@ -9,12 +9,11 @@
   <module value="com.intellij.modules.externalSystem"/>
   <module value="com.intellij.platform.ide.impl.wsl"/>
 
-  <xi:include href="PlatformLangComponents.xml"/>
+  <xi:include href="/META-INF/PlatformLangComponents.xml"/>
   <xi:include href="/idea/PriorityEditorLangActions.xml"/>
   <xi:include href="/idea/PlatformActions.xml"/>
   <xi:include href="/META-INF/PlatformExecutionActions.xml"/>
   <xi:include href="/idea/ExecutionActions.xml"/>
-  <xi:include href="/idea/XDebuggerActions.xml"/>
   <xi:include href="/idea/LangActions.xml"/>
   <xi:include href="/idea/UsageViewActions.xml"/>
   <xi:include href="/idea/ProblemsViewActions.xml"/>
@@ -39,12 +38,6 @@
 
   <xi:include href="/META-INF/PlatformExtensions.xml"/>
   <xi:include href="/META-INF/PlatformExecutionExtensions.xml"/>
-
-  <xi:include href="/META-INF/credential-store.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/ide-concurrency.xml"/>
 
   <xi:include href="/META-INF/LangExtensions.xml"/>
   <xi:include href="/META-INF/ProjectModelLangExtensions.xml"/>
@@ -74,6 +67,7 @@
     <applicationService serviceInterface="com.intellij.profile.codeInspection.InspectionProfileManager"
                         serviceImplementation="com.intellij.codeInspection.ex.ApplicationInspectionProfileManager"/>
 
+    <projectOpenProcessor implementation="com.intellij.platform.FolderProjectOpenProcessor"/>
     <projectOpenProcessor implementation="com.intellij.platform.PlatformProjectOpenProcessor" order="last"/>
 
     <projectService serviceImplementation="com.intellij.ide.projectView.impl.nodes.ProjectViewDirectoryHelper"/>
@@ -90,7 +84,6 @@
     <bookmarkProvider implementation="com.intellij.ide.bookmark.providers.RootTypeBookmarkProvider"/>
     <bookmarksListProvider implementation="com.intellij.ide.bookmark.ui.tree.BookmarkListProvider"/>
     <bookmarksListProvider implementation="com.intellij.ide.bookmark.ui.tree.GroupListProvider"/>
-    <bookmarksListProvider implementation="com.intellij.xdebugger.impl.breakpoints.BreakpointListProvider"/>
     <advancedSetting id="show.line.bookmarks.in.popup" default="true"
                      bundle="messages.BookmarkBundle" groupKey="group.advanced.settings.bookmarks"/>
     <advancedSetting id="tasks.enable.bookmark.context.on.branch.switch"
@@ -139,40 +132,8 @@
 
     <registryKey key="ide.project.view.new.file.popup" defaultValue="false"
                  description="Switches submenu in File - New to popup step" />
+
+    <registryKey key="ide.allow.folder.as.project" defaultValue="false"
+                 description="Allow opening folder as project without modules" />
   </extensions>
-
-  <xi:include href="/META-INF/diff-impl.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/compose.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/xdebugger.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/GraphPlugin.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/builtInServer.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/smRunner.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/duplicates-analysis.xml">
-    <xi:fallback/>
-  </xi:include>
-
-  <xi:include href="/META-INF/ExternalProcessAuthHelper.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/ExternalSystem.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/ExternalSystemDependencyUpdater.xml">
-    <xi:fallback/>
-  </xi:include>
 </idea-plugin>

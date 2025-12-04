@@ -16,10 +16,13 @@ import com.intellij.testFramework.rules.ProjectModelExtension
 import com.intellij.util.indexing.testEntities.DependencyItem
 import com.intellij.util.indexing.testEntities.OneMoreWithReferenceTestEntity
 import com.intellij.util.indexing.testEntities.ReferredTestEntity
+import com.intellij.util.indexing.testEntities.ReferredTestEntityBuilder
 import com.intellij.util.indexing.testEntities.ReferredTestEntityId
 import com.intellij.util.indexing.testEntities.WithReferenceTestEntity
+import com.intellij.util.indexing.testEntities.WithReferenceTestEntityBuilder
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl
 import com.intellij.workspaceModel.ide.NonPersistentEntitySource
+import com.intellij.workspaceModel.ide.impl.WorkspaceModelImpl
 import io.kotest.common.runBlocking
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
@@ -75,7 +78,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertFalse(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     WorkspaceModel.getInstance(projectModel.project).update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -92,7 +95,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertFalse(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     WorkspaceModel.getInstance(projectModel.project).update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -103,7 +106,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
 
     // modify an existing WithReferenceTestEntity entity
     WorkspaceModel.getInstance(projectModel.project).update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(*references.toTypedArray(), DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -113,7 +116,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
   @Test
   fun `check contributor called once on reference added to multiple entities`() = runBlocking {
     WorkspaceModel.getInstance(projectModel.project).update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -134,7 +137,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertFalse(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     model.update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -149,7 +152,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertTrue(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     model.update("Remove reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf()
       }
     }
@@ -166,7 +169,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertFalse(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     model.update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -176,7 +179,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
       assertTrue(WorkspaceFileIndex.getInstance(projectModel.project).isInWorkspace(entityRoot))
     }
     model.update("Remove reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf()
       }
     }
@@ -191,13 +194,13 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
   fun `check contributor is called on referred entity rename`() = runBlocking {
     val model = WorkspaceModel.getInstance(projectModel.project)
     model.update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
     referredTestEntityContributor.numberOfCalls.set(0)
     model.update("Rename entity and update reference") {
-      it.modifyEntity(ReferredTestEntity.Builder::class.java, referredTestEntity) {
+      it.modifyEntity(ReferredTestEntityBuilder::class.java, referredTestEntity) {
         name = "New Name"
       }
     }
@@ -211,17 +214,18 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
   fun `check contributor does not called on referred entity rename and rename back`() = runBlocking {
     val model = WorkspaceModel.getInstance(projectModel.project)
     model.update("Create reference between entities") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
     referredTestEntityContributor.numberOfCalls.set(0)
 
-    model.update("Rename entity and rename it back") {
-      val newEntity = it.modifyEntity(ReferredTestEntity.Builder::class.java, referredTestEntity) {
+
+    (model as WorkspaceModelImpl).updateUnderWriteAction("Rename entity and rename it back") {
+      val newEntity = it.modifyEntity(ReferredTestEntityBuilder::class.java, referredTestEntity) {
         name = "New Name"
       }
-      it.modifyEntity(ReferredTestEntity.Builder::class.java, newEntity) {
+      it.modifyEntity(ReferredTestEntityBuilder::class.java, newEntity) {
         name = "ReferredTestEntity"
       }
     }
@@ -255,7 +259,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
     }
 
     model.update("Add another type reference holder") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }
@@ -275,7 +279,7 @@ class WorkspaceFileIndexContributorOnReferenceDependenciesTest {
     }
 
     model.update("Add another type reference holder second reference") {
-      it.modifyEntity(WithReferenceTestEntity.Builder::class.java, referenceTestEntity) {
+      it.modifyEntity(WithReferenceTestEntityBuilder::class.java, referenceTestEntity) {
         references = mutableListOf(DependencyItem(referredTestEntity.symbolicId))
       }
     }

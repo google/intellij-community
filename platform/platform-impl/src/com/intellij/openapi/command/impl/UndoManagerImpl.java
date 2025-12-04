@@ -10,7 +10,6 @@ import com.intellij.openapi.client.ClientKind;
 import com.intellij.openapi.client.ClientSession;
 import com.intellij.openapi.client.ClientSessionsManager;
 import com.intellij.openapi.command.CommandProcessor;
-import com.intellij.openapi.command.UndoConfirmationPolicy;
 import com.intellij.openapi.command.undo.DocumentReference;
 import com.intellij.openapi.command.undo.DocumentReferenceManager;
 import com.intellij.openapi.command.undo.UndoManager;
@@ -21,12 +20,12 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.ClientFileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.impl.CurrentEditorProvider;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.EmptyRunnable;
 import com.intellij.openapi.util.NlsActions.ActionDescription;
 import com.intellij.openapi.util.NlsActions.ActionText;
-import com.intellij.openapi.util.NlsContexts.Command;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
@@ -78,7 +77,7 @@ public class UndoManagerImpl extends UndoManager {
   @NonInjectable
   protected UndoManagerImpl(@Nullable ComponentManager componentManager) {
     myProject = componentManager instanceof Project project ? project : null;
-    myUndoSharedState = new UndoSharedState(isPerClientSupported());
+    myUndoSharedState = new UndoSharedState(this::isPerClientSupported);
   }
 
   @Override
@@ -103,14 +102,14 @@ public class UndoManagerImpl extends UndoManager {
 
   @Override
   public void undo(@Nullable FileEditor editor) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    ThreadingAssertions.assertEventDispatchThread();
     LOG.assertTrue(isUndoAvailable(editor));
     undoOrRedo(editor, true);
   }
 
   @Override
   public void redo(@Nullable FileEditor editor) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    ThreadingAssertions.assertEventDispatchThread();
     LOG.assertTrue(isRedoAvailable(editor));
     undoOrRedo(editor, false);
   }
@@ -129,7 +128,7 @@ public class UndoManagerImpl extends UndoManager {
 
   @Override
   public void nonundoableActionPerformed(@NotNull DocumentReference ref, boolean isGlobal) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    ThreadingAssertions.assertEventDispatchThread();
     if (myProject != null && myProject.isDisposed()) {
       return;
     }
@@ -138,7 +137,7 @@ public class UndoManagerImpl extends UndoManager {
 
   @Override
   public void undoableActionPerformed(@NotNull UndoableAction action) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    ThreadingAssertions.assertEventDispatchThread();
     if (myProject != null && myProject.isDisposed()) {
       return;
     }
@@ -199,15 +198,18 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   public void invalidateActionsFor(@NotNull DocumentReference ref) {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
+    ThreadingAssertions.assertEventDispatchThread();
     for (UndoClientState state : getAllClientStates()) {
       state.invalidateActions(ref);
     }
   }
 
   public @NotNull CurrentEditorProvider getEditorProvider() {
-    CurrentEditorProvider provider = myOverriddenEditorProvider;
-    return (provider != null) ? provider : CurrentEditorProvider.getInstance();
+    CurrentEditorProvider overriddenProvider = myOverriddenEditorProvider;
+    CurrentEditorProvider editorProvider = overriddenProvider != null
+        ? overriddenProvider
+        : ProgressManager.getInstance().computeInNonCancelableSection(CurrentEditorProvider::getInstance);
+    return new StableEditorProvider(editorProvider);
   }
 
   public @Nullable Project getProject() {
@@ -290,8 +292,9 @@ public class UndoManagerImpl extends UndoManager {
       } finally {
         Disposer.dispose(disposable);
       }
-      if (myProject != null) {
-        getUndoSpy().undoRedoPerformed(myProject, editor, isUndo);
+      UndoSpy undoSpy = UndoSpy.getInstance();
+      if (undoSpy != null) {
+        undoSpy.undoRedoPerformed(myProject, editor, isUndo);
       }
     }
   }
@@ -302,11 +305,6 @@ public class UndoManagerImpl extends UndoManager {
       .getMessageBus()
       .syncPublisher(UndoRedoListener.Companion.getTOPIC())
       .undoRedoStarted(myProject, this, editor, isUndo, disposable);
-  }
-
-  @ApiStatus.Internal
-  protected @NotNull UndoSpy getUndoSpy() {
-    return UndoSpy.BLIND;
   }
 
   @ApiStatus.Internal
@@ -335,48 +333,39 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   @ApiStatus.Internal
+  public boolean isGroupIdChangeSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
+  protected boolean isEditorStateRestoreSupported() {
+    return true;
+  }
+
+  @ApiStatus.Internal
   protected final int getStackSize(@Nullable DocumentReference docRef, boolean isUndo) {
     UndoClientState state = Objects.requireNonNull(getClientState(), "undo/redo is not available");
     return state.getStackSize(docRef, isUndo);
   }
 
   @ApiStatus.Internal
-  protected void onCommandStarted(
-    @Nullable Project project,
-    @NotNull UndoConfirmationPolicy undoConfirmationPolicy,
-    boolean recordOriginalReference,
-    boolean isTransparent
-  ) {
-    UndoClientState state = getClientState();
-    if (state == null || !state.isInsideCommand()) {
-      for (UndoProvider undoProvider : getUndoProviders()) {
-        undoProvider.commandStarted(project);
-      }
+  protected void onCommandStarted(@NotNull CmdEvent cmdEvent) {
+    for (UndoProvider undoProvider : getUndoProviders()) {
+      undoProvider.commandStarted(cmdEvent.project());
     }
+    UndoClientState state = getClientState();
     if (state != null) {
-      state.commandStarted(
-        project,
-        getEditorProvider(),
-        undoConfirmationPolicy,
-        recordOriginalReference,
-        isTransparent
-      );
+      state.commandStarted(cmdEvent, getEditorProvider());
     }
   }
 
-  void onCommandFinished(
-    @Nullable Project project,
-    @Nullable @Command String commandName,
-    @Nullable Object commandGroupId
-  ) {
+  void onCommandFinished(@NotNull CmdEvent cmdEvent) {
     UndoClientState state = getClientState();
     if (state != null) {
-      state.commandFinished(getEditorProvider(), commandName, commandGroupId);
+      state.commandFinished(cmdEvent);
     }
-    if (state == null || !state.isInsideCommand()) {
-      for (UndoProvider undoProvider : getUndoProviders()) {
-        undoProvider.commandFinished(project);
-      }
+    for (UndoProvider undoProvider : getUndoProviders()) {
+      undoProvider.commandFinished(cmdEvent.project());
     }
   }
 
@@ -489,14 +478,27 @@ public class UndoManagerImpl extends UndoManager {
     return Pair.create(name.trim(), description.trim());
   }
 
+  private boolean isUndoRedoAvailable(@Nullable FileEditor editor, boolean undo) {
+    ThreadingAssertions.assertEventDispatchThread();
+    return isUndoRedoAvailableUnsafe(editor, undo);
+  }
+
   @ApiStatus.Internal
-  protected boolean isUndoRedoAvailable(@Nullable FileEditor editor, boolean undo) {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+  protected boolean isUndoRedoAvailableUnsafe(@Nullable FileEditor editor, boolean undo) {
     UndoClientState state = getClientState(editor);
     return state != null && state.isUndoRedoAvailable(editor, undo);
   }
 
   private @Nullable UndoClientState getClientState() {
+    try {
+      return ProgressManager.getInstance().computeInNonCancelableSection(this::getClientStateUnsafe);
+    } catch (Throwable ex) {
+      LOG.error("Failed to get client state, the error may lead to undo inconsistency", ex);
+      return null;
+    }
+  }
+
+  private @Nullable UndoClientState getClientStateUnsafe() {
     ClientId clientId = ClientId.getCurrentOrNull();
     if (clientId != null) {
       ClientSession appSession = ClientSessionsManager.getAppSession(clientId);
@@ -532,9 +534,11 @@ public class UndoManagerImpl extends UndoManager {
   }
 
   private @NotNull List<UndoProvider> getUndoProviders() {
-    return myProject == null
-           ? UndoProvider.EP_NAME.getExtensionList()
-           : UndoProvider.PROJECT_EP_NAME.getExtensionList(myProject);
+    return ProgressManager.getInstance().computeInNonCancelableSection(
+      () -> myProject == null
+            ? UndoProvider.EP_NAME.getExtensionList()
+            : UndoProvider.PROJECT_EP_NAME.getExtensionList(myProject)
+    );
   }
 
   private @NotNull ComponentManager getComponentManager() {

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tasks.actions;
 
 import com.intellij.codeInsight.documentation.DocumentationManager;
@@ -18,7 +18,7 @@ import com.intellij.tasks.LocalTask;
 import com.intellij.tasks.Task;
 import com.intellij.tasks.TaskBundle;
 import com.intellij.tasks.TaskManager;
-import com.intellij.tasks.doc.TaskPsiElement;
+import com.intellij.tasks.core.TaskSymbol;
 import com.intellij.tasks.impl.TaskManagerImpl;
 import com.intellij.tasks.impl.TaskUtil;
 import com.intellij.util.ArrayUtilRt;
@@ -93,8 +93,8 @@ public class GotoTaskAction extends GotoActionBase implements DumbAware {
       @Override
       public void elementChosen(ChooseByNamePopup popup, Object element) {
         TaskManager taskManager = TaskManager.getManager(project);
-        if (element instanceof TaskPsiElement) {
-          Task task = ((TaskPsiElement)element).getTask();
+        if (element instanceof TaskSymbol) {
+          Task task = ((TaskSymbol)element).getTask();
           LocalTask localTask = taskManager.findTask(task.getId());
           if (localTask != null) {
             taskManager.activateTask(localTask, !shiftPressed.get());
@@ -123,7 +123,7 @@ public class GotoTaskAction extends GotoActionBase implements DumbAware {
 
     protected GotoTaskPopupModel(@NotNull Project project) {
       super(project, TaskBundle.message("enter.task.name"), null);
-      myListCellRenderer = new TaskCellRenderer(project);
+      myListCellRenderer = TaskUiUtil.getTaskCellRenderer(project);
     }
 
     @Override
@@ -143,8 +143,8 @@ public class GotoTaskAction extends GotoActionBase implements DumbAware {
 
     @Override
     public String getElementName(@NotNull Object element) {
-      if (element instanceof TaskPsiElement) {
-        return TaskUtil.getTrimmedSummary(((TaskPsiElement)element).getTask());
+      if (element instanceof TaskSymbol) {
+        return TaskUtil.getTrimmedSummary(((TaskSymbol)element).getTask());
       }
       else if (element == CREATE_NEW_TASK_ACTION) {
         return CREATE_NEW_TASK_ACTION.getActionText();

@@ -24,13 +24,13 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.util.text.Strings
@@ -146,7 +146,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   private var documentationUrl: LinkPanel? = null
   private var sourceCodeUrl: LinkPanel? = null
   private var suggestedFeatures: SuggestedComponent? = null
-  private var bottomScrollPane: JBScrollPane? = null
+  private lateinit var bottomScrollPane: JBScrollPane
   private val scrollPanes = ArrayList<JBScrollPane>()
   private var descriptionComponent: JEditorPane? = null
   private var description: String? = null
@@ -177,7 +177,13 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
   init {
     nameAndButtons = BaselinePanel(12, false)
-    customizer = getPluginsViewCustomizer().getPluginDetailsCustomizer(pluginModel.getModel())
+    customizer = try {
+      getPluginsViewCustomizer().getPluginDetailsCustomizer(pluginModel.getModel())
+    }
+    catch (e: Exception) {
+      LOG.error("Error while getting plugin details customizer", e)
+      NoOpPluginsViewCustomizer.getPluginDetailsCustomizer(pluginModel.getModel())
+    }
     pluginManagerCustomizer = PluginManagerCustomizer.getInstance()
 
     createPluginPanel()
@@ -186,6 +192,8 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   companion object {
+    private val LOG = logger<PluginDetailsPageComponent>()
+
     @JvmStatic
     fun createDescriptionComponent(imageViewHandler: Consumer<in View>?): JEditorPane {
       val kit = HTMLEditorKitBuilder().withViewFactoryExtensions({ e, view ->
@@ -323,7 +331,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     nameAndButtons!!.add(versionPanel)
 
     createButtons()
-    nameAndButtons!!.setProgressDisabledButton((if (isMarketplace) installButton?.getComponent() else if (updateDescriptor != null) updateButton else gearButton)!!)
+    nameAndButtons!!.setProgressDisabledButton((if (isMarketplace) installButton?.getComponent() else if (pluginManagerCustomizer != null && updateDescriptor == null) gearButton else updateButton)!!)
 
     topPanel.add(ErrorComponent().also { errorComponent = it }, VerticalLayout.FILL_HORIZONTAL)
     topPanel.add(licensePanel)
@@ -460,7 +468,12 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       component.background = PluginManagerConfigurable.MAIN_BG_COLOR
     }
 
-    customizer.processPluginNameAndButtonsComponent(nameAndButtons)
+    try {
+      customizer.processPluginNameAndButtonsComponent(nameAndButtons)
+    }
+    catch (e: Exception) {
+      LOG.error("Error during PluginDetailsPage customization", e)
+    }
   }
 
   fun setOnlyUpdateMode() {
@@ -502,8 +515,8 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   private fun createHtmlImageViewHandler(): Consumer<View> {
     return Consumer { view: View ->
       val width = view.getPreferredSpan(View.X_AXIS)
-      if (width < 0 || width > bottomScrollPane!!.width) {
-        bottomScrollPane!!.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS
+      if (width < 0 || width > bottomScrollPane.width) {
+        bottomScrollPane.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS
       }
     }
   }
@@ -521,14 +534,18 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     installOptionButton.setOptions(customizationModel.additionalActions)
     val mainAction = customizationModel.mainAction
     if (mainAction != null) {
-      setInstallAction(installOptionButton, mainAction)
-      installOptionButton.setEnabled(customizationModel.isVisible, customizationModel.text)
+      if(customizationModel.isVisible) {
+        setInstallAction(installOptionButton, mainAction)
+      }
+      installOptionButton.setEnabled(customizationModel.isVisible)
+      installOptionButton.setTextAndSize(customizationModel.text)
       installOptionButton.isVisible = customizationModel.isVisible
     }
     else {
       setDefaultInstallAction(installOptionButton)
       val text = if (customizationModel.isVisible) null else IdeBundle.message("plugins.configurable.installed")
-      installButton?.setEnabled(customizationModel.isVisible, text)
+      installButton?.setEnabled(customizationModel.isVisible, null)
+      installOptionButton.setTextAndSize(text)
       installButton?.setVisible(customizationModel.isVisible)
     }
 
@@ -547,7 +564,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     val customizationModel = pluginManagerCustomizer.getDisableButtonCustomizationModel(pluginModel, uiModel, installedDescriptorForMarketplace, modalityState)
                              ?: return
     enableDisableController?.setOptions(customizationModel.additionalActions)
-    val visible = customizationModel.isVisible && customizationModel.text == null
+    val visible = customizationModel.isVisible && customizationModel.text == null && restartButton?.isVisible != true
     component.isVisible = visible
     component.isEnabled = visible
     if (customizationModel.text != null && restartButton?.isVisible != true) {
@@ -624,7 +641,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       pane.addTab(IdeBundle.message("plugins.configurable.overview.tab.name"),
                   createScrollPane(parent).also { bottomScrollPane = it })
     }
-    myImagesComponent!!.setParent(bottomScrollPane!!.viewport)
+    myImagesComponent!!.setParent(bottomScrollPane.viewport)
+    if (bottomScrollPane.verticalScrollBarNeedsSpace()) {
+      bottomScrollPane.verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS
+    }
   }
 
   private fun createChangeNotesTab(pane: JBTabbedPane) {
@@ -872,7 +892,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   suspend fun showPluginImpl(pluginUiModel: PluginUiModel, updateDescriptor: PluginUiModel?) {
     plugin = pluginUiModel
     this.updateDescriptor = if (updateDescriptor != null && updateDescriptor.canBeEnabled) updateDescriptor else null
-    isPluginCompatible = !pluginUiModel.isIncompatibleWithCurrentOs
+    isPluginCompatible = !pluginUiModel.isIncompatibleWithCurrentPlatform
     isPluginAvailable = isPluginCompatible && updateDescriptor?.canBeEnabled ?: true
     if (isMarketplace) {
       withContext(Dispatchers.IO) {
@@ -882,7 +902,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       nameAndButtons!!.setProgressDisabledButton((if (this.updateDescriptor == null) installButton?.getComponent() else updateButton)!!)
     }
     if (plugin == null) return
-    showPlugin(pluginUiModel)
+
+    withContext(Dispatchers.EDT + ModalityState.stateForComponent(this).asContextElement()) {
+      showPlugin(pluginUiModel)
+    }
 
     select(0, true)
 
@@ -893,7 +916,12 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     }
 
     if (plugin != null) {
-      customizer.processShowPlugin(plugin!!.getDescriptor())
+      try {
+        customizer.processShowPlugin(plugin!!.getDescriptor())
+      }
+      catch (e: Exception) {
+        LOG.error("Error during processShowPlugin() customization", e)
+      }
     }
 
     mySuggestedIdeBanner.suggestIde(suggestedCommercialIde, plugin!!.pluginId)
@@ -1517,7 +1545,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   private fun createInstallButton(): PluginInstallButton {
-    if (Registry.`is`("reworked.plugin.manager.enabled", false)) {
+    if (UiPluginManager.isCombinedPluginManagerEnabled()) {
       val button = InstallOptionButton()
       setDefaultInstallAction(button)
       return button
@@ -1647,12 +1675,14 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   private fun getDescription(): @Nls String? {
-    return installedPluginMarketplaceNode?.description?.takeIf { it.isNotBlank() }
+    return updateDescriptor?.description?.takeIf { it.isNotBlank() }
+           ?: installedPluginMarketplaceNode?.description?.takeIf { it.isNotBlank() }
            ?: plugin?.description?.takeIf { it.isNotBlank() }
   }
 
   private fun getChangeNotes(): @NlsSafe String? {
-    return plugin?.changeNotes?.takeIf { it.isNotBlank() }
+    return updateDescriptor?.changeNotes?.takeIf { it.isNotBlank() }
+           ?: plugin?.changeNotes?.takeIf { it.isNotBlank() }
            ?: installedPluginMarketplaceNode?.changeNotes?.takeIf { it.isNotBlank() }
   }
 

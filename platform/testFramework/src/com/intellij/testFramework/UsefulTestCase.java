@@ -84,7 +84,8 @@ import static org.junit.Assume.assumeTrue;
  * To use JUnit 4, annotate your test subclass with {@code @RunWith(JUnit4.class)} or any other runner (like {@code Parametrized.class}).
  * <p>
  * For JUnit 5 support,
- * see the {@code intellij.platform.testFramework.junit5} module in {@code community/platform/testFramework/junit5}.
+ * see the {@code intellij.platform.testFramework.junit5} module in {@code community/platform/testFramework/junit5}
+ * and the showcase in {@code community/platform/testFramework/junit5/test/showcase}.
  * <h3>Caveats</h3>
  * If you're looking for JUnit 4 for Assume support and still have JUnit 3 tests,
  * consider using {@code @RunWith(JUnit38AssumeSupportRunner.class)}.
@@ -1104,7 +1105,7 @@ Most likely there was an uncaught exception in asynchronous execution that resul
    * Checks that the code block throws a specified exception.
    */
   public static void assertThrows(@NotNull Class<? extends Throwable> exceptionClass, @NotNull ThrowableRunnable<?> runnable) {
-    assertThrows(exceptionClass, null, runnable);
+    assertThrows(runnable, exceptionClass, null);
   }
 
   /**
@@ -1114,6 +1115,14 @@ Most likely there was an uncaught exception in asynchronous execution that resul
   public static void assertThrows(@NotNull Class<? extends Throwable> exceptionClass,
                                   @Nullable String expectedErrorMsgPart,
                                   @NotNull ThrowableRunnable<?> runnable) {
+    assertThrows(runnable, exceptionClass, expectedErrorMsgPart != null ? msg -> assertTrue(
+      msg.getClass() + " message was expected to contain '" + expectedErrorMsgPart + "', but got: '" + msg + "'",
+      msg.contains(expectedErrorMsgPart)) : null);
+  }
+
+  public static void assertThrows(@NotNull ThrowableRunnable<?> runnable,
+                                  @NotNull Class<? extends Throwable> exceptionClass,
+                                  @Nullable Consumer<String> messageChecker) {
     boolean wasThrown = false;
     try {
       runnable.run();
@@ -1129,8 +1138,8 @@ Most likely there was an uncaught exception in asynchronous execution that resul
         throw new AssertionError("Expected instance of: " + exceptionClass + " actual: " + cause.getClass(), cause);
       }
 
-      if (expectedErrorMsgPart != null) {
-        assertTrue(cause.getClass()+" message was expected to contain '"+expectedErrorMsgPart+"', but got: '"+cause.getMessage()+"'", ObjectUtils.notNull(cause.getMessage(), "").contains(expectedErrorMsgPart));
+      if (messageChecker != null) {
+        messageChecker.accept(ObjectUtils.notNull(cause.getMessage(), ""));
       }
     }
     finally {

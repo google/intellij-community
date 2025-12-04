@@ -764,10 +764,8 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
               task.code("from sourceSets.test.output");
               return null;
             })
-            .addPostfix("artifacts {",
-                        "    tests testJar",
-                        "    archives testJar",
-                        "}")
+            .addPostfix("artifacts { tests testJar }")
+            .addPostfix("assemble.dependsOn(testJar)")
             .addTestImplementationDependency("junit:junit:4.11");
         })
         .project(":impl", it -> {
@@ -1178,10 +1176,8 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
               task.code("from project.sourceSets.test.output");
               return null;
             })
-            .addPostfix("artifacts {",
-                        "    tests testJar",
-                        "    archives testJar",
-                        "}")
+            .addPostfix("artifacts { tests testJar }")
+            .addPostfix("assemble.dependsOn(testJar)")
             .addTestImplementationDependency("junit:junit:4.11");
         })
         .project(":project2", it -> {
@@ -1999,7 +1995,6 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
   }
 
   @Test
-  @TargetVersions("4.6+")
   public void testAnnotationProcessorDependencies() throws Exception {
     var lombok = "org.projectlombok:lombok:1.16.2";
     importProject(script(it -> {

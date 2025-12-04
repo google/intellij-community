@@ -20,10 +20,12 @@ jvm_library(
     "//plugins/completion-ml-ranking",
     "//libraries/io",
     "//libraries/ktor/client",
+    "//platform/core-impl",
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
     "//platform/util/concurrency",
     "//platform/core-api:core",
+    "//platform/lang-api:lang",
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-api:indexing",
     "//jps/model-api:model",
@@ -40,13 +42,19 @@ jvm_library(
     "//libraries/gson",
     "//libraries/commons/text",
     "//platform/warmup",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "@lib//:jetbrains-annotations",
   ]
 )
 ### auto-generated section `build intellij.evaluationPlugin` end
 
 ### auto-generated section `build intellij.evaluationPlugin.tests` start
+jvm_library(
+  name = "evaluationPlugin-tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
 jvm_library(
   name = "evaluationPlugin-tests_test_lib",
   module_name = "intellij.evaluationPlugin.tests",

@@ -54,16 +54,17 @@ public class PyClassPatternImpl extends PyElementImpl implements PyClassPattern,
     if (!(context.getType(refName) instanceof PyClassType classType)) return false;
 
     final List<PyPattern> arguments = getArgumentList().getPatterns();
-    if (SPECIAL_BUILTINS.contains(classType.getClassQName())) {
+    final @Nullable String classQName = classType.getClassQName();
+    if (classQName != null && SPECIAL_BUILTINS.contains(classQName)) {
       if (arguments.isEmpty()) return true;
       if (arguments.size() > 1) return false;
-      return arguments.get(0).canExcludePatternType(context);
+      return arguments.getFirst().canExcludePatternType(context);
     }
 
     List<String> matchArgs = getMatchArgs(classType, context);
     for (int i = 0; i < arguments.size(); i++) {
       final var member = arguments.get(i);
-      if (member instanceof PyKeywordPattern keywordPattern)  {
+      if (member instanceof PyKeywordPattern keywordPattern) {
         if (getMemberType(classType, keywordPattern.getKeyword(), context) == null) {
           return false;
         }
@@ -89,14 +90,14 @@ public class PyClassPatternImpl extends PyElementImpl implements PyClassPattern,
   public @Nullable PyType getCaptureTypeForChild(@NotNull PyPattern pattern, @NotNull TypeEvalContext context) {
     pattern = as(PsiTreeUtil.findFirstParent(pattern, el -> this.getArgumentList() == el.getParent()), PyPattern.class);
     if (pattern == null) return null;
-    
+
     if (pattern instanceof PyKeywordPattern keywordPattern) {
       if (context.getType(this) instanceof PyClassType classType) {
         return Ref.deref(getMemberType(classType, keywordPattern.getKeyword(), context));
       }
       return null;
     }
-    
+
     final List<PyPattern> arguments = getArgumentList().getPatterns();
     int index = arguments.indexOf(pattern);
     if (index < 0) return null;
@@ -104,7 +105,8 @@ public class PyClassPatternImpl extends PyElementImpl implements PyClassPattern,
     // capture type can be a union like: list[int] | list[str]
     return PyTypeUtil.toStream(context.getType(this)).map(type -> {
       if (type instanceof PyClassType classType) {
-        if (SPECIAL_BUILTINS.contains(classType.getClassQName())) {
+        final @Nullable String classQName = classType.getClassQName();
+        if (classQName != null && SPECIAL_BUILTINS.contains(classQName)) {
           if (index == 0) {
             return classType;
           }
@@ -143,14 +145,15 @@ public class PyClassPatternImpl extends PyElementImpl implements PyClassPattern,
     if (matchArgs == null) {
       matchArgs = PyDataclassTypeProvider.Companion.getGeneratedMatchArgs(cls, context);
     }
-    
+
     return matchArgs;
   }
 
   @Nullable
   static Ref<PyType> getMemberType(@NotNull PyType type, @NotNull String name, @NotNull TypeEvalContext context) {
     final PyResolveContext resolveContext = PyResolveContext.defaultContext(context);
-    final List<PyTypedResolveResult> results = type.getMemberTypes(name, null, AccessDirection.READ, resolveContext);
-    return ContainerUtil.isEmpty(results) ? null : Ref.create(getFirstItem(results).getType());
+    List<PyTypeMember> members = type.findMember(name, resolveContext);
+    if (members.isEmpty()) return null;
+    return Ref.create(PyUnionType.union(ContainerUtil.map(members, PyTypeMember::getType)));
   }
 }

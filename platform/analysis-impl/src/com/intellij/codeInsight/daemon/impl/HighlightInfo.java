@@ -602,7 +602,7 @@ public class HighlightInfo implements Segment {
       s += "; gutter: " + gutterIconRenderer;
     }
     if (toolId != null) {
-      s += showFullQualifiedClassNames ? "; toolId: " + toolId + " (" + toolId.getClass() + ")" :
+      s += showFullQualifiedClassNames ? "; toolId: " + toolId + (toolId instanceof Class ? "" : " (" + toolId.getClass() + ")") :
            "; toolId: " + (toolId instanceof Class<?> c ? c.getSimpleName() : "not specified");
     }
     if (group != HighlightInfoUpdaterImpl.MANAGED_HIGHLIGHT_INFO_GROUP) {
@@ -668,7 +668,7 @@ public class HighlightInfo implements Segment {
     /**
      * @deprecated Do not use. Inspections set this id automatically when run
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     @NotNull Builder inspectionToolId(@NotNull String inspectionTool);
 
     // only one allowed
@@ -962,7 +962,7 @@ public class HighlightInfo implements Segment {
       return myCanCleanup;
     }
 
-    public @NotNull Iterable<? extends IntentionAction> getOptions(@NotNull PsiElement element, @Nullable Editor editor) {
+    public @NotNull Iterable<? extends @NotNull IntentionAction> getOptions(@NotNull PsiElement element, @Nullable Editor editor) {
       if (editor != null && Boolean.FALSE.equals(editor.getUserData(IntentionManager.SHOW_INTENTION_OPTIONS_KEY))) {
         return Collections.emptyList();
       }
@@ -1582,5 +1582,10 @@ public class HighlightInfo implements Segment {
   // after recycled the highlighter, destroy its reference to avoid the highlighter being stored in two HIs by accident
   void invalidate() {
     offsetStore = TOMB;
+  }
+
+  @TestOnly
+  public @NotNull HighlightInfoType getType() {
+    return type;
   }
 }

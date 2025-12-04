@@ -44,7 +44,7 @@ import static java.util.Objects.requireNonNullElse;
 
 @SuppressWarnings({"CallToPrintStackTrace", "UseOfSystemOutOrSystemErr"})
 public final class TestLoggerFactory implements Logger.Factory {
-  @SuppressWarnings("SpellCheckingInspection") private static final String LOG_DIR = "testlog";
+  private static final String LOG_DIR = "testlog";
   private static final String LOG_FILE_NAME = "idea.log";
   private static final String SPLIT_LOGS_SUBDIR = "splitTestLogs";
 
@@ -55,6 +55,8 @@ public final class TestLoggerFactory implements Logger.Factory {
   private static final int MAX_BUFFER_LENGTH = Integer.getInteger("idea.single.test.log.max.length", 10_000_000);
 
   private final StringBuilder myBuffer = new StringBuilder();
+  private int myBufferStaticFixturesEndOffset = 0;
+  private int myBufferFixturesEndOffset = 0;
   private long myTestStartedMillis;
   private boolean myInitialized;
 
@@ -108,7 +110,7 @@ public final class TestLoggerFactory implements Logger.Factory {
 
       Path logFile = logDir.resolve(LOG_FILE_NAME);
       JulLogger.clearHandlers();
-      JulLogger.configureLogFileAndConsole(logFile, false, true, false, null, null, null);
+      JulLogger.configureLogFileAndConsole(logFile, false, true, false, true, null, null, null);
 
       if (myEchoDebugToStdout) {
         addConsoleAppenderForDebugRecords();
@@ -263,7 +265,10 @@ public final class TestLoggerFactory implements Logger.Factory {
     myRethrowErrorsNumber.set(0);
     TestLoggerFactory factory = getTestLoggerFactory();
     if (factory != null) {
-      factory.clearLogBuffer();  // clear buffer from tests which failed to report their termination properly
+      // clear buffer from tests which failed to report their termination properly
+      synchronized (factory.myBuffer) {
+        factory.myBuffer.setLength(factory.myBufferFixturesEndOffset);
+      }
       DebugArtifactPublisher publisher = factory.myDebugArtifactPublisher.getAndSet(null);
       if (publisher != null) {
         publisher.cleanup();
@@ -294,6 +299,51 @@ public final class TestLoggerFactory implements Logger.Factory {
         }
       }
       factory.dumpLogBuffer(success, testName);
+    }
+  }
+
+  public static void onFixturesInitializationStarted(boolean isStatic) {
+    TestLoggerFactory factory = getTestLoggerFactory();
+    if (factory != null) {
+      if (isStatic) {
+        factory.myBufferStaticFixturesEndOffset = 0;
+      }
+      else {
+        factory.myBufferFixturesEndOffset = factory.myBufferStaticFixturesEndOffset;
+      }
+    }
+  }
+
+  public static void onFixturesInitializationFinished(boolean isStatic) {
+    TestLoggerFactory factory = getTestLoggerFactory();
+    if (factory != null) {
+      if (isStatic) {
+        synchronized (factory.myBuffer) {
+          factory.myBuffer.append("---Static Fixtures Initialization End---");
+          factory.myBuffer.append(System.lineSeparator());
+          factory.myBufferStaticFixturesEndOffset = factory.myBuffer.length();
+        }
+      }
+      else {
+        synchronized (factory.myBuffer) {
+          factory.myBuffer.append("---Instance Fixtures Initialization End---");
+          factory.myBuffer.append(System.lineSeparator());
+          factory.myBufferFixturesEndOffset = factory.myBuffer.length();
+        }
+      }
+    }
+  }
+
+  public static void onFixturesDisposeStart(boolean isStatic) {
+    TestLoggerFactory factory = getTestLoggerFactory();
+    if (factory != null) {
+      if (isStatic) {
+        factory.myBufferStaticFixturesEndOffset = 0;
+        factory.myBufferFixturesEndOffset = 0;
+      }
+      else {
+        factory.myBufferFixturesEndOffset = factory.myBufferStaticFixturesEndOffset;
+      }
     }
   }
 
@@ -328,17 +378,11 @@ public final class TestLoggerFactory implements Logger.Factory {
     return myDebugArtifactPublisher.get();
   }
 
-  private void clearLogBuffer() {
-    synchronized (myBuffer) {
-      myBuffer.setLength(0);
-    }
-  }
-
   private void dumpLogBuffer(boolean success, @NotNull String testName) {
     String buffer;
     synchronized (myBuffer) {
       buffer = success || myBuffer.isEmpty() ? null : myBuffer.toString();
-      myBuffer.setLength(0);
+      myBuffer.setLength(myBufferStaticFixturesEndOffset);
     }
 
     if (buffer != null) {
@@ -369,7 +413,7 @@ public final class TestLoggerFactory implements Logger.Factory {
       else {
         // mark each line in IDEA console with this hidden mark to be able to fold it automatically
         List<String> lines = LineTokenizer.tokenizeIntoList(buffer, false, false);
-        if (!lines.get(0).startsWith("\n")) lines = ContainerUtil.prepend(lines.subList(1, lines.size()),"\n" + lines.get(0));
+        if (!lines.getFirst().startsWith("\n")) lines = ContainerUtil.prepend(lines.subList(1, lines.size()), "\n" + lines.getFirst());
         System.err.println(String.join(FAILED_TEST_DEBUG_OUTPUT_MARKER + "\n", lines));
       }
     }

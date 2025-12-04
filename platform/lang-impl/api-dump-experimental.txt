@@ -285,6 +285,13 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - p:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
 - a:isImportList(com.intellij.psi.PsiFile,I):Z
 - supportNewLineCompletion():Z
+*a:com.intellij.codeInsight.completion.command.commands.AbstractParameterInfoCompletionCommand
+- com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
+- <init>():V
+- a:inParameterList(I,com.intellij.psi.PsiFile):Z
+- pf:isApplicable(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):Z
+- f:supportsInjected():Z
+- f:supportsReadOnly():Z
 *a:com.intellij.codeInsight.completion.command.commands.AbstractQuickDocumentationCompletionCommand
 - com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - <init>():V
@@ -638,6 +645,8 @@ f:com.intellij.find.impl.FindInProjectUtil
 - getEmptyRangeAttributes():com.intellij.openapi.editor.markup.TextAttributes
 - getExcludedAttributes():com.intellij.openapi.editor.markup.TextAttributes
 - getSelectionAttributes():com.intellij.openapi.editor.markup.TextAttributes
+*:com.intellij.find.usages.api.DynamicUsage
+- isDynamic():Z
 *:com.intellij.find.usages.api.PsiUsage
 - com.intellij.find.usages.api.Usage
 - *sf:Companion:com.intellij.find.usages.api.PsiUsage$Companion
@@ -1184,5 +1193,6 @@ c:com.intellij.util.indexing.IndexInfrastructureVersionBase
 *f:com.intellij.util.indexing.roots.IndexableSetContributorFilesIterator$Companion
 - f:createProjectUnAwareIndexableSetContributors():java.util.List
 *:com.intellij.workspaceModel.ide.OptionalExclusionContributor
-- a:requestExclusion(com.intellij.openapi.project.Project,com.intellij.platform.workspace.storage.url.VirtualFileUrl):Z
-- a:requestExclusionCancellation(com.intellij.openapi.project.Project,com.intellij.platform.workspace.storage.url.VirtualFileUrl):Z
+- a:canCancelExclusion(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z
+- a:requestExclusion(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z
+- a:requestExclusionCancellation(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z

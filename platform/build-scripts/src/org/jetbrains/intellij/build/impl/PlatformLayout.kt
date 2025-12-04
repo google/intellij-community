@@ -15,13 +15,13 @@ import org.jetbrains.jps.model.module.JpsModuleReference
 /**
  * Describes layout of the platform (*.jar files in IDE_HOME/lib directory).
  *
- * By default, it includes all modules specified in [org.jetbrains.intellij.build.ProductModulesLayout],
+ * By default, it includes all modules specified in [org.jetbrains.intellij.build.productLayout.ProductModulesLayout],
  * all libraries these modules depend on with scope 'Compile' or 'Runtime', and all project libraries from dependencies (with scope 'Compile'
- * or 'Runtime') of plugin modules for plugins which are [org.jetbrains.intellij.build.ProductModulesLayout.bundledPluginModules] bundled
- * (or prepared to be [org.jetbrains.intellij.build.ProductModulesLayout.pluginModulesToPublish] published) with the product (except
+ * or 'Runtime') of plugin modules for plugins which are [org.jetbrains.intellij.build.productLayout.ProductModulesLayout.bundledPluginModules] bundled
+ * (or prepared to be [org.jetbrains.intellij.build.productLayout.ProductModulesLayout.pluginModulesToPublish] published) with the product (except
  * project libraries which are explicitly included in layouts of all plugins depending on them by [BaseLayoutSpec.withProjectLibrary]).
  */
-class PlatformLayout : BaseLayout() {
+class PlatformLayout(@JvmField val descriptorCacheContainer: DescriptorCacheContainer = DescriptorCacheContainer()) : BaseLayout() {
   internal var libAsProductModule: Set<String> = emptySet()
 
   private val projectLibraryToPolicy: MutableMap<String, ProjectLibraryPackagingPolicy> = HashMap()
@@ -60,7 +60,8 @@ class PlatformLayout : BaseLayout() {
     val uniqueGuard = HashSet<String>()
     for (item in includedModules) {
       // libraries are packed into product module
-      if (item.isProductModule()) {
+      // there are no strong valid reasons to check `item.includeDependencies` here, just to preserve current behavior and reduce scope of changes; it will be addressed later
+      if (item.isProductModule() && !item.includeDependencies) {
         continue
       }
 

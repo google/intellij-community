@@ -2,12 +2,12 @@
 
 package com.intellij.codeInsight.daemon.impl.analysis;
 
-import com.intellij.codeInsight.actions.VcsFacade;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.featureStatistics.fusCollectors.InspectionWidgetUsageCollector;
 import com.intellij.ide.EssentialHighlightingMode;
 import com.intellij.lang.Language;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
@@ -27,12 +27,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.SingleRootFileViewProvider;
 import com.intellij.psi.search.ProjectScope;
 import com.intellij.psi.util.PsiUtilBase;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBus;
 import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 @State(name = "HighlightingSettingsPerFile", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
@@ -41,13 +43,11 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
   private static final @NonNls String ROOT_ATT_PREFIX = "root";
   private static final @NonNls String FILE_ATT = "file";
   private final MessageBus messageBus;
-  private final Set<String> vcsIgnoreFileNames;
   private final SimpleModificationTracker myModificationTracker = new SimpleModificationTracker();
 
-  private final Map<VirtualFile, FileHighlightingSetting[]> myHighlightSettings = new HashMap<>();
+  private final Map<String, FileHighlightingSetting[]> myUrlToSettings = new ConcurrentHashMap<>();
 
   public HighlightingSettingsPerFile(@NotNull Project project) {
-    vcsIgnoreFileNames = VcsFacade.getInstance().getVcsIgnoreFileNames(project);
     messageBus = project.getMessageBus();
   }
 
@@ -74,7 +74,8 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
     PsiFile containingFile = root.getContainingFile();
     VirtualFile virtualFile = containingFile.getVirtualFile();
     if (virtualFile == null) return FileHighlightingSetting.FORCE_HIGHLIGHTING;
-    FileHighlightingSetting[] fileHighlightingSettings = myHighlightSettings.get(virtualFile);
+    String url = virtualFile.getUrl();
+    FileHighlightingSetting[] fileHighlightingSettings = myUrlToSettings.get(url);
     int index = getRootIndex(containingFile);
     if (fileHighlightingSettings != null && index < fileHighlightingSettings.length) {
       return fileHighlightingSettings[index];
@@ -103,7 +104,7 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
     PsiFile containingFile = root.getContainingFile();
     VirtualFile virtualFile = containingFile.getVirtualFile();
     if (virtualFile == null) return;
-    FileHighlightingSetting[] defaults = myHighlightSettings.get(virtualFile);
+    FileHighlightingSetting[] defaults = myUrlToSettings.get(virtualFile.getUrl());
     int rootIndex = getRootIndex(containingFile);
     if (defaults != null && rootIndex >= defaults.length) {
       defaults = null;
@@ -114,16 +115,17 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
     defaults[rootIndex] = setting;
     boolean toRemove = true;
     for (FileHighlightingSetting aDefault : defaults) {
+      //noinspection deprecation
       if (aDefault != FileHighlightingSetting.NONE) {
         toRemove = false;
         break;
       }
     }
     if (toRemove) {
-      myHighlightSettings.remove(virtualFile);
+      myUrlToSettings.remove(virtualFile.getUrl());
     }
     else {
-      myHighlightSettings.put(virtualFile, defaults);
+      myUrlToSettings.put(virtualFile.getUrl(), defaults);
     }
 
     incModificationCount();
@@ -136,37 +138,38 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
     List<Element> children = element.getChildren(SETTING_TAG);
     for (Element child : children) {
       String url = child.getAttributeValue(FILE_ATT);
-      if (url == null) continue;
-      VirtualFile fileByUrl = VirtualFileManager.getInstance().findFileByUrl(url);
-      if (fileByUrl != null) {
-        List<FileHighlightingSetting> settings = new ArrayList<>();
-        int index = 0;
-        while (child.getAttributeValue(ROOT_ATT_PREFIX + index) != null) {
-          String attributeValue = child.getAttributeValue(ROOT_ATT_PREFIX + index++);
-          settings.add(Enum.valueOf(FileHighlightingSetting.class, attributeValue));
-        }
-        myHighlightSettings.put(fileByUrl, settings.toArray(new FileHighlightingSetting[0]));
+      if (url == null) {
+        continue;
       }
+      List<FileHighlightingSetting> settings = new ArrayList<>();
+      int index = 0;
+      while (child.getAttributeValue(ROOT_ATT_PREFIX + index) != null) {
+        String attributeValue = child.getAttributeValue(ROOT_ATT_PREFIX + index++);
+        settings.add(Enum.valueOf(FileHighlightingSetting.class, attributeValue));
+      }
+      myUrlToSettings.put(url, settings.toArray(new FileHighlightingSetting[0]));
     }
     incModificationCount();
   }
 
   @Override
-  public Element getState() {
+  public @NotNull Element getState() {
     Element element = new Element("state");
-    List<Map.Entry<VirtualFile, FileHighlightingSetting[]>> entries = new ArrayList<>(myHighlightSettings.entrySet());
-    entries.sort(Comparator.comparing(entry -> entry.getKey().getPath()));
-    for (Map.Entry<VirtualFile, FileHighlightingSetting[]> entry : entries) {
-      Element child = new Element(SETTING_TAG);
-
-      VirtualFile vFile = entry.getKey();
-      if (!vFile.isValid()) continue;
-      child.setAttribute(FILE_ATT, vFile.getUrl());
-      for (int i = 0; i < entry.getValue().length; i++) {
-        FileHighlightingSetting fileHighlightingSetting = entry.getValue()[i];
-        child.setAttribute(ROOT_ATT_PREFIX + i, fileHighlightingSetting.toString());
+    List<Map.Entry<String, FileHighlightingSetting[]>> entries = new ArrayList<>(myUrlToSettings.entrySet());
+    entries.sort(Map.Entry.comparingByKey());
+    for (Map.Entry<String, FileHighlightingSetting[]> entry : entries) {
+      String url = entry.getKey();
+      // remove invalid entries to make sure we save only the valid ones
+      if (ReadAction.compute(() -> VirtualFileManager.getInstance().findFileByUrl(url)) != null) {
+        Element child = new Element(SETTING_TAG);
+        child.setAttribute(FILE_ATT, url);
+        FileHighlightingSetting[] settings = entry.getValue();
+        for (int i = 0; i < settings.length; i++) {
+          FileHighlightingSetting fileHighlightingSetting = settings[i];
+          child.setAttribute(ROOT_ATT_PREFIX + i, fileHighlightingSetting.toString());
+        }
+        element.addContent(child);
       }
-      element.addContent(child);
     }
     return element;
   }
@@ -186,9 +189,14 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
     }
     Project project = psiRoot.getProject();
     VirtualFile virtualFile = psiRoot.getContainingFile().getVirtualFile();
-    if (virtualFile == null || !virtualFile.isValid()) return false;
+    if (virtualFile == null || !virtualFile.isValid()) {
+      return false;
+    }
 
-    if (ProjectUtil.isProjectOrWorkspaceFile(virtualFile) && !vcsIgnoreFileNames.contains(virtualFile.getName())) {
+    List<HighlightingProjectOrWorkspaceFileOverride> extensionList =
+      HighlightingProjectOrWorkspaceFileOverride.EP_NAME.getExtensionsIfPointIsRegistered();
+    if (ProjectUtil.isProjectOrWorkspaceFile(virtualFile) &&
+        !ContainerUtil.exists(extensionList, ep -> ep.shouldInspectFile(virtualFile, project))) {
       return false;
     }
 
@@ -205,7 +213,7 @@ public final class HighlightingSettingsPerFile extends HighlightingLevelManager 
   }
 
   public int countRoots(@NotNull FileHighlightingSetting setting) {
-    return myHighlightSettings.values()
+    return myUrlToSettings.values()
       .stream()
       .flatMap(array -> Stream.of(array))
       .mapToInt(s -> s == setting ? 1 : 0)

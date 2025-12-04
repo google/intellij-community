@@ -14,6 +14,9 @@ import com.intellij.platform.eel.provider.utils.ProcessFunctions
 import com.intellij.platform.eel.provider.utils.bindProcessToScopeImpl
 import com.intellij.python.community.execService.BinOnTarget
 import com.intellij.python.community.execService.ExecuteGetProcessError
+import com.intellij.python.community.execService.impl.PyExecBundle
+import com.intellij.python.community.execService.spi.TargetEnvironmentRequestHandler
+import com.intellij.remoteServer.util.ServerRuntimeException
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.Exe
 import com.jetbrains.python.errorProcessing.ExecErrorReason
@@ -32,21 +35,34 @@ internal suspend fun createProcessLauncherOnTarget(binOnTarget: BinOnTarget, lau
 
   val request = if (target != null) {
     val projectMan = ProjectManager.getInstance() // Broken Targets API doesn't work without project
-    target.createEnvironmentRequest(projectMan.openProjects.firstOrNull() ?: projectMan.defaultProject)
+    try {
+      target.createEnvironmentRequest(projectMan.openProjects.firstOrNull() ?: projectMan.defaultProject)
+    }
+    catch (e: ServerRuntimeException) {
+      return@withContext Result.failure(ExecuteGetProcessError.EnvironmentError(MessageError(e.localizedMessage)))
+    }
   }
   else LocalTargetEnvironmentRequest()
 
   // Broken Targets API can only upload the whole directory
   val dirsToMap = launchRequest.args.localFiles.map { it.parent }.toSet()
-  for (localDir in dirsToMap) {
-    request.uploadVolumes.add(TargetEnvironment.UploadRoot(localDir, TargetEnvironment.TargetPath.Temporary(), removeAtShutdown = true))
-  }
+  val handler = TargetEnvironmentRequestHandler.getHandler(request)
+  val uploadRoots = handler.mapUploadRoots(request, dirsToMap)
+  request.uploadVolumes.addAll(uploadRoots)
+
   val targetEnv = try {
     request.prepareEnvironment(TargetProgressIndicator.EMPTY)
+  }
+  catch (e: RuntimeException) { // some types like DockerRemoteRequest throw base RuntimeException instead of anything meaningful, need to change platform code first
+    fileLogger().warn("Failed to start $target", e) // TODO: i18n
+    return@withContext Result.failure(ExecuteGetProcessError.EnvironmentError(MessageError("Failed to start environment due to ${e.localizedMessage}")))
   }
   catch (e: ExecutionException) {
     fileLogger().warn("Failed to start $target", e) // TODO: i18n
     return@withContext Result.failure(ExecuteGetProcessError.EnvironmentError(MessageError("Failed to start environment due to ${e.localizedMessage}")))
+  }
+  targetEnv.uploadVolumes.forEach { _, volume ->
+    volume.upload(".", TargetProgressIndicator.EMPTY)
   }
   val args = launchRequest.args.getArgs { localFile ->
     targetEnv.getTargetPaths(localFile.pathString).first()
@@ -75,11 +91,17 @@ internal suspend fun createProcessLauncherOnTarget(binOnTarget: BinOnTarget, lau
 }
 
 private class TargetProcessCommands(
-  private val scopeToBind: CoroutineScope,
+  override val scopeToBind: CoroutineScope,
   private val exePath: FullPathOnTarget,
   private val targetEnv: TargetEnvironment,
   private val cmdLine: TargetedCommandLine,
 ) : ProcessCommands {
+  override val info: ProcessCommandsInfo
+    get() = ProcessCommandsInfo(
+      env = cmdLine.environmentVariables,
+      cwd = cmdLine.workingDirectory,
+      target = targetEnv.request.configuration?.displayName ?: PyExecBundle.message("py.exec.target.name.default")
+    )
 
   private var process: Process? = null
 
@@ -89,7 +111,7 @@ private class TargetProcessCommands(
     }
     targetEnv.shutdown()
   }, killProcess = {
-    process?.destroyForcibly();
+    process?.destroyForcibly()
     targetEnv.shutdown()
   })
 

@@ -9,7 +9,6 @@ import com.intellij.collaboration.ui.codereview.diff.DiscussionsViewOption
 import com.intellij.collaboration.ui.codereview.editor.*
 import com.intellij.collaboration.util.HashingUtil
 import com.intellij.collaboration.util.getOrNull
-import com.intellij.diff.util.Side
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -66,8 +65,8 @@ internal class GHPRReviewInEditorController(private val project: Project, privat
               launchNow {
                 ReviewInEditorUtil.showReviewToolbarWithActions(
                   reviewVm, editor,
-                  actionManager.getAction("GitHub.Diff.Review.PreviousComment"),
-                  actionManager.getAction("GitHub.Diff.Review.NextComment"),
+                  actionManager.getAction("CodeReview.PreviousComment"),
+                  actionManager.getAction("CodeReview.NextComment"),
                 )
               }
 
@@ -121,10 +120,13 @@ private suspend fun showReview(project: Project, settings: GithubPullRequestsPro
     launchNow {
       val userIcon = fileVm.iconProvider.getIcon(fileVm.currentUser.url, 16)
       editor.renderInlays(model.inlays, HashingUtil.mappingStrategy(GHPREditorMappedComponentModel::key)) {
-        GHPRInlayUtils.installInlaysDimming(this, model)
+        GHPRInlayUtils.installInlaysDimming(this, model, null)
+        editor.project?.let { project ->
+          GHPRInlayUtils.installInlaysFocusTracker(this, model, project)
+        }
         launchNow {
           model.inlays
-            .mapStatefulToStateful { inlayModel -> GHPRInlayUtils.installInlayHoverOutline(this, editor, Side.RIGHT, null, inlayModel) }
+            .mapStatefulToStateful { inlayModel -> GHPRInlayUtils.installInlayHoverOutline(this, editor, false, null, inlayModel) }
             .collect()
         }
         createRenderer(it, userIcon)

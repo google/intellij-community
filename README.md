@@ -1,4 +1,4 @@
-[![official JetBrains project](http://jb.gg/badges/official.svg)](https://github.com/JetBrains/.github/blob/main/profile/README.md) [![Build status](https://github.com/JetBrains/intellij-community/workflows/IntelliJ%20IDEA/badge.svg)](https://github.com/JetBrains/intellij-community/actions/workflows/IntelliJ_IDEA.yml)
+[![official JetBrains project](http://jb.gg/badges/official.svg)](https://github.com/JetBrains/.github/blob/main/profile/README.md) [![IntelliJ IDEA build status](https://github.com/JetBrains/intellij-community/workflows/IntelliJ%20IDEA/badge.svg)](https://github.com/JetBrains/intellij-community/actions/workflows/IntelliJ_IDEA.yml) [![PyCharm build status](https://github.com/JetBrains/intellij-community/workflows/PyCharm/badge.svg)](https://github.com/JetBrains/intellij-community/actions/workflows/PyCharm.yml)
 
 # IntelliJ Open Source Repository
 
@@ -115,7 +115,7 @@ Installer build examples:
 > [!TIP]
 > 
 > The `installers.cmd` is used to run [OpenSourceCommunityInstallersBuildTarget](build/src/OpenSourceCommunityInstallersBuildTarget.kt) from the command line.
-> You can also call it directly from IDEA, using run configuration `Build IDEA Community Installers (current OS)`.
+> You can also call it directly from IDEA, using run configuration `Build IntelliJ IDEA Installers (current OS)`.
 
 
 #### Dockerized Build Environment
@@ -156,4 +156,4 @@ You may find the list of available properties in [TestingOptions.kt](platform/bu
 ```
 
 `tests.cmd` is used just to run [CommunityRunTestsBuildTarget](build/src/CommunityRunTestsBuildTarget.kt) from the command line.
-You can also call it directly from IDEA, see run configuration `tests in community` for an example.
+You can also call it directly from IDEA, see run configuration `tests` for an example.

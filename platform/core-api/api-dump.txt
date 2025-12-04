@@ -449,6 +449,20 @@ com.intellij.openapi.application.BaseExpirableExecutor
 - a:expireWith(com.intellij.openapi.Disposable):com.intellij.openapi.application.BaseExpirableExecutor
 - a:submit(java.lang.Runnable):org.jetbrains.concurrency.CancellablePromise
 - a:submit(java.util.concurrent.Callable):org.jetbrains.concurrency.CancellablePromise
+f:com.intellij.openapi.application.CoroutinesKt
+- sf:backgroundWriteAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:constrainedReadAction(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:constrainedReadActionBlocking(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:constrainedReadAndWriteAction(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
+- sf:edtWriteAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:getEDT(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
+- sf:getUI(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
+- sf:readAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:readActionBlocking(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:readAndBackgroundWriteAction(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
+- sf:readAndEdtWriteAction(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
+- sf:smartReadAction(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- sf:smartReadActionBlocking(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 com.intellij.openapi.application.ModalityStateListener
 - java.util.EventListener
 - beforeModalityStateChanged(Z,java.lang.Object):V
@@ -685,6 +699,7 @@ com.intellij.openapi.fileTypes.FileType
 - a:getIcon():javax.swing.Icon
 - a:getName():java.lang.String
 - a:isBinary():Z
+- isCharsetHardcoded():Z
 - isReadOnly():Z
 com.intellij.openapi.fileTypes.FileTypeRegistry$FileTypeDetector
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
@@ -697,6 +712,7 @@ com.intellij.openapi.fileTypes.INativeFileType
 - a:useNativeIcon():Z
 com.intellij.openapi.fileTypes.InternalFileType
 - com.intellij.openapi.fileTypes.FileType
+- isCharsetHardcoded():Z
 - isReadOnly():Z
 com.intellij.openapi.fileTypes.OSFileIdeAssociation
 - getExtensionMode():com.intellij.openapi.fileTypes.OSFileIdeAssociation$ExtensionMode
@@ -1303,6 +1319,9 @@ com.intellij.psi.PsiFileSystemItem
 - a:processChildren(com.intellij.psi.search.PsiElementProcessor):Z
 com.intellij.psi.PsiFileWithOneLanguage
 - com.intellij.psi.PsiFile
+f:com.intellij.psi.PsiInvalidElementAccessException
+- s:getCreationTrace(com.intellij.openapi.util.UserDataHolder):java.lang.Object
+- s:setCreationTrace(com.intellij.openapi.util.UserDataHolderBase,java.lang.Object):V
 com.intellij.psi.PsiLanguageInjectionHost
 - com.intellij.model.psi.PsiExternalReferenceHost
 - a:createLiteralTextEscaper():com.intellij.psi.LiteralTextEscaper
@@ -1574,6 +1593,8 @@ com.intellij.psi.tree.ILeafElementType
 - a:createLeafNode(java.lang.CharSequence):com.intellij.lang.ASTNode
 com.intellij.psi.tree.ILightLazyParseableElementType
 - a:parseContents(com.intellij.lang.LighterLazyParseableNode):com.intellij.util.diff.FlyweightCapableTreeStructure
+c:com.intellij.psi.tree.IReparseableElementType
+- createNode(java.lang.CharSequence):com.intellij.lang.ASTNode
 com.intellij.psi.tree.IReparseableElementTypeBase
 - com.intellij.psi.tree.ILazyParseableElementTypeBase
 - isParsable(com.intellij.lang.ASTNode,java.lang.CharSequence,com.intellij.lang.Language,com.intellij.openapi.project.Project):Z
@@ -1609,6 +1630,19 @@ com.intellij.psi.util.PsiModificationTracker
 com.intellij.psi.util.PsiModificationTracker$Listener
 - a:modificationCountChanged():V
 Fc:com.intellij.psi.util.PsiTreeUtil
+c:com.intellij.testFramework.LightVirtualFile
+- s:builder():com.intellij.testFramework.LightVirtualFile$Builder
+f:com.intellij.testFramework.LightVirtualFile$Builder
+- build():com.intellij.testFramework.LightVirtualFile
+- charset(java.nio.charset.Charset):com.intellij.testFramework.LightVirtualFile$Builder
+- content(java.lang.CharSequence):com.intellij.testFramework.LightVirtualFile$Builder
+- creationTrace(java.lang.Object):com.intellij.testFramework.LightVirtualFile$Builder
+- fileType(com.intellij.openapi.fileTypes.FileType):com.intellij.testFramework.LightVirtualFile$Builder
+- language(com.intellij.lang.Language):com.intellij.testFramework.LightVirtualFile$Builder
+- modificationStamp(J):com.intellij.testFramework.LightVirtualFile$Builder
+- name(java.lang.String):com.intellij.testFramework.LightVirtualFile$Builder
+a:com.intellij.testFramework.LightVirtualFileBase
+- <init>(java.lang.String,com.intellij.openapi.fileTypes.FileType,J,java.lang.Object):V
 com.intellij.testIntegration.TestFramework
 - com.intellij.openapi.project.PossiblyDumbAware
 - sf:EXTENSION_NAME:com.intellij.openapi.extensions.ExtensionPointName

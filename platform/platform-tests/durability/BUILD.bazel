@@ -11,6 +11,12 @@ create_kotlinc_options(
 )
 
 jvm_library(
+  name = "durability",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
   name = "durability_test_lib",
   module_name = "intellij.platform.durability",
   visibility = ["//visibility:public"],
@@ -21,7 +27,7 @@ jvm_library(
     "@lib//:ktor-network-tls",
     "//libraries/io",
     "//platform/platform-impl:ide-impl",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "@lib//:kotlinc-kotlinx-serialization-compiler-plugin",

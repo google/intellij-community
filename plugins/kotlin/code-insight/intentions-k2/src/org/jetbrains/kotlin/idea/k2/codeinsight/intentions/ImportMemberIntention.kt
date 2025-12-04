@@ -10,12 +10,13 @@ import org.jetbrains.kotlin.analysis.api.KaIdeApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.ShortenCommand
 import org.jetbrains.kotlin.analysis.api.components.ShortenStrategy
-import org.jetbrains.kotlin.analysis.api.components.collectPossibleReferenceShortenings
 import org.jetbrains.kotlin.analysis.api.components.importableFqName
 import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.collectPossibleReferenceShorteningsForIde
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.invokeShortening
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinApplicableModCommandAction
+import org.jetbrains.kotlin.idea.codeinsight.utils.resolveCompanionObjectShortReferenceToContainingClassSymbol
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtElement
@@ -49,7 +50,14 @@ internal class ImportMemberIntention :
         (element is KtDotQualifiedExpression && !element.isInImportDirective()) || element is KtUserType
 
     override fun KaSession.prepareContext(element: KtElement): Context? {
-        val symbol = element.actualReference?.resolveToSymbol() ?: return null
+        val reference = element.actualReference ?: return null
+
+        val symbol =
+            // for implicit companion object references, we want to import the outer class
+            reference.resolveCompanionObjectShortReferenceToContainingClassSymbol()
+                ?: reference.resolveToSymbol()
+                ?: return null
+        
         val file = element.containingKtFile
         return computeContext(file, symbol)?.takeUnless {
             symbol.isTopLevel && symbol.containingFile?.isInSamePackage(file) == true
@@ -77,7 +85,7 @@ private fun computeContext(file: KtFile, symbol: KaSymbol): ImportMemberIntentio
             } else {
                 (symbol as KaConstructorSymbol).containingClassId
             } ?: return null
-            val shortenCommand = collectPossibleReferenceShortenings(
+            val shortenCommand = collectPossibleReferenceShorteningsForIde(
                 file,
                 classShortenStrategy = {
                     if (it.classId == classId)
@@ -98,7 +106,7 @@ private fun computeContext(file: KtFile, symbol: KaSymbol): ImportMemberIntentio
             val callableId = symbol.callableId ?: return null
             if (callableId.callableName.isSpecial) return null
             if (symbol.importableFqName == null) return null
-            val shortenCommand = collectPossibleReferenceShortenings(
+            val shortenCommand = collectPossibleReferenceShorteningsForIde(
                 file,
                 classShortenStrategy = { ShortenStrategy.DO_NOT_SHORTEN },
                 callableShortenStrategy = {

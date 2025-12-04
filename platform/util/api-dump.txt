@@ -60,6 +60,9 @@ com.intellij.openapi.diagnostic.ExceptionWithAttachments
 - a:getAttachments():com.intellij.openapi.diagnostic.Attachment[]
 com.intellij.openapi.diagnostic.Logger$Factory
 - a:getLoggerInstance(java.lang.String):com.intellij.openapi.diagnostic.Logger
+f:com.intellij.openapi.diagnostic.LoggerKt
+- sf:debug(com.intellij.openapi.diagnostic.Logger,java.lang.Throwable,kotlin.jvm.functions.Function0):V
+- bs:debug$default(com.intellij.openapi.diagnostic.Logger,java.lang.Throwable,kotlin.jvm.functions.Function0,I,java.lang.Object):V
 com.intellij.openapi.diagnostic.UntraceableException
 com.intellij.openapi.util.BooleanGetter
 - java.util.function.BooleanSupplier
@@ -93,6 +96,7 @@ com.intellij.openapi.util.Factory
 com.intellij.openapi.util.Getter
 - java.util.function.Supplier
 com.intellij.openapi.util.Iconable
+- sf:ICON_FLAG_FAST_ONLY:I
 - sf:ICON_FLAG_READ_STATUS:I
 - sf:ICON_FLAG_VISIBILITY:I
 - a:getIcon(I):javax.swing.Icon
@@ -222,6 +226,9 @@ f:com.intellij.openapi.util.io.OSAgnosticPathUtil
 - s:isUncPath(java.lang.String):Z
 - s:startsWith(java.lang.String,java.lang.String):Z
 - s:startsWithWindowsDrive(java.lang.String):Z
+c:com.intellij.openapi.util.registry.RegistryValue
+- sf:Companion:com.intellij.openapi.util.registry.RegistryValue$Companion
+f:com.intellij.openapi.util.registry.RegistryValue$Companion
 com.intellij.openapi.util.registry.RegistryValueListener
 - afterValueChanged(com.intellij.openapi.util.registry.RegistryValue):V
 - beforeValueChanged(com.intellij.openapi.util.registry.RegistryValue):V
@@ -405,6 +412,10 @@ com.intellij.util.containers.Predicate
 - java.util.function.Predicate
 - a:apply(java.lang.Object):Z
 - test(java.lang.Object):Z
+f:com.intellij.util.containers.SmartHashSet
+- java.util.AbstractSet
+- <init>(I):V
+- <init>(I,F):V
 com.intellij.util.containers.hash.EqualityPolicy
 - sf:CANONICAL:com.intellij.util.containers.hash.EqualityPolicy
 - sf:IDENTITY:com.intellij.util.containers.hash.EqualityPolicy
@@ -512,6 +523,8 @@ com.intellij.util.io.BaseDataReader$SleepingPolicy
 com.intellij.util.io.DataExternalizer
 - a:read(java.io.DataInput):java.lang.Object
 - a:save(java.io.DataOutput,java.lang.Object):V
+a:com.intellij.util.io.Decompressor
+- pa:nextEntry(Z):com.intellij.util.io.Decompressor$Entry
 com.intellij.util.io.KeyDescriptor
 - com.intellij.util.containers.hash.EqualityPolicy
 - com.intellij.util.io.DataExternalizer
@@ -531,6 +544,7 @@ c:com.intellij.util.io.zip.JBZipFile
 - <init>(java.nio.file.Path,java.nio.charset.Charset):V
 - <init>(java.nio.file.Path,java.nio.charset.Charset,Z):V
 - <init>(java.nio.file.Path,java.nio.charset.Charset,Z,com.intellij.util.ThreeState):V
+- <init>(java.nio.file.Path,Z):V
 com.intellij.util.keyFMap.KeyFMap
 - sf:EMPTY_MAP:com.intellij.util.keyFMap.KeyFMap
 - a:equalsByReference(com.intellij.util.keyFMap.KeyFMap):Z

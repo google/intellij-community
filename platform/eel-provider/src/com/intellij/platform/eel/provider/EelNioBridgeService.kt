@@ -1,4 +1,5 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:ApiStatus.Experimental
 package com.intellij.platform.eel.provider
 
 import com.intellij.openapi.diagnostic.logger
@@ -29,7 +30,7 @@ import java.nio.file.Path
  * @throws IllegalArgumentException if the Eel API for [this] does not have a corresponding [java.nio.file.FileSystem]
  */
 @Throws(IllegalArgumentException::class)
-@ApiStatus.Internal
+@ApiStatus.Experimental
 fun EelPath.asNioPath(): @MultiRoutingFileSystemPath Path {
   return asNioPathOrNull()
          ?: throw IllegalArgumentException("Could not convert $this to NIO path, descriptor is $descriptor")
@@ -44,7 +45,7 @@ fun EelPath.asNioPath(project: Project?): @MultiRoutingFileSystemPath Path {
 
 /** See docs for [asNioPath] */
 @Deprecated("It never returns null anymore")
-@ApiStatus.Internal
+@ApiStatus.Experimental
 fun EelPath.asNioPathOrNull(): @MultiRoutingFileSystemPath Path? {
   if (descriptor === LocalEelDescriptor) {
     return Path.of(toString())
@@ -87,23 +88,44 @@ fun EelPath.asNioPathOrNull(): @MultiRoutingFileSystemPath Path? {
  * @throws EelPathException if the passed path is not an absolute path.
  */
 @Throws(IllegalArgumentException::class, EelPathException::class)
-@ApiStatus.Internal
+@ApiStatus.Experimental
 fun Path.asEelPath(): EelPath {
+  return asEelPath(getEelDescriptor())
+}
+
+/**
+ * [descriptor] should be exactly `this.getEelDescriptor()`. This method exists only to avoid calling `getEelDescriptor()` twice.
+ */
+@Throws(IllegalArgumentException::class, EelPathException::class)
+@ApiStatus.Experimental
+fun Path.asEelPath(descriptor: EelDescriptor): EelPath {
   if (fileSystem != FileSystems.getDefault()) {
     throw IllegalArgumentException("Could not convert $this to EelPath: the path does not belong to the default NIO FileSystem")
   }
-  val descriptor = EelProvider.EP_NAME.extensionList.firstNotNullOfOrNull { eelProvider -> eelProvider.getEelDescriptor(this) }
-                   ?: return EelPath.parse(toString(), LocalEelDescriptor)
-
-  val root = (descriptor as? EelPathBoundDescriptor)?.rootPath ?: throw NoSuchElementException("Cannot find a root for $this")
-
-  val relative = root.relativize(this)
-  if (descriptor.osFamily.isPosix) {
-    return relative.fold(EelPath.parse("/", descriptor), { path, part -> path.resolve(part.toString()) })
+  when (descriptor) {
+    is LocalEelDescriptor -> return EelPath.parse(toString(), descriptor)
+    is EelPathBoundDescriptor if (descriptor.osFamily.isPosix) -> {
+      val root = descriptor.rootPath
+      val relative = root.relativize(this)
+      return relative.fold(EelPath.parse("/", descriptor)) { path, part ->
+        part.toString().takeIf { it.isNotEmpty() }?.let { path.getChild(it) } ?: path
+      }
+    }
+    is EelPathBoundDescriptor -> {
+      TODO() // on Windows, we need additional logic to guess the new root
+    }
+    else -> {
+      throw NoSuchElementException("Cannot find a root for $this")
+    }
   }
-  else {
-    TODO() // on Windows, we need additional logic to guess the new root
-  }
+}
+
+@ApiStatus.Internal
+fun EelDescriptor.mountProvider(): EelMountProvider? {
+  return EelProvider.EP_NAME.extensionList
+    .firstNotNullOfOrNull { eelProvider ->
+      eelProvider.getMountProvider(eelDescriptor = this)
+    }
 }
 
 @ApiStatus.Internal

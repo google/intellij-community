@@ -16,6 +16,8 @@ import kotlinx.collections.immutable.persistentMapOf
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.impl.PlatformLayout
 import org.jetbrains.intellij.build.impl.qodana.QodanaProductProperties
+import org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec
+import org.jetbrains.intellij.build.productLayout.ProductModulesLayout
 import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.module.JpsModule
 import java.nio.file.Path
@@ -134,8 +136,9 @@ abstract class ProductProperties {
    * An identifier which will be used to form names for directories where configuration and caches will be stored, usually a product name
    * without spaces with an added version ('IntelliJIdea2016.1' for IntelliJ IDEA 2016.1).
    */
-  open fun getSystemSelector(appInfo: ApplicationInfoProperties, buildNumber: String): String =
-    "${appInfo.fullProductName}${appInfo.majorVersion}.${appInfo.minorVersionMainPart}"
+  open fun getSystemSelector(appInfo: ApplicationInfoProperties, buildNumber: String): String {
+    return "${appInfo.fullProductName}${appInfo.majorVersion}.${appInfo.minorVersionMainPart}"
+  }
 
   /**
    * If `true`, Alt+Button1 shortcut will be removed from 'Quick Evaluate Expression' action and assigned to 'Add/Remove Caret' action
@@ -158,6 +161,13 @@ abstract class ProductProperties {
    * If `true`, the product's main JAR file will be scrambled using [ProprietaryBuildTools.scrambleTool].
    */
   var scrambleMainJar: Boolean = false
+
+  /**
+   * List of content modules from the core plugin which should be scrambled using [ProprietaryBuildTools.scrambleTool].
+   * Modules are mentioned here should be put to separate JARs (i.e., they aren't registered as 'embedded' and don't have the 'package' attribute).
+   * If some modules are listed here, it's required [scrambleMainJar] to be set to `true`.
+   */
+  var contentModulesToScramble: List<String> = emptyList()
 
   /**
    * Path to an alternative scramble script which will should be used for a product.
@@ -216,7 +226,7 @@ abstract class ProductProperties {
   var rootModuleForModularLoader: String? = null
 
   /**
-   * Specifies the mode of this product which will be used to determine which plugin modules should be loaded at runtime by 
+   * Specifies the mode of this product which will be used to determine which plugin modules should be loaded at runtime by
    * [the modular loader][com.intellij.platform.bootstrap.ModuleBasedProductLoadingStrategy].
    * This property makes sense only if [rootModuleForModularLoader] is set to a non-null value.
    */
@@ -277,7 +287,7 @@ abstract class ProductProperties {
    * @return an instance of the class containing properties specific for Windows distribution,
    * or `null` if the product doesn't have Windows distribution.
    */
-  abstract fun createWindowsCustomizer(projectHome: String): WindowsDistributionCustomizer?
+  abstract fun createWindowsCustomizer(projectHome: Path): WindowsDistributionCustomizer?
 
   /**
    * @return an instance of the class containing properties specific for Linux distribution,
@@ -289,7 +299,7 @@ abstract class ProductProperties {
    * @return an instance of the class containing properties specific for macOS distribution,
    * or `null` if the product doesn't have macOS distribution.
    */
-  abstract fun createMacCustomizer(projectHome: String): MacDistributionCustomizer?
+  abstract fun createMacCustomizer(projectHome: Path): MacDistributionCustomizer?
 
   /**
    * If `true`, a .zip archive containing sources of modules included in the product will be produced.
@@ -325,7 +335,7 @@ abstract class ProductProperties {
   /**
    * Override this method to copy additional files to distributions of all operating systems.
    */
-  open suspend fun copyAdditionalFiles(context: BuildContext, targetDir: Path) { }
+  open suspend fun copyAdditionalFiles(targetDir: Path, context: BuildContext) { }
 
   /**
    * Override this method if the product has several editions to ensure that their artifacts won't be mixed up.
@@ -338,16 +348,49 @@ abstract class ProductProperties {
    * Paths to externally built plugins to be included in the IDE.
    * They will be copied into the build, as well as included in the IDE classpath when launching it to build search index, .jar order, etc.
    */
-  open fun getAdditionalPluginPaths(context: BuildContext): List<Path> = emptyList()
+  open suspend fun getAdditionalPluginPaths(context: BuildContext): List<Path> = emptyList()
 
   /**
-   * Override this function to provide additional JVM command line arguments which will be added to launchers along with 
+   * Override this function to provide additional JVM command line arguments which will be added to launchers along with
    * [additionalIdeJvmArguments].
    */
   open fun getAdditionalContextDependentIdeJvmArguments(context: BuildContext): List<String> = emptyList()
 
   /**
-   * @return custom properties for [org.jetbrains.intellij.build.impl.productInfo.ProductInfoData].
+   * Override this method to programmatically specify content modules for the product plugin.xml.
+   *
+   * This provides a way to define content modules in Kotlin code instead of using XML xi:include directives.
+   * The modules specified here will be automatically injected into the product's plugin.xml during build
+   * via `layout.withPatch` mechanism in `processAndGetProductPluginContentModules`.
+   *
+   * You can:
+   * - Reference named module sets (e.g., "essential", "vcs", "xml") which are resolved from
+   *   [org.jetbrains.intellij.build.productLayout.CommunityModuleSets] and UltimateModuleSets registries
+   * - Add individual modules via `additionalModules`
+   * - Exclude specific modules via `excludedModules`
+   * - Override loading modes via `moduleLoadingOverrides`
+   *
+   * The programmatic modules are merged with XML-based xi:includes (both are supported during transition).
+   *
+   * Example:
+   * ```
+   * override fun getProductContentModules() = ProductModulesContentSpec().apply {
+   *   moduleSets = listOf(
+   *     ModuleSet("essential", CommunityModuleSets.essential()),
+   *     ModuleSet("vcs", CommunityModuleSets.vcs())
+   *   )
+   *   additionalModules = listOf(ContentModule("my.custom.module"))
+   *   excludedModules = setOf("intellij.unwanted.module")
+   * }
+   * ```
+   *
+   * @return specification of programmatic content modules, or null to use only XML-based includes
+   * @see org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec
+   */
+  abstract fun getProductContentDescriptor(): ProductModulesContentSpec?
+
+  /**
+   * @return custom properties for [com.intellij.platform.buildData.productInfo.ProductInfoData].
    */
   @Suppress("KDocUnresolvedReference")
   open fun generateCustomPropertiesForProductInfo(): List<CustomProperty> = emptyList()
@@ -356,8 +399,8 @@ abstract class ProductProperties {
    * If `true`, a distribution contains libraries and launcher script for running IDE in Remote Development mode.
    */
   @ApiStatus.Internal
-  open suspend fun addRemoteDevelopmentLibraries(buildContext: BuildContext): Boolean {
-    return buildContext.getBundledPluginModules().contains("intellij.remoteDevServer")
+  open suspend fun addRemoteDevelopmentLibraries(context: BuildContext): Boolean {
+    return context.getBundledPluginModules().contains("intellij.remoteDevServer")
   }
 
   /**
@@ -370,7 +413,7 @@ abstract class ProductProperties {
    * Copies additional localization resources to the plugin-generated localization resources directory.
    */
   @ApiStatus.Internal
-  open suspend fun copyAdditionalLocalizationResourcesToPlugin(context: BuildContext, lang: String, targetDir: Path) {}
+  open suspend fun copyAdditionalLocalizationResourcesToPlugin(lang: String, targetDir: Path, context: BuildContext) {}
 
   /**
    * Build steps which are always skipped for this product.
@@ -467,12 +510,10 @@ abstract class ProductProperties {
       is PluginCreationFail -> result.errorsAndWarnings
     }
   }
-
-  private companion object {
-    /**
-     * From https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html#idea-plugin__id:
-     * > Please use characters, numbers, and '.'/'-'/'_' symbols only and keep it reasonably short.
-     */
-    val PLUGIN_ID_REGEX: Regex = "^[\\w.-]+$".toRegex()
-  }
 }
+
+/**
+ * From https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html#idea-plugin__id:
+ * > Please use characters, numbers, and '.'/'-'/'_' symbols only and keep it reasonably short.
+ */
+private val PLUGIN_ID_REGEX: Regex = "^[\\w.-]+$".toRegex()

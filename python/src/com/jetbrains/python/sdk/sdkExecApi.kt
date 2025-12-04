@@ -11,6 +11,7 @@ import com.jetbrains.python.target.PyTargetAwareAdditionalData
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.CheckReturnValue
+import java.nio.file.Path
 
 // Various functions to execute code against SDK
 
@@ -47,8 +48,20 @@ suspend fun ExecService.executeHelper(
   helperArgs: List<String> = emptyList(),
   options: ExecOptions = ExecOptions(),
   procListener: PyProcessListener? = null,
-): PyResult<String> =
-  execGetStdout(sdk, Args().addHelper(helper).addArgs(helperArgs), options, procListener)
+): PyResult<String> = executeHelper(sdk, helper, Args(*helperArgs.toTypedArray()), options, procListener)
+
+/**
+ * Executes [helper] on [sdk] (copies it to the remote machine if needed)
+ */
+@ApiStatus.Internal
+@CheckReturnValue
+suspend fun ExecService.executeHelper(
+  sdk: Sdk,
+  helper: HelperName,
+  helperArgs: Args = Args(),
+  options: ExecOptions = ExecOptions(),
+  procListener: PyProcessListener? = null,
+): PyResult<String> = execGetStdout(sdk, Args().addHelper(helper).add(helperArgs), options, procListener)
 
 
 // See function it calls for more info
@@ -65,11 +78,10 @@ suspend fun ExecService.executeGetProcess(
  * Converts SDK to [BinOnTarget] to be used by [ExecService]
  */
 @ApiStatus.Internal
-fun Sdk.asBinToExecute(): BinOnTarget {
-  val targetConfig = (getOrCreateAdditionalData() as? PyTargetAwareAdditionalData)?.targetEnvironmentConfiguration
-  val binaryToExec = BinOnTarget(this::configureBuilderToRunPythonOnTarget, targetConfig)
-  return binaryToExec
+fun Sdk.asBinToExecute(): BinaryToExec = when (val additionalData = getOrCreateAdditionalData()) {
+  is PyTargetAwareAdditionalData -> BinOnTarget(
+    configureTargetCmdLine = this::configureBuilderToRunPythonOnTarget,
+    target = additionalData.targetEnvironmentConfiguration ?: error("Target is not configured"),
+  )
+  else -> BinOnEel(Path.of(homePath ?: error("Home path is not set")))
 }
-
-
-

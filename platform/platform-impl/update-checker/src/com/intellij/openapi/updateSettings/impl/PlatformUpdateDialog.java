@@ -22,6 +22,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.io.NioFiles;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.ui.LicensingFacade;
 import com.intellij.util.Restarter;
 import com.intellij.util.SystemProperties;
@@ -126,16 +127,17 @@ public final class PlatformUpdateDialog extends AbstractUpdateDialog {
 
   @Override
   protected @NotNull JComponent createCenterPanel() {
-    return UpdateInfoPanel.create(
-      myPlatformUpdate.getNewBuild(),
-      myPlatformUpdate.getPatches(),
-      myTestPatch,
-      myWriteProtected,
-      myLicenseInfo != null ? myLicenseInfo.licenseNote : null,
-      myLicenseInfo != null && myLicenseInfo.warning,
-      myAddConfigureUpdatesLink,
-      myPlatformUpdate.getUpdatedChannel()
-    );
+    UpdateInfoPanel infoPanel =
+      new UpdateInfoPanel(myPlatformUpdate.getNewBuild(),
+                          myPlatformUpdate.getPatches(),
+                          myTestPatch,
+                          myWriteProtected,
+                          myLicenseInfo != null ? myLicenseInfo.licenseNote : null,
+                          myLicenseInfo != null && myLicenseInfo.warning,
+                          myAddConfigureUpdatesLink,
+                          myPlatformUpdate.getUpdatedChannel(),
+                          this.myDisposable);
+    return Registry.is("ide.update.dialog.new.ui.enabled") ? infoPanel.createNew() : infoPanel.create();
   }
 
   @Override
@@ -213,11 +215,13 @@ public final class PlatformUpdateDialog extends AbstractUpdateDialog {
   }
 
   private void downloadPatchAndRestart(Map<PluginId, PluginUiModel> installedPlugins) {
+    Collection<PluginDownloader> selectedPluginsToUpdate = new ArrayList<>();
     if (myUpdatesForPlugins != null && !installedPlugins.isEmpty()) {
-      var dialog = new PluginUpdateDialog(myProject, installedPlugins.values(), null, installedPlugins);
-      if (!PluginUpdateDialog.showDialogAndUpdate(myUpdatesForPlugins, dialog)) {
+      var dialog = new PluginUpdateDialog(myProject, ContainerUtil.map(myUpdatesForPlugins, it -> it.getUiModel()), null, installedPlugins);
+      if (!dialog.showAndGet()) {
         return;  // update cancelled
       }
+      selectedPluginsToUpdate.addAll(PluginUpdateDialog.getSelectedDownloaders(myUpdatesForPlugins, dialog));
     }
 
     //noinspection UsagesOfObsoleteApi
@@ -252,8 +256,8 @@ public final class PlatformUpdateDialog extends AbstractUpdateDialog {
           return;
         }
 
-        if (!ContainerUtil.isEmpty(myUpdatesForPlugins)) {
-          UpdateInstaller.installPluginUpdates(myUpdatesForPlugins, indicator);
+        if (!ContainerUtil.isEmpty(selectedPluginsToUpdate)) {
+          UpdateInstaller.installPluginUpdates(selectedPluginsToUpdate, indicator);
         }
 
         if (ApplicationManager.getApplication().isRestartCapable()) {

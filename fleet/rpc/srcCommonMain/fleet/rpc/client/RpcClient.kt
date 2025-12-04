@@ -1,7 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package fleet.rpc.client
 
-import fleet.multiplatform.shims.ConcurrentHashMap
+import fleet.multiplatform.shims.MultiplatformConcurrentHashMap
 import fleet.multiplatform.shims.newSingleThreadCoroutineDispatcher
 import fleet.rpc.RemoteApiDescriptor
 import fleet.rpc.RemoteKind
@@ -81,13 +81,13 @@ private class RpcClient(
     element.second?.invoke(RpcClientDisconnectedException("Request channel closed", null))
   }
 
-  private val grayList = ConcurrentHashMap<UID, CompletableDeferred<Unit>>()
+  private val grayList = MultiplatformConcurrentHashMap<UID, CompletableDeferred<Unit>>()
 
-  private val outgoingRpc = ConcurrentHashMap<UID, OngoingRequest>()
-  private val completedRpc = ConcurrentHashMap<UID, TransferredResource>()
-  private val streams = ConcurrentHashMap<UID, InternalStreamDescriptor>()
-  private val remoteResources = ConcurrentHashMap<InstanceId, Set<Pair<InstanceId, RemoteResource>>>()
-  private val resourceParents = ConcurrentHashMap<InstanceId, InstanceId>()
+  private val outgoingRpc = MultiplatformConcurrentHashMap<UID, OngoingRequest>()
+  private val completedRpc = MultiplatformConcurrentHashMap<UID, TransferredResource>()
+  private val streams = MultiplatformConcurrentHashMap<UID, InternalStreamDescriptor>()
+  private val remoteResources = MultiplatformConcurrentHashMap<InstanceId, Set<Pair<InstanceId, RemoteResource>>>()
+  private val resourceParents = MultiplatformConcurrentHashMap<InstanceId, InstanceId>()
 
   private val remoteObjectFactory = this.asHandlerFactory().tracing()
 
@@ -227,6 +227,7 @@ private class RpcClient(
         cause = ex
       }
       finally {
+
         if (cause != null) {
           logger.debug(cause) { "Cancelling request queue" }
         }
@@ -235,10 +236,10 @@ private class RpcClient(
         }
         transport.outgoing.close()
         val ex = cause?.causeOfType<TransportDisconnectedException>()?.let { RpcClientDisconnectedException(null, it) }
-                 ?: cause
-                 ?: RpcClientDisconnectedException("Transport channel closed without cause", cause = null)
+                 ?: RpcClientDisconnectedException("Transport channel closed without TransportDisconnectedException", cause)
         resumeAllOngoingCallsWithThrowable(ex)
         requestsChannel.close(cause)
+        currentCoroutineContext().ensureActive()
         throw ex
       }
     }
@@ -453,6 +454,7 @@ private class RpcClient(
         error.conflict != null -> AssumptionsViolatedException(error.conflict)
         error.serviceNotReady != null -> RpcServiceNotReady(rpc.call)
         error.unresolvedService != null -> UnresolvedServiceException(rpc.call.service)
+        error.producerCancelled != null -> RemoteIsCancelledException(error.producerCancelled, null)
         else -> RpcException.callFailed(rpc.call, error)
       }
 
@@ -499,7 +501,7 @@ private class RpcClient(
       is InternalStreamDescriptor.FromRemote -> {
         val producerCancelled = error?.producerCancelled
         val causePrime = if (producerCancelled != null) {
-          ProducerIsCancelledException(msg = rpcStreamFailureMessage(desc.displayName, error.message()), cause = null) as Throwable?
+          RemoteIsCancelledException(msg = rpcStreamFailureMessage(desc.displayName, error.message()), cause = null) as Throwable?
         }
         else {
           cause as Throwable? // without `as Throwable?` wasm compiles but throws on wasm compilation in the browser (same as in FL-32234)

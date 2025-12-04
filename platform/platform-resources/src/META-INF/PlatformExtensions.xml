@@ -1,6 +1,9 @@
 <!--suppress PluginXmlRegistrationCheck -->
 <idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
   <extensions defaultExtensionNs="com.intellij">
+    <applicationService serviceInterface="com.intellij.execution.wsl.GatewayNativeWslProjectOpener"
+                        serviceImplementation="com.intellij.execution.wsl.GatewayNativeWslProjectOpenerImpl"/>
+
     <applicationService
       serviceInterface="com.intellij.diagnostic.StartUpPerformanceService"
       serviceImplementation="com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.IdeStartUpPerformanceService"
@@ -8,7 +11,7 @@
     />
 
     <applicationService
-            serviceInterface="com.intellij.openapi.application.impl.TransferredWriteActionService"
+            serviceInterface="com.intellij.util.concurrency.TransferredWriteActionService"
             serviceImplementation="com.intellij.openapi.application.impl.TransferredWriteActionServiceImpl"
     />
 
@@ -408,6 +411,8 @@
     <projectService serviceInterface="com.intellij.diff.editor.DiffEditorTabFilesManager"
                     serviceImplementation="com.intellij.diff.editor.DiffEditorTabFilesManagerImpl"/>
 
+    <settingsController id="LoggingSettingsController" implementation="com.intellij.ide.actions.LoggingSettingsController"/>
+
     <fileEditorProvider implementation="com.intellij.diff.editor.DiffFileEditorProvider"/>
     <fileEditorProvider implementation="com.intellij.ide.browsers.actions.WebPreviewEditorProvider"/>
     <fileEditorProvider implementation="com.intellij.ide.plugins.UIComponentEditorProvider"/>
@@ -645,6 +650,9 @@
                         serviceImplementation="com.intellij.ide.PlatformIdeServiceImpl"/>
 
     <postStartupActivity implementation="com.intellij.ide.ProjectWindowCustomizerListener" order="last"/>
+    <backgroundPostStartupActivity implementation="com.intellij.util.singleProduct.MigrationStartupActivity"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.util.singleProduct.MigrateToSingleProductCollector"/>
+
 
     <applicationService
       serviceInterface="com.intellij.platform.ide.productInfo.IdeProductInfo"
@@ -901,7 +909,21 @@
       id="EditorDeleteLine.checkHandler"
     />
 
+    <registryKey key="remdev.completion.on.frontend"
+                 defaultValue="false"
+                 description="Enables frontend completion support"
+                 restartRequired="true"
+    />
+
     <typedHandler implementation="com.intellij.codeInsight.inline.completion.listeners.typing.InlineCompletionTypedHandlerDelegate"/>
+    <inline.completion.suppress.state.supplier
+      implementation="com.intellij.codeInsight.inline.completion.suppress.InlineCompletionSuppressStateByInlinePromptSupplier"/>
+    <inline.edit.awaiter implementation="com.intellij.codeInsight.inline.edit.InlineCompletionAwaiter"/>
+    <editorActionHandler
+      action="CallInlineCompletionAction"
+      id="inline.edit.no.suggestions.hint"
+      order="last"
+      implementationClass="com.intellij.codeInsight.inline.completion.action.CallInlineCompletionAction$ShowNoSuggestionsHintIfNeededHandler"/>
 
     <registryKey key="editor.action.caretMovement.UpDownIgnoreSelectionBoundaries" defaultValue="false"
                  description="Allows to restore the legacy behavior of Up/Down w.r.t. selection boundaries.\n\
@@ -1018,6 +1040,7 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.codeInsight.navigation.actions.GTDUCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.codeInsight.navigation.actions.GoToDeclarationCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.accessibility.AccessibilityUsageTrackerCollector"/>
+    <statistics.applicationUsagesCollector implementation="com.intellij.accessibility.AccessibilityToolsStateCollector"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersStatisticsCollector"/>
     <statistics.counterUsagesCollector
@@ -1163,7 +1186,8 @@
                              key="configurable.breadcrumbs" bundle="messages.ApplicationBundle"
                              instance="com.intellij.xml.breadcrumbs.BreadcrumbsConfigurable"/>
 
-    <fileBreadcrumbsCollector implementation="com.intellij.xml.breadcrumbs.PsiFileBreadcrumbsCollector" order="last"/>
+    <fileBreadcrumbsCollector implementation="com.intellij.xml.breadcrumbs.PsiFileBreadcrumbsCollector"
+                              id="PsiFileBreadcrumbsCollector" order="last"/>
 
     <applicationConfigurable parentId="preferences.editor" id="editor.stickyLines"
                              key="configurable.sticky.lines" bundle="messages.ApplicationBundle"
@@ -1526,13 +1550,16 @@
     <applicationService serviceInterface="com.intellij.ui.ToolbarService"
                         serviceImplementation="com.intellij.ui.ToolbarServiceImpl"/>
 
-    <applicationService serviceInterface="com.intellij.openapi.ui.OnboardingBackgroundImageProvider"
-                        serviceImplementation="com.intellij.openapi.wm.impl.OnboardingBackgroundImageProviderImpl"/>
+    <applicationService serviceInterface="com.intellij.openapi.ui.DialogBackgroundImageProvider"
+                        serviceImplementation="com.intellij.openapi.wm.impl.DialogBackgroundImageProviderImpl"/>
 
     <applicationService serviceImplementation="com.intellij.ui.WindowDeactivationManager" client="all"/>
 
     <applicationService serviceInterface="com.intellij.ui.AutoScrollToSourceTaskManager"
                         serviceImplementation="com.intellij.ui.AutoScrollToSourceTaskManagerImpl"/>
+
+    <applicationService serviceInterface="com.intellij.logCollector.CollectZippedLogsService"
+                        serviceImplementation="com.intellij.platform.ide.impl.logsUploader.CollectZippedLogsServiceImpl"/>
 
     <applicationService serviceImplementation="com.intellij.openapi.updateSettings.impl.UpdateCheckerService" headlessImplementation=""/>
     <postStartupActivity implementation="com.intellij.openapi.updateSettings.impl.UpdateCheckerProjectActivity" order="last"/>
@@ -1623,7 +1650,8 @@
                        key="notification.group.failed.to.generate.module.descriptors"/>
     <notificationGroup id="Ultimate Installed" displayType="BALLOON" bundle="messages.IdeBundle"
                        key="notification.group.advertiser.try.ultimate.installed"/>
-    <notificationGroup id="Mac15 Local Network" displayType="BALLOON" bundle="messages.IdeCoreBundle" key="mac15.local.network.issue.title"/>
+    <notificationGroup id="code.style.cache.dump" displayType="BALLOON" hideFromSettings="true" isLogByDefault="false"/>
+    <notificationGroup id="proxy.auth.failed" displayType="STICKY_BALLOON" bundle="messages.UIBundle" key="proxy.auth.notification.title"/>
 
     <defaultHighlightingSettingProvider implementation="com.intellij.codeInsight.actions.ReaderModeHighlightingSettingsProvider"/>
     <registryKey key="html.editor.timeout" defaultValue="15000" description="HTML editor content loading timeout, ms"/>
@@ -1794,6 +1822,7 @@
                              provider="com.intellij.ide.minimap.settings.MinimapConfigurableProvider"
                              key="settings.name" bundle="messages.MinimapBundle"/>
     <registryKey key="popup.advertiser.speed.search" defaultValue="false" description="Shows speed search advertiser in popups"/>
+    <registryKey key="wayland.true.popups" defaultValue="true" description="Show popups in Wayland as true popups (allows remembering the location, but limits them to the IDE window)"/>
     <actionPromoter implementation="com.intellij.ide.actions.speedSearch.SpeedSearchActionPromoter"/>
 
     <fileEditorProvider id="learnIde" implementation="com.intellij.openapi.wm.impl.welcomeScreen.learnIde.editorTab.LearnIdeFileEditorProvider"/>
@@ -1817,7 +1846,7 @@
 
     <idePerformanceListener implementation="com.intellij.diagnostic.FusFreezeReporter"/>
 
-    <backgroundPostStartupActivity implementation="com.intellij.internal.DumpPluginDescriptorsOnProjectOpenTrigger"/>
+    <applicationActivity implementation="com.intellij.internal.DumpPluginDescriptorsOnAppStartTrigger"/>
 
     <registryKey key="search.everywhere.footer.extended.info"
                  defaultValue="true"
@@ -1858,11 +1887,6 @@
     <registryKey key="ide.recent.projects.query.ep.providers"
                  defaultValue="true"
                  description="Enables showing non-local projects in the recents list"/>
-
-    <registryKey key="code.style.package.entry.table.check.compatibility"
-                 defaultValue="true"
-                 description="Enable checks that the import layout is compatible"
-                 restartRequired="true"/>
 
     <actionConfigurationCustomizer implementation="com.intellij.openapi.project.impl.SeparateProcessActionsCustomizer"/>
 
@@ -2005,6 +2029,9 @@
     <registryKey key="ide.suppress.low.memory.notifications.when.dumb" defaultValue="false"
                  description="Disables Low Memory notifications during indexing for the sake of less false-positive detection for users" />
     <configFolderChangedListener implementation="com.intellij.configurationStore.ComponentStoreImplReloadListener"/>
+
+    <applicationService serviceInterface="com.intellij.configurationStore.defaults.DefaultSettingsService"
+                        serviceImplementation="com.intellij.configurationStore.defaults.DefaultSettingsServiceImpl" />
   </extensions>
 
   <applicationListeners>
@@ -2100,14 +2127,11 @@
               topic="com.intellij.codeInsight.template.TemplateManagerListener"/>
     <listener class="com.intellij.ide.actionsOnSave.impl.ActionsOnSaveFileDocumentManagerListener"
               topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"/>
-    <listener class="com.intellij.codeInsight.multiverse.EditorFilterUpdater"
+    <listener class="com.intellij.codeInsight.multiverse.MultiverseEditorFilterUpdater"
               topic="com.intellij.codeInsight.multiverse.EditorContextManager$ChangeEventListener"/>
   </projectListeners>
 
   <xi:include href="/META-INF/RemoteDevUtil.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="intellij.platform.kernel.xml">
     <xi:fallback/>
   </xi:include>
   <xi:include href="intellij.platform.project.xml">

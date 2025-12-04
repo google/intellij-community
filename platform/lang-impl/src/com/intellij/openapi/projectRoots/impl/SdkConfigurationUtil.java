@@ -22,6 +22,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.DiskQueryRelay;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.eel.provider.EelProviderUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.Consumer;
 import com.intellij.util.NullableConsumer;
@@ -227,7 +228,7 @@ public final class SdkConfigurationUtil {
                                        @Nullable SdkAdditionalData additionalData,
                                        @Nullable String customSdkSuggestedName,
                                        @NotNull Supplier<? extends @NotNull ProjectJdkTable> projectJdkTableSupplier) {
-    return createSdk(allSdks, sdkType.sdkPath(homeDir), sdkType, additionalData, customSdkSuggestedName, projectJdkTableSupplier);
+    return createSdk(null, allSdks, sdkType.sdkPath(homeDir), sdkType, additionalData, customSdkSuggestedName, projectJdkTableSupplier);
   }
 
   public static @NotNull Sdk createSdk(@NotNull Collection<? extends Sdk> allSdks,
@@ -235,7 +236,7 @@ public final class SdkConfigurationUtil {
                                        @NotNull SdkType sdkType,
                                        @Nullable SdkAdditionalData additionalData,
                                        @Nullable String customSdkSuggestedName) {
-    return createSdk(allSdks, homePath, sdkType, additionalData, customSdkSuggestedName, () -> ProjectJdkTable.getInstance());
+    return createSdk(null, allSdks, homePath, sdkType, additionalData, customSdkSuggestedName, () -> ProjectJdkTable.getInstance());
   }
 
   @ApiStatus.Internal
@@ -245,10 +246,11 @@ public final class SdkConfigurationUtil {
                                        @NotNull SdkType sdkType,
                                        @Nullable SdkAdditionalData additionalData,
                                        @Nullable String customSdkSuggestedName) {
-    return createSdk(allSdks, homePath, sdkType, additionalData, customSdkSuggestedName, () -> ProjectJdkTable.getInstance(project));
+    return createSdk(project, allSdks, homePath, sdkType, additionalData, customSdkSuggestedName, () -> ProjectJdkTable.getInstance(project));
   }
 
-  private static @NotNull Sdk createSdk(@NotNull Collection<? extends Sdk> allSdks,
+  private static @NotNull Sdk createSdk(@Nullable Project project,
+                                        @NotNull Collection<? extends Sdk> allSdks,
                                         @NotNull String homePath,
                                         @NotNull SdkType sdkType,
                                         @Nullable SdkAdditionalData additionalData,
@@ -258,7 +260,7 @@ public final class SdkConfigurationUtil {
                            ? createUniqueSdkName(sdkType, homePath, allSdks)
                            : createUniqueSdkName(customSdkSuggestedName, allSdks);
 
-    Sdk sdk = projectJdkTableSupplier.get().createSdk(sdkName, sdkType);
+    Sdk sdk = SdkUtils.createSdkForEnvironment(projectJdkTableSupplier.get(), project, sdkName, sdkType, homePath);
     SdkModificator sdkModificator = sdk.getSdkModificator();
     if (additionalData != null) {
       // additional initialization.
@@ -457,6 +459,14 @@ public final class SdkConfigurationUtil {
     // The behaviour may also depend on the FileChooser implementations which does not reuse that code
     FileChooser.chooseFiles(descriptor, null, component, suggestedSdkRoot, chosen -> {
       final String chosenPath = chosen.get(0).getPath();
+      if (!EelProviderUtil.getEelDescriptor(Path.of(chosenPath)).equals(EelProviderUtil.getEelDescriptor(path))) {
+        Messages.showErrorDialog(
+          component,
+          ProjectBundle.message("sdk.configure.sdk.not.accessible.from.current.environment.error", sdkType.getPresentableName()),
+          ProjectBundle.message("sdk.configure.jdk.environment.mismatch.title", sdkType.getPresentableName())
+        );
+        return;
+      }
       final String adjustedPath = sdkType.adjustSelectedSdkHome(chosenPath);
       AtomicBoolean isAdjustedPathValid = new AtomicBoolean(false);
       ProgressManager.getInstance().runProcessWithProgressSynchronously(

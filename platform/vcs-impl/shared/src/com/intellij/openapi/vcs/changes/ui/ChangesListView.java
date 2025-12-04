@@ -13,6 +13,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.changes.*;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.ide.productMode.IdeProductMode;
 import com.intellij.platform.vcs.VcsSharedDataKeys;
 import com.intellij.platform.vcs.impl.shared.RdLocalChanges;
 import com.intellij.platform.vcs.impl.shared.actions.VcsTransferableDataKeys;
@@ -100,23 +101,9 @@ public abstract class ChangesListView extends ChangesTree implements DnDAware {
 
   @Override
   protected boolean isIncludable(@NotNull ChangesBrowserNode<?> node) {
-    if (isUnderResolvedConflicts(node)) return true;
+    if (VcsTreeModelDataExKt.isUnderTag(node, RESOLVED_CONFLICTS_NODE_TAG)) return true;
 
     return super.isIncludable(node);
-  }
-
-  private static boolean isUnderResolvedConflicts(@NotNull ChangesBrowserNode<?> node) {
-    ChangesBrowserNode<?> curNode = node;
-
-    while (curNode != null && !(node.getUserObject() instanceof LocalChangeList)
-           && curNode.getUserObject() != RESOLVED_CONFLICTS_NODE_TAG) {
-      curNode = curNode.getParent();
-      if (curNode != null && curNode.getUserObject() == RESOLVED_CONFLICTS_NODE_TAG) return true;
-    }
-
-    if (curNode == null) return false;
-
-    return curNode.getUserObject() == RESOLVED_CONFLICTS_NODE_TAG;
   }
 
   private static @Nullable ChangesBrowserNode<?> getSubtreeRoot(@NotNull ChangesBrowserNode<?> node) {
@@ -157,7 +144,7 @@ public abstract class ChangesListView extends ChangesTree implements DnDAware {
       .toList().toArray(ChangeList[]::new));
     JBIterable<FilePath> filePaths = VcsTreeModelData.mapToFilePath(VcsTreeModelData.selected(this));
     sink.set(VcsSharedDataKeys.FILE_PATHS, filePaths);
-    if (filePaths.isNotEmpty()) {
+    if (!IdeProductMode.isFrontend() && filePaths.isNotEmpty()) {
       sink.set(PlatformDataKeys.DELETE_ELEMENT_PROVIDER, new VirtualFileDeleteProvider());
     }
     sink.set(UNVERSIONED_FILE_PATHS_DATA_KEY, getSelectedUnversionedFiles());

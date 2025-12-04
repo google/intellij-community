@@ -1,12 +1,7 @@
 package com.jetbrains.lsp.implementation
 
-import com.jetbrains.lsp.protocol.LSP
-import com.jetbrains.lsp.protocol.LSP.ProgressNotificationType
-import com.jetbrains.lsp.protocol.RequestType
 import com.jetbrains.lsp.protocol.NotificationType
-import com.jetbrains.lsp.protocol.ProgressParams
-import com.jetbrains.lsp.protocol.WorkDoneProgress
-import com.jetbrains.lsp.protocol.WorkDoneProgressParams
+import com.jetbrains.lsp.protocol.RequestType
 import kotlinx.coroutines.CoroutineScope
 
 interface LspHandlers {
@@ -44,21 +39,6 @@ class LspHandlerContext(
 context(context: LspHandlerContext)
 val lspClient: LspClient get() = context.lspClient
 
-fun <P : WorkDoneProgress> LspClient.reportProgress(
-    params: WorkDoneProgressParams,
-    progress: P,
-) {
-    val token = params.workDoneToken ?: return
-    notify(ProgressNotificationType, ProgressParams(token, LSP.json.encodeToJsonElement(WorkDoneProgress.serializer(), progress)))
-}
-
-fun LspClient.reportProgressMessage(
-    params: WorkDoneProgressParams,
-    message: String,
-) {
-    val report = WorkDoneProgress.Report(message = message)
-    reportProgress(params, report)
-}
 
 
 class LspRequestHandler<Params, Result, Error>(

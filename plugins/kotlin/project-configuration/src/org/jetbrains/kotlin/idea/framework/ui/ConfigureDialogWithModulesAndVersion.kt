@@ -18,11 +18,12 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.net.HttpConfigurable
 import com.intellij.util.text.VersionComparatorUtil
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout.standaloneCompilerVersion
 import org.jetbrains.kotlin.idea.configuration.*
 import org.jetbrains.kotlin.idea.projectConfiguration.KotlinProjectConfigurationBundle.message
-import org.jetbrains.kotlin.idea.statistics.KotlinJ2KOnboardingFUSCollector
+import org.jetbrains.kotlin.idea.statistics.KotlinConfigurationFUSCollector
 import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
@@ -58,10 +59,10 @@ class ConfigureDialogWithModulesAndVersion(
     val modulesAndJvmTargets: Map<ModuleName, TargetJvm>
 
     init {
-        KotlinJ2KOnboardingFUSCollector.logShowConfigureKtWindow(project)
+        KotlinConfigurationFUSCollector.logShowConfigureKtWindow(project)
         title = message("configure.kotlin.title", configurator.presentableText)
         val compatibility = checkModuleJvmTargetCompatibility(
-            chooseModulePanel.modules, IdeKotlinVersion.get(DEFAULT_KOTLIN_VERSION)
+            chooseModulePanel.modules, defaultKotlinVersion
         )
         jvmModulesTargetingUnsupportedJvm = compatibility.modulesByIncompatibleJvmTarget
         modulesAndJvmTargets = compatibility.moduleJvmTargets
@@ -207,12 +208,17 @@ class ConfigureDialogWithModulesAndVersion(
     }
 
     companion object {
-
+        @JvmStatic
         private val LOG = Logger.getInstance(ConfigureDialogWithModulesAndVersion::class.java)
 
         private const val MODULES_TO_DISPLAY_SIZE = 2
 
         internal const val DEFAULT_KOTLIN_VERSION = "2.2.20"
+
+        @JvmStatic
+        val defaultKotlinVersion: IdeKotlinVersion
+            @ApiStatus.Internal
+            get() = IdeKotlinVersion.get(DEFAULT_KOTLIN_VERSION)
 
         @Throws(IOException::class)
         @JvmStatic

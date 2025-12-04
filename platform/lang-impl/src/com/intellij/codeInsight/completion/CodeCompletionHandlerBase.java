@@ -70,6 +70,9 @@ public class CodeCompletionHandlerBase {
    */
   public static final Key<Boolean> DIRECT_INSERTION = Key.create("CodeCompletionHandlerBase.directInsertion");
 
+  @ApiStatus.Internal
+  public static final Key<FinishCompletionInfo> ITEM_PATTERN_AND_PREFIX_LENGTH = Key.create("CodeCompletionHandlerBase.prefix-length");
+
   final @NotNull CompletionType completionType;
   final boolean invokedExplicitly;
   final boolean synchronous;
@@ -260,7 +263,12 @@ public class CodeCompletionHandlerBase {
     }
 
     LookupImpl lookup = (LookupImpl)LookupManager.getInstance(project).createLookup(editor, LookupElement.EMPTY_ARRAY, "",
-                                                                                    new LookupArranger.DefaultArranger());
+                                                                                    new LookupArranger.DefaultArranger() {
+                                                                                      @Override
+                                                                                      public boolean isCompletion() {
+                                                                                        return true;
+                                                                                      }
+                                                                                    });
     if (editor.isOneLineMode()) {
       lookup.setCancelOnClickOutside(true);
       lookup.setCancelOnOtherWindowOpen(true);
@@ -269,11 +277,10 @@ public class CodeCompletionHandlerBase {
     return lookup;
   }
 
-  @ApiStatus.Internal
-  protected void doComplete(@NotNull CompletionInitializationContextImpl initContext,
-                            boolean hasModifiers,
-                            boolean isValidContext,
-                            long startingTime) {
+  private void doComplete(@NotNull CompletionInitializationContextImpl initContext,
+                          boolean hasModifiers,
+                          boolean isValidContext,
+                          long startingTime) {
     Editor editor = initContext.getEditor();
     CompletionAssertions.checkEditorValid(editor);
 
@@ -310,7 +317,8 @@ public class CodeCompletionHandlerBase {
     scheduleContributorsAfterAsyncCommit(initContext, indicator, hasModifiers);
   }
 
-  private void scheduleContributorsAfterAsyncCommit(@NotNull CompletionInitializationContextImpl initContext,
+  @ApiStatus.Internal
+  protected void scheduleContributorsAfterAsyncCommit(@NotNull CompletionInitializationContextImpl initContext,
                                                     @NotNull CompletionProgressIndicator indicator,
                                                     boolean hasModifiers) {
     CompletionPhase phase;
@@ -345,7 +353,8 @@ public class CodeCompletionHandlerBase {
    * 2. It waits for them to be computed for the given timeout.
    * 3. If candidates are computed until timeout, the UI is updated immediately, otherwise computation continues and the phase is set to BgCalculation.
    */
-  private void trySynchronousCompletion(@NotNull CompletionInitializationContextImpl initContext,
+  @ApiStatus.Internal
+  protected void trySynchronousCompletion(@NotNull CompletionInitializationContextImpl initContext,
                                         boolean hasModifiers,
                                         long startingTime,
                                         @NotNull CompletionProgressIndicator indicator,
@@ -455,7 +464,7 @@ public class CodeCompletionHandlerBase {
     return AutoCompletionDecision.SHOW_LOOKUP;
   }
 
-  private static @Nullable AutoCompletionPolicy getAutocompletionPolicy(@NotNull LookupElement element) {
+  private static @NotNull AutoCompletionPolicy getAutocompletionPolicy(@NotNull LookupElement element) {
     return element.getAutoCompletionPolicy();
   }
 
@@ -705,7 +714,13 @@ public class CodeCompletionHandlerBase {
 
     WatchingInsertionContext context =
       CompletionUtil.createInsertionContext(lookupItems, item, completionChar, editor, psiFile, caretOffset, idEndOffset, offsetMap);
+
     int initialStartOffset = Math.max(0, caretOffset - item.getLookupString().length());
+    if (item instanceof CompletionItemLookupElement) {
+      // No additional special handling should be performed; 
+      // everything is already done inside LookupImpl::insertItem
+      return context;
+    }
     ApplicationManager.getApplication().runWriteAction(() -> {
       try {
         if (caretOffset < idEndOffset && completionChar == Lookup.REPLACE_SELECT_CHAR) {

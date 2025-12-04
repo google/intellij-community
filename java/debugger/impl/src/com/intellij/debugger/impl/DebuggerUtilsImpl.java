@@ -274,6 +274,7 @@ public final class DebuggerUtilsImpl extends DebuggerUtilsEx {
   }
 
   public static boolean instanceOf(@Nullable ReferenceType type, @NotNull ReferenceType superType) {
+    // Use the reference implementation if possible
     if (type instanceof ReferenceTypeImpl referenceTypeImpl) {
       return referenceTypeImpl.isAssignableTo(superType);
     }

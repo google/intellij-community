@@ -12,20 +12,17 @@ import com.jetbrains.python.PyBundle
 import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.PythonModuleTypeBase
 import com.jetbrains.python.errorProcessing.PyResult
-import com.jetbrains.python.icons.PythonIcons
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.sdk.impl.resolvePythonBinary
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
+import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.createSdk
 import com.jetbrains.python.sdk.getOrCreateAdditionalData
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.nio.file.Path
 import java.util.regex.Pattern
-import javax.swing.Icon
 import kotlin.io.path.pathString
 
-// TODO: Provide a special icon for poetry
-val POETRY_ICON: Icon = PythonIcons.Python.Origami
 
 @Internal
 fun suggestedSdkName(basePath: Path): @NlsSafe String = "Poetry (${PathUtil.getFileName(basePath.pathString)})"
@@ -40,20 +37,20 @@ suspend fun createNewPoetrySdk(
 ): PyResult<Sdk> {
   val pythonBinaryPath = setUpPoetry(moduleBasePath, basePythonBinaryPath, installPackages).getOr { return it }
 
-  return createPoetrySdk(moduleBasePath, existingSdks, pythonBinaryPath)
+  return createPoetrySdk(moduleBasePath, existingSdks, PathHolder.Eel(pythonBinaryPath))
 }
 
 @Internal
 suspend fun createPoetrySdk(
-  moduleBasePath: Path,
+  basePath: Path,
   existingSdks: List<Sdk>,
-  pythonBinaryPath: PythonBinary,
+  pythonBinaryPath: PathHolder.Eel,
 ): PyResult<Sdk> = createSdk(
   pythonBinaryPath = pythonBinaryPath,
   existingSdks = existingSdks,
-  associatedProjectPath = moduleBasePath.toString(),
-  suggestedSdkName = suggestedSdkName(moduleBasePath),
-  sdkAdditionalData = PyPoetrySdkAdditionalData(moduleBasePath)
+  associatedProjectPath = basePath.toString(),
+  suggestedSdkName = suggestedSdkName(basePath),
+  sdkAdditionalData = PyPoetrySdkAdditionalData(basePath)
 )
 
 internal val Sdk.isPoetry: Boolean
@@ -64,16 +61,6 @@ internal val Sdk.isPoetry: Boolean
 
     return getOrCreateAdditionalData() is PyPoetrySdkAdditionalData
   }
-
-internal fun sdkHomes(sdks: List<Sdk>): Set<String> {
-  return sdks.mapNotNull { it.homePath }.toSet()
-}
-
-internal fun allModules(project: Project?): List<Module> {
-  return project?.let {
-    ModuleUtil.getModulesOfType(it, PythonModuleTypeBase.getInstance())
-  }?.sortedBy { it.name } ?: emptyList()
-}
 
 private suspend fun setUpPoetry(moduleBasePath: Path, basePythonBinaryPath: PythonBinary?, installPackages: Boolean): PyResult<PythonBinary> {
   val init = PyProjectToml.findInRoot(moduleBasePath) == null

@@ -3,12 +3,16 @@
 package com.intellij.mcpserver
 
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.mcpserver.impl.util.network.McpServerConnectionAddressProvider
 import com.intellij.mcpserver.impl.util.network.findFirstFreePort
 import com.intellij.mcpserver.stdio.IJ_MCP_SERVER_PORT
 import com.intellij.mcpserver.stdio.IJ_MCP_SERVER_PROJECT_PATH
 import com.intellij.mcpserver.stdio.main
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.util.DebugAttachDetectorArgs
+import io.modelcontextprotocol.kotlin.sdk.client.SseClientTransport
+import io.modelcontextprotocol.kotlin.sdk.shared.AbstractTransport
 import kotlinx.serialization.json.*
 import java.io.File
 import kotlin.io.path.pathString
@@ -21,7 +25,7 @@ import kotlin.reflect.jvm.javaMethod
  * @return commandline to run MCP stdio transport process
  */
 fun createStdioMcpServerCommandLine(ideServerPort: Int, projectBasePath: String?, authToken: Pair<String, String>? = null): GeneralCommandLine {
-  val classpaths = McpStdioRunnerClasspath.CLASSPATH_CLASSES.map {
+  val classpaths = getClassPathClasses().map {
     (PathManager.getJarForClass(it) ?: error("No path for class $it")).pathString
   }.toSet()
 
@@ -38,6 +42,13 @@ fun createStdioMcpServerCommandLine(ideServerPort: Int, projectBasePath: String?
   if (projectBasePath != null) commandLine.withEnvironment(IJ_MCP_SERVER_PROJECT_PATH, projectBasePath)
   if (authToken != null) commandLine.withEnvironment(authToken.first, authToken.second)
   return commandLine
+}
+
+private fun getClassPathClasses(): Collection<Class<*>> {
+  if (ApplicationManager.getApplication().isUnitTestMode) {
+    return McpStdioRunnerClasspath.CLASSPATH_CLASSES + listOf(AbstractTransport::class.java, SseClientTransport::class.java)
+  }
+  return McpStdioRunnerClasspath.CLASSPATH_CLASSES
 }
 
 /**
@@ -89,12 +100,37 @@ fun createStdioServerJsonEntry(cmd: GeneralCommandLine): JsonObject {
  * ```
  */
 fun createSseServerJsonEntry(port: Int, projectBasePath: String?, authToken: Pair<String, String>? = null): JsonObject {
+  val provider = McpServerConnectionAddressProvider.getInstanceOrNull()
+  val url = provider?.httpUrl("/sse", portOverride = port) ?: "http://localhost:$port/sse"
+  return buildTransportJson(
+    type = "sse",
+    url = url,
+    projectBasePath = projectBasePath,
+    authToken = authToken,
+  )
+}
+fun createStreamableServerJsonEntry(port: Int, projectBasePath: String?, authToken: Pair<String, String>? = null): JsonObject {
+  val provider = McpServerConnectionAddressProvider.getInstanceOrNull()
+  val url = provider?.httpUrl("/stream", portOverride = port) ?: "http://localhost:$port/stream"
+  return buildTransportJson(
+    type = "streamable-http",
+    url = url,
+    projectBasePath = projectBasePath,
+    authToken = authToken,
+  )
+}
+
+private fun buildTransportJson(type: String, url: String, projectBasePath: String?, authToken: Pair<String, String>?): JsonObject {
   return buildJsonObject {
-    put("type", "sse")
-    put("url", "http://localhost:$port/sse")
+    put("type", type)
+    put("url", url)
     put("headers", buildJsonObject {
-      put(IJ_MCP_SERVER_PROJECT_PATH, projectBasePath)
-      if (authToken != null) put(authToken.first, authToken.second)
+      if (projectBasePath != null) {
+        put(IJ_MCP_SERVER_PROJECT_PATH, projectBasePath)
+      }
+      if (authToken != null) {
+        put(authToken.first, authToken.second)
+      }
     })
   }
 }

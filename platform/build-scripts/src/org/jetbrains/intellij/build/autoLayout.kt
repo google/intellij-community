@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
+import com.intellij.openapi.util.JDOMUtil
 import com.intellij.util.xml.dom.readXmlAsModel
-import io.opentelemetry.api.trace.Span
+import org.jetbrains.intellij.build.impl.BUILT_IN_HELP_MODULE_NAME
 import org.jetbrains.intellij.build.impl.JarPackager
 import org.jetbrains.intellij.build.impl.ModuleItem
 import org.jetbrains.intellij.build.impl.PlatformLayout
 import org.jetbrains.intellij.build.impl.PluginLayout
-import org.jetbrains.intellij.build.impl.findFileInModuleSources
+import org.jetbrains.intellij.build.impl.ScopedCachedDescriptorContainer
+import org.jetbrains.intellij.build.impl.contentModuleNameToDescriptorFileName
 
 private const val VERIFIER_MODULE = "intellij.platform.commercial.verifier"
 
@@ -33,7 +35,7 @@ internal suspend fun inferModuleSources(
     }
 
     val moduleItem = ModuleItem(moduleName = name, relativeOutputFile = getDefaultJarName(layout, name, frontendModuleFilter), reason = "<- ${layout.mainModule}")
-    if (isIncludedIntoAnotherPlugin(platformLayout = platformLayout, moduleItem = moduleItem, context = context, layout = layout, moduleName = name)) {
+    if (isIncludedIntoAnotherPlugin(platformLayout = platformLayout, moduleItem = moduleItem, layout = layout, moduleName = name, context = context)) {
       continue
     }
 
@@ -61,43 +63,76 @@ internal suspend fun inferModuleSources(
 internal suspend fun computeModuleSourcesByContent(
   helper: JarPackagerDependencyHelper,
   context: BuildContext,
-  layout: PluginLayout,
+  pluginLayout: PluginLayout,
   addedModules: MutableSet<String>,
   jarPackager: JarPackager,
   searchableOptionSet: SearchableOptionSetDescriptor?,
-  modulesWithCustomPath: HashSet<String>
+  modulesWithCustomPath: HashSet<String>,
+  pluginCachedDescriptorContainer: ScopedCachedDescriptorContainer,
 ) {
-  val frontendModuleFilter = context.getFrontendModuleFilter()
-  val contentModuleFilter = context.getContentModuleFilter()
-  for ((moduleName, loadingRule) in helper.readPluginContentFromDescriptor(context.findRequiredModule(layout.mainModule), jarPackager.moduleOutputPatcher)) {
-    if (helper.isOptionalLoadingRule(loadingRule) && !contentModuleFilter.isOptionalModuleIncluded(moduleName, pluginMainModuleName = layout.mainModule)) {
-      Span.current().addEvent("Module '$moduleName' is excluded from plugin '${layout.mainModule}' by $contentModuleFilter")
-      continue
-    }
+  // plugin patcher must be executed before
+  val cachedFileData = pluginCachedDescriptorContainer.getCachedFileData(PLUGIN_XML_RELATIVE_PATH)
+  // quick fix of clion installer - not clear yet why a proper fix didn't help
+  if (cachedFileData == null && pluginLayout.mainModule == BUILT_IN_HELP_MODULE_NAME) {
+    return
+  }
 
+  val element = requireNotNull(cachedFileData) {
+    "Plugin descriptor '$PLUGIN_XML_RELATIVE_PATH' is not found in cached descriptor container, " +
+    "plugin patcher must be executed before (pluginMainModule=${pluginLayout.mainModule}, pluginCachedDescriptorContainer=$pluginCachedDescriptorContainer)"
+  }.let { JDOMUtil.load(it) }
+
+  val pluginContent = sequence {
+    for (content in element.getChildren("content")) {
+      for (module in content.getChildren("module")) {
+        val moduleName = module.getAttributeValue("name")?.takeIf { !it.contains('/') } ?: continue
+        val loadingRuleString = module.getAttributeValue("loading")
+        yield(moduleName to loadingRuleString)
+      }
+    }
+  }
+
+  val frontendModuleFilter = context.getFrontendModuleFilter()
+  val descriptorCacheWriter = pluginCachedDescriptorContainer.write()
+  for ((moduleName, loadingRule) in pluginContent) {
     if (!addedModules.add(moduleName)) {
       continue
     }
 
-    val module = context.findRequiredModule(moduleName)
-    val descriptor = readXmlAsModel(findFileInModuleSources(module, "$moduleName.xml") ?: error("$moduleName.xml not found in module $moduleName sources"))
-    val useSeparateJar = (descriptor.getAttributeValue("package") == null || 
-                          helper.isPluginModulePackedIntoSeparateJar(module, layout, frontendModuleFilter)) && loadingRule != "embedded"
+    val useSeparateJar: Boolean
+    if (loadingRule == "embedded") {
+      useSeparateJar = false
+    }
+    else {
+      val module = context.findRequiredModule(moduleName)
+      val descriptorFileName = contentModuleNameToDescriptorFileName(moduleName)
+      var descriptorData = pluginCachedDescriptorContainer.getCachedFileData(descriptorFileName)
+      if (descriptorData == null) {
+        descriptorData = requireNotNull(findUnprocessedDescriptorContent(module = module, path = descriptorFileName, context = context)) {
+          "$descriptorFileName not found in module $moduleName"
+        }
+        descriptorCacheWriter.put(descriptorFileName, descriptorData)
+      }
+      val descriptor = readXmlAsModel(descriptorData)
+      useSeparateJar = (descriptor.getAttributeValue("package") == null || helper.isPluginModulePackedIntoSeparateJar(module, pluginLayout, frontendModuleFilter))
+    }
     if (!useSeparateJar && modulesWithCustomPath.contains(moduleName)) {
       addedModules.remove(moduleName)
       continue
     }
+
     jarPackager.computeSourcesForModule(
       item = ModuleItem(
         moduleName = moduleName,
         // relative path with `/` is always packed by dev-mode, so we don't need to fix resolving for now and can improve it later
-        relativeOutputFile = if (useSeparateJar) "modules/$moduleName.jar" else getDefaultJarName(layout, moduleName, frontendModuleFilter),
-        reason = "<- ${layout.mainModule} (plugin content)",
+        relativeOutputFile = if (useSeparateJar) "modules/$moduleName.jar" else getDefaultJarName(pluginLayout, moduleName, frontendModuleFilter),
+        reason = "<- ${pluginLayout.mainModule} (plugin content)",
       ),
-      layout = layout,
+      layout = pluginLayout,
       searchableOptionSet = searchableOptionSet,
     )
   }
+  descriptorCacheWriter.apply()
 }
 
 private fun getDefaultJarName(layout: PluginLayout, moduleName: String, frontendModuleFilter: FrontendModuleFilter): String {
@@ -109,13 +144,13 @@ private fun getDefaultJarName(layout: PluginLayout, moduleName: String, frontend
   }
 }
 
-private fun isIncludedIntoAnotherPlugin(platformLayout: PlatformLayout, moduleItem: ModuleItem, context: BuildContext, layout: PluginLayout, moduleName: String): Boolean {
-  if (moduleName == VERIFIER_MODULE) {
-    return false
+private fun isIncludedIntoAnotherPlugin(platformLayout: PlatformLayout, moduleItem: ModuleItem, layout: PluginLayout, moduleName: String, context: BuildContext): Boolean {
+  return when {
+    moduleName == VERIFIER_MODULE -> false
+    platformLayout.includedModules.contains(moduleItem) -> true
+    platformLayout.includedModules.any { it.moduleName == moduleName } -> true
+    else -> context.productProperties.productLayout.pluginLayouts.any { otherPluginLayout ->
+      otherPluginLayout !== layout && otherPluginLayout.includedModules.any { it.moduleName == moduleName }
+    }
   }
-
-  return platformLayout.includedModules.contains(moduleItem) ||
-         context.productProperties.productLayout.pluginLayouts.any { otherPluginLayout ->
-           otherPluginLayout !== layout && otherPluginLayout.includedModules.any { it.moduleName == moduleName }
-         }
 }

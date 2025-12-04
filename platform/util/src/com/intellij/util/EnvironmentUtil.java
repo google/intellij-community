@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util;
 
+import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.system.OS;
@@ -111,7 +112,8 @@ public final class EnvironmentUtil {
     ourEnvGetter.set(loader);
   }
 
-  private static Map<String, String> getSystemEnv() {
+  @ApiStatus.Internal
+  public static Map<String, String> getSystemEnv() {
     if (OS.CURRENT == OS.Windows) {
       return Collections.unmodifiableMap(CollectionFactory.createCaseInsensitiveStringMap(System.getenv()));
     }
@@ -220,7 +222,10 @@ public final class EnvironmentUtil {
   private static final Pattern pattern = Pattern.compile("\\$(.*?)\\$");
 
   public static void inlineParentOccurrences(@NotNull Map<String, String> envs, @NotNull Map<String, String> parentEnv) {
-    LinkedHashMap<String, String> lookup = new LinkedHashMap<>(envs);
+    // On Windows, names of environment variables are case-insensitive. On UNIX, names are case-sensitive.
+    Comparator<String> keyComparator = SystemInfoRt.isWindows ? String.CASE_INSENSITIVE_ORDER : Comparator.naturalOrder();
+    Map<String, String> lookup = new TreeMap<>(keyComparator);
+    lookup.putAll(envs);
     lookup.putAll(parentEnv);
     for (Map.Entry<String, String> entry : envs.entrySet()) {
       String key = entry.getKey();

@@ -7,9 +7,12 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.execution.wsl.WSLCommandLineOptions
 import com.intellij.execution.wsl.WSLDistribution
+import com.intellij.ide.impl.ProjectUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.util.io.toNioPathOrNull
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelPlatform
@@ -68,6 +71,7 @@ sealed class GitExecutable {
   abstract val id: String
   abstract val exePath: String
   abstract val isLocal: Boolean
+  open val isRemote: Boolean get() = !isLocal
 
   /**
    * Convert an absolute file path into a form that can be passed into executable arguments.
@@ -159,6 +163,9 @@ sealed class GitExecutable {
     override fun getLocaleEnv(): Map<String, String> = VcsLocaleHelper.getDefaultLocaleEnvironmentVars("git")
   }
 
+  /**
+   * Ideally, can represent any git executable, either local or remote. Actual instantiation depends on the feature flags enabled.
+   */
   data class Eel(override val exePath: @NonNls String, val eel: EelApi) : GitExecutable() {
     private val delegate = Local(exePath)
 
@@ -186,7 +193,7 @@ sealed class GitExecutable {
     }
 
     override fun createBundledCommandLine(project: Project, vararg command: String): GeneralCommandLine {
-      return delegate.doCreateBundledCommandLine(project, eel.platform is EelPlatform.Windows, *command)
+      return delegate.doCreateBundledCommandLine(project, eel.platform is EelPlatform.Windows, *command).withWorkingDirectory(project.basePath?.let { Path(it) })
     }
 
     override fun getLocaleEnv(): Map<@NonNls String, @NonNls String> {
@@ -194,6 +201,10 @@ sealed class GitExecutable {
     }
   }
 
+  /**
+   * Legacy option of handling wsl git.
+   * Now [Eel] is used for representing wsl git (as well as git inside docker and any other non-demdev remote git).
+   */
   data class Wsl(
     override val exePath: String,
     val distribution: WSLDistribution,
@@ -297,6 +308,7 @@ sealed class GitExecutable {
 
   data class Unknown(override val id: String, override val exePath: String, val errorMessage: @Nls String) : GitExecutable() {
     override val isLocal: Boolean = false
+    override val isRemote: Boolean = false
     override fun toString(): String = "$id: $exePath"
 
     override fun getModificationTime(): Long {

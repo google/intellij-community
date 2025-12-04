@@ -17,6 +17,7 @@ import com.intellij.vcs.rpc.ProjectScopeRpcHelper.projectScoped
 import com.intellij.vcs.rpc.ProjectScopeRpcHelper.projectScopedCallbackFlow
 import git4idea.branch.GitRefType
 import git4idea.repo.GitRepository
+import git4idea.repo.GitRepositoryIdCache
 import git4idea.repo.GitRepositoryManager
 import git4idea.ui.branch.GitBranchManager
 import kotlinx.coroutines.channels.SendChannel
@@ -61,7 +62,7 @@ class GitRepositoryApiImpl : GitRepositoryApi {
   ): Unit = projectScoped(projectId) { project ->
     requireOwner()
 
-    val resolvedRepositories = resolveRepositories(project, repositories)
+    val resolvedRepositories = GitRepositoryIdCache.getInstance(project).resolveAll(repositories)
 
     val refType = GitRefType.of(reference)
     val branchManager = project.service<GitBranchManager>()
@@ -106,15 +107,7 @@ class GitRepositoryApiImpl : GitRepositoryApi {
     }
 
     override fun tagsLoaded(repository: GitRepository) {
-      if (repository.isDisposed) return
-
-      // Even though getInfo is annotated with @NotNull, a value can still be missing during the initialization stage.
-      // At the same time, tags can be loaded at any point
-      @Suppress("SENSELESS_COMPARISON")
-      if (repository.info == null) {
-        LOG.debug("Tags were loaded while repo is not fully initialized. Skip")
-        return
-      }
+      if (!isRepositoryValid(repository)) return
 
       LOG.debug("Tags were loaded for ${repository.root}. Updating tags state")
 
@@ -122,9 +115,32 @@ class GitRepositoryApiImpl : GitRepositoryApi {
       channel.trySend(GitRepositoryEvent.TagsLoaded(repository.rpcId, tagsState))
     }
 
+    private fun isRepositoryValid(repository: GitRepository): Boolean {
+      if (repository.isDisposed) return false
+
+      // Even though getInfo is annotated with @NotNull, a value can still be missing during the initialization stage.
+      // At the same time, tags can be loaded at any point
+      @Suppress("SENSELESS_COMPARISON")
+      if (repository.info == null) {
+        LOG.debug("Repo is not fully initialized. Skip using it")
+        return false
+      }
+
+      return true
+    }
+
     override fun tagsHidden() {
       LOG.debug("Tags were hidden")
       channel.trySend(GitRepositoryEvent.TagsHidden)
+    }
+
+    override fun workingTreesLoaded(repository: GitRepository) {
+      if (!isRepositoryValid(repository)) return
+
+      LOG.debug("Working trees were loaded for ${repository.root}. Updating working trees state")
+
+      val workingTrees = repository.workingTreeHolder.getWorkingTrees()
+      channel.trySend(GitRepositoryEvent.WorkingTreesLoaded(repository.rpcId, workingTrees))
     }
 
     override fun favoriteRefsUpdated(repository: GitRepository?) {
@@ -167,20 +183,5 @@ class GitRepositoryApiImpl : GitRepositoryApi {
     val LOG = Logger.getInstance(GitRepositoryApiImpl::class.java)
 
     private fun getAllRepositories(project: Project): List<GitRepository> = GitRepositoryManager.getInstance(project).repositories
-
-    private fun resolveRepositories(project: Project, repositoryIds: List<RepositoryId>): List<GitRepository> {
-      val repositories = GitRepositoryManager.getInstance(project).repositories.associateBy { it.rpcId }
-
-      val notFound = mutableListOf<RepositoryId>()
-      val resolved = repositoryIds.mapNotNull {
-        val resolved = repositories[it]
-        if (resolved == null) notFound.add(it)
-        resolved
-      }
-
-      assert(notFound.isEmpty()) { "Not found repositories: $notFound" }
-
-      return resolved
-    }
   }
 }

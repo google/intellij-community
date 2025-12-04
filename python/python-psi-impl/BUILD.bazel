@@ -28,7 +28,7 @@ jvm_library(
     "//python/openapi:community",
     "//libraries/jsoup",
     "//platform/indexing-impl",
-    "@lib//:stream_ex",
+    "//libraries/stream",
     "//platform/projectModel-impl",
     "//platform/analysis-impl",
     "//platform/service-container",
@@ -51,6 +51,7 @@ jvm_library(
     "//python/python-syntax-core:syntax-core",
     "//python/impl.helperLocator:community-helpersLocator",
     "//libraries/hash4j",
+    "//python/python-sdk:sdk",
   ],
   exports = ["//python/python-syntax-core:syntax-core"]
 )

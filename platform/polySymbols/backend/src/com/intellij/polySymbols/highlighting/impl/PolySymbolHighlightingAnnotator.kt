@@ -45,6 +45,7 @@ import com.intellij.polySymbols.utils.nameSegments
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.startOffset
 import com.intellij.util.SmartList
 import com.intellij.util.containers.MultiMap
 import org.jetbrains.annotations.PropertyKey
@@ -52,7 +53,7 @@ import java.util.*
 
 private val INSPECTION_TOOL_INFO_CACHE = Key.create<MutableMap<String, InspectionToolInfo>>("polySymbols.inspectionTools")
 
-class PolySymbolHighlightingAnnotator : Annotator {
+private class PolySymbolHighlightingAnnotator : Annotator {
 
   private val symbolReferencesProvider = PsiPolySymbolReferenceProviderImpl()
 
@@ -72,7 +73,7 @@ class PolySymbolHighlightingAnnotator : Annotator {
         multiMap.putValue(declaration.rangeInDeclaringElement.startOffset, declaration.symbol)
       }
 
-      val elementOffset = element.textOffset
+      val elementOffset = element.startOffset
       multiMap.entrySet().forEach { (offset, symbols) ->
         highlightSymbols(elementOffset + offset, symbols, element, holder)
       }

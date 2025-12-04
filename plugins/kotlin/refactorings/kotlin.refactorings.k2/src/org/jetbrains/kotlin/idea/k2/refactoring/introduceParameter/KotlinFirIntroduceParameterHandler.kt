@@ -97,7 +97,7 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
             object : KtTreeVisitorVoid() {
                 override fun visitThisExpression(expression: KtThisExpression) {
                     super.visitThisExpression(expression)
-                    if (receiverTypeRef != null && expression.instanceReference.mainReference.resolve() == targetParent) {
+                    if (receiverTypeRef != null && expression.instanceReference.mainReference.resolve() == receiverTypeRef) {
                         usages.putValue(receiverTypeRef, expression)
                     }
                 }
@@ -198,7 +198,7 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
 
         var message: @Nls String? = null
         var suggestedNames: List<String> = listOf()
-        val descriptorToType = analyzeInModalWindow(targetParent, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
+        val descriptorToType = analyzeInModalWindow(physicalExpression, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
             val expressionType = expressionTypeEvaluator.invoke(this)
             message = if (expressionType == null) {
                 KotlinBundle.message("error.text.expression.has.no.type")

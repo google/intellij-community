@@ -89,15 +89,20 @@ public final class PluginInstaller {
     if (pluginDescriptor.isBundled()) {
       throw new IllegalArgumentException("Plugin is bundled: " + pluginDescriptor.getPluginId());
     }
+    LOG.debug("Scheduling uninstallation of plugin " + pluginDescriptor + " after restart");
     // Make sure this method does not interfere with installAfterRestart by adding the DeleteCommand to the beginning of the script.
     // This way plugin installation always takes place after plugin uninstallation.
-    addActionCommandsToBeginning(List.of(new DeleteCommand(pluginDescriptor.getPluginPath())));
+    if (pluginDescriptor.getPluginId().equals(PluginManagerCore.MARKETPLACE_PLUGIN_ID)) {
+      setMarketplacePluginUpdateActionScript(List.of(new DeleteCommand(pluginDescriptor.getPluginPath())));
+    } else {
+      addActionCommandsToBeginning(List.of(new DeleteCommand(pluginDescriptor.getPluginPath())));
+    }
   }
 
   @ApiStatus.Internal
   public static boolean unloadDynamicPlugin(
     @Nullable JComponent parentComponent,
-    @NotNull IdeaPluginDescriptorImpl pluginDescriptor,
+    @NotNull PluginMainDescriptor pluginDescriptor,
     boolean isUpdate
   ) {
     var options = new DynamicPlugins.UnloadPluginOptions().withDisable(false).withWaitForClassloaderUnload(true).withUpdate(isUpdate);
@@ -109,7 +114,7 @@ public final class PluginInstaller {
   @ApiStatus.Internal
   public static boolean uninstallDynamicPlugin(
     @Nullable JComponent parentComponent,
-    @NotNull IdeaPluginDescriptorImpl pluginDescriptor,
+    @NotNull PluginMainDescriptor pluginDescriptor,
     boolean isUpdate
   ) {
     if (pluginDescriptor.isBundled()) {
@@ -119,6 +124,7 @@ public final class PluginInstaller {
     var uninstalledWithoutRestart = !pluginDescriptor.isEnabled() || unloadDynamicPlugin(parentComponent, pluginDescriptor, isUpdate);
     if (uninstalledWithoutRestart) {
       try {
+        LOG.debug("Deleting dynamic plugin from disk: " + pluginDescriptor.getPluginPath());
         NioFiles.deleteRecursively(pluginDescriptor.getPluginPath());
       }
       catch (IOException e) {
@@ -154,6 +160,7 @@ public final class PluginInstaller {
     @Nullable Path existingPlugin,
     boolean deleteSourceFile
   ) throws IOException {
+    LOG.debug("Scheduling installation of plugin " + descriptor + " after restart");
     var commands = new ArrayList<ActionCommand>();
 
     if (existingPlugin != null) {
@@ -174,7 +181,11 @@ public final class PluginInstaller {
       commands.add(new DeleteCommand(sourceFile));
     }
 
-    addActionCommands(commands);
+    if (descriptor.getPluginId().equals(PluginManagerCore.MARKETPLACE_PLUGIN_ID)) {
+      setMarketplacePluginUpdateActionScript(commands);
+    } else {
+      addActionCommands(commands);
+    }
 
     PluginStateManager.fireState(descriptor, true);
   }
@@ -201,6 +212,7 @@ public final class PluginInstaller {
   }
 
   public static @NotNull Path unpackPlugin(@NotNull Path sourceFile, @NotNull Path targetPath) throws IOException {
+    LOG.debug("Unpacking " + sourceFile + " to " + targetPath);
     Path target;
     if (sourceFile.getFileName().toString().endsWith(".jar")) {
       target = targetPath.resolve(sourceFile.getFileName().toString());

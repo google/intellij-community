@@ -1,11 +1,14 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.command.impl
 
-import com.intellij.openapi.command.UndoConfirmationPolicy
+import com.intellij.ide.impl.UndoRemoteBehaviorService
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.command.undo.DocumentReference
 import com.intellij.openapi.command.undo.UndoableAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.NlsContexts.Command
 import org.jetbrains.annotations.ApiStatus
 
 /**
@@ -15,41 +18,30 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Internal
 interface UndoSpy {
 
-  fun commandStarted(
-    project: Project?,
-    undoConfirmationPolicy: UndoConfirmationPolicy,
-  )
+  fun commandBeforeStarted(undoProject: Project?, editor: FileEditor?, originator: DocumentReference?)
 
-  fun undoableActionAdded(
-    project: Project?,
-    action: UndoableAction,
-    type: UndoableActionType,
-  )
+  fun commandStarted(cmdEvent: CmdEvent)
 
-  fun commandFinished(
-    project: Project?,
-    commandName: @Command String?,
-    commandGroupId: Any?,
-    isTransparent: Boolean,
-  )
+  fun undoableActionAdded(undoProject: Project?, action: UndoableAction, type: UndoableActionType)
 
-  fun undoRedoPerformed(
-    project: Project?,
-    editor: FileEditor?,
-    isUndo: Boolean,
-  )
+  fun commandFinished(cmdEvent: CmdEvent)
+
+  fun undoRedoPerformed(project: Project?, editor: FileEditor?, isUndo: Boolean)
 
   // TODO: sync FE commands instead of flush
   fun commandMergerFlushed(project: Project?)
 
   companion object {
-    @JvmField
-    val BLIND: UndoSpy = object : UndoSpy {
-      override fun commandStarted(project: Project?, undoConfirmationPolicy: UndoConfirmationPolicy) {}
-      override fun undoableActionAdded(project: Project?, action: UndoableAction, type: UndoableActionType) {}
-      override fun commandFinished(project: Project?, commandName: @Command String?, commandGroupId: Any?, isTransparent: Boolean) {}
-      override fun undoRedoPerformed(project: Project?, editor: FileEditor?, isUndo: Boolean) {}
-      override fun commandMergerFlushed(project: Project?) {}
+    @JvmStatic
+    fun getInstance(): UndoSpy? {
+      return ProgressManager.getInstance().computeInNonCancelableSection<UndoSpy?, Exception> {
+        if (UndoRemoteBehaviorService.isSpeculativeUndoEnabled()) {
+          val application = ApplicationManager.getApplication()
+          application?.service<UndoSpy>()
+        } else {
+          null
+        }
+      }
     }
   }
 }

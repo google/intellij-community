@@ -14,10 +14,11 @@ import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.exists
 
 internal const val BUILT_IN_HELP_MODULE_NAME = "intellij.builtInHelp"
 
-internal fun buildHelpPlugin(pluginVersion: String, context: BuildContext): PluginLayout? {
+internal fun buildHelpPlugin(pluginVersion: String, context: BuildContext): Pair<PluginLayout, String>? {
   val productName = context.applicationInfo.fullProductName
   val resourceRoot = context.paths.projectHome.resolve("help/plugin-resources")
   if (Files.notExists(resourceRoot.resolve("topics/app.js"))) {
@@ -25,16 +26,17 @@ internal fun buildHelpPlugin(pluginVersion: String, context: BuildContext): Plug
     return null
   }
 
+  val pluginXml = pluginXml(pluginVersion, context)
   return PluginLayout.pluginAutoWithCustomDirName(BUILT_IN_HELP_MODULE_NAME) { spec ->
     val productLowerCase = productName.replace(' ', '-').lowercase()
     spec.mainJarName = "$productLowerCase-help.jar"
     spec.directoryName = "${productName.replace(" ", "")}Help"
     spec.excludeFromModule(BUILT_IN_HELP_MODULE_NAME, "com/jetbrains/builtInHelp/indexer/**")
-    spec.withPatch { patcher, buildContext ->
+    spec.withPatch { patcher, _ ->
       patcher.patchModuleOutput(
         moduleName = BUILT_IN_HELP_MODULE_NAME,
         path = "META-INF/plugin.xml",
-        content = pluginXml(buildContext, pluginVersion),
+        content = pluginXml,
         overwrite = PatchOverwriteMode.TRUE
       )
     }
@@ -48,11 +50,11 @@ internal fun buildHelpPlugin(pluginVersion: String, context: BuildContext): Plug
         context = context,
       )
     }
-  }
+  } to pluginXml
 }
 
-private fun pluginXml(buildContext: BuildContext, version: String): String {
-  val productName = buildContext.applicationInfo.fullProductName
+private fun pluginXml(version: String, context: BuildContext): String {
+  val productName = context.applicationInfo.fullProductName
   val productLowerCase = productName.replace(" ", "-").lowercase()
   val pluginId = "bundled-$productLowerCase-help"
   val pluginName = "$productName Help"
@@ -88,25 +90,63 @@ private fun pluginXml(buildContext: BuildContext, version: String): String {
  */
 private val helpIndexerMutex = Mutex()
 
-private suspend fun buildResourcesForHelpPlugin(resourceRoot: Path, classPath: List<String>, assetJar: Path, context: CompilationContext) {
+
+/*  Offline help plugins include a separate set of help topics for each of the supported languages.
+This is a map of language code to descriptors that define resources associated with that language.
+ */
+
+private data class LanguageResourcesDescriptor(
+  val isRequired: Boolean = false,
+  val resPath: String,
+  val resList: List<String> = listOf("topics", "images", "search"),
+)
+
+private val supportedLanguages = mapOf(
+  //Localized resources don't include images
+  Pair("zh-cn", LanguageResourcesDescriptor(resPath = "zh-cn/", resList = listOf("topics", "search"))),
+  Pair("en-us", LanguageResourcesDescriptor(isRequired = true, resPath = ""))
+)
+
+private suspend fun buildResourcesForHelpPlugin(resourceRoot: Path, classPath: Collection<Path>, assetJar: Path, context: CompilationContext) {
   spanBuilder("index help topics").use {
     helpIndexerMutex.withLock {
-      runJavaForIntellijModule(
-        context = context, mainClass = "com.jetbrains.builtInHelp.indexer.HelpIndexer",
-        args = listOf(
-          resourceRoot.resolve("search").toString(),
-          resourceRoot.resolve("topics").toString(),
-        ),
-        jvmArgs = emptyList(),
-        classPath = classPath,
-      )
+      supportedLanguages.forEach { (lang, descriptor) ->
+        val topicPath = resourceRoot.resolve("${descriptor.resPath}topics")
+        if (topicPath.exists())
+          runJavaForIntellijModule(
+            context = context, mainClass = "com.jetbrains.builtInHelp.indexer.HelpIndexer",
+            args = listOf(
+              resourceRoot.resolve("${descriptor.resPath}search").toString(),
+              topicPath.toString(),
+            ),
+            jvmArgs = emptyList(),
+            classPath = classPath.map { it.toString() },
+          )
+        else {
+          Span.current().addEvent("skip \"${lang}\" for offline help plugin because it was not supplied. ")
+        }
+      }
     }
+
     writeNewZipWithoutIndex(file = assetJar, compress = true) { zipCreator ->
       val archiver = ZipArchiver()
       archiver.setRootDir(resourceRoot)
-      archiveDir(startDir = resourceRoot.resolve("topics"), addFile = { archiver.addFile(it, zipCreator) })
-      archiveDir(startDir = resourceRoot.resolve("images"), addFile = { archiver.addFile(it, zipCreator) })
-      archiveDir(startDir = resourceRoot.resolve("search"), addFile = { archiver.addFile(it, zipCreator) })
+
+      supportedLanguages.forEach { (lang, descriptor) ->
+        val langRootDir = resourceRoot.resolve(descriptor.resPath)
+        if (langRootDir.exists()) {
+          Span.current().addEvent("adding \"${lang}\" to the resulting ZIP.")
+          descriptor.resList.forEach { resDir ->
+            archiveDir(
+              startDir = langRootDir.resolve(resDir),
+              addFile = { archiver.addFile(it, zipCreator) })
+          }
+        }
+        else
+          Span.current().addEvent("skip adding \"${lang}\" to the resulting ZIP because it was not supplied.")
+      }
     }
   }
 }
+
+

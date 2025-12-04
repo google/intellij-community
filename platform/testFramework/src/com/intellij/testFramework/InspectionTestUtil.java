@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework;
 
 import com.intellij.analysis.AnalysisScope;
@@ -169,12 +169,12 @@ public final class InspectionTestUtil {
     final HighlightDisplayKey key = HighlightDisplayKey.find(shortName);
     if (key == null){
       Computable.PredefinedValueComputable<String> displayName = new Computable.PredefinedValueComputable<>(toolWrapper.getDisplayName());
-      HighlightDisplayKey.register(shortName, displayName, toolWrapper.getID());
+      HighlightDisplayKey.register(shortName, displayName, toolWrapper.getID(), null, toolWrapper);
     }
 
     globalContext.doInspections(scope);
     do {
-      UIUtil.dispatchAllInvocationEvents();
+      PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
     }
     while (!globalContext.isFinished());
   }

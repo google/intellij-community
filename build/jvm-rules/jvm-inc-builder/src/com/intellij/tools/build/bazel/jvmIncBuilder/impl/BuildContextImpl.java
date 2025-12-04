@@ -29,6 +29,7 @@ public class BuildContextImpl implements BuildContext {
   private final Appendable myMessageSink;
   private final @NotNull Path myOutJar;
   private final @Nullable Path myAbiJar;
+  private final @Nullable Path myKotlinCriStoragePath;
   private final Path myDataDir;
 
   private final @NotNull NodeSourceSnapshot mySources;
@@ -37,7 +38,7 @@ public class BuildContextImpl implements BuildContext {
   private final boolean myIsRebuild;
   private final BuilderOptions myBuilderOptions;
 
-  private volatile boolean myHasErrors;
+  private final List<Message> myErrors = new ArrayList<>();
 
   public BuildContextImpl(Path baseDir, Iterable<Input> inputs, Map<CLFlags, List<String>> flags, Appendable messageSink) {
     myFlags = Map.copyOf(flags);
@@ -59,6 +60,8 @@ public class BuildContextImpl implements BuildContext {
 
     String abiPath = CLFlags.ABI_OUT.getOptionalScalarValue(flags);
     myAbiJar = abiPath != null? baseDir.resolve(abiPath).normalize() : null;
+
+    myKotlinCriStoragePath = myOutJar.resolveSibling(truncateExtension(myOutJar.getFileName().toString()) + DataPaths.KOTLIN_CRI_STORAGE_SUFFIX);
 
     myDataDir = myOutJar.resolveSibling(truncateExtension(myOutJar.getFileName().toString()) + DataPaths.DATA_DIR_NAME_SUFFIX);
     
@@ -321,6 +324,11 @@ public class BuildContextImpl implements BuildContext {
   }
 
   @Override
+  public @Nullable Path getKotlinCriStoragePath() {
+    return myKotlinCriStoragePath;
+  }
+
+  @Override
   public @NotNull NodeSourceSnapshot getSources() {
     return mySources;
   }
@@ -353,10 +361,16 @@ public class BuildContextImpl implements BuildContext {
   @Override
   public void report(Message msg) {
     try {
-      if (!myAllowWarnings && msg.getKind() == Message.Kind.WARNING) {
-        return;
+      if (msg.getKind() == Message.Kind.ERROR) {
+        myErrors.add(msg);
       }
+      
       if (!myAllowWarnings) {
+
+        if (msg.getKind() == Message.Kind.WARNING) {
+          return;
+        }
+
         // Some warnings in javac are impossible to disable
         // They're also reported as notes, not warnings
         // It greatly pollutes compilation output
@@ -371,11 +385,11 @@ public class BuildContextImpl implements BuildContext {
           return;
         }
       }
+
       if (msg.getSource() != null) {
         myMessageSink.append(msg.getSource().getName()).append(": ");
       }
       if (msg.getKind() == Message.Kind.ERROR) {
-        myHasErrors = true;
         myMessageSink.append("Error: ");
       }
       myMessageSink.append(msg.getText()).append("\n");
@@ -387,11 +401,15 @@ public class BuildContextImpl implements BuildContext {
 
   @Override
   public boolean hasErrors() {
-    return myHasErrors;
+    return !myErrors.isEmpty();
+  }
+
+  @Override
+  public Iterable<Message> getErrors() {
+    return myErrors;
   }
 
   private static String truncateExtension(String filename) {
-    int idx = filename.lastIndexOf('.');
-    return idx >= 0? filename.substring(0, idx) : filename;
+    return DataPaths.truncateExtension(filename);  // todo: inline the method
   }
 }

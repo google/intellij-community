@@ -56,7 +56,7 @@ internal class GitInMemoryInteractiveRebaseProcess(
     }
 
     reportSequentialProgress(entriesWithCommits.size) { reporter ->
-      entriesWithCommits.forEachIndexed { index, (entry, commitToRebase) ->
+      entriesWithCommits.forEach { (entry, commitToRebase) ->
         baseCommit = processEntry(baseCommit, entry, commitToRebase)
         reporter.itemStep()
       }
@@ -67,7 +67,8 @@ internal class GitInMemoryInteractiveRebaseProcess(
       baseCommit = objectRepo.findCommit(objectRepo.commitTree(objectRepo.emptyTree.oid, listOf(), byteArrayOf()))
     }
 
-    return CommitEditingResult(baseCommit.oid)
+    val modifiesTree = baseCommit.treeOid != baseToHeadCommitsRange.last().treeOid
+    return CommitEditingResult(baseCommit.oid, requiresWorkingTreeUpdate = modifiesTree)
   }
 
   private fun processEntry(
@@ -91,7 +92,7 @@ internal class GitInMemoryInteractiveRebaseProcess(
     val SUPPORTED_ACTIONS = actionProcessors.keys
 
     private object PickActionProcessor : RebaseActionProcessor {
-      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit? {
+      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit {
         if (commitToRebase.parentsOids.single() == baseCommit?.oid) {
           return commitToRebase
         }
@@ -100,7 +101,7 @@ internal class GitInMemoryInteractiveRebaseProcess(
     }
 
     private object RewordActionProcessor : RebaseActionProcessor {
-      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit? {
+      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit {
         val newMessage = (entry as GitRebaseRewordEntryWithMessage).newMessage
         val rewordedCommit = objectRepo.commitTreeWithOverrides(commitToRebase, message = newMessage.toByteArray())
         return objectRepo.findCommit(objectRepo.rebaseCommit(objectRepo.findCommit(rewordedCommit), baseCommit))
@@ -108,7 +109,7 @@ internal class GitInMemoryInteractiveRebaseProcess(
     }
 
     private object FixupActionProcessor : RebaseActionProcessor {
-      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit? {
+      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntryWithDetails): GitObject.Commit {
         checkNotNull(baseCommit) { "Can't apply squash as first commit" }
         val mergedTree = objectRepo.mergeTrees(commitToRebase, baseCommit)
         objectRepo.persistObject(mergedTree)

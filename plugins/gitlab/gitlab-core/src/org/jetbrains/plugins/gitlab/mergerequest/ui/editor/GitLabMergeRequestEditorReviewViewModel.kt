@@ -1,11 +1,10 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gitlab.mergerequest.ui.editor
 
-import com.intellij.collaboration.async.launchNow
-import com.intellij.collaboration.async.mapNullableScoped
-import com.intellij.collaboration.async.mapState
+import com.intellij.collaboration.async.*
 import com.intellij.collaboration.ui.codereview.diff.DiffLineLocation
 import com.intellij.collaboration.ui.codereview.diff.DiscussionsViewOption
+import com.intellij.collaboration.ui.codereview.diff.UnifiedCodeReviewItemPosition
 import com.intellij.collaboration.ui.codereview.editor.CodeReviewInEditorViewModel
 import com.intellij.collaboration.ui.icon.IconsProvider
 import com.intellij.collaboration.ui.util.selectedItem
@@ -32,8 +31,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
+import org.jetbrains.plugins.gitlab.data.GitLabImageLoader
 import org.jetbrains.plugins.gitlab.mergerequest.GitLabMergeRequestsPreferences
 import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabMergeRequest
+import org.jetbrains.plugins.gitlab.mergerequest.ui.createDiffDataFlow
 import org.jetbrains.plugins.gitlab.mergerequest.ui.review.GitLabMergeRequestDiscussionsViewModels
 import org.jetbrains.plugins.gitlab.mergerequest.ui.review.GitLabMergeRequestReviewViewModelBase
 import org.jetbrains.plugins.gitlab.mergerequest.util.GitLabMergeRequestBranchUtil
@@ -50,8 +51,9 @@ class GitLabMergeRequestEditorReviewViewModel internal constructor(
   private val projectMapping: GitLabProjectMapping,
   currentUser: GitLabUserDTO,
   private val mergeRequest: GitLabMergeRequest,
-  private val discussions: GitLabMergeRequestDiscussionsViewModels,
+  private val discussionsVms: GitLabMergeRequestDiscussionsViewModels,
   private val avatarIconsProvider: IconsProvider<GitLabUserDTO>,
+  private val imageLoader: GitLabImageLoader,
   private val openMergeRequestDetails: (String, GitLabStatistics.ToolWindowOpenTabActionPlace, Boolean) -> Unit,
   private val openMergeRequestDiff: (String, Boolean) -> Unit,
 ) : GitLabMergeRequestReviewViewModelBase(
@@ -67,9 +69,47 @@ class GitLabMergeRequestEditorReviewViewModel internal constructor(
   private val changesRequest = MutableSharedFlow<Unit>(replay = 1)
 
   val actualChangesState: StateFlow<ChangesState> = _actualChangesState.asStateFlow()
+  private val actualChanges: StateFlow<GitBranchComparisonResult?> = actualChangesState.mapNotNull {
+    (it as? ChangesState.Loaded)?.changes
+  }.distinctUntilChangedBy {
+    it.baseSha + it.headSha + it.mergeBaseSha
+  }.stateInNow(cs, null)
+  private val patchesByChangeFlow = actualChanges.mapState { changesOrNull ->
+    val changes = changesOrNull ?: return@mapState null
+    val allChanges = changes.changes.toSet()
 
-  private val filesVms: MutableMap<FilePath, Flow<GitLabMergeRequestEditorReviewFileViewModel?>> = mutableMapOf()
+    changes.patchesByChange.filterKeys { it in allChanges }
+  }
+
+  private val filesVms: MutableMap<FilePath, Flow<FileReviewState>> = mutableMapOf()
   private val diffRequestsMulticaster = EventDispatcher.create(DiffRequestListener::class.java)
+
+  internal val discussions: StateFlow<ComputedResult<Collection<GitLabMergeRequestEditorDiscussionViewModel>>> =
+    discussionsVms.discussions.transformConsecutiveSuccesses {
+      map { discussions ->
+        discussions.map { discussion ->
+          val diffDataFlow = createDiffDataFlow(discussion.position, patchesByChangeFlow)
+          GitLabMergeRequestEditorDiscussionViewModel(discussion, diffDataFlow, discussionsViewOption)
+        }
+      }
+    }.stateInNow(cs, ComputedResult.loading())
+  internal val draftNotes: StateFlow<ComputedResult<Collection<GitLabMergeRequestEditorDraftNoteViewModel>>> =
+    discussionsVms.draftNotes.transformConsecutiveSuccesses {
+      map { draftNotes ->
+        draftNotes.map { draftNote ->
+          val diffDataFlow = createDiffDataFlow(draftNote.position, patchesByChangeFlow)
+          GitLabMergeRequestEditorDraftNoteViewModel(draftNote, diffDataFlow, discussionsViewOption)
+        }
+      }
+    }.stateInNow(cs, ComputedResult.loading())
+
+  private val noteByTrackingId: StateFlow<Map<String, DiffDataMappedGitLabMergeRequestEditorViewModel>> =
+    combineStates(discussions, draftNotes) { discussionsResult, draftNotesResult ->
+      val discussions = discussionsResult.getOrNull() ?: emptyList()
+      val draftNotes = draftNotesResult.getOrNull() ?: emptyList()
+
+      (discussions + draftNotes).associateBy { note -> note.trackingId }
+    }
 
   @OptIn(ExperimentalCoroutinesApi::class)
   val localRepositorySyncStatus: StateFlow<ComputedResult<GitBranchSyncStatus?>?> by lazy {
@@ -137,37 +177,64 @@ class GitLabMergeRequestEditorReviewViewModel internal constructor(
     preferences.editorReviewEnabled = viewOption != DiscussionsViewOption.DONT_SHOW
   }
 
+  fun lookupNextComment(cursorLocation: UnifiedCodeReviewItemPosition, additionalIsVisible: (String) -> Boolean): String? =
+    discussionsVms.lookupNextComment(cursorLocation) { isNoteVisible(it) && additionalIsVisible(it) }
+
+  fun lookupNextComment(noteTrackingId: String, additionalIsVisible: (String) -> Boolean): String? =
+    discussionsVms.lookupNextComment(noteTrackingId) { isNoteVisible(it) && additionalIsVisible(it) }
+
+  fun lookupPreviousComment(cursorLocation: UnifiedCodeReviewItemPosition, additionalIsVisible: (String) -> Boolean): String? =
+    discussionsVms.lookupPreviousComment(cursorLocation) { isNoteVisible(it) && additionalIsVisible(it) }
+
+  fun lookupPreviousComment(noteTrackingId: String, additionalIsVisible: (String) -> Boolean): String? =
+    discussionsVms.lookupPreviousComment(noteTrackingId) { isNoteVisible(it) && additionalIsVisible(it) }
+
+  internal fun lookupThreadPosition(noteTrackingId: String): Pair<RefComparisonChange, Int>? {
+    val note = noteByTrackingId.value[noteTrackingId] ?: return null
+
+    val change = note.diffData.value?.change ?: return null
+    val line = note.line.value ?: return null
+
+    return change to line
+  }
+
+  internal fun requestThreadFocus(noteTrackingId: String) {
+    val note = noteByTrackingId.value[noteTrackingId] ?: return
+    note.requestFocus()
+  }
+
+  private fun isNoteVisible(noteTrackingId: String): Boolean {
+    val note = noteByTrackingId.value[noteTrackingId] ?: return false
+    return note.isVisible.value && note.line.value != null
+  }
+
   /**
    * A view model for [virtualFile] review
    */
-  fun getFileVm(virtualFile: VirtualFile): Flow<GitLabMergeRequestEditorReviewFileViewModel?> {
+  fun getFileStateFlow(virtualFile: VirtualFile): Flow<FileReviewState> {
     if (!virtualFile.isValid || virtualFile.isDirectory ||
         !VfsUtilCore.isAncestor(projectMapping.remote.repository.root, virtualFile, true)) {
-      return flowOf(null)
+      return flowOf(FileReviewState.NotInReview)
     }
     val filePath = VcsContextFactory.getInstance().createFilePathOn(virtualFile)
     changesRequest.tryEmit(Unit)
     //TODO: do not recreate VMs on changes change
     return filesVms.getOrPut(filePath) {
-      actualChangesState.mapNotNull {
-        (it as? ChangesState.Loaded)?.changes
-      }.distinctUntilChangedBy {
-        it.baseSha + it.headSha + it.mergeBaseSha
-      }.transform { parsedChanges ->
+      actualChanges.filterNotNull().mapScoped { parsedChanges ->
         val change = parsedChanges.changes.find { it.filePathAfter == filePath }
         if (change == null) {
-          emit(null)
-          return@transform
+          return@mapScoped FileReviewState.NotInReview
         }
         val diffData = parsedChanges.patchesByChange[change] ?: run {
           LOG.info("Diff data not found for change $change")
-          emit(null)
-          return@transform
+          return@mapScoped FileReviewState.NotInReview
         }
+        if (diffData.patch.hunks.isEmpty()) {
+          return@mapScoped FileReviewState.ReviewDisabledEmptyDiff
+        }
+
         val changeSelection = ListSelection.create(parsedChanges.changes, change)
-        emit(changeSelection to diffData)
-      }.mapNullableScoped { (change, diffData) ->
-        createChangeVm(change, diffData)
+        FileReviewState.ReviewEnabled(createChangeVm(changeSelection, diffData))
       }
     }
   }
@@ -183,13 +250,15 @@ class GitLabMergeRequestEditorReviewViewModel internal constructor(
     }
   }
 
-  private fun CoroutineScope.createChangeVm(change: ListSelection<RefComparisonChange>, diffData: GitTextFilePatchWithHistory) =
-    GitLabMergeRequestEditorReviewFileViewModelImpl(this, project, mergeRequest, change.selectedItem!!, diffData,
-                                                    discussions,
-                                                    discussionsViewOption, avatarIconsProvider).also { vm ->
+  private fun CoroutineScope.createChangeVm(changes: ListSelection<RefComparisonChange>, diffData: GitTextFilePatchWithHistory) =
+    GitLabMergeRequestEditorReviewFileViewModelImpl(
+      this, project, mergeRequest, changes.selectedItem!!, diffData,
+      discussionsVms, this@GitLabMergeRequestEditorReviewViewModel,
+      discussionsViewOption, avatarIconsProvider, imageLoader
+    ).also { vm ->
       launchNow {
         vm.showDiffRequests.collect { line ->
-          diffRequestsMulticaster.multicaster.onChangesSelectionChanged(change, line?.let { DiffLineLocation(Side.RIGHT, it) })
+          diffRequestsMulticaster.multicaster.onChangesSelectionChanged(changes, line?.let { DiffLineLocation(Side.RIGHT, it) })
           withContext(Dispatchers.Main) {
             openMergeRequestDiff(mergeRequestIid, true)
           }
@@ -202,6 +271,12 @@ class GitLabMergeRequestEditorReviewViewModel internal constructor(
     data object Loading : ChangesState
     data object Error : ChangesState
     class Loaded(val changes: GitBranchComparisonResult) : ChangesState
+  }
+
+  sealed interface FileReviewState {
+    data object NotInReview : FileReviewState
+    data object ReviewDisabledEmptyDiff : FileReviewState
+    data class ReviewEnabled(val vm: GitLabMergeRequestEditorReviewFileViewModel) : FileReviewState
   }
 }
 

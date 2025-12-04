@@ -115,10 +115,12 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(TypeOfAnnotationMemberFixFactory.typeOfAnnotationMemberFixFactory)
         registerFactory(TooLongCharLiteralToStringFixFactory.illegalEscapeFactory)
         registerFactory(TooLongCharLiteralToStringFixFactory.tooManyCharactersInCharacterLiteralFactory)
-        registerFactory(ConvertCollectionLiteralToIntArrayOfFixFactory.convertCollectionLiteralToIntArrayOfFixFactory)
+        registerFactory(ConvertCollectionLiteralToIntArrayOfFixFactory.convertCollectionLiteralToIntArrayOfErrorFixFactory)
+        registerFactory(ConvertCollectionLiteralToIntArrayOfFixFactory.convertCollectionLiteralToIntArrayOfWarningFixFactory)
         registerFactory(AddReturnExpressionFixFactory.addReturnExpressionFixFactory)
         registerFactory(RemoveArgumentFixFactory.removeArgumentFixFactory)
         registerFactory(RemoveReturnLabelFixFactory.removeReturnLabelFixFactory)
+        registerFactory(RemoveRedundantReturnFixFactory.removeRedundantReturnFixFactory)
         registerFactory(AddJvmInlineAnnotationFixFactory.addJvmInlineAnnotationFixFactory)
         registerFactory(RemoveNoConstructorFixFactory.removeNoConstructorFixFactory)
         registerFactory(ArgumentTypeMismatchFactory.addArrayOfTypeFixFactory)
@@ -189,6 +191,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeTypeQuickFixFactories.implicitNothingPropertyTypeFixFactory)
         registerFactory(InapplicableJvmFieldFixFactories.removeAnnotationFixFactory)
         registerFactory(OverridingIgnorableWithMustUseFixFactories.addIgnorableReturnValueAnnotationFixFactory)
+        registerFactory(AddNewLineAfterAnnotationsFixFactory.addNewLineAfterAnnotationsFixFactory)
         registerFactory(ConstFixFactories.addConstModifierFixFactory)
     }
 
@@ -229,6 +232,12 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeToLabeledReturnFixFactory.nullForNonnullType)
         registerFactory(ChangeToLabeledReturnFixFactory.returnNotAllowed)
         registerFactory(ChangeToLabeledReturnFixFactory.returnTypeMismatch)
+    }
+
+    private val conflictingDeclarations = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(ConflictingDeclarationsFactories.conflictingOverloads)
+        registerFactory(ConflictingDeclarationsFactories.redeclaration)
+        registerFactory(ConflictingDeclarationsFactories.classifierRedeclaration)
     }
 
     private val convertStringToCharLiteral = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -376,6 +385,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(AddExclExclCallFixFactories.unsafeCallFactory)
         registerFactory(AddExclExclCallFixFactories.unsafeInfixCallFactory)
         registerFactory(AddExclExclCallFixFactories.unsafeOperatorCallFactory)
+        registerFactory(AddExclExclCallFixFactories.unsafeCallableReferenceFactory)
         registerFactory(AddExclExclCallFixFactories.iteratorOnNullableFactory)
         registerFactory(AddNameToArgumentFixFactory.addNameToArgumentFixFactory)
         registerFactory(TypeMismatchFactories.argumentTypeMismatchFactory)
@@ -434,6 +444,10 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeTypeQuickFixFactories.parameterTypeMismatch)
         registerFactory(ChangeTypeQuickFixFactories.typeMismatch)
         registerFactory(ChangeTypeQuickFixFactories.incompatibleTypes)
+
+        registerFactory(ChangeTypeQuickFixFactories.returnTypeRequired)
+        registerFactory(ChangeTypeQuickFixFactories.returnTypeRequiredWarning)
+        registerFactory(ChangeTypeQuickFixFactories.returnTypeRequiredWithImplicitType)
 
         registerFactory(AddToStringFixFactories.typeMismatch)
         registerFactory(AddToStringFixFactories.argumentTypeMismatch)
@@ -658,6 +672,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         addValVarToConstructorParameter,
         changeToMutableCollection,
         changeToLabeledReturn,
+        conflictingDeclarations,
         convertStringToCharLiteral,
         insertDelegationCall,
         propertyInitialization,

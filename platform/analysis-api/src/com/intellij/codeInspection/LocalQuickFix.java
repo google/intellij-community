@@ -36,8 +36,7 @@ import static com.intellij.codeInsight.intention.CustomizableIntentionAction.Ran
  * {@link com.intellij.codeInsight.intention.LowPriorityAction LowPriorityAction} to change ordering.
  * <p>
  * To learn how to implement preview correctly, read <a href="https://plugins.jetbrains.com/docs/intellij/code-intentions-preview.html">Intention Action Preview (IntelliJ Platform Docs)</a>.
- * 
- * @author max
+ *
  * @see ProblemDescriptor
  * @see com.intellij.openapi.util.Iconable
  */
@@ -123,5 +122,10 @@ public interface LocalQuickFix extends QuickFix<ProblemDescriptor>, FileModifier
   @Contract("null -> null; !null -> !null")
   static @Nullable LocalQuickFix from(@Nullable ModCommandAction action) {
     return action == null ? null : ModCommandService.getInstance().wrapToQuickFix(action);
+  }
+
+  @Contract("null, _ -> null; !null, _ -> !null")
+  static @Nullable LocalQuickFix from(@Nullable ModCommandAction action, boolean availableInBatchMode) {
+    return action == null ? null : ModCommandService.getInstance().wrapToQuickFix(action, availableInBatchMode);
   }
 }

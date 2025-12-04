@@ -16,9 +16,13 @@
       ]]>
   </description>
 
-  <depends>com.intellij.modules.lang</depends>
-  <depends>com.intellij.modules.externalSystem</depends>
   <depends optional="true" config-file="gradle-properties.xml">com.intellij.properties</depends>
+
+  <dependencies>
+    <plugin id="com.intellij.modules.lang"/>
+    <plugin id="com.intellij.modules.externalSystem"/>
+    <module name="intellij.platform.externalSystem.impl"/>
+  </dependencies>
 
   <resource-bundle>messages.GradleBundle</resource-bundle>
 
@@ -145,10 +149,8 @@
     <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.GradleExcludeBuildFilesDataService"/>
     <externalProjectStructureCustomizer implementation="org.jetbrains.plugins.gradle.service.project.GradleProjectStructureCustomizer"/>
     <externalIconProvider key="GRADLE" implementationClass="org.jetbrains.plugins.gradle.ui.GradleIconProvider"/>
-    <externalExecutionAware id="gradleOnWsl" order="before gradle" key="GRADLE" implementationClass="org.jetbrains.plugins.gradle.service.execution.wsl.GradleOnWslExecutionAware"/>
     <externalExecutionAware id="gradle" key="GRADLE" implementationClass="org.jetbrains.plugins.gradle.service.execution.LocalGradleExecutionAware"/>
-    <externalExecutionAware  id="gradleOnEel" order="before gradleOnWsl" key="GRADLE"
-                             implementationClass="org.jetbrains.plugins.gradle.service.execution.eel.EelGradleExecutionAware"/>
+    <externalExecutionAware  id="gradleOnEel" key="GRADLE" implementationClass="org.jetbrains.plugins.gradle.service.execution.eel.EelGradleExecutionAware"/>
     <externalSystemNotificationExtension implementation="org.jetbrains.plugins.gradle.service.notification.GradleNotificationExtension" order="last"/>
 
     <externalSystemTaskProgressIndicatorUpdater
@@ -210,6 +212,8 @@
 
     <search.optionContributor implementation="org.jetbrains.plugins.gradle.config.GradleSearchableOptionContributor"/>
 
+    <registryKey key="GRADLE.system.in.process" defaultValue="true"
+                 description="Whether IDEA should use 'in-process' mode for interaction with Gradle API"/>
     <registryKey key="gradle.daemon.jvm.criteria" defaultValue="true"
                  description="Enable the Gradle Daemon JVM criteria allowing to detect provisioning required toolchain for the build"/>
     <registryKey key="gradle.daemon.jvm.criteria.new.project" defaultValue="false"
@@ -245,7 +249,9 @@
                  description="Enable performance trace collection in the Gradle daemon collected by OTLP java agent"/>
     <registryKey key="gradle.daemon.legacy.dependency.resolver" defaultValue="false"
                  description="Use ArtifactResolutionQuery instead of ArtifactView to resolve Javadoc/Sources"/>
-    <registryKey key="gradle.sync.use.eel.for.wsl" defaultValue="true" description="Use EEL API for WSL projects"/>
+    <registryKey key="gradle.auto.auto.jdk.fix.disabled" defaultValue="false"
+                 description="Disable attempt to fix unknown JDK in Gradle configuration on project open"/>
+
     <commandLineInspectionProjectConfigurator implementation="org.jetbrains.plugins.gradle.GradleCommandLineProjectConfigurator"/>
     <warmupConfigurator implementation="org.jetbrains.plugins.gradle.GradleWarmupConfigurator"/>
     <notificationGroup id="Gradle Notification Group" displayType="STICKY_BALLOON" bundle="messages.GradleBundle" key="notification.group.gradle"/>

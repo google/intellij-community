@@ -49,20 +49,11 @@ class DummyChangesView implements ChangesViewEx {
   }
 
   @Override
-  public void setBusy(boolean b) {
-  }
-
-  @Override
   public void setGrouping(@NotNull String groupingKey) {
   }
 
   @Override
   public void scheduleRefresh(@NotNull Runnable callback) {
-  }
-
-  @Override
-  public boolean isAllowExcludeFromCommit() {
-    return false;
   }
 
   @Override

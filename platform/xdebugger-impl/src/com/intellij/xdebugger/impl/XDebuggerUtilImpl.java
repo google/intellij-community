@@ -27,6 +27,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.debugger.impl.shared.XDebuggerUtilImplShared;
+import com.intellij.platform.debugger.impl.shared.proxy.*;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
@@ -50,14 +51,15 @@ import com.intellij.xdebugger.frame.XValueContainer;
 import com.intellij.xdebugger.impl.breakpoints.*;
 import com.intellij.xdebugger.impl.breakpoints.ui.grouping.XBreakpointFileGroupingRule;
 import com.intellij.xdebugger.impl.evaluate.ValueLookupManagerController;
-import com.intellij.xdebugger.impl.frame.XDebugManagerProxy;
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.frame.XStackFrameContainerEx;
+import com.intellij.xdebugger.impl.proxy.MonolithBreakpointTypeProxyKt;
+import com.intellij.xdebugger.impl.proxy.MonolithLineBreakpointProxy;
 import com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl;
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
-import com.intellij.xdebugger.impl.ui.tree.XDebuggerTreeState;
 import com.intellij.xdebugger.impl.ui.tree.actions.XDebuggerTreeActionBase;
+import com.intellij.xdebugger.impl.util.XDebugMonolithUtils;
 import com.intellij.xdebugger.settings.XDebuggerSettings;
 import com.intellij.xdebugger.ui.DebuggerColors;
 import kotlin.Unit;
@@ -77,7 +79,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static com.intellij.xdebugger.impl.breakpoints.XBreakpointTypeProxyKt.asProxy;
 import static org.jetbrains.concurrency.Promises.asPromise;
 import static org.jetbrains.concurrency.Promises.rejectedPromise;
 
@@ -304,12 +305,21 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     final @Nullable Editor editor,
     boolean canRemove
   ) {
-    var proxyTypes = ContainerUtil.map(types, t -> asProxy(t, project));
+    var proxyTypes = ContainerUtil.map(types, t -> MonolithBreakpointTypeProxyKt.asProxy(t, project));
     var future = toggleAndReturnLineBreakpointProxy(
       project, proxyTypes, position, selectVariantByPositionColumn,
       temporary, editor, canRemove, false, null);
-    return asPromise(future)
-      .then(b -> b instanceof XLineBreakpointProxy.Monolith monolith ? monolith.getBreakpoint() : null);
+    return asPromise(future).then(b -> {
+      if (b == null) return null;
+      if (b instanceof MonolithLineBreakpointProxy monolith) {
+        return monolith.getBreakpoint();
+      }
+      XBreakpointBase<?, ?, ?> monolithBreakpoint = XDebugMonolithUtils.findBreakpointById(b.getId());
+      if (monolithBreakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+        return lineBreakpoint;
+      }
+      return null;
+    });
   }
 
   public static @NotNull CompletableFuture<@Nullable XLineBreakpointProxy> toggleAndReturnLineBreakpointProxy(
@@ -594,7 +604,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   }
 
   /**
-   * @see CoroutineUtilsKt#performDebuggerActionAsync
+   * @see DebuggerAsyncActionUtilsKt#performDebuggerActionAsync
    */
   public static void performDebuggerAction(@NotNull AnActionEvent e, @NotNull Runnable action) {
     action.run();
@@ -889,7 +899,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
 
   public static void rebuildTreeAndViews(XDebuggerTree tree) {
     if (tree.isDetached()) {
-      tree.rebuildAndRestore(XDebuggerTreeState.saveState(tree));
+      tree.rebuild();
     }
     rebuildAllSessionsViews(tree.getProject());
   }

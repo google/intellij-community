@@ -6,11 +6,10 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.util.io.NioFiles
 import com.intellij.terminal.JBTerminalWidget
 import com.intellij.terminal.pty.PtyProcessTtyConnector
-import com.intellij.util.io.delete
 import com.jediterm.core.util.TermSize
-import com.jediterm.terminal.TtyConnector
 import com.pty4j.windows.conpty.WinConPtyProcess
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.JBTerminalSystemSettingsProvider
@@ -18,7 +17,6 @@ import org.jetbrains.plugins.terminal.LocalTerminalDirectRunner
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 import org.jetbrains.plugins.terminal.shellStartupOptions
 import java.io.IOException
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.function.BooleanSupplier
 
@@ -71,8 +69,8 @@ class ClassicTerminalTestShellSession(shellCommand: List<String>?, val widget: S
         it.initialTermSize = initialTermSize
         it.workingDirectory = workingDirectory.toString()
       }.build()
-      val process = runner.createProcess(configuredOptions)
-      val connector: TtyConnector = PtyProcessTtyConnector(process, StandardCharsets.UTF_8)
+      val connector = runner.createTtyConnector(configuredOptions)
+      val process = (connector as PtyProcessTtyConnector).process
       terminalWidget.asNewWidget().connectToTty(connector, initialTermSize)
 
       Disposer.register(terminalWidget) {
@@ -82,7 +80,7 @@ class ClassicTerminalTestShellSession(shellCommand: List<String>?, val widget: S
         catch (t: Throwable) {
           logger<ClassicTerminalTestShellSession>().error("Error closing TtyConnector", t)
         }
-        workingDirectory.delete()
+        NioFiles.deleteRecursively(workingDirectory)
       }
 
       if (SystemInfo.isWindows) {

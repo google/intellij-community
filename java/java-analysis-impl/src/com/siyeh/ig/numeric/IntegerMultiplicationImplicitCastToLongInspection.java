@@ -18,14 +18,17 @@ package com.siyeh.ig.numeric;
 import com.intellij.codeInspection.CleanupLocalInspectionTool;
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.dataFlow.CommonDataflow;
+import com.intellij.codeInspection.dataFlow.jvm.SpecialField;
 import com.intellij.codeInspection.dataFlow.rangeSet.LongRangeSet;
 import com.intellij.codeInspection.dataFlow.types.DfLongType;
+import com.intellij.codeInspection.dataFlow.types.DfReferenceType;
+import com.intellij.codeInspection.dataFlow.types.DfType;
 import com.intellij.codeInspection.options.OptPane;
-import com.intellij.lang.java.parser.JavaBinaryOperations;
 import com.intellij.modcommand.ModPsiUpdater;
 import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
+import com.intellij.psi.impl.source.tree.ElementType;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.ConstantEvaluationOverflowException;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -144,7 +147,7 @@ public final class IntegerMultiplicationImplicitCastToLongInspection extends Bas
   }
 
   private static boolean isShiftToken(IElementType tokenType) {
-    return JavaBinaryOperations.SHIFT_OPS.contains(tokenType);
+    return ElementType.SHIFT_OPS.contains(tokenType);
   }
 
   private static boolean isShiftEqToken(@NotNull IElementType tokenType) {
@@ -278,7 +281,11 @@ public final class IntegerMultiplicationImplicitCastToLongInspection extends Bas
       if (dfr != null) {
         long min = 1, max = 1;
         for (PsiExpression operand : operands) {
-          LongRangeSet set = DfLongType.extractRange(dfr.getDfType(PsiUtil.skipParenthesizedExprDown(operand)));
+          DfType type = dfr.getDfType(PsiUtil.skipParenthesizedExprDown(operand));
+          if (type instanceof DfReferenceType) {
+            type = SpecialField.UNBOX.getFromQualifier(type);
+          }
+          LongRangeSet set = DfLongType.extractRange(type);
           if (operand == operands[0]) {
             min = set.min();
             max = set.max();

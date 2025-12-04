@@ -43,6 +43,8 @@ open class RecentProjectListActionProvider {
   @Internal
   fun collectProjects(): List<RecentProjectTreeItem> = collectProjects(projectToFilterOut = null)
 
+  open fun recentProjectsInDocSupported() = true
+
   private fun collectProjects(projectToFilterOut: Project?): List<RecentProjectTreeItem> {
     val recentProjectManager = RecentProjectsManager.getInstance() as RecentProjectsManagerBase
     val openedPaths = ProjectManagerEx.getOpenProjects().mapNotNullTo(LinkedHashSet()) {
@@ -241,12 +243,14 @@ open class RecentProjectListActionProvider {
     var displayName = recentProjectManager.getDisplayName(path)
     val projectName = recentProjectManager.getProjectName(path)
     val activationTimestamp = recentProjectManager.getActivationTimestamp(path)
-    var branch: String? = null
+
+    val nameIsDistinct = !duplicates.contains(ProjectNameOrPathIfNotYetComputed(projectName))
+    val branch: String? = if (isBranchNameAllowed(displayName)) {
+      getCurrentBranch(path, nameIsDistinct)
+    }
+    else null
 
     if (displayName.isNullOrBlank()) {
-      val nameIsDistinct = !duplicates.contains(ProjectNameOrPathIfNotYetComputed(projectName))
-      branch = getCurrentBranch(path, nameIsDistinct)
-
       displayName = if (nameIsDistinct) {
         projectName
       }
@@ -265,6 +269,13 @@ open class RecentProjectListActionProvider {
       branchName = branch,
       activationTimestamp = activationTimestamp,
     )
+  }
+
+  @Internal
+  protected open fun isBranchNameAllowed(displayName: String?): Boolean {
+    // by default, displayName will not be null for multi-module projects
+    // (see com.intellij.platform.ModuleAttachProcessorKt.getMultiProjectDisplayName)
+    return displayName.isNullOrBlank()
   }
 
   private fun createRecentProject(

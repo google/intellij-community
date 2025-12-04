@@ -755,39 +755,21 @@ a:com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor$Wrapper
 f:com.intellij.openapi.vcs.changes.ChangesPreprocess
 - <init>():V
 - s:preprocessChangesRemoveDeletedForDuplicateMoved(java.util.List):java.util.List
-a:com.intellij.openapi.vcs.changes.ChangesTreeEditorDiffPreview
-- com.intellij.openapi.vcs.changes.EditorTabDiffPreview
-- <init>(com.intellij.openapi.vcs.changes.ui.ChangesTree,javax.swing.JComponent):V
-- b:<init>(com.intellij.openapi.vcs.changes.ui.ChangesTree,javax.swing.JComponent,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- pf:getTree():com.intellij.openapi.vcs.changes.ui.ChangesTree
-- handleDoubleClick(java.awt.event.MouseEvent):Z
-- handleEnterKey():Z
-- p:handleEscapeKey():V
-- p:handleNextDiffShortcut():V
-- p:handleSingleClick():V
-- p:isOpenPreviewWithNextDiffShortcut():Z
-- p:isOpenPreviewWithSingleClick():Z
-- p:isOpenPreviewWithSingleClickEnabled():Z
-- p:isPreviewOnDoubleClick():Z
-- p:isPreviewOnEnter():Z
-- p:returnFocusToTree():V
 com.intellij.openapi.vcs.changes.ChangesViewEx
 - com.intellij.openapi.vcs.changes.ChangesViewI
 - a:getCommitWorkflowHandler():com.intellij.vcs.commit.ChangesViewCommitWorkflowHandler
-- a:isAllowExcludeFromCommit():Z
 - a:resetViewImmediatelyAndRefreshLater():V
 - a:scheduleRefresh(java.lang.Runnable):V
 com.intellij.openapi.vcs.changes.ChangesViewI
 - a:scheduleRefresh():V
 - a:selectChanges(java.util.List):V
 - a:selectFile(com.intellij.openapi.vfs.VirtualFile):V
-- a:setBusy(Z):V
 - a:setGrouping(java.lang.String):V
 - a:updateProgressComponent(java.util.List):V
 c:com.intellij.openapi.vcs.changes.ChangesViewManager
 - com.intellij.openapi.Disposable
 - com.intellij.openapi.vcs.changes.ChangesViewEx
-- <init>(com.intellij.openapi.project.Project):V
+- <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
 - closeEditorPreview(Z):V
 - s:createTextStatusFactory(java.lang.String,Z):com.intellij.openapi.util.Factory
 - diffPreviewChanged(Z):V
@@ -795,35 +777,14 @@ c:com.intellij.openapi.vcs.changes.ChangesViewManager
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ChangesViewI
 - s:getInstanceEx(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ChangesViewEx
 - s:getLocalChangesToolWindowName(com.intellij.openapi.project.Project):java.lang.String
-- isAllowExcludeFromCommit():Z
 - isDiffPreviewAvailable():Z
 - resetViewImmediatelyAndRefreshLater():V
 - scheduleRefresh():V
 - scheduleRefresh(java.lang.Runnable):V
 - selectChanges(java.util.List):V
 - selectFile(com.intellij.openapi.vfs.VirtualFile):V
-- setBusy(Z):V
 - setGrouping(java.lang.String):V
 - updateProgressComponent(java.util.List):V
-f:com.intellij.openapi.vcs.changes.ChangesViewManager$ChangesViewToolWindowPanel
-- com.intellij.openapi.ui.SimpleToolWindowPanel
-- com.intellij.openapi.Disposable
-- addListener(com.intellij.openapi.vcs.changes.ChangesViewManager$ChangesViewToolWindowPanel$Listener,com.intellij.openapi.Disposable):V
-- dispose():V
-- getActions(Z):java.util.List
-- isAllowExcludeFromCommit():Z
-- scheduleRefresh():V
-- selectChanges(java.util.List):V
-- selectFile(com.intellij.openapi.vfs.VirtualFile):V
-- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
-- updateCommitWorkflow():V
-com.intellij.openapi.vcs.changes.ChangesViewManager$ChangesViewToolWindowPanel$Listener
-- java.util.EventListener
-- a:allowExcludeFromCommitChanged():V
-c:com.intellij.openapi.vcs.changes.ChangesViewManager$ContentPreloader
-- com.intellij.openapi.vcs.changes.ui.ChangesViewContentProvider$Preloader
-- <init>(com.intellij.openapi.project.Project):V
-- preloadTabContent(com.intellij.ui.content.Content):V
 c:com.intellij.openapi.vcs.changes.ChangesViewManager$ContentProvider
 - com.intellij.openapi.vcs.changes.ui.ChangesViewContentProvider
 - <init>(com.intellij.openapi.project.Project):V
@@ -833,12 +794,16 @@ c:com.intellij.openapi.vcs.changes.ChangesViewManager$DisplayNameSupplier
 - <init>(com.intellij.openapi.project.Project):V
 - get():java.lang.String
 Fa:com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager
+- sf:Companion:com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager$Companion
 - sf:TOPIC:com.intellij.util.messages.Topic
+- a:getAllowExcludeFromCommit():kotlinx.coroutines.flow.StateFlow
 - f:getCommitWorkflowHandler():com.intellij.vcs.commit.ChangesViewCommitWorkflowHandler
-- s:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager
+- sf:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager
 com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager$ChangesViewWorkflowListener
 - java.util.EventListener
 - a:commitWorkflowChanged():V
+f:com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager$Companion
+- f:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ChangesViewWorkflowManager
 com.intellij.openapi.vcs.changes.DiffPreviewProvider
 - a:createDiffRequestProcessor():com.intellij.diff.impl.DiffRequestProcessor
 - a:getEditorTabName(com.intellij.diff.impl.DiffRequestProcessor):java.lang.String
@@ -1656,7 +1621,6 @@ f:com.intellij.openapi.vcs.changes.patch.ApplyPatchAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- s:showAndGetApplyPatch(com.intellij.openapi.project.Project,java.io.File):java.lang.Boolean
 - s:showApplyPatch(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
 c:com.intellij.openapi.vcs.changes.patch.ApplyPatchDefaultExecutor
@@ -2290,6 +2254,7 @@ f:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 - sf:SHELF:java.lang.String
 - sf:TOOLWINDOW_ID:java.lang.String
 - sf:VCS_LOG:java.lang.String
+- sf:WORKING_TREES:java.lang.String
 - addContent(com.intellij.ui.content.Content):V
 - attachToolWindow(com.intellij.openapi.wm.ToolWindow):V
 - dispose():V
@@ -2299,6 +2264,7 @@ f:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 - sf:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.ui.ChangesViewContentI
 - sf:getToolWindowFor(com.intellij.openapi.project.Project,java.lang.String):com.intellij.openapi.wm.ToolWindow
 - sf:getToolWindowIdFor(com.intellij.openapi.project.Project,java.lang.String):java.lang.String
+- f:isCommitToolWindowEnabled():kotlinx.coroutines.flow.StateFlow
 - sf:isCommitToolWindowShown(com.intellij.openapi.project.Project):Z
 - f:isContentSelected(java.lang.String):Z
 - sf:isToolWindowTabVertical(com.intellij.openapi.project.Project,java.lang.String):Z
@@ -2327,6 +2293,7 @@ e:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - sf:REPOSITORY:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - sf:SHELF:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - sf:VCS_LOG:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
+- sf:WORKING_TREES:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - s:getEntries():kotlin.enums.EnumEntries
 - f:getTabName():java.lang.String
 - f:getWeight():I
@@ -2408,6 +2375,21 @@ a:com.intellij.openapi.vcs.changes.ui.CommitDialogChangesBrowser
 - a:getSelectedChanges():java.util.List
 - a:getSelectedUnversionedFiles():java.util.List
 - a:updateDisplayedChangeLists():V
+f:com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- sf:Companion:com.intellij.openapi.vcs.changes.ui.CommitLegendComponent$Companion
+- sf:create(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator):com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- sf:create(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator,java.util.List):com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- sf:defaultLegendChunks(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator):java.util.List
+- f:getComponent():com.intellij.ui.SimpleColoredComponent
+- f:getFullLegendString():java.lang.String
+- f:isCompact():Z
+- f:setCompact(Z):V
+- f:update():V
+f:com.intellij.openapi.vcs.changes.ui.CommitLegendComponent$Companion
+- f:create(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator):com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- f:create(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator,java.util.List):com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- bs:create$default(com.intellij.openapi.vcs.changes.ui.CommitLegendComponent$Companion,com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator,java.util.List,I,java.lang.Object):com.intellij.openapi.vcs.changes.ui.CommitLegendComponent
+- f:defaultLegendChunks(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator):java.util.List
 c:com.intellij.openapi.vcs.changes.ui.CommitLegendPanel
 - <init>(com.intellij.openapi.vcs.changes.ui.CommitLegendPanel$InfoCalculator):V
 - pf:append(I,com.intellij.openapi.vcs.FileStatus,java.lang.String):V
@@ -2469,6 +2451,12 @@ com.intellij.openapi.vcs.changes.ui.EditChangelistSupport
 - a:addControls(javax.swing.JPanel,com.intellij.openapi.vcs.changes.LocalChangeList):com.intellij.util.Consumer
 - changelistCreated(com.intellij.openapi.vcs.changes.LocalChangeList):V
 - a:installSearch(com.intellij.ui.EditorTextField,com.intellij.ui.EditorTextField):V
+a:com.intellij.openapi.vcs.changes.ui.LegendChunk
+- <init>():V
+- a:formatNumbers():java.lang.String
+- a:getCompactLabel():java.lang.String
+- a:getFileStatus():com.intellij.openapi.vcs.FileStatus
+- a:getFullLabel():java.lang.String
 c:com.intellij.openapi.vcs.changes.ui.LoadingCommittedChangeListPanel
 - com.intellij.openapi.Disposable
 - <init>(com.intellij.openapi.project.Project):V
@@ -2624,7 +2612,7 @@ c:com.intellij.openapi.vcs.changes.ui.TreeHandlerDiffRequestProcessor
 - pf:selectChange(com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor$Wrapper):V
 - p:showAllChangesForEmptySelection():Z
 a:com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview
-- com.intellij.openapi.vcs.changes.ChangesTreeEditorDiffPreview
+- com.intellij.openapi.vcs.changes.EditorTabDiffPreview
 - sf:Companion:com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview$Companion
 - <init>(com.intellij.openapi.vcs.changes.ui.ChangesTree,com.intellij.openapi.vcs.changes.ui.ChangesTreeDiffPreviewHandler):V
 - <init>(com.intellij.openapi.vcs.changes.ui.ChangesTree,javax.swing.JComponent,com.intellij.openapi.vcs.changes.ui.ChangesTreeDiffPreviewHandler):V
@@ -2635,7 +2623,19 @@ a:com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview
 - pf:getEditorTabName(com.intellij.diff.impl.DiffEditorViewer):java.lang.String
 - a:getEditorTabName(com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor$Wrapper):java.lang.String
 - pf:getHandler():com.intellij.openapi.vcs.changes.ui.ChangesTreeDiffPreviewHandler
+- pf:getTree():com.intellij.openapi.vcs.changes.ui.ChangesTree
+- handleDoubleClick(java.awt.event.MouseEvent):Z
+- handleEnterKey():Z
+- p:handleEscapeKey():V
+- p:handleNextDiffShortcut():V
+- p:handleSingleClick():V
 - f:hasContent():Z
+- p:isOpenPreviewWithNextDiffShortcut():Z
+- p:isOpenPreviewWithSingleClick():Z
+- p:isOpenPreviewWithSingleClickEnabled():Z
+- p:isPreviewOnDoubleClick():Z
+- p:isPreviewOnEnter():Z
+- p:returnFocusToTree():V
 f:com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview$Companion
 - f:createDefaultViewer(com.intellij.openapi.vcs.changes.ui.ChangesTree,com.intellij.openapi.vcs.changes.ui.ChangesTreeDiffPreviewHandler,java.lang.String):com.intellij.diff.impl.DiffEditorViewer
 a:com.intellij.openapi.vcs.changes.ui.VcsToolWindowFactory
@@ -2696,15 +2696,6 @@ a:com.intellij.openapi.vcs.configurable.VcsOptionsTopHitProviderBase
 - com.intellij.ide.ui.OptionsSearchTopHitProvider$ProjectLevelProvider
 - <init>():V
 - p:isEnabled(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.VcsKey):Z
-e:com.intellij.openapi.vcs.ex.ExclusionState
-- java.lang.Enum
-- sf:ALL_EXCLUDED:com.intellij.openapi.vcs.ex.ExclusionState
-- sf:ALL_INCLUDED:com.intellij.openapi.vcs.ex.ExclusionState
-- sf:NO_CHANGES:com.intellij.openapi.vcs.ex.ExclusionState
-- sf:PARTIALLY:com.intellij.openapi.vcs.ex.ExclusionState
-- s:getEntries():kotlin.enums.EnumEntries
-- s:valueOf(java.lang.String):com.intellij.openapi.vcs.ex.ExclusionState
-- s:values():com.intellij.openapi.vcs.ex.ExclusionState[]
 com.intellij.openapi.vcs.ex.LineStatusTracker
 - com.intellij.openapi.vcs.ex.LineStatusTrackerI
 - a:getProject():com.intellij.openapi.project.Project
@@ -2727,11 +2718,6 @@ f:com.intellij.openapi.vcs.ex.LocalLineStatusTracker$Mode
 - f:getDetectWhitespaceChangedLines():Z
 - f:getShowErrorStripeMarkers():Z
 - f:isVisible():Z
-f:com.intellij.openapi.vcs.ex.LocalRange
-- com.intellij.openapi.vcs.ex.Range
-- f:getChangelistId():java.lang.String
-- getClientIds():java.util.List
-- f:getExclusionState():com.intellij.openapi.vcs.ex.RangeExclusionState
 f:com.intellij.openapi.vcs.ex.PartialCommitContent
 - <init>(java.lang.CharSequence,java.lang.CharSequence,java.util.List):V
 - f:getCurrentContent():java.lang.CharSequence
@@ -3099,6 +3085,7 @@ f:com.intellij.openapi.vcs.impl.PartialChangesUtil
 - sf:getPartialTracker(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.changes.Change):com.intellij.openapi.vcs.ex.PartialLocalLineStatusTracker
 - sf:getPartialTracker(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.vcs.ex.PartialLocalLineStatusTracker
 - sf:getVirtualFile(com.intellij.openapi.vcs.changes.Change):com.intellij.openapi.vfs.VirtualFile
+- sf:isPartialChange(com.intellij.openapi.vcs.changes.Change):Z
 - sf:processPartialChanges(com.intellij.openapi.project.Project,java.util.Collection,Z,com.intellij.util.PairFunction):java.util.List
 - sf:runUnderChangeList(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.changes.LocalChangeList,java.lang.Runnable):V
 - f:underChangeList(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.changes.LocalChangeList,kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
@@ -3521,7 +3508,6 @@ a:com.intellij.openapi.vcs.vfs.AbstractVcsVirtualFile
 - p:<init>(com.intellij.openapi.vcs.FilePath):V
 - p:<init>(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vcs.FilePath):V
 - p:<init>(com.intellij.openapi.vfs.VirtualFile,java.lang.String):V
-- p:<init>(java.lang.String):V
 - a:contentsToByteArray():B[]
 - getChildren():com.intellij.openapi.vfs.VirtualFile[]
 - getFileSystem():com.intellij.openapi.vfs.VirtualFileSystem
@@ -3569,11 +3555,6 @@ c:com.intellij.openapi.vcs.vfs.VcsVirtualFile
 - <init>(com.intellij.openapi.vcs.FilePath,com.intellij.openapi.vcs.history.VcsFileRevision):V
 - <init>(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vcs.FilePath,com.intellij.openapi.vcs.history.VcsFileRevision):V
 - <init>(com.intellij.openapi.vfs.VirtualFile,java.lang.String,com.intellij.openapi.vcs.history.VcsFileRevision):V
-- <init>(com.intellij.openapi.vfs.VirtualFile,java.lang.String,com.intellij.openapi.vcs.history.VcsFileRevision,com.intellij.openapi.vfs.VirtualFileSystem):V
-- <init>(java.lang.String,com.intellij.openapi.vcs.history.VcsFileRevision):V
-- <init>(java.lang.String,com.intellij.openapi.vcs.history.VcsFileRevision,com.intellij.openapi.vfs.VirtualFileSystem):V
-- <init>(java.lang.String,B[],java.lang.String):V
-- <init>(java.lang.String,B[],java.lang.String,com.intellij.openapi.vfs.VirtualFileSystem):V
 - contentsToByteArray():B[]
 - getCharset():java.nio.charset.Charset
 - getFileRevision():com.intellij.openapi.vcs.history.VcsFileRevision
@@ -3583,8 +3564,6 @@ c:com.intellij.openapi.vcs.vfs.VcsVirtualFile
 c:com.intellij.openapi.vcs.vfs.VcsVirtualFolder
 - com.intellij.openapi.vcs.vfs.AbstractVcsVirtualFile
 - <init>(com.intellij.openapi.vcs.FilePath,com.intellij.openapi.vfs.VirtualFile):V
-- <init>(java.lang.String,com.intellij.openapi.vfs.VirtualFile):V
-- <init>(java.lang.String,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vfs.VirtualFileSystem):V
 - contentsToByteArray():B[]
 - getChildren():com.intellij.openapi.vfs.VirtualFile[]
 - isDirectory():Z
@@ -3941,11 +3920,11 @@ f:com.intellij.vcs.commit.AbstractCommitWorkflowKt
 - sf:setCleanupCommitMessage(com.intellij.openapi.vcs.changes.CommitContext,Z):V
 a:com.intellij.vcs.commit.AbstractCommitter
 - com.intellij.vcs.commit.Committer
-- sf:Companion:com.intellij.vcs.commit.AbstractCommitter$Companion
 - <init>(com.intellij.openapi.project.Project,java.lang.String,Z):V
 - pa:commit():V
+- f:getCurrentReporter():com.intellij.platform.util.progress.RawProgressReporter
 - f:runCommit(java.lang.String,Z):V
-f:com.intellij.vcs.commit.AbstractCommitter$Companion
+- f:setCurrentReporter(com.intellij.platform.util.progress.RawProgressReporter):V
 f:com.intellij.vcs.commit.ChangeListCommitState
 - <init>(com.intellij.openapi.vcs.changes.LocalChangeList,java.util.List,java.lang.String):V
 - f:getChangeList():com.intellij.openapi.vcs.changes.LocalChangeList
@@ -3963,24 +3942,36 @@ a:com.intellij.vcs.commit.ChangeListViewCommitPanel
 - f:getEditedCommit():com.intellij.platform.vcs.impl.shared.commit.EditedCommitPresentation
 - f:getIncludedChanges():java.util.List
 - f:getIncludedUnversionedFiles():java.util.List
-- f:getInclusionModel():com.intellij.openapi.vcs.changes.InclusionModel
 - f:select(java.lang.Object):V
 - f:selectFirst(java.util.Collection):V
 - f:setCompletionContext(java.util.List):V
 - f:setEditedCommit(com.intellij.platform.vcs.impl.shared.commit.EditedCommitPresentation):V
-- f:setInclusionModel(com.intellij.openapi.vcs.changes.InclusionModel):V
+- setInclusionModel(com.intellij.openapi.vcs.changes.InclusionModel):V
 f:com.intellij.vcs.commit.ChangesViewCommitPanel
-- com.intellij.vcs.commit.ChangeListViewCommitPanel
+- com.intellij.vcs.commit.NonModalCommitPanel
+- com.intellij.vcs.commit.ChangesViewCommitWorkflowUi
 - activate():Z
 - deactivate(Z):V
+- endExecution():V
+- expand(java.lang.Object):V
+- getCommitProgressUi():com.intellij.vcs.commit.CommitProgressUi
+- getDisplayedChanges():java.util.List
+- getDisplayedUnversionedFiles():java.util.List
+- getEditedCommit():com.intellij.platform.vcs.impl.shared.commit.EditedCommitPresentation
+- getIncludedChanges():java.util.List
+- getIncludedUnversionedFiles():java.util.List
 - isActive():Z
 - refreshChangesViewBeforeCommit(kotlin.coroutines.Continuation):java.lang.Object
+- select(java.lang.Object):V
+- selectFirst(java.util.Collection):V
+- setCompletionContext(java.util.List):V
+- setEditedCommit(com.intellij.platform.vcs.impl.shared.commit.EditedCommitPresentation):V
+- setInclusionModel(com.intellij.openapi.vcs.changes.InclusionModel):V
 com.intellij.vcs.commit.ChangesViewCommitWorkflowUi
 - com.intellij.vcs.commit.NonModalCommitWorkflowUi
 - a:deactivate(Z):V
 - a:endExecution():V
 - a:expand(java.lang.Object):V
-- a:getInclusionModel():com.intellij.openapi.vcs.changes.InclusionModel
 - a:isActive():Z
 - a:refreshChangesViewBeforeCommit(kotlin.coroutines.Continuation):java.lang.Object
 - a:select(java.lang.Object):V
@@ -4086,7 +4077,8 @@ c:com.intellij.vcs.commit.CommitProgressPanel
 - com.intellij.openapi.editor.event.DocumentListener
 - com.intellij.openapi.vcs.changes.InclusionListener
 - com.intellij.vcs.commit.CommitProgressUi
-- <init>(com.intellij.openapi.project.Project):V
+- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):V
+- <init>(com.intellij.openapi.project.Project,com.intellij.vcs.commit.CommitWorkflowUi,com.intellij.ui.EditorTextComponent):V
 - addCommitCheckFailure(com.intellij.vcs.commit.CommitCheckFailure):V
 - p:buildErrorText():java.lang.String
 - clearCommitCheckFailures():V

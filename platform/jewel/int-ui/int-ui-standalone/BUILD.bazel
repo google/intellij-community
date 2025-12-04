@@ -29,13 +29,13 @@ jvm_library(
   kotlinc_opts = ":custom_jewel-intUi-standalone",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//libraries/skiko",
     "@lib//:jetbrains-annotations",
     "//platform/jewel/ui",
     "//libraries/compose-foundation-desktop",
     "//platform/jewel/foundation",
-    "@lib//:jbr-api",
+    "//libraries/jbr",
   ],
   plugins = ["@lib//:compose-plugin"]
 )

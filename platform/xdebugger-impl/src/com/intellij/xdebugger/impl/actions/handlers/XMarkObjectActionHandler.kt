@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.actions.handlers
 
+import com.intellij.ide.ui.colors.rpcId
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
 import com.intellij.openapi.application.EDT
@@ -9,8 +10,8 @@ import com.intellij.platform.debugger.impl.rpc.XDebuggerValueMarkupApi
 import com.intellij.platform.debugger.impl.rpc.XValueMarkerDto
 import com.intellij.ui.ComponentUtil
 import com.intellij.xdebugger.impl.actions.MarkObjectActionHandler
-import com.intellij.xdebugger.impl.frame.XDebugManagerProxy
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy
 import com.intellij.xdebugger.impl.frame.XValueMarkers
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 import com.intellij.xdebugger.impl.ui.tree.ValueMarkerPresentationDialog
@@ -97,7 +98,7 @@ private suspend fun performMarkObject(
       return false
     }
     XDebugManagerProxy.getInstance().withId(value, proxy) { xValueId ->
-      val marker = XValueMarkerDto(markup.text, markup.color, markup.toolTipText)
+      val marker = XValueMarkerDto(markup.text, markup.color.rpcId(), markup.toolTipText)
       XDebuggerValueMarkupApi.getInstance().markValue(xValueId, marker)
     }
   }

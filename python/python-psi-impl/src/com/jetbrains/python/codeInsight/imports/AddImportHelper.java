@@ -23,15 +23,18 @@ import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.PythonCodeStyleService;
 import com.jetbrains.python.ast.impl.PyUtilCore;
 import com.jetbrains.python.codeInsight.PyCodeInsightSettings;
+import com.jetbrains.python.codeInsight.dataflow.scope.ScopeUtil;
 import com.jetbrains.python.documentation.docstrings.DocStringUtil;
 import com.jetbrains.python.documentation.doctest.PyDocstringFile;
 import com.jetbrains.python.psi.*;
+import com.jetbrains.python.psi.impl.PyBuiltinCache;
 import com.jetbrains.python.psi.impl.PyCodeFragmentWithHiddenImports;
 import com.jetbrains.python.psi.impl.PyPsiUtils;
 import com.jetbrains.python.psi.resolve.QualifiedNameFinder;
 import com.jetbrains.python.pyi.PyiFile;
 import com.jetbrains.python.pyi.PyiUtil;
-import com.jetbrains.python.sdk.PythonSdkUtil;
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
+import com.jetbrains.python.sdk.skeleton.PySkeletonUtil;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -63,7 +66,9 @@ public final class AddImportHelper {
   }
 
   public static @NotNull Comparator<String> getImportTextComparator(@NotNull PsiFile settingsAnchor) {
-    return PythonCodeStyleService.getInstance().isOptimizeImportsCaseSensitiveOrder(settingsAnchor) ? String.CASE_INSENSITIVE_ORDER : Comparator.naturalOrder();
+    return PythonCodeStyleService.getInstance().isOptimizeImportsCaseSensitiveOrder(settingsAnchor)
+           ? String.CASE_INSENSITIVE_ORDER
+           : Comparator.naturalOrder();
   }
 
   private static @NotNull List<String> getSortNames(@NotNull PyImportStatementBase importStatement) {
@@ -160,7 +165,6 @@ public final class AddImportHelper {
     if (parentElement != null) {
       parentElement.addBefore(generator.createFromImportStatement(languageLevel, qualifier, name, asName), anchor);
     }
-
   }
 
   public static @Nullable PsiElement getLocalInsertPosition(@NotNull PsiElement anchor) {
@@ -367,7 +371,8 @@ public final class AddImportHelper {
     return getImportPriorityWithReason(importStatement, resolvedFileOrDir);
   }
 
-  static @NotNull ImportPriorityChoice getImportPriorityWithReason(@NotNull PsiElement importLocation, @NotNull PsiFileSystemItem toImport) {
+  static @NotNull ImportPriorityChoice getImportPriorityWithReason(@NotNull PsiElement importLocation,
+                                                                   @NotNull PsiFileSystemItem toImport) {
     final VirtualFile vFile = toImport.getVirtualFile();
     if (vFile == null) {
       return new ImportPriorityChoice(UNRESOLVED_SYMBOL_PRIORITY, toImport + " doesn't have an associated virtual file");
@@ -380,7 +385,7 @@ public final class AddImportHelper {
     final Module module = ModuleUtilCore.findModuleForPsiElement(importLocation);
     final Sdk pythonSdk = module != null ? PythonSdkUtil.findPythonSdk(module) : projectRootManager.getProjectSdk();
 
-    if (PythonSdkUtil.isStdLib(vFile, pythonSdk)) {
+    if (PySkeletonUtil.isStdLib(vFile, pythonSdk)) {
       return new ImportPriorityChoice(ImportPriority.BUILTIN, vFile + " is either in lib but not under site-packages," +
                                                               " or belongs to the root of skeletons," +
                                                               " or is a .pyi stub definition for stdlib module");
@@ -787,18 +792,28 @@ public final class AddImportHelper {
    * @see #addOrUpdateFromImportStatement
    */
   public static void addImport(@NotNull PsiNamedElement target, @NotNull PsiFile file, @NotNull PyElement element) {
+    if (target.getContainingFile().equals(file)) return;
+    if (PyBuiltinCache.getInstance(element).isBuiltin(target)) return;
+
     if (target instanceof PsiFileSystemItem) {
       addFileSystemItemImport((PsiFileSystemItem)target, file, element);
       return;
     }
 
-    final String name = target.getName();
+    // If target is a class attribute, import the containing class
+    PsiNamedElement elementToImport = target;
+    var parent = ScopeUtil.getScopeOwner(target);
+    if (parent instanceof PyClass pyClass) {
+      elementToImport = pyClass;
+    }
+
+    final String name = elementToImport.getName();
     if (name == null) return;
 
-    final PsiFileSystemItem toImport = target.getContainingFile();
+    final PsiFileSystemItem toImport = elementToImport.getContainingFile();
     if (toImport == null) return;
 
-    final QualifiedName importPath = QualifiedNameFinder.findCanonicalImportPath(target, element);
+    final QualifiedName importPath = QualifiedNameFinder.findCanonicalImportPath(elementToImport, element);
     if (importPath == null) return;
 
     final String path = importPath.toString();
@@ -808,7 +823,7 @@ public final class AddImportHelper {
       addImportStatement(file, path, null, priority, element);
 
       final PyElementGenerator elementGenerator = PyElementGenerator.getInstance(file.getProject());
-      element.replace(elementGenerator.createExpressionFromText(LanguageLevel.forElement(target), path + "." + name));
+      element.replace(elementGenerator.createExpressionFromText(LanguageLevel.forElement(elementToImport), path + "." + name));
     }
     else {
       addOrUpdateFromImportStatement(file, path, name, null, priority, element);

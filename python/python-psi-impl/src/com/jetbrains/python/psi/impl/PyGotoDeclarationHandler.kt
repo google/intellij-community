@@ -21,6 +21,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.impl.source.resolve.FileContextUtil
 import com.jetbrains.python.PyUserInitiatedResolvableReference
 import com.jetbrains.python.psi.PyElement
+import com.jetbrains.python.psi.PyQualifiedExpression
 import com.jetbrains.python.psi.PyReferenceOwner
 import com.jetbrains.python.psi.resolve.PyResolveContext
 import com.jetbrains.python.psi.resolve.PyResolveUtil
@@ -52,15 +53,23 @@ class PyGotoDeclarationHandler : GotoDeclarationHandlerBase() {
     val referenceOwner = sourceElement as? PyReferenceOwner ?: parent as? PyReferenceOwner
     if (referenceOwner != null) {
       val results = PyResolveUtil.multiResolveDeclaration(referenceOwner.getReference(context), context)
-          .map {
-            if (PyiUtil.isInsideStub(it) && !PyiUtil.isInsideStub(FileContextUtil.getContextFile(sourceElement)!!)) {
-              PyiUtil.getOriginalElement(it as PyElement) ?: it
-            }
-            else it
+        .map {
+          if (PyiUtil.isInsideStub(it) && !PyiUtil.isInsideStub(FileContextUtil.getContextFile(sourceElement)!!)) {
+            PyiUtil.getOriginalElement(it as PyElement) ?: it
           }
-          .filter { it !== referenceOwner }
-          .groupBy { it.containingFile }
-          .flatMap { if (it.key == sourceElement.containingFile) it.value else listOf(it.value.first()) }
+          else it
+        }
+        .filter { it !== referenceOwner }
+        .groupBy { it.containingFile }
+        .flatMap { (containingFile, declarations) ->
+          if (containingFile != sourceElement.containingFile)
+            declarations.take(1)
+          // if it's a qualified expression, then it could be a union, so go to the different declarations
+          //  otherwise go to the most recent assignment
+          else if ((referenceOwner as? PyQualifiedExpression)?.isQualified == true)
+            declarations
+          else declarations.takeLast(1)
+        }
       if (results.isNotEmpty()) {
         return results.toTypedArray()
       }

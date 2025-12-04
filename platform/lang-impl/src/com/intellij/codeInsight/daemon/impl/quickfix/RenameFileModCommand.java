@@ -29,13 +29,16 @@ public class RenameFileModCommand implements ModCommandAction {
 
   @Override
   public @NotNull ModCommand perform(@NotNull ActionContext context) {
-    VirtualFile file = context.file().getVirtualFile();
-    return new ModMoveFile(file, new FutureVirtualFile(file.getParent(), myNewFileName, file.getFileType()));
+    PsiFile psiFile = context.file();
+    psiFile = psiFile.getOriginalFile();
+    VirtualFile virtualFile = psiFile.getVirtualFile();
+    return new ModMoveFile(virtualFile, new FutureVirtualFile(virtualFile.getParent(), myNewFileName, virtualFile.getFileType()));
   }
 
   @Override
   public @Nullable Presentation getPresentation(@NotNull ActionContext context) {
     PsiFile psiFile = context.file();
+    psiFile = psiFile.getOriginalFile();
     VirtualFile vFile = psiFile.getVirtualFile();
     if (vFile == null) return null;
     VirtualFile parent = vFile.getParent();

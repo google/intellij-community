@@ -12,10 +12,16 @@ import java.nio.ByteBuffer
 
 @get:ApiStatus.Internal
 val EelFileSystemApi.pathSeparator: String
-  get() = when (this) {
-    is EelFileSystemPosixApi -> ":"
-    is EelFileSystemWindowsApi -> ";"
-    else -> throw UnsupportedOperationException("Unsupported OS: ${this::class.java}")
+  get() = when (descriptor.osFamily) {
+    EelOsFamily.Posix -> ":"
+    EelOsFamily.Windows -> ";"
+  }
+
+@get:ApiStatus.Internal
+val EelFileSystemApi.separator: Char
+  get() = when (descriptor.osFamily) {
+    EelOsFamily.Posix -> '/'
+    EelOsFamily.Windows -> '\\'
   }
 
 @ApiStatus.Internal
@@ -288,6 +294,7 @@ interface EelFileSystemApi {
      * It's ready for reading, the position and the limit are already set.
      */
     val bytes: ByteBuffer
+
 
     /**
      * `true` if [bytes] contains the whole file, `false` only if the part of the file.

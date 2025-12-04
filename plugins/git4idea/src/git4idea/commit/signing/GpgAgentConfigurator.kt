@@ -21,7 +21,6 @@ import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
@@ -29,6 +28,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.platform.util.coroutines.flow.debounceBatch
 import com.intellij.util.application
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.io.createParentDirectories
 import git4idea.commands.GitScriptGenerator
 import git4idea.commit.signing.GpgAgentPathsLocator.Companion.GPG_AGENT_CONF_BACKUP_FILE_NAME
 import git4idea.commit.signing.GpgAgentPathsLocator.Companion.GPG_AGENT_CONF_FILE_NAME
@@ -61,6 +61,7 @@ import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import kotlin.io.path.copyTo
 import kotlin.io.path.exists
+import kotlin.io.path.writeText
 import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG = logger<GpgAgentConfigurator>()
@@ -73,14 +74,17 @@ internal class GpgAgentConfigurator(private val project: Project, private val cs
     @JvmStatic
     fun isEnabled(project: Project, executable: GitExecutable): Boolean =
       (Registry.`is`("git.commit.gpg.signing.enable.embedded.pinentry", false) || application.isUnitTestMode)
-      && (SystemInfo.isUnix || executable is GitExecutable.Wsl)
+      && (isRemDevOrWsl(executable) || isLocalUnix(executable))
       && signingIsEnabledInAnyRepo(project)
 
     private fun isUnitTestModeOnUnix(): Boolean =
       SystemInfo.isUnix && application.isUnitTestMode
 
+    private fun isLocalUnix(executable: GitExecutable): Boolean =
+      executable.isLocal && SystemInfo.isUnix
+
     private fun isRemDevOrWsl(executable: GitExecutable): Boolean =
-      AppMode.isRemoteDevHost() || executable is GitExecutable.Wsl
+      AppMode.isRemoteDevHost() || executable.isRemote
 
     // do not configure Gpg Agent for roots without commit.gpgSign and user.signingkey enabled
     private fun signingIsEnabledInAnyRepo(project: Project): Boolean = GitRepositoryManager.getInstance(project)
@@ -176,10 +180,7 @@ internal class GpgAgentConfigurator(private val project: Project, private val cs
   }
 
   private fun createGpgAgentExecutor(executor: GitExecutable): GpgAgentCommandExecutor {
-    if (executor is GitExecutable.Wsl) {
-      return WslGpgAgentCommandExecutor(project, executor)
-    }
-    return LocalGpgAgentCommandExecutor()
+    return GpgAgentCommandExecutorImpl(project, executor)
   }
 
   @VisibleForTesting
@@ -224,8 +225,8 @@ internal class GpgAgentConfigurator(private val project: Project, private val cs
     }
   }
 
-  private suspend fun generatePinentryLauncher(executable: GitExecutable, gpgAgentPaths: GpgAgentPaths, pinentryFallback: String?) {
-    LOG.info("Creating pinentry launcher with fallback: ${pinentryFallback ?: "-"}")
+  private suspend fun generatePinentryLauncher(executable: GitExecutable, gpgAgentPaths: GpgAgentPaths, pinentryFallback: String) {
+    LOG.info("Creating pinentry launcher with fallback: ${pinentryFallback}")
     PinentryShellScriptLauncherGenerator(executable).generate(project, gpgAgentPaths, pinentryFallback)
   }
 
@@ -324,40 +325,33 @@ internal interface GpgAgentCommandExecutor {
   fun execute(command: String, vararg params: String): List<String>
 }
 
-private class LocalGpgAgentCommandExecutor : GpgAgentCommandExecutor {
-  override fun execute(command: String, vararg params: String): List<String> {
-    val processOutput = CapturingProcessHandler
-      .Silent(GeneralCommandLine(command).withParameters(*params))
-      .runProcess(10000, true)
-    return processOutput.stdoutLines + processOutput.stderrLines
-  }
-}
-
-private class WslGpgAgentCommandExecutor(
+private class GpgAgentCommandExecutorImpl(
   private val project: Project,
-  private val executable: GitExecutable.Wsl,
+  private val executable: GitExecutable,
 ) : GpgAgentCommandExecutor {
   override fun execute(command: String, vararg params: String): List<String> {
-    val commandLine = executable.createBundledCommandLine(project, command).withParameters(*params)
+    val commandLine = if (executable.isLocal) {
+      GeneralCommandLine(command)
+    }
+    else {
+      executable.createBundledCommandLine(project, command)
+    }
     val processOutput = CapturingProcessHandler
-      .Silent(commandLine)
+      .Silent(commandLine.withParameters(*params))
       .runProcess(10000, true)
     return processOutput.stdoutLines + processOutput.stderrLines
   }
 }
 
-internal interface PinentryLauncherGenerator {
-  val executable: GitExecutable
-  fun getScriptTemplate(fallbackPinentryPath: String?): String
+internal class PinentryShellScriptLauncherGenerator(val executable: GitExecutable) {
 
-  suspend fun generate(project: Project, gpgAgentPaths: GpgAgentPaths, fallbackPinentryPath: String?) = withContext(Dispatchers.IO) {
+  suspend fun generate(project: Project, gpgAgentPaths: GpgAgentPaths, fallbackPinentryPath: String) = withContext(Dispatchers.IO) {
     val path = gpgAgentPaths.gpgPinentryAppLauncher
     try {
-      FileUtil.writeToFile(path.toFile(), getScriptTemplate(fallbackPinentryPath))
-      val executable = executable
+      path.createParentDirectories().writeText(getScriptTemplate(fallbackPinentryPath))
       if (executable is GitExecutable.Wsl) {
         val launcherConfigPath = gpgAgentPaths.gpgPinentryAppLauncherConfigPath
-        WslGpgAgentCommandExecutor(project, executable).execute("chmod", "+x", launcherConfigPath)
+        GpgAgentCommandExecutorImpl(project, executable).execute("chmod", "+x", launcherConfigPath)
       }
       else {
         NioFiles.setExecutable(path)
@@ -372,30 +366,32 @@ internal interface PinentryLauncherGenerator {
   fun getCommandLineParameters(): Array<String> {
     return if (LOG.isDebugEnabled) arrayOf("--log") else emptyArray()
   }
-}
 
-internal class PinentryShellScriptLauncherGenerator(override val executable: GitExecutable) :
-  GitScriptGenerator(executable), PinentryLauncherGenerator {
+  fun getCommandLine(): String {
+    return GitScriptGenerator(executable).addParameters(*getCommandLineParameters()).commandLine(PinentryApp::class.java, false)
+  }
 
-  @Language("Shell Script")
-  override fun getScriptTemplate(fallbackPinentryPath: String?): String {
-    if (fallbackPinentryPath == null) {
-      return """|#!/bin/sh
-                |${addParameters(*getCommandLineParameters()).commandLine(PinentryApp::class.java, false)}
-             """.trimMargin()
+  @Language("ShellScript")
+  private fun getScriptTemplate(fallbackPinentryPath: String): String {
+    return run {
+      """|#!/bin/sh
+         |if [ -n "${'$'}$PINENTRY_USER_DATA_ENV" ]; then
+         |  case "${'$'}$PINENTRY_USER_DATA_ENV" in
+         |    ${PinentryData.PREFIX}*)
+         |      ${getCommandLine()}
+         |      exit $?
+         |    ;;
+         |    ${PinentryData.ENTRYPOINT_PREFIX}*)
+         |      EXTERNAL_CLI_ENTRYPOINT=${'$'}{PINENTRY_USER_DATA#IJ_PINENTRY_ENTRYPOINT=}
+         |      EXTERNAL_CLI_ENTRYPOINT=${'$'}{EXTERNAL_CLI_ENTRYPOINT%%:*}
+         |      ${'$'}EXTERNAL_CLI_ENTRYPOINT
+         |      exit $?
+         |    ;;
+         |  esac
+         |fi
+         |exec ${CommandLineUtil.posixQuote(fallbackPinentryPath)} "$@"
+      """.trimMargin()
     }
-
-    return """|#!/bin/sh
-              |if [ -n "${'$'}$PINENTRY_USER_DATA_ENV" ]; then
-              |  case "${'$'}$PINENTRY_USER_DATA_ENV" in
-              |    ${PinentryData.PREFIX}*)
-              |      ${addParameters(*getCommandLineParameters()).commandLine(PinentryApp::class.java, false)}
-              |      exit $?
-              |    ;;
-              |  esac
-              |fi
-              |exec ${CommandLineUtil.posixQuote(fallbackPinentryPath)} "$@"
-           """.trimMargin()
   }
 }
 

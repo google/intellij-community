@@ -23,13 +23,18 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointManagerProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XLightLineBreakpointProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointHighlighterRange
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointProxy
 import com.intellij.util.DocumentUtil
 import com.intellij.util.ThreeState
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl
-import com.intellij.xdebugger.impl.frame.XDebugManagerProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy
+import com.intellij.xdebugger.impl.proxy.MonolithLineBreakpointProxy
 import com.intellij.xdebugger.ui.DebuggerColors
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -68,6 +73,7 @@ class XBreakpointVisualRepresentation(
         finally {
           // Guarantee that the highlighter is removed when the scope is canceled
           removeHighlighter()
+          redrawInlineInlays()
         }
       }
     }
@@ -113,10 +119,6 @@ class XBreakpointVisualRepresentation(
       val highlightRange = myBreakpoint.getHighlightRangeSuspend()
       if (highlightRange !is XLineBreakpointHighlighterRange.Available) return@withContext
       val range = highlightRange.range
-      if (rangeMarker != null && rangeMarker !is RangeHighlighter) {
-        removeHighlighter()
-        assert(highlighter == null)
-      }
 
       val attributes = getBreakpointAttributes()
       val highlighter = getHighlighterIfValid(range, document, attributes)
@@ -144,8 +146,9 @@ class XBreakpointVisualRepresentation(
     document: Document,
     attributes: TextAttributes?,
   ): RangeHighlighter? {
-    val highlighter = this.highlighter ?: return null
-    if (!highlighter.isValid()
+    val highlighter = rangeMarker ?: return null
+    if (highlighter !is RangeHighlighter
+        || !highlighter.isValid()
         //breakpoint range marker is out-of-sync with actual breakpoint text range
         || range != null && highlighter.textRange != range
         || !DocumentUtil.isValidOffset(highlighter.getStartOffset(), document)
@@ -252,7 +255,7 @@ class XBreakpointVisualRepresentation(
             myBreakpoint.setFileUrl(file!!.url)
             myBreakpoint.setLine(line)
             val session = debuggerManager.currentSession
-            if (session != null && myBreakpoint is XLineBreakpointProxy.Monolith) {
+            if (session != null && myBreakpoint is MonolithLineBreakpointProxy) {
               // TODO IJPL-185322 support active breakpoint update on DnD
               session.checkActiveNonLineBreakpointOnRemoval(myBreakpoint.breakpoint)
             }

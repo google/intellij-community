@@ -11,7 +11,12 @@ jvm_library(
   name = "community",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":community_resources"]
+  resources = [":community_resources"],
+  exports = ["//plugins/javaFX"],
+  runtime_deps = [
+    "//plugins/javaFX",
+    "//platform/core-ui",
+  ]
 )
 
 jvm_library(
@@ -32,6 +37,7 @@ jvm_library(
     "//java/testFramework",
     "//jps/model-api:model",
     "//platform/projectModel-api:projectModel",
+    "//xml/xml-analysis-api:analysis",
     "//platform/refactoring",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -51,7 +57,8 @@ jvm_library(
   exports = [
     "//plugins/javaFX",
     "//plugins/javaFX:javaFX_test_lib",
-  ]
+  ],
+  runtime_deps = [":community"]
 )
 ### auto-generated section `build intellij.javaFX.community` end
 

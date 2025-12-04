@@ -233,7 +233,7 @@ public final class PyResolveUtil {
   /**
    * Resolve a symbol by its qualified name, climbing up from the specified scope until the first component
    * of the qualified is resolved and then following the chain of type members.
-   * <p> 
+   * <p>
    * This type of resolve is stub-safe, i.e. it's not supposed to cause any un-stubbing of external files unless it is explicitly
    * allowed by the given type evaluation context.
    *
@@ -393,7 +393,7 @@ public final class PyResolveUtil {
    * <i>Note: the returned stream could contain null values.</i>
    */
   private static @NotNull StreamEx<PsiElement> fullMultiResolveLocally(@NotNull PyReferenceExpression referenceExpression,
-                                                              @NotNull Set<PyReferenceExpression> visited) {
+                                                                       @NotNull Set<PyReferenceExpression> visited) {
     return StreamEx
       .of(resolveLocally(referenceExpression))
       .flatMap(
@@ -520,7 +520,8 @@ public final class PyResolveUtil {
     return rate;
   }
 
-  public static @NotNull List<@NotNull PsiElement> multiResolveDeclaration(@NotNull PsiReference reference, @NotNull PyResolveContext resolveContext) {
+  public static @NotNull List<@NotNull PsiElement> multiResolveDeclaration(@NotNull PsiReference reference,
+                                                                           @NotNull PyResolveContext resolveContext) {
     final PsiElement element = reference.getElement();
 
     final var context = resolveContext.getTypeEvalContext();
@@ -528,9 +529,7 @@ public final class PyResolveUtil {
     if (call != null && element instanceof PyTypedElement) {
       final var type = PyUtil.as(context.getType((PyTypedElement)element), PyClassType.class);
 
-      if (type != null && type.isDefinition()) {
-        final var cls = type.getPyClass();
-
+      if (type != null && type.isDefinition() && type.getDeclarationElement() instanceof PyClass cls) {
         final var constructor = ContainerUtil.find(
           PyUtil.filterTopPriorityElements(PyCallExpressionHelper.resolveImplicitlyInvokedMethods(type, call, resolveContext)),
           it -> it instanceof PyPossibleClassMember possibleClassMember && possibleClassMember.getContainingClass() == cls
@@ -545,15 +544,11 @@ public final class PyResolveUtil {
     if (reference instanceof PsiPolyVariantReference multiReference) {
       return PyUtil.multiResolveTopPriority(multiReference);
     }
-    final var result = reference.resolve();
-    if (result == null) return List.of();
-    return List.of(result);
+    return ContainerUtil.createMaybeSingletonList(reference.resolve());
   }
 
   public static @Nullable PsiElement resolveDeclaration(@NotNull PsiReference reference, @NotNull PyResolveContext resolveContext) {
-    final var result = multiResolveDeclaration(reference, resolveContext);
-    if (result.isEmpty()) return null;
-    return result.get(0);
+    return ContainerUtil.getFirstItem(multiResolveDeclaration(reference, resolveContext));
   }
 
   private static @NotNull List<RatedResolveResult> resolveTypeParameters(@NotNull PyTypeParameterListOwner typeParameterListOwner,

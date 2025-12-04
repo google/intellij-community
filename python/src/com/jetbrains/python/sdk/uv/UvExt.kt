@@ -7,7 +7,8 @@ import com.intellij.python.pyproject.PY_PROJECT_TOML
 import com.intellij.util.PathUtil
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.icons.PythonIcons
-import com.jetbrains.python.sdk.PythonSdkUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
+import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.createSdk
 import com.jetbrains.python.sdk.getOrCreateAdditionalData
 import com.jetbrains.python.sdk.uv.impl.createUvCli
@@ -41,9 +42,6 @@ internal fun suggestedSdkName(basePath: Path): @NlsSafe String {
   return "uv (${PathUtil.getFileName(basePath.pathString)})"
 }
 
-val UV_ICON: Icon = PythonIcons.UV
-
-
 suspend fun setupNewUvSdkAndEnv(
   workingDir: Path,
   existingSdks: List<Sdk>,
@@ -52,7 +50,7 @@ suspend fun setupNewUvSdkAndEnv(
   val toml = workingDir.resolve(PY_PROJECT_TOML)
   val init = !toml.exists()
 
-  val uv = createUvLowLevel(workingDir, createUvCli())
+  val uv = createUvLowLevel(workingDir, createUvCli().getOr { return it })
   val envExecutable = uv.initializeEnvironment(init, version)
     .getOr {
       return it
@@ -69,7 +67,7 @@ suspend fun setupExistingEnvAndSdk(
   existingSdks: List<Sdk>,
 ): PyResult<Sdk> {
   val sdk = createSdk(
-    envExecutable,
+    PathHolder.Eel(envExecutable),
     existingSdks,
     projectDir.toString(),
     suggestedSdkName(envWorkingDir),

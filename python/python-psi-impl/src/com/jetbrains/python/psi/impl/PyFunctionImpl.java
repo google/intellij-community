@@ -35,7 +35,7 @@ import com.jetbrains.python.psi.stubs.PyClassStub;
 import com.jetbrains.python.psi.stubs.PyFunctionStub;
 import com.jetbrains.python.psi.stubs.PyTargetExpressionStub;
 import com.jetbrains.python.psi.types.*;
-import com.jetbrains.python.sdk.PythonSdkUtil;
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -247,6 +247,7 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
         type = null;
       }
     }
+    // TODO Is it still needed if we infer Self as a return type?
     else if (receiver != null) {
       type = replaceSelf(type, receiver, context);
     }
@@ -389,7 +390,7 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
       }
       return null;
     }
-    return PyUnionType.union(types);
+    return PyUnionType.unionOrNever(types);
   }
 
   @Override
@@ -402,7 +403,7 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
       boolean collectImplicitReturn = true;
 
       ControlFlowUtil.Operation checkInstruction(@NotNull Instruction instruction) {
-        if (dataFlow.isUnreachable(instruction)) {
+        if (dataFlow.getReachability(instruction) != Reachability.REACHABLE) {
           return ControlFlowUtil.Operation.CONTINUE;
         }
         if (instruction instanceof PyFinallyFailExitInstruction exitInstruction) {
@@ -740,7 +741,8 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
       if (decos.length > 0) {
         for (int i = decos.length - 1; i >= 0; i -= 1) {
           PyDecorator deco = decos[i];
-          List<PyKnownDecorator> knownDecorators = PyKnownDecoratorUtil.asKnownDecorators(deco, TypeEvalContext.codeInsightFallback(getProject()));
+          List<PyKnownDecorator> knownDecorators =
+            PyKnownDecoratorUtil.asKnownDecorators(deco, TypeEvalContext.codeInsightFallback(getProject()));
           for (PyKnownDecorator decorator : knownDecorators) {
             if (decorator.isClassMethod() || decorator.isStaticMethod()) {
               return decorator;
@@ -788,15 +790,6 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
   @Override
   public @Nullable PyAnnotation getAnnotation() {
     return getStubOrPsiChild(PyStubElementTypes.ANNOTATION);
-  }
-
-  /**
-   * is `function` a method or a classmethod
-   */
-  public static boolean isMethod(PyFunction function) {
-    final var isMethod = ScopeUtil.getScopeOwner(function) instanceof PyClass;
-    final var modifier = function.getModifier();
-    return (isMethod && modifier == null) || modifier == CLASSMETHOD;
   }
 
   /**

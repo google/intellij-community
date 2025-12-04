@@ -40,6 +40,9 @@ concurrent.interpreters._queues.UNBOUND_REMOVE
 
 importlib.util.Loader.exec_module  # See Lib/importlib/_abc.py. Might be defined for backwards compatibility
 
+# Condition functions are exported in __init__
+threading.Condition.locked
+multiprocessing.dummy.Condition.locked
 
 # ====================================
 # Pre-existing errors from Python 3.13
@@ -83,6 +86,9 @@ _collections_abc.MutableMapping.setdefault
 posixpath.join
 ntpath.join
 os.path.join
+
+# this is implemented with *args having a minimum size so arguments before it must be positional (but stubtest doesn't see that)
+tkinter.ttk.Style.element_create
 
 # typing.IO uses positional-or-keyword arguments, but in the stubs we prefer
 # to mark these as positional-only for compatibility with existing sub-classes.

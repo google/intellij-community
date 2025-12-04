@@ -1032,7 +1032,7 @@ public class PyStubsTest extends PyTestCase {
     final TypeEvalContext context = TypeEvalContext.codeInsightFallback(myFixture.getProject());
     final PyType typeDef = context.getType(type);
 
-    assertTrue(typeDef instanceof PyTypingNewType);
+    assertInstanceOf(typeDef, PyTypingNewTypeFactoryType.class);
     assertNotParsed(file);
   }
 
@@ -1192,7 +1192,6 @@ public class PyStubsTest extends PyTestCase {
     assertFalse(customStub.getEqDefault());
     assertTrue(customStub.getOrderDefault());
     assertFalse(customStub.getKwOnlyDefault());
-    assertFalse(customStub.getFrozenDefault());
     assertEquals(
       List.of(
         QualifiedName.fromDottedString("field1"),

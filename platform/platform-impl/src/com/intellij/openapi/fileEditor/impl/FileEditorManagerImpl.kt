@@ -6,6 +6,7 @@ package com.intellij.openapi.fileEditor.impl
 
 import com.intellij.codeInsight.intention.preview.IntentionPreviewUtils
 import com.intellij.codeWithMe.ClientId
+import com.intellij.codeWithMe.asContextElement
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.diagnostic.PerformanceWatcher
 import com.intellij.featureStatistics.fusCollectors.FileEditorCollector
@@ -488,22 +489,24 @@ open class FileEditorManagerImpl(
   private suspend fun rootsChanged(fileEditorProviderManager: FileEditorProviderManager) {
     val fileToProviders = IdentityHashMap<VirtualFile, List<FileEditorProvider>>()
     val providerChanges = openedComposites.toList().mapNotNull { composite ->
-      val file = composite.file
-      val providers = fileToProviders.getOrPut(file) { fileEditorProviderManager.getProvidersAsync(project, file) }
-      val editorTypeIds = providers.mapTo(LinkedHashSet()) { it.editorTypeId }
-      val oldEditorTypeIds = getEditorTypeIds(composite)
-      if (oldEditorTypeIds.isEmpty()) {
-        // not initialized or invalid
-        return@mapNotNull null
-      }
+      withContext(composite.clientId.asContextElement()) {
+        val file = composite.file
+        val providers = fileToProviders.getOrPut(file) { fileEditorProviderManager.getProvidersAsync(project, file) }
+        val editorTypeIds = providers.mapTo(LinkedHashSet()) { it.editorTypeId }
+        val oldEditorTypeIds = getEditorTypeIds(composite)
+        if (oldEditorTypeIds.isEmpty()) {
+          // not initialized or invalid
+          return@withContext null
+        }
 
-      val newProviders = providers.filter { !oldEditorTypeIds.contains(it.editorTypeId) }
-      val editorTypeIdsToRemove = oldEditorTypeIds.filter { !editorTypeIds.contains(it) }
-      if (newProviders.isEmpty() && editorTypeIdsToRemove.isEmpty()) {
-        null
-      }
-      else {
-        ProviderChange(composite = composite, newProviders = newProviders, editorTypeIdsToRemove = editorTypeIdsToRemove)
+        val newProviders = providers.filter { !oldEditorTypeIds.contains(it.editorTypeId) }
+        val editorTypeIdsToRemove = oldEditorTypeIds.filter { !editorTypeIds.contains(it) }
+        if (newProviders.isEmpty() && editorTypeIdsToRemove.isEmpty()) {
+          null
+        }
+        else {
+          ProviderChange(composite = composite, newProviders = newProviders, editorTypeIdsToRemove = editorTypeIdsToRemove)
+        }
       }
     }
     if (providerChanges.isEmpty()) {
@@ -918,6 +921,15 @@ open class FileEditorManagerImpl(
   }
 
   override suspend fun openFile(file: VirtualFile, options: FileEditorOpenOptions): FileEditorComposite {
+    if (!ClientId.isCurrentlyUnderLocalId) {
+      return clientFileEditorManager?.openFileAsync(
+        file = file,
+        // it used to be passed as forceCreate=false there, so we need to pass it as reuseOpen=true
+        // otherwise, any navigation will open a new editor composite which is invisible in RD mode
+        options = options.copy(reuseOpen = true),
+      ) ?: FileEditorComposite.EMPTY
+    }
+
     val mode = options.openMode
     if (mode == OpenMode.NEW_WINDOW) {
       return withContext(Dispatchers.EDT) {
@@ -948,17 +960,11 @@ open class FileEditorManagerImpl(
       }
     }
 
-    val isCurrentlyUnderLocalId = ClientId.isCurrentlyUnderLocalId
-
-    var composite: FileEditorComposite? = withContext(Dispatchers.EDT) {
+    val composite: FileEditorComposite? = withContext(Dispatchers.EDT) {
       writeIntentReadAction {
         val window = getWindowToOpen(options, file)
         if (forbidSplitFor(file) && !window.isFileOpen(file)) {
           closeFile(file)
-        }
-
-        if (!isCurrentlyUnderLocalId) {
-          return@writeIntentReadAction null
         }
 
         @Suppress("DuplicatedCode")
@@ -968,21 +974,11 @@ open class FileEditorManagerImpl(
       }
     }
 
-    if (composite == null) {
-      assert(!isCurrentlyUnderLocalId)
-      composite = clientFileEditorManager?.openFileAsync(
-        file = file,
-        // it used to be passed as forceCreate=false there, so we need to pass it as reuseOpen=true
-        // otherwise, any navigation will open a new editor composite which is invisible in RD mode
-        options = options.copy(reuseOpen = true),
-      ) ?: FileEditorComposite.EMPTY
-    }
-
     // The client of the `openFile` API expects an editor to be available after invocation, so we wait until the file is opened
     if (composite is EditorComposite) {
       composite.waitForAvailable()
     }
-    return composite
+    return composite ?: FileEditorComposite.EMPTY
   }
 
   @ApiStatus.Internal

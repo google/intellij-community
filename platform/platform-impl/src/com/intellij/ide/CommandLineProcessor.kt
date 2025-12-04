@@ -12,6 +12,7 @@ import com.intellij.ide.lightEdit.LightEditFeatureUsagesUtil.OpenPlace
 import com.intellij.ide.lightEdit.LightEditService
 import com.intellij.ide.lightEdit.LightEditUtil
 import com.intellij.ide.util.PsiNavigationSupport
+import com.intellij.idea.ApplicationStartArguments
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.*
@@ -32,8 +33,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.platform.CommandLineProjectOpenProcessor
+import com.intellij.platform.FolderProjectOpenProcessor
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.configureToOpenDotIdeaOrCreateNewIfNotExists
-import com.intellij.platform.ide.bootstrap.CommandLineArgs
 import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.ui.AppIcon
 import com.intellij.util.PlatformUtils
@@ -78,16 +79,26 @@ object CommandLineProcessor {
 
   @VisibleForTesting
   @ApiStatus.Internal
-  suspend fun doOpenFileOrProject(file: Path, shouldWait: Boolean): CommandLineProcessorResult {
+  suspend fun doOpenFileOrProject(file: Path, createOrOpenExistingProject: Boolean, shouldWait: Boolean): CommandLineProcessorResult {
     if (!LightEditUtil.isForceOpenInLightEditMode()) {
       val options = OpenProjectTask {
         // do not check for .ipr files in the specified directory
         // (@develar: it is existing behavior, I am not fully sure that it is correct)
         preventIprLookup = true
-        configureToOpenDotIdeaOrCreateNewIfNotExists(projectDir = file, projectToClose = null)
+        if (createOrOpenExistingProject) {
+          configureToOpenDotIdeaOrCreateNewIfNotExists(projectDir = file, projectToClose = null)
+        }
+        else {
+          runConfigurators = false
+          createModule = false
+          useDefaultProjectAsTemplate = false
+          projectRootDir = file
+          processorChooser = { FolderProjectOpenProcessor() }
+        }
       }
       try {
         val project = ProjectUtil.openOrImportAsync(file, options)
+        // project is null, for example, when a regular file is opened
         if (project != null) {
           val future = if (shouldWait) CommandLineWaitingManager.getInstance().addHookForProject(project).asDeferred() else OK_FUTURE
           return CommandLineProcessorResult(project, future)
@@ -233,6 +244,9 @@ object CommandLineProcessor {
     for (arg in args) logMessage.append(arg).append('\n')
     logMessage.append("-----")
     LOG.info(logMessage.toString())
+
+    val args = ApplicationStartArguments.stripKnownArguments(args)
+
     if (args.isEmpty()) {
       FUSProjectHotStartUpMeasurer.noProjectFound()
       if (focusApp) {
@@ -400,7 +414,7 @@ object CommandLineProcessor {
     var i = 0
     while (i < args.size) {
       var arg = args[i]
-      if (CommandLineArgs.isKnownArgument(arg) || OPTION_WAIT == arg) {
+      if (OPTION_WAIT == arg) {
         i++
         continue
       }
@@ -429,8 +443,7 @@ object CommandLineProcessor {
         continue
       }
       if (arg == "-p" || arg == "--project") {
-        // Skip, replaced with the opposite option above
-        // TODO<rv>: Remove in future versions
+        tempProject = false
         i++
         continue
       }
@@ -477,7 +490,7 @@ object CommandLineProcessor {
   ): CommandLineProcessorResult = LightEditUtil.computeWithCommandLineOptions(shouldWait, lightEditMode).use {
     val asFile = line != -1 || tempProject
     if (asFile) doOpenFile(file, line, column, tempProject, shouldWait)
-    else doOpenFileOrProject(file, shouldWait)
+    else doOpenFileOrProject(file, !tempProject, shouldWait)
   }
 }
 

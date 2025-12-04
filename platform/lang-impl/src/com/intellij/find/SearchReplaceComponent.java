@@ -5,6 +5,7 @@ import com.intellij.find.editorHeaderActions.*;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
 import com.intellij.ide.lightEdit.LightEditCompatible;
+import com.intellij.ide.ui.UISettings;
 import com.intellij.ide.ui.laf.darcula.ui.DarculaTextBorder;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
@@ -26,7 +27,9 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.ui.*;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
+import com.intellij.ui.components.JBViewport;
 import com.intellij.ui.components.TextComponentEmptyText;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.components.panels.Wrapper;
@@ -205,17 +208,10 @@ public final class SearchReplaceComponent extends EditorHeaderComponent implemen
     };
     myReplaceFieldWrapper.setBorder(JBUI.Borders.emptyTop(1));
 
-    JPanel leftPanel = new JPanel(new GridBagLayout());
+    JPanel leftPanel = new JPanel(new BorderLayout());
     leftPanel.setBackground(JBUI.CurrentTheme.Editor.BORDER_COLOR);
-    GridBagConstraints constraints = new GridBagConstraints();
-    constraints.gridx = 0;
-    constraints.gridy = 0;
-    constraints.fill = GridBagConstraints.BOTH;
-    constraints.weightx = 1;
-    constraints.weighty = 1;
-    leftPanel.add(mySearchFieldWrapper, constraints);
-    constraints.gridy++;
-    leftPanel.add(myReplaceFieldWrapper, constraints);
+    leftPanel.add(mySearchFieldWrapper, BorderLayout.NORTH);
+    leftPanel.add(myReplaceFieldWrapper, BorderLayout.SOUTH);
 
     if (showSeparator) {
       leftPanel.setBorder(new AbstractBorder() {
@@ -372,12 +368,12 @@ public final class SearchReplaceComponent extends EditorHeaderComponent implemen
     }
     updateTextComponentBorders();
     if (myModePanel != null) {
-      Border border = JBUI.Borders.empty(JBUI.CurrentTheme.Editor.SearchReplaceModePanel.borderInsets());
       if (myIslandsEnabled) {
-        myModePanel.setBorder(border);
+        myModePanel.setBorder(JBUI.Borders.empty(5, 3, 3, 3));
       }
       else {
-        myModePanel.setBorder(JBUI.Borders.compound(JBUI.Borders.customLine(JBUI.CurrentTheme.Editor.BORDER_COLOR, 0, 0, 0, 1), border));
+        myModePanel.setBorder(JBUI.Borders.compound(JBUI.Borders.customLine(JBUI.CurrentTheme.Editor.BORDER_COLOR, 0, 0, 0, 1),
+                                                    JBUI.Borders.empty(JBUI.CurrentTheme.Editor.SearchReplaceModePanel.borderInsets())));
       }
     }
   }
@@ -660,6 +656,24 @@ public final class SearchReplaceComponent extends EditorHeaderComponent implemen
           }
           return defaultSize;
         }
+
+        @Override
+        protected int getRowHeight() {
+          if (!myIslandsEnabled) {
+            return super.getRowHeight();
+          }
+          Insets insets = getInsets();
+          int parentBorders = 0;
+          Container parent = getParent();
+          if (parent instanceof JBViewport) {
+            parent = parent.getParent();
+            if (parent instanceof JBScrollPane) {
+              Insets parentInsent = parent.getInsets();
+              parentBorders = parentInsent.top + parentInsent.bottom;
+            }
+          }
+          return JBUI.scale(UISettings.getInstance().getCompactMode() ? 24 : 28) - insets.top - insets.bottom - parentBorders;
+        }
       };
       ((JBTextArea)innerTextComponent).setRows(isMultiline() ? 2 : 1);
       ((JBTextArea)innerTextComponent).setColumns(12);
@@ -740,7 +754,13 @@ public final class SearchReplaceComponent extends EditorHeaderComponent implemen
       component.setBorder(new DarculaTextBorder() {
         @Override
         public Insets getBorderInsets(Component c) {
-          return new JBInsets(4, 6, 0, 6).asUIResource();
+          int top = 4;
+          int bottom = 2;
+          if (UISettings.getInstance().getCompactMode()) {
+            top = 2;
+            bottom = 4;
+          }
+          return new JBInsets(top, 6, bottom, 6).asUIResource();
         }
 
         @Override
@@ -748,7 +768,10 @@ public final class SearchReplaceComponent extends EditorHeaderComponent implemen
           Rectangle r = new Rectangle(x, y, width, height);
           boolean fillBackground = JBColor.isBright();
           Color bgColor = fillBackground ? UIUtil.getTextFieldBackground() : null;
-          paintDarculaSearchArea((Graphics2D)g, r, (JComponent)c, bgColor, fillBackground, c.isEnabled());
+          if (c instanceof SearchTextArea area) {
+            c = area.getTextArea();
+          }
+          paintDarculaSearchArea((Graphics2D)g, r, (JComponent)c, bgColor, fillBackground, c.isEnabled(), true);
         }
       });
     }

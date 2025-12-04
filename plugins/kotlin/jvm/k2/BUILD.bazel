@@ -1,18 +1,18 @@
-### auto-generated section `build kotlin.jvm.k2` start
+### auto-generated section `build intellij.kotlin.jvm` start
 load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 resourcegroup(
-  name = "k2_resources",
+  name = "kotlin-jvm_resources",
   srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
 
 jvm_library(
-  name = "k2",
-  module_name = "kotlin.jvm.k2",
+  name = "kotlin-jvm",
+  module_name = "intellij.kotlin.jvm",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":k2_resources"],
+  resources = [":kotlin-jvm_resources"],
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
@@ -31,6 +31,7 @@ jvm_library(
     "//plugins/kotlin/idea",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/psi",
+    "//platform/execution",
     "//java/execution/impl",
     "//java/java-frontback-psi-api:frontback-psi",
     "//platform/vcs-impl",
@@ -40,12 +41,13 @@ jvm_library(
     "//java/java-frontback-psi-impl:frontback-psi-impl",
     "//plugins/kotlin/base/code-insight",
     "//java/java-psi-impl:psi-impl",
-    "//plugins/kotlin/base/scripting/scripting.k2",
+    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-analysis-api-platform-interface",
     "//plugins/kotlin/base/scripting/scripting.shared",
     "//platform/util/jdom",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
+    "@lib//:kotlinc-kotlin-scripting-common",
   ]
 )
-### auto-generated section `build kotlin.jvm.k2` end
+### auto-generated section `build intellij.kotlin.jvm` end

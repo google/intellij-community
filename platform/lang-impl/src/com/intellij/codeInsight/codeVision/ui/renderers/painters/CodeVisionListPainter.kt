@@ -6,6 +6,7 @@ import com.intellij.codeInsight.codeVision.ui.model.ProjectCodeVisionModel
 import com.intellij.codeInsight.codeVision.ui.model.RangeCodeVisionModel
 import com.intellij.codeInsight.codeVision.ui.renderers.providers.painter
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.markup.TextAttributes
 import org.jetbrains.annotations.ApiStatus
@@ -86,7 +87,7 @@ open class CodeVisionListPainter(
       painter.paint(editor, textAttributes, g, it, Point(x, y), state, it == hoveredEntry, hoveredEntry)
       x += size.width
 
-      if (painter.shouldBeDelimited() && (index < value.visibleLens.size - 1 || hovered)) {
+      if (painter.shouldBeDelimited(it) && (index < value.visibleLens.size - 1 || hovered)) {
         delimiterPainter.paint(editor, textAttributes, g, Point(x, y), state, false)
         x += delimiterWidth
       }
@@ -132,7 +133,7 @@ open class CodeVisionListPainter(
   }
 
   @ApiStatus.Internal
-  open fun inlayHeightInPixels(editor: Editor): Int? {
+  open fun inlayHeightInPixels(editor: Editor, inlay: Inlay<*>): Int? {
     return null
   }
 

@@ -104,7 +104,11 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     dataContextId: DataContextId,
   ): SeSortedProviderIds? {
     val providersHolder = getProvidersHolder(session, dataContextId) ?: return null
-    val allProviderIds = SeItemsProviderFactory.EP_NAME.extensionList.map { it.id.toProviderId() } + providersHolder.legacyAllTabContributors.map { it.key }
+    val allProviderIds = (SeItemsProviderFactory.EP_NAME.extensionList.map { it.id.toProviderId() } +
+                          providersHolder.legacyContributors.allTab.map { it.key }).filter {
+      // Remove the frontend version of TopHit contributor
+      it.value != SeProviderIdUtils.TOP_HIT_ID
+    }
     return SeSortedProviderIds.create(allProviderIds, providersHolder, session)
   }
 
@@ -256,6 +260,30 @@ class SeBackendService(val project: Project, private val coroutineScope: Corouti
     return providerIds.any { providerId ->
       val provider = getProvidersHolder(session, dataContextId)?.get(providerId, isAllTab)
       provider?.isPreviewEnabled() ?: false
+    }
+  }
+
+  suspend fun isExtendedInfoEnabled(
+    session: SeSession,
+    dataContextId: DataContextId,
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): Boolean {
+    return providerIds.any { providerId ->
+      val provider = getProvidersHolder(session, dataContextId)?.get(providerId, isAllTab)
+      provider?.isExtendedInfoEnabled() ?: false
+    }
+  }
+
+  suspend fun isCommandsSupported(
+    session: SeSession,
+    dataContextId: DataContextId,
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): Boolean {
+    return providerIds.any { providerId ->
+      val provider = getProvidersHolder(session, dataContextId)?.get(providerId, isAllTab)
+      provider?.isCommandsSupported() ?: false
     }
   }
 

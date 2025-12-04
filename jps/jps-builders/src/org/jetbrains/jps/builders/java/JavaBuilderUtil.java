@@ -45,7 +45,9 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 public final class JavaBuilderUtil {
 
@@ -437,7 +439,8 @@ public final class JavaBuilderUtil {
       .calculateAffected(context.shouldDifferentiate(chunk) && !isForcedRecompilationAllJavaModules(context))
       .processConstantsIncrementally(dataManager.isProcessConstantsIncrementally())
       .withAffectionFilter(s -> moduleBasedFilter.accept(pathMapper.toPath(s).toFile()) && !LibraryDef.isLibraryPath(s))
-      .withChunkStructureFilter(s -> moduleBasedFilter.belongsToCurrentTargetChunk(pathMapper.toPath(s).toFile()));
+      .withChunkStructureFilter(s -> moduleBasedFilter.belongsToCurrentTargetChunk(pathMapper.toPath(s).toFile()))
+      .withLogConsumer(LogConsumer.createJULogConsumer(Level.FINE));
     DifferentiateParameters differentiateParams = params.get();
     DifferentiateResult diffResult = dependencyGraph.differentiate(delta, differentiateParams);
 
@@ -447,7 +450,7 @@ public final class JavaBuilderUtil {
       // some compilers (and compiler plugins) may produce different outputs for the same set of inputs.
       // This might cause corresponding graph Nodes to be considered as always 'changed'. In some scenarios this may lead to endless build loops
       // This fallback logic detects such loops and recompiles the whole module chunk instead.
-      Set<NodeSource> affectedForChunk = Iterators.collect(Iterators.filter(diffResult.getAffectedSources(), differentiateParams.belongsToCurrentCompilationChunk()::test), new HashSet<>());
+      Set<NodeSource> affectedForChunk = Iterators.collect(Iterators.filter(diffResult.getAffectedSources(), differentiateParams.belongsToCurrentCompilationChunk()), new HashSet<>());
       if (!affectedForChunk.isEmpty() && !getOrCreate(context, ALL_AFFECTED_NODE_SOURCES_KEY, HashSet::new).addAll(affectedForChunk)) {
         // all affected files in this round have already been affected in previous rounds. This might indicate a build cycle => recompiling whole chunk
         LOG.info("Build cycle detected for " + chunk.getName() + "; recompiling whole module chunk");
@@ -736,12 +739,7 @@ public final class JavaBuilderUtil {
       }
       Set<BuildTarget<?>> targetOfFileWithDependencies = myCache.computeIfAbsent(
         targetOfFile,
-        trg -> Iterators.collect(Iterators.recurseDepth(trg, new Iterators.Function<BuildTarget<?>, Iterable<? extends BuildTarget<?>>>() {
-          @Override
-          public Iterable<? extends BuildTarget<?>> fun(BuildTarget<?> t) {
-            return myBuildTargetIndex.getDependencies(t, myContext);
-          }
-        }, false), new HashSet<>())
+        trg -> Iterators.collect(Iterators.recurseDepth(trg, (Function<BuildTarget<?>, Iterable<? extends BuildTarget<?>>>) t -> myBuildTargetIndex.getDependencies(t, myContext), false), new HashSet<>())
       );
       return ContainerUtil.intersects(targetOfFileWithDependencies, myChunkTargets);
     }

@@ -2,6 +2,9 @@
 package org.jetbrains.intellij.build
 
 import com.intellij.util.text.SemVer
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentHashMapOf
+import kotlinx.collections.immutable.plus
 import org.apache.maven.model.Developer
 import org.apache.maven.model.License
 import org.apache.maven.model.Model
@@ -20,7 +23,8 @@ import org.jetbrains.jps.model.module.JpsModuleDependency
 import kotlin.io.path.exists
 
 private const val GROUP_ID: String = "org.jetbrains.jewel"
-private val CORE: Map<String, String> = mapOf(
+
+private val CORE: PersistentMap<String, String> = persistentHashMapOf(
   "intellij.platform.jewel.foundation" to "jewel-foundation",
   "intellij.platform.jewel.markdown.core" to "jewel-markdown-core",
   "intellij.platform.jewel.ui" to "jewel-ui",
@@ -30,9 +34,13 @@ private val CORE: Map<String, String> = mapOf(
   "intellij.platform.jewel.markdown.extensions.gfmAlerts" to "jewel-markdown-extensions-gfm-alerts",
   "intellij.platform.jewel.markdown.extensions.images" to "jewel-markdown-extensions-images",
 )
-private val NOT_PUBLISHED: Set<String> = setOf("intellij.platform.jewel.ideLafBridge", "intellij.platform.jewel.markdown.ideLafBridgeStyling")
 
-private val transitiveJewelDependencies = mapOf(
+private val NOT_PUBLISHED: Set<String> = setOf(
+  "intellij.platform.jewel.ideLafBridge",
+  "intellij.platform.jewel.markdown.ideLafBridgeStyling",
+)
+
+private val transitiveJewelDependencies = persistentHashMapOf(
   "jewel-foundation" to emptySet(),
   "jewel-ui" to emptySet(),
   "jewel-decorated-window" to setOf("jewel-foundation", "jewel-ui"),
@@ -48,14 +56,14 @@ private val transitiveJewelDependencies = mapOf(
 )
 
 internal object JewelMavenArtifacts {
-  internal val STANDALONE: Map<String, String> = mapOf(
+  internal val STANDALONE: PersistentMap<String, String> = persistentHashMapOf(
     "intellij.platform.jewel.markdown.intUiStandaloneStyling" to "jewel-markdown-int-ui-standalone-styling",
     "intellij.platform.jewel.intUi.decoratedWindow" to "jewel-int-ui-decorated-window",
     "intellij.platform.jewel.intUi.standalone" to "jewel-int-ui-standalone",
     "intellij.platform.jewel.decoratedWindow" to "jewel-decorated-window",
   )
 
-  private val ALL: Map<String, String> = CORE + STANDALONE
+  private val ALL: PersistentMap<String, String> = CORE + STANDALONE
 
   internal val ALL_MODULES: Set<String> = ALL.keys
 
@@ -69,9 +77,8 @@ internal object JewelMavenArtifacts {
     DependenciesProperties(COMMUNITY_ROOT, jewelProperties).property("jewel.release.version")
   }
 
-  fun isPublishedJewelModule(module: JpsModule): Boolean {
-    return module.name.startsWith("intellij.platform.jewel.") && module.name !in NOT_PUBLISHED
-  }
+  fun isPublishedJewelModule(module: JpsModule): Boolean =
+    module.name.startsWith("intellij.platform.jewel.") && module.name !in NOT_PUBLISHED
 
   fun patchCoordinates(module: JpsModule, coordinates: MavenCoordinates): MavenCoordinates {
     check(isPublishedJewelModule(module))
@@ -129,7 +136,7 @@ internal object JewelMavenArtifacts {
         // * org.jetbrains:annotations
         // * org.jetbrains.skiko:*
         // * org.jetbrains.kotlin:kotlin-stdlib
-        // * com.intellij.platform:kotlinx-coroutines-core-jvm — we want to use the "normal" one, not the IJP fork
+        // * org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core-jvm — we want to use the "normal" one, not the IJP fork
       }
     }
   }
@@ -182,12 +189,7 @@ internal object JewelMavenArtifacts {
       .flatMap { it.modulesTree() }
       .distinct().forEach { module ->
         val artifact = mavenArtifacts.singleOrNull { (it) -> it.name == module.name }
-        if (module.isLibraryModule()) {
-          check(artifact == null) {
-            "Maven artifact for the library module ${module.name} is not supposed to be created: $artifact"
-          }
-        }
-        else {
+        if (!module.isLibraryModule()) {
           checkNotNull(artifact) {
             "No maven artifact is created for the module ${module.name}:\n$mavenArtifacts"
           }

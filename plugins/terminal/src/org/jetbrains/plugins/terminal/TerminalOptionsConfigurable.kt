@@ -137,6 +137,9 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
             .component
         }
 
+        val inlineCompletionSettingsProvider = TerminalCloudCompletionSettingsProvider.getProvider()
+        val inlineCompletionAvailable = inlineCompletionSettingsProvider?.isAvailable() == true
+        val commandCompletionAvailable = TerminalCommandCompletion.isEnabled(project)
         group(message("terminal.command.completion")) {
           rowsRange {
             lateinit var completionEnabledCheckBox: JBCheckBox
@@ -174,23 +177,26 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
               shortcutCombobox(
                 labelText = message("terminal.command.completion.shortcut.trigger"),
                 presets = listOf(getCtrlSpacePreset(project), TAB_SHORTCUT_PRESET),
-                actionId = "Terminal.CommandCompletion.Gen2"
+                actionId = "Terminal.CommandCompletion.Invoke"
               )
             }
             row {
               shortcutCombobox(
                 labelText = message("terminal.command.completion.shortcut.insert"),
                 presets = listOf(ENTER_SHORTCUT_PRESET, TAB_SHORTCUT_PRESET),
-                actionId = "Terminal.EnterCommandCompletion"
+                actionId = "Terminal.CommandCompletion.InsertSuggestion"
               )
             }
-          }.visible(TerminalCommandCompletion.isEnabled())
+          }.visible(commandCompletionAvailable)
 
-          TerminalCloudCompletionSettingsProvider.getProvider()?.addSettingsRow(this)
+          if (inlineCompletionAvailable) {
+            inlineCompletionSettingsProvider.addSettingsRow(this)
+          }
         }.bottomGap(BottomGap.NONE)
           .visibleIf(terminalEngineComboBox.selectedValueIs(TerminalEngine.REWORKED)
                        .and(shellPathField.shellWithIntegrationSelected())
-                       .and(ComponentPredicate.fromValue(AppModeAssertions.isMonolith())))
+                       .and(ComponentPredicate.fromValue(AppModeAssertions.isMonolith()))
+                       .and(ComponentPredicate.fromValue(commandCompletionAvailable || inlineCompletionAvailable)))
 
         indent {
           buttonsGroup(title = message("settings.prompt.style")) {
@@ -202,7 +208,7 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
             }
             row {
               radioButton(message("settings.shell.prompt"), value = TerminalPromptStyle.SHELL)
-              contextHelp(message("settings.shell.prompt.description"))
+                .contextHelp(message("settings.shell.prompt.description"))
             }
           }.bind(blockTerminalOptions::promptStyle)
 
@@ -333,13 +339,11 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
           textField()
             .columns(4)
             .enabledIf(enforceContrastCheckbox.selected)
-            .gap(RightGap.SMALL)
+            .contextHelp(message("settings.enforce.minimum.contrast.ratio.description"))
             .bindText(
               getter = { optionsProvider.minContrastRatio.toFormattedString() },
               setter = { optionsProvider.minContrastRatio = parseRatio(it) }
             )
-
-          contextHelp(message("settings.enforce.minimum.contrast.ratio.description"))
         }.visibleIf(terminalEngineComboBox.selectedValueIs(TerminalEngine.REWORKED))
         row {
           checkBox(message("settings.show.separators.between.blocks"))
@@ -418,7 +422,7 @@ internal class TerminalOptionsConfigurable(private val project: Project) : Bound
             items = TerminalUiSettingsManager.CursorShape.entries,
             renderer = textListCellRenderer { it?.text },
           ).bindItem(optionsProvider::cursorShape.toNullableProperty())
-        }
+        }.layout(RowLayout.INDEPENDENT)
       }
     }
   }

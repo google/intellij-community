@@ -292,7 +292,11 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
 
   private static @Nullable Span startProcessSpan(@Nullable ProgressIndicator progress) {
     String progressText = getProgressIndicatorText(progress);
-    return progressManagerTracer.spanBuilder("Progress: " + progressText, TracerLevel.DEFAULT).startSpan();
+    if (progressText != null) {
+      return progressManagerTracer.spanBuilder("Progress: " + progressText, TracerLevel.DEFAULT).startSpan();
+    } else {
+      return null;
+    }
   }
 
   private static void assertNoOtherThreadUnder(@NotNull ProgressIndicator progress) {
@@ -455,8 +459,8 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   @Override
   public void run(@NotNull Task task) {
     if (isSynchronousHeadless(task)) {
-      if (SwingUtilities.isEventDispatchThread()) {
-        WriteIntentReadAction.run((Runnable)() -> runProcessWithProgressSynchronously(task));
+      if (EDT.isCurrentThreadEdt()) {
+        WriteIntentReadAction.run(() -> runProcessWithProgressSynchronously(task));
       }
       else {
         runProcessWithProgressInCurrentThread(task, new EmptyProgressIndicator(), ModalityState.defaultModalityState());

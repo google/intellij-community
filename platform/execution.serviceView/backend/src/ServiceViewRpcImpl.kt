@@ -6,9 +6,11 @@ import com.intellij.execution.dashboard.RunDashboardManagerProxy
 import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.vfs.VirtualFileId
 import com.intellij.ide.vfs.virtualFile
+import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
+import com.intellij.platform.execution.serviceView.setServiceViewImplementationForNextIdeRun
 import com.intellij.platform.execution.serviceView.splitApi.ServiceViewConfigurationType
 import com.intellij.platform.execution.serviceView.splitApi.ServiceViewConfigurationTypeSettings
 import com.intellij.platform.execution.serviceView.splitApi.ServiceViewRpc
@@ -62,5 +64,10 @@ internal class ServiceViewRpcImpl : ServiceViewRpc {
   override suspend fun saveConfigurationTypes(projectId: ProjectId, includedTypes: Set<String>) {
     val project = projectId.findProjectOrNull() ?: return
     RunDashboardManagerProxy.getInstance(project).types = includedTypes
+  }
+
+  override suspend fun changeServiceViewImplementationForNextIdeRunAndRestart(shouldEnableSplitImplementation: Boolean) {
+    setServiceViewImplementationForNextIdeRun(shouldEnableSplitImplementation)
+    ApplicationManagerEx.getApplicationEx().restart(true)
   }
 }

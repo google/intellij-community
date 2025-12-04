@@ -4,12 +4,16 @@ package com.intellij.platform.vcs.impl.shared.changes
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.LocalChangeList
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.projectIdOrNull
 import com.intellij.platform.vcs.changes.ChangeListManagerState
 import com.intellij.platform.vcs.impl.shared.RdLocalChanges
+import com.intellij.platform.vcs.impl.shared.rpc.ChangeId
 import com.intellij.platform.vcs.impl.shared.rpc.ChangeListsApi
+import fleet.rpc.client.durable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus
@@ -22,25 +26,41 @@ class ChangeListsViewModel(
 ) {
   val areChangeListsEnabled: StateFlow<Boolean> = changeListsApiFlow(checkRegistry = false) { api, projectId ->
     emitAll(api.areChangeListsEnabled(projectId))
-  }.stateIn(cs, SharingStarted.Eagerly, false)
+  }.stateIn(cs, SharingStarted.Eagerly, true)
 
   val changeListManagerState: StateFlow<ChangeListManagerState> = changeListsApiFlow(checkRegistry = false) { api, projectId ->
     emitAll(api.getChangeListManagerState(projectId))
   }.stateIn(cs, SharingStarted.Eagerly,
             ChangeListManagerState.Updating(ChangeListManagerState.FileHoldersState(true, true)))
 
-  val changeLists: StateFlow<ChangeLists> = changeListsApiFlow { api, projectId ->
-    emitAll(api.getChangeLists(projectId).map { changeLists ->
-      ChangeLists(changeLists.map { it.getChangeList(project) })
-    })
-  }.stateIn(cs, SharingStarted.Eagerly, ChangeLists(emptyList()))
+  val changeListsState: StateFlow<ChangeLists> = changeListsApiFlow { api, projectId ->
+    emitAll(
+      combine(
+        api.getChangeLists(projectId),
+        api.getUnversionedFiles(projectId),
+        api.getIgnoredFiles(projectId)
+      ) { changeListDtos, unversionedDtos, ignoredDtos ->
+        val changeLists = changeListDtos.map { it.getChangeList(project) }
+        ChangeLists(
+          changeLists = changeLists,
+          changesIdMapping = changeLists.flatMap { it.changes }.associateBy { ChangeId.getId(it) },
+          unversionedFiles = unversionedDtos.map { it.filePath },
+          ignoredFiles = ignoredDtos.map { it.filePath }
+        )
+      }
+    )
+  }.stateIn(cs, SharingStarted.Eagerly, ChangeLists.EMPTY)
+
+  fun resolveChange(changeId: ChangeId): Change? = changeListsState.value.changesIdMapping[changeId]
 
   private fun <T> changeListsApiFlow(checkRegistry: Boolean = true, flowProducer: suspend FlowCollector<T>.(ChangeListsApi, ProjectId) -> Unit): Flow<T> =
     if (checkRegistry && !RdLocalChanges.isEnabled()) emptyFlow()
     else flow {
       val projectId = project.projectIdOrNull() ?: return@flow
       val api = ChangeListsApi.getInstance()
-      flowProducer(api, projectId)
+      durable {
+        flowProducer(api, projectId)
+      }
     }
 
   companion object {
@@ -48,5 +68,14 @@ class ChangeListsViewModel(
     fun getInstance(project: Project): ChangeListsViewModel = project.service()
   }
 
-  class ChangeLists(val lists: List<LocalChangeList>)
+  class ChangeLists(
+    val changeLists: List<LocalChangeList>,
+    val changesIdMapping: Map<ChangeId, Change>,
+    val unversionedFiles: List<FilePath>,
+    val ignoredFiles: List<FilePath>,
+  ) {
+    companion object {
+      val EMPTY = ChangeLists(emptyList(), emptyMap(), emptyList(), emptyList())
+    }
+  }
 }

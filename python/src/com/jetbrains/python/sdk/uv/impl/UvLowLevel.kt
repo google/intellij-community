@@ -2,12 +2,11 @@
 package com.jetbrains.python.sdk.uv.impl
 
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.RuntimeJsonMappingException
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.errorProcessing.*
-import com.jetbrains.python.errorProcessing.PyExecResult
-import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.PyPackageName
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
@@ -145,8 +144,8 @@ private class UvLowLevelImpl(val cwd: Path, private val uvCli: UvCli) : UvLowLev
 
       return PyExecResult.success(packages)
     }
-    catch (e: Exception) {
-      return PyResult.localizedError(e.message ?: "")
+    catch (e: RuntimeJsonMappingException) {
+      return PyResult.localizedError(e.message ?: e.localizedMessage ?: e.toString())
     }
   }
 
@@ -278,7 +277,7 @@ private class UvLowLevelImpl(val cwd: Path, private val uvCli: UvCli) : UvLowLev
 
   override suspend fun sync(): PyResult<String> {
     return uvCli.runUv(cwd, "sync")
- }
+  }
 
   override suspend fun lock(): PyResult<String> {
     return uvCli.runUv(cwd, "lock")
@@ -314,9 +313,11 @@ private class UvLowLevelImpl(val cwd: Path, private val uvCli: UvCli) : UvLowLev
   }
 }
 
-fun createUvLowLevel(cwd: Path, uvCli: UvCli = createUvCli()): UvLowLevel {
+fun createUvLowLevel(cwd: Path, uvCli: UvCli): UvLowLevel {
   return UvLowLevelImpl(cwd, uvCli)
 }
+
+suspend fun createUvLowLevel(cwd: Path): PyResult<UvLowLevel> = createUvCli().mapSuccess { createUvLowLevel(cwd, it) }
 
 private fun tryExtractStderr(err: PyError): String? =
   when (err) {

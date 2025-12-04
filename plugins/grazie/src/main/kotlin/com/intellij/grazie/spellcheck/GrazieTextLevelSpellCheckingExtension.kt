@@ -16,7 +16,9 @@ import ai.grazie.utils.toLinkedSet
 import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.GrazieConfig.State.Processing
+import com.intellij.grazie.cloud.APIQueries
 import com.intellij.grazie.cloud.GrazieCloudConnector
+import com.intellij.grazie.ide.inspection.grammar.GrazieInspection
 import com.intellij.grazie.ide.inspection.grammar.GrazieInspection.Companion.sortByPriority
 import com.intellij.grazie.mlec.LanguageHolder
 import com.intellij.grazie.rule.SentenceBatcher
@@ -52,6 +54,7 @@ object GrazieTextLevelSpellCheckingExtension {
 
   private val knownPhrases = ContainerUtil.createConcurrentSoftValueMap<Language, KnownPhrases>()
 
+
   /**
    * Performs spell-checking on the specified PSI element.
    *
@@ -70,6 +73,8 @@ object GrazieTextLevelSpellCheckingExtension {
 
     val texts = sortByPriority(TextExtractor.findTextsExactlyAt(element, DOMAINS), session.priorityRange)
     if (texts.isEmpty()) return SpellCheckingResult.Ignored
+    if (GrazieInspection.skipCheckingTooLargeTexts(texts)) return SpellCheckingResult.Checked
+
     val filteredTexts = texts.filter { ProblemFilter.allIgnoringFilters(it).findAny().isEmpty }
     if (filteredTexts.isEmpty()) return SpellCheckingResult.Checked
 
@@ -119,7 +124,14 @@ object GrazieTextLevelSpellCheckingExtension {
     return typos.mapNotNull { typo ->
       val range = text.textRangeToFile(mapRange(typo.range))
       if (!psiRange.contains(range)) return@mapNotNull null
-      createTypo(typo.word, range.shiftLeft(element.textRange.startOffset), element) {
+      val shiftedRange = range.shiftLeft(element.textRange.startOffset)
+
+      val hasUnknownFragmentsInside = text.unknownOffsets().any { offset ->
+        offset > typo.range.start && offset < typo.range.endExclusive
+      }
+      if (hasUnknownFragmentsInside) return@mapNotNull null
+
+      createTypo(typo.word, shiftedRange, element) {
         if (typo is CloudTypo) typo.fixes else LinkedSet()
       }
     }
@@ -145,7 +157,7 @@ object GrazieTextLevelSpellCheckingExtension {
         || GrazieConfig.get().processing == Processing.Local
         || !GrazieCloudConnector.seemsCloudConnected()
         || GrazieCloudConnector.isAfterRecentGecError()
-        || !NaturalTextDetector.seemsNatural(text.toString())) {
+        || !NaturalTextDetector.seemsNatural(text)) {
       return localTypos
     }
 
@@ -175,7 +187,7 @@ object GrazieTextLevelSpellCheckingExtension {
     override val fixes: LinkedSet<String> = lazyFixes()
   }
 
-  private class CloudTypo(override val word: String, override val range: ai.grazie.text.TextRange, override val fixes: LinkedSet<String>): Typo
+  private class CloudTypo(override val word: String, override val range: ai.grazie.text.TextRange, override val fixes: LinkedSet<String>) : Typo
 
   @Service
   private class SpellServerBatcherHolder : LanguageHolder<SentenceBatcher<SentenceWithProblems>>() {
@@ -183,17 +195,16 @@ object GrazieTextLevelSpellCheckingExtension {
       language: Language,
     ) : SentenceBatcher<SentenceWithProblems>(language, 32), Disposable {
       override suspend fun parse(sentences: List<SentenceWithExclusions>, project: Project): Map<SentenceWithExclusions, SentenceWithProblems>? {
-        return GrazieCloudConnector.EP_NAME.extensionList
-                 .firstNotNullOfOrNull { it.spell(sentences, language, project) }
-                 ?.zip(sentences)
-                 ?.associate { it.second to it.first }
+        return APIQueries.spell(sentences, language, project)
+          ?.zip(sentences)
+          ?.associate { it.second to it.first }
       }
 
       override fun dispose() {}
 
       init {
         GrazieConfig.subscribe(this) { clearCache() }
-        GrazieCloudConnector.EP_NAME.forEachExtensionSafe { it.subscribeToAuthorizationStateEvents(this) { clearCache() } }
+        GrazieCloudConnector.subscribeToAuthorizationStateEvents(this) { clearCache() }
       }
     }
 

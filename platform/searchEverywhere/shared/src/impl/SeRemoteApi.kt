@@ -131,6 +131,22 @@ interface SeRemoteApi : RemoteApi<Unit> {
     isAllTab: Boolean,
   ): Boolean
 
+  suspend fun isExtendedInfoEnabled(
+    projectId: ProjectId,
+    session: SeSession,
+    dataContextId: DataContextId,
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): Boolean
+
+  suspend fun isCommandsSupported(
+    projectId: ProjectId,
+    session: SeSession,
+    dataContextId: DataContextId,
+    providerIds: List<SeProviderId>,
+    isAllTab: Boolean,
+  ): Boolean
+
   companion object {
     @JvmStatic
     suspend fun getInstance(): SeRemoteApi {

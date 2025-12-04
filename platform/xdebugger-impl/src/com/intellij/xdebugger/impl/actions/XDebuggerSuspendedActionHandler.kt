@@ -5,9 +5,12 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.actions.handlers.XDebuggerActionHandler
-import com.intellij.xdebugger.impl.frame.XDebugSessionProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy
 import org.jetbrains.annotations.ApiStatus
 
+/**
+ * This API is obsolete. Use [com.intellij.xdebugger.impl.actions.handlers.XDebuggerBackendOnlyActionHandler] instead.
+ */
 @ApiStatus.Obsolete
 abstract class XDebuggerSuspendedActionHandler : XDebuggerActionHandler() {
   @Suppress("UsagesOfObsoleteApi")

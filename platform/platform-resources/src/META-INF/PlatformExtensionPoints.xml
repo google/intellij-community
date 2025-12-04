@@ -92,6 +92,7 @@
     <extensionPoint name="exportable" beanClass="com.intellij.openapi.components.ServiceBean" dynamic="true"/>
 
     <extensionPoint name="ideRootPaneNorth" interface="com.intellij.openapi.wm.IdeRootPaneNorthExtension" dynamic="false"/>
+    <extensionPoint name="commercialBannerImageProvider" interface="com.intellij.openapi.ui.BannerImageProvider" dynamic="true"/>
 
     <extensionPoint name="handleTypeFactory" interface="com.intellij.openapi.vcs.readOnlyHandler.HandleTypeFactory"
                     area="IDEA_PROJECT" dynamic="false"/>
@@ -108,6 +109,10 @@
     <extensionPoint name="undoProvider" interface="com.intellij.openapi.command.impl.UndoProvider" dynamic="true"/>
     <extensionPoint name="projectUndoProvider" interface="com.intellij.openapi.command.impl.UndoProvider"
                     area="IDEA_PROJECT" dynamic="true"/>
+
+    <extensionPoint name="undoManagerProvider"
+                    interface="com.intellij.openapi.command.undo.UndoManagerProvider"
+                    dynamic="true"/>
 
     <extensionPoint name="undoReportHandler" interface="com.intellij.openapi.command.impl.UndoReportHandler" dynamic="true"/>
 

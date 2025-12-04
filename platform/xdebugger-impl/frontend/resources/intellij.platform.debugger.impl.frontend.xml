@@ -1,8 +1,9 @@
-<idea-plugin visibility="internal" package="com.intellij.platform.debugger.impl.frontend">
+<idea-plugin visibility="internal">
   <dependencies>
     <module name="intellij.platform.frontend"/>
     <module name="intellij.platform.execution.impl.frontend"/>
     <module name="intellij.platform.debugger.impl.shared"/>
+    <module name="intellij.platform.debugger.impl.ui"/>
     <module name="intellij.platform.debugger.impl.rpc"/>
     <module name="intellij.platform.rpc.topics.frontend"/>
     <module name="intellij.platform.rpc.topics"/>
@@ -10,6 +11,8 @@
   <extensionPoints>
     <extensionPoint name="xdebugger.customQuickEvaluateActionProvider"
                     interface="com.intellij.platform.debugger.impl.frontend.actions.CustomQuickEvaluateActionProvider" dynamic="true"/>
+    <extensionPoint name="xdebugger.imageEditorUIProvider"
+                    interface="com.intellij.platform.debugger.impl.frontend.frame.ImageEditorUIProvider" dynamic="true"/>
   </extensionPoints>
   <actions resource-bundle="messages.FrontendDebuggerImplBundle">
     <action id="QuickEvaluateExpression" class="com.intellij.platform.debugger.impl.frontend.actions.QuickEvaluateAction"/>
@@ -26,5 +29,10 @@
     <postStartupActivity implementation="com.intellij.platform.debugger.impl.frontend.FrontendXDebuggerInitializationProjectActivity"/>
     <xdebugger.managerProxy implementation="com.intellij.platform.debugger.impl.frontend.FrontendXDebugManagerProxy" order="first"/>
     <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.debugger.impl.frontend.ShowBreakpointsDialogRemoteTopicListener"/>
+    <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.debugger.impl.frontend.frame.ShowImagePopupRemoteTopicListener"/>
+    <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.debugger.impl.frontend.frame.FrameNotificationRemoteTopicListener"/>
+    <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.debugger.impl.frontend.frame.ShowSessionTabRemoteTopicListener"/>
+
+    <notificationGroup id="Split debugger internal" displayType="STICKY_BALLOON" hideFromSettings="true"/>
   </extensions>
 </idea-plugin>

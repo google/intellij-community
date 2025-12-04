@@ -4,6 +4,7 @@
 package com.intellij.platform.ijent
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.platform.ijent.tcp.TcpDeployInfo
 import com.intellij.util.containers.map2Array
 
 /**
@@ -13,8 +14,9 @@ fun getIjentGrpcArgv(
   remotePathToIjent: String,
   additionalEnv: Map<String, String> = mapOf(),
   selfDeleteOnExit: Boolean = false,
+  noShutdownOnDisconnect: Boolean = false,
   usrBinEnv: String = "/usr/bin/env",
-  tcpConfig: TcpConnectionInfo? = null,
+  deployInfo: TcpDeployInfo? = null,
 ): List<String> {
   return listOfNotNull(
     usrBinEnv,
@@ -22,8 +24,10 @@ fun getIjentGrpcArgv(
     // "gdbserver", "0.0.0.0:12345",  // https://sourceware.org/gdb/onlinedocs/gdb/Connecting.html
     remotePathToIjent,
     "grpc-server",
-    if (tcpConfig != null) "--port=${tcpConfig.remotePort}" else null,
+    if (deployInfo != null) "--address=${deployInfo.host}" else null,
+    if (deployInfo != null && deployInfo is TcpDeployInfo.FixedPort) "--port=${deployInfo.port}" else null,
     if (selfDeleteOnExit) "--self-delete-on-exit" else null,
+    if (noShutdownOnDisconnect) "--no-shutdown-on-disconnect" else null,
   )
 }
 

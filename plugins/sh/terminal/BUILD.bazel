@@ -20,9 +20,9 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/execution-impl",
     "//platform/core-ui",
-    "@lib//:jediterm-ui",
+    "//libraries/jediterm-ui",
     "//plugins/sh/core",
-    "@lib//:jediterm-core",
+    "//libraries/jediterm-core",
   ],
   runtime_deps = ["//platform/backend"]
 )

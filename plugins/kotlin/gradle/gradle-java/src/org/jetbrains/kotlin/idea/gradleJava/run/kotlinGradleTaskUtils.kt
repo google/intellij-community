@@ -8,11 +8,15 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
+import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaFlexibleType
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
 import org.jetbrains.kotlin.idea.base.util.module
@@ -29,6 +33,7 @@ import org.jetbrains.plugins.gradle.util.GradleConstants.KOTLIN_DSL_SCRIPT_EXTEN
 
 
 private const val GRADLE_KOTLIN_PROJECT_DELEGATE = "org.gradle.kotlin.dsl.support.delegates.ProjectDelegate"
+private const val GRADLE_KOTLIN_TASK_CONTAINER_SCOPE = "org.gradle.kotlin.dsl.TaskContainerScope"
 
 @ApiStatus.Internal
 fun isInGradleKotlinScript(psiElement: PsiElement): Boolean {
@@ -71,7 +76,9 @@ private fun findTaskNameInSurroundingCallExpression(element: PsiElement): String
         val functionCall = resolvedCall.singleFunctionCallOrNull() ?: return null
         if (!doesCustomizeTask(functionCall)) return null
         val nameArgument = functionCall.argumentMapping
-            .filter { it.value.name.identifier == "name" }
+            .filterValues { isStringParameterSignature(it) }
+            // IDEA-380456: uncomment, when parameter names in .class files are fixed. Now, the parameter is named as "var1", not "name".
+            //.filterValues { it.name.identifier == "name" }
             .keys.singleOrNull() ?: return null
         val taskName = nameArgument
             .evaluate()
@@ -116,19 +123,28 @@ private fun doesCustomizeTask(functionCall: KaCallableMemberCall<*, *>): Boolean
 private fun getReceiverClassFqName(functionCall: KaCallableMemberCall<*, *>): FqName? {
     val type = functionCall.partiallyAppliedSymbol.extensionReceiver?.type
         ?: functionCall.partiallyAppliedSymbol.dispatchReceiver?.type
-    return type?.symbol?.classId?.asSingleFqName()
+    val unwrappedType = if (type is KaFlexibleType) type.lowerBound else type
+
+    return unwrappedType?.symbol?.classId?.asSingleFqName()
 }
 
 private val taskContainerMethods = setOf("register", "create", "named", "registering", "creating")
+private val taskContainerFqNames = setOf(FqName(GRADLE_API_TASK_CONTAINER), FqName(GRADLE_KOTLIN_TASK_CONTAINER_SCOPE))
 
 private fun isMethodOfTaskContainer(methodName: String, fqClassName: FqName) =
-    fqClassName == FqName(GRADLE_API_TASK_CONTAINER)
+    fqClassName in taskContainerFqNames
             && methodName in taskContainerMethods
 
 private fun isMethodOfProject(methodName: String, fqClassName: FqName) =
     (methodName == "task") && (fqClassName == FqName(GRADLE_API_PROJECT)
             || fqClassName == FqName(GRADLE_KOTLIN_PROJECT_DELEGATE)
             || fqClassName == FqName("Build_gradle")) // Could be resolved instead of ProjectDelegate on Gradle 6.0
+
+private fun KaSession.isStringParameterSignature(signature: KaVariableSignature<KaValueParameterSymbol>): Boolean {
+    return signature.symbol.returnType
+        .withNullability(false)
+        .isStringType
+}
 
 fun KtNamedFunction.getKMPGradleConfigurationName(runTask: KotlinJvmRunTaskData): String =
     "${getConfigurationName()} [${runTask.targetName}]"

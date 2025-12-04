@@ -1,4 +1,4 @@
-### auto-generated section `build kotlin.project-wizard.idea` start
+### auto-generated section `build intellij.kotlin.projectWizard.idea` start
 load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 resourcegroup(
@@ -9,20 +9,19 @@ resourcegroup(
 
 jvm_library(
   name = "idea",
-  module_name = "kotlin.project-wizard.idea",
+  module_name = "intellij.kotlin.projectWizard.idea",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
   resources = [":idea_resources"],
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/observable",
     "@lib//:kotlinc-kotlin-compiler-common",
-    "@lib//:kotlinc-kotlin-compiler-fe10",
     "@lib//:kotlinc-kotlin-jps-common",
     "@lib//:java_compatibility",
     "//platform/platform-impl:ide-impl",
@@ -37,7 +36,7 @@ jvm_library(
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/facet",
     "//plugins/kotlin/base/statistics",
-    "//plugins/kotlin/base/external-build-system",
+    "//plugins/kotlin/base/external-build-system:kotlin-base-externalSystem",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/project-configuration",
     "//plugins/kotlin/formatter",
@@ -47,14 +46,15 @@ jvm_library(
     "//platform/vcs-impl",
     "//platform/external-system-api:externalSystem",
     "//platform/external-system-impl:externalSystem-impl",
+    "//platform/execution",
     "//java/openapi:java",
     "//java/java-impl:impl",
     "//java/idea-ui:ui",
-    "@lib//:kotlinx-coroutines-core",
+    "//libraries/kotlinx/coroutines/core",
     "//plugins/gradle:gradle-common",
     "//plugins/kotlin/base/indices",
     "//platform/platform-api:ide",
     "//plugins/kotlin/code-insight/api",
   ]
 )
-### auto-generated section `build kotlin.project-wizard.idea` end
+### auto-generated section `build intellij.kotlin.projectWizard.idea` end

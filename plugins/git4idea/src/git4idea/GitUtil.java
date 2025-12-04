@@ -28,6 +28,10 @@ import com.intellij.openapi.vcs.versionBrowser.CommittedChangeList;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.eel.path.EelPath;
+import com.intellij.platform.eel.path.EelPathException;
+import com.intellij.platform.eel.provider.EelNioBridgeServiceKt;
+import com.intellij.platform.eel.provider.LocalEelDescriptor;
 import com.intellij.util.Consumer;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.ThrowableRunnable;
@@ -99,9 +103,9 @@ public final class GitUtil {
     // do nothing
   }
 
-  public static void updateHead(@NotNull GitRepository repository,
-                                @NotNull Hash newObjectId,
-                                @Nullable String reflogMessage) throws VcsException {
+  public static void updateHeadReference(@NotNull GitRepository repository,
+                                         @NotNull Hash newObjectId,
+                                         @Nullable String reflogMessage) throws VcsException {
     Git.getInstance().updateReference(repository, HEAD, newObjectId, reflogMessage).throwOnError();
   }
 
@@ -137,16 +141,25 @@ public final class GitUtil {
   }
 
   private static @Nullable Path findRealRepositoryDir(@NotNull @NonNls Path rootPath, @NotNull @NonNls String path) {
-    if (!FileUtil.isAbsolute(path)) {
-      String canonicalPath = FileUtil.toCanonicalPath(FileUtil.join(rootPath.toString(), path), true);
-      path = FileUtil.toSystemIndependentName(canonicalPath);
+    EelPath rootPathEel = EelNioBridgeServiceKt.asEelPath(rootPath);
+    EelPath eelResolved;
+    try {
+      eelResolved = EelPath.parse(path, rootPathEel.getDescriptor());
     }
-
-    Path file = Path.of(path);
-    if (!Files.isDirectory(file)) {
+    catch (EelPathException e) {
+      try {
+        eelResolved = rootPathEel.resolve(path);
+      } catch (EelPathException e1) {
+        return null;
+      }
+    }
+    Path result = EelNioBridgeServiceKt.asNioPath(eelResolved);
+    if (Files.isDirectory(result)) {
+      return result;
+    }
+    else {
       return null;
     }
-    return file;
   }
 
   @ApiStatus.Internal
@@ -923,22 +936,28 @@ public final class GitUtil {
       FilePath after = afterPathGetter.convert(change);
       FilePath before = beforePathGetter.convert(change);
       if (before == null) {
-        return "A: " + getRelativePath(root, after);
+        return "A: " + getLogString(root, after);
       }
       else if (after == null) {
-        return "D: " + getRelativePath(root, before);
+        return "D: " + getLogString(root, before);
       }
       else if (ChangesUtil.equalsCaseSensitive(before, after)) {
-        return "M: " + getRelativePath(root, after);
+        return "M: " + getLogString(root, after);
       }
       else {
-        return "R: " + getRelativePath(root, before) + " -> " + getRelativePath(root, after);
+        return "R: " + getLogString(root, before) + " -> " + getLogString(root, after);
       }
     }, ", ");
   }
 
-  public static @Nullable String getRelativePath(@NotNull String root, @NotNull FilePath after) {
-    return FileUtil.getRelativePath(root, after.getPath(), File.separatorChar);
+  public static @NotNull String getLogString(@NotNull String root, @NotNull FilePath filePath) {
+    String path = getRelativePath(root, filePath);
+    if (path != null) return path;
+    return filePath.getPath();
+  }
+
+  public static @Nullable String getRelativePath(@NotNull String root, @NotNull FilePath filePath) {
+    return FileUtil.getRelativePath(root, filePath.getPath(), File.separatorChar);
   }
 
   /**

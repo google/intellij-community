@@ -7,6 +7,7 @@ import com.intellij.codeInspection.IntentionAndQuickFixAction;
 import com.intellij.codeInspection.util.IntentionFamilyName;
 import com.intellij.codeInspection.util.IntentionName;
 import com.intellij.grazie.GrazieBundle;
+import com.intellij.grazie.cloud.APIQueries;
 import com.intellij.grazie.cloud.GrazieCloudConnector;
 import com.intellij.grazie.detection.LangDetector;
 import com.intellij.grazie.ide.fus.GrazieFUSCounter;
@@ -14,6 +15,7 @@ import com.intellij.grazie.ide.ui.PaddedListCellRenderer;
 import com.intellij.grazie.text.TextContent;
 import com.intellij.grazie.text.TextExtractor;
 import com.intellij.grazie.utils.HighlightingUtil;
+import com.intellij.grazie.utils.NaturalTextDetector;
 import com.intellij.grazie.utils.Text;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -39,7 +41,6 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 @SuppressWarnings("IntentionDescriptionNotFoundInspection")
 public class RephraseAction extends IntentionAndQuickFixAction {
@@ -62,8 +63,9 @@ public class RephraseAction extends IntentionAndQuickFixAction {
     }
 
     TextContent content = TextExtractor.findTextAt(psiFile, editor.getCaretModel().getOffset(), TextContent.TextDomain.ALL);
-    if (content == null) return false;
-    return content.fileRangeToText(HighlightingUtil.selectionRange(editor)) != null;
+    TextRange range = HighlightingUtil.selectionRange(editor);
+    if (content == null || (range.isEmpty() && !NaturalTextDetector.seemsNatural(content))) return false;
+    return content.fileRangeToText(range) != null;
   }
 
   public record SuggestionsWithLanguage(
@@ -100,12 +102,7 @@ public class RephraseAction extends IntentionAndQuickFixAction {
         int rangeLength = textRange.getLength();
         GrazieFUSCounter.INSTANCE.reportRephraseRequested(iso, content.length(), rangeLength, wordRangeCount);
         TextRange wordBoundRange = Text.alignToWordBounds(textRange, content.toString());
-        List<String> rephrasedSentences = GrazieCloudConnector.Companion.getEP_NAME().getExtensionList()
-          .stream()
-          .map(connector -> connector.rephrase(content.toString(), wordBoundRange, iso, project))
-          .filter(Objects::nonNull)
-          .findFirst()
-          .orElse(null);
+        List<String> rephrasedSentences = APIQueries.getRephraser().rephrase(content.toString(), wordBoundRange, iso, project);
         if (rephrasedSentences == null) {
           return new SuggestionsWithLanguage(iso, Collections.emptyList(), content.length(), rangeLength, wordRangeCount);
         }

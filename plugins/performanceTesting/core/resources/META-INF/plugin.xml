@@ -15,6 +15,7 @@
 
   <content namespace="jetbrains">
     <module name="intellij.performanceTesting.remoteDriver"/>
+    <module name="intellij.performanceTesting.remoteDriver.compose"/>
     <module name="intellij.performanceTesting.vcs"/>
     <module name="intellij.performanceTesting.frontend"/>
     <module name="intellij.tools.ide.starter.bus" loading="embedded"/>
@@ -42,8 +43,12 @@
       <add-to-group group-id="HelpDiagnosticTools" anchor="last"/>
     </group>
 
-    <action id="SimulateFreeze" internal="true" class="com.jetbrains.performancePlugin.actions.SimulateFreeze"
-            text="Simulate a Freeze"/>
+    <action id="SimulateFreeze" internal="true" class="com.jetbrains.performancePlugin.actions.SimulateFreeze"/>
+    <action id="SimulateRWFreeze" internal="true" class="com.jetbrains.performancePlugin.actions.SimulateRWFreeze"/>
+
+    <reference ref="CaptureMemorySnapShot">
+      <add-to-group group-id="HelpMenu" relative-to-action="CollectZippedLogs" anchor="after"/>
+    </reference>
   </actions>
 
   <extensionPoints>
@@ -91,6 +96,9 @@
 
     <listener class="com.jetbrains.performancePlugin.commands.WaitForFinishedCodeAnalysisListener"
               topic="com.intellij.codeInsight.daemon.DaemonCodeAnalyzer$DaemonListener"/>
+
+    <listener class="com.jetbrains.performancePlugin.commands.FileOpenLoggerListener"
+              topic="com.intellij.openapi.fileEditor.FileEditorManagerListener$Before"/>
   </projectListeners>
 
   <extensions defaultExtensionNs="com.jetbrains.performancePlugin">

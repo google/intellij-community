@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:Suppress("ReplaceGetOrSet")
+
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.platform.ijent.community.buildConstants.IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY
@@ -16,7 +18,6 @@ import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.jetbrains.intellij.build.ApplicationInfoProperties
 import org.jetbrains.intellij.build.ApplicationInfoPropertiesImpl
@@ -39,6 +40,7 @@ import org.jetbrains.intellij.build.ProductProperties
 import org.jetbrains.intellij.build.ProprietaryBuildTools
 import org.jetbrains.intellij.build.WindowsDistributionCustomizer
 import org.jetbrains.intellij.build.computeAppInfoXml
+import org.jetbrains.intellij.build.findProductModulesFile
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
 import org.jetbrains.intellij.build.impl.plugins.PluginAutoPublishList
 import org.jetbrains.intellij.build.io.runProcess
@@ -63,6 +65,9 @@ import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.pathString
 import kotlin.time.Duration
 
+@Suppress("SpellCheckingInspection")
+private val PLUGIN_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
+
 class BuildContextImpl internal constructor(
   internal val compilationContext: CompilationContext,
   override val productProperties: ProductProperties,
@@ -71,7 +76,9 @@ class BuildContextImpl internal constructor(
   override val macDistributionCustomizer: MacDistributionCustomizer?,
   override val proprietaryBuildTools: ProprietaryBuildTools,
   override val applicationInfo: ApplicationInfoProperties = ApplicationInfoPropertiesImpl(
-    compilationContext.project, productProperties, compilationContext.options
+    project = compilationContext.project,
+    productProperties = productProperties,
+    buildOptions = compilationContext.options
   ),
   @JvmField internal val jarCacheManager: JarCacheManager,
 ) : BuildContext, CompilationContext by compilationContext {
@@ -144,10 +151,6 @@ class BuildContextImpl internal constructor(
 
   override val isNightlyBuild: Boolean = options.isNightlyBuild || isNightly(buildNumber)
 
-  private fun isNightly(buildNumber: String): Boolean {
-    return buildNumber.count { it == '.' } <= 1
-  }
-
   init {
     @Suppress("DEPRECATION")
     if (productProperties.productCode == null) {
@@ -181,9 +184,17 @@ class BuildContextImpl internal constructor(
       options: BuildOptions = BuildOptions(),
     ): BuildContext {
       val compilationContext = CompilationContextImpl.createCompilationContext(
-        projectHome, createBuildOutputRootEvaluator(projectHome, productProperties, options), options, setupTracer
+        projectHome = projectHome,
+        buildOutputRootEvaluator = createBuildOutputRootEvaluator(projectHome, productProperties, options),
+        options = options,
+        setupTracer = setupTracer
       ).asBazelIfNeeded
-      return createContext(compilationContext, projectHome, productProperties, proprietaryBuildTools)
+      return createContext(
+        compilationContext = compilationContext,
+        projectHome = projectHome,
+        productProperties = productProperties,
+        proprietaryBuildTools = proprietaryBuildTools,
+      )
     }
 
     fun createContext(
@@ -197,22 +208,27 @@ class BuildContextImpl internal constructor(
         LocalDiskJarCacheManager(cacheDir = it, productionClassOutDir = compilationContext.classesOutputDirectory.resolve("production"))
       } ?: NonCachingJarCacheManager
       return BuildContextImpl(
-        compilationContext.asArchivedIfNeeded, productProperties,
-        productProperties.createWindowsCustomizer(projectHomeAsString),
-        productProperties.createLinuxCustomizer(projectHomeAsString),
-        productProperties.createMacCustomizer(projectHomeAsString),
-        proprietaryBuildTools,
-        ApplicationInfoPropertiesImpl(compilationContext.project, productProperties, compilationContext.options),
-        jarCacheManager
+        compilationContext = compilationContext.asArchivedIfNeeded,
+        productProperties = productProperties,
+        windowsDistributionCustomizer = productProperties.createWindowsCustomizer(projectHome),
+        linuxDistributionCustomizer = productProperties.createLinuxCustomizer(projectHomeAsString),
+        macDistributionCustomizer = productProperties.createMacCustomizer(projectHome),
+        proprietaryBuildTools = proprietaryBuildTools,
+        applicationInfo = ApplicationInfoPropertiesImpl(project = compilationContext.project, productProperties = productProperties, buildOptions = compilationContext.options),
+        jarCacheManager = jarCacheManager,
       )
     }
-
-    private val PLUGIN_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
   }
 
   override var builtinModule: BuiltinModulesFileData?
-    get() = if (options.buildStepsToSkip.contains(BuildOptions.PROVIDED_MODULES_LIST_STEP)) null
-            else builtinModulesData ?: throw IllegalStateException("builtinModulesData is not set. Make sure `BuildTasksImpl.buildProvidedModuleList` was called before")
+    get() {
+      if (options.buildStepsToSkip.contains(BuildOptions.PROVIDED_MODULES_LIST_STEP)) {
+        return null
+      }
+      else {
+        return builtinModulesData ?: throw IllegalStateException("builtinModulesData is not set. Make sure `BuildTasksImpl.buildProvidedModuleList` was called before")
+      }
+    }
     set(value) {
       check(builtinModulesData == null) { "builtinModulesData was already set" }
       builtinModulesData = value
@@ -228,10 +244,11 @@ class BuildContextImpl internal constructor(
     distFiles.add(file)
   }
 
-  override suspend fun getBundledPluginModules(): List<String> =
-    bundledPluginModulesForModularLoader.await() ?: productProperties.productLayout.bundledPluginModules
+  override fun getBundledPluginModules(): List<String> {
+    return bundledPluginModulesForModularLoader ?: productProperties.productLayout.bundledPluginModules
+  }
 
-  private val bundledPluginModulesForModularLoader = asyncLazy("bundled plugin modules for modular loader") {
+  private val bundledPluginModulesForModularLoader by lazy {
     productProperties.rootModuleForModularLoader?.let { rootModule ->
       loadRawProductModules(rootModule, productProperties.productMode).bundledPluginMainModules.map {
         it.stringId
@@ -256,44 +273,43 @@ class BuildContextImpl internal constructor(
     compilationContext.notifyArtifactBuilt(artifactPath)
   }
 
-  private val _frontendModuleFilter = asyncLazy("JetBrains client module filter") {
+  private val _frontendModuleFilter by lazy {
     val rootModule = productProperties.embeddedFrontendRootModule
     if (rootModule != null && options.enableEmbeddedFrontend) {
       val productModules = loadRawProductModules(rootModule, ProductMode.FRONTEND)
-      FrontendModuleFilterImpl.create(project, productModules, jarPackagerDependencyHelper)
+      FrontendModuleFilterImpl.createFrontendModuleFilter(project = project, productModules = productModules, context = this@BuildContextImpl)
     }
     else {
       EmptyFrontendModuleFilter
     }
   }
 
-  override suspend fun getFrontendModuleFilter(): FrontendModuleFilter = _frontendModuleFilter.await()
+  override fun getFrontendModuleFilter(): FrontendModuleFilter = _frontendModuleFilter
 
-  private val contentModuleFilter = computeContentModuleFilter()
+  private val _contentModuleFilter by lazy { computeContentModuleFilter() }
 
-  private fun computeContentModuleFilter(): Deferred<ContentModuleFilter> {
+  private fun computeContentModuleFilter(): ContentModuleFilter {
     if (productProperties.productMode == ProductMode.MONOLITH) {
       if (productProperties.productLayout.skipUnresolvedContentModules) {
-        return CompletableDeferred(SkipUnresolvedOptionalContentModuleFilter(context = this))
+        return SkipUnresolvedOptionalContentModuleFilter(context = this)
       }
-      return CompletableDeferred(IncludeAllContentModuleFilter)
+      return IncludeAllContentModuleFilter
     }
 
-    return asyncLazy("Content Modules Filter") {
-      val bundledPluginModules = getBundledPluginModules()
-      ContentModuleByProductModeFilter(project, bundledPluginModules, productProperties.productMode)
-    }
+    val bundledPluginModules = getBundledPluginModules()
+    return ContentModuleByProductModeFilter(project = project, bundledPluginModules = bundledPluginModules, productMode = productProperties.productMode)
   }
 
-  override suspend fun getContentModuleFilter(): ContentModuleFilter = contentModuleFilter.await()
+  override fun getContentModuleFilter(): ContentModuleFilter = _contentModuleFilter
 
   override val isEmbeddedFrontendEnabled: Boolean
     get() = productProperties.embeddedFrontendRootModule != null && options.enableEmbeddedFrontend
 
   override fun shouldBuildDistributions(): Boolean = !options.targetOs.isEmpty()
 
-  override fun shouldBuildDistributionForOS(os: OsFamily, arch: JvmArchitecture): Boolean =
-    shouldBuildDistributions() && options.targetOs.contains(os) && (options.targetArch == null || options.targetArch == arch)
+  override fun shouldBuildDistributionForOS(os: OsFamily, arch: JvmArchitecture): Boolean {
+    return shouldBuildDistributions() && options.targetOs.contains(os) && (options.targetArch == null || options.targetArch == arch)
+  }
 
   override suspend fun createCopyForProduct(
     productProperties: ProductProperties,
@@ -315,20 +331,25 @@ class BuildContextImpl internal constructor(
     options.targetArch = sourceOptions.targetArch
     options.targetOs = sourceOptions.targetOs
 
-    val newAppInfo = ApplicationInfoPropertiesImpl(project, productProperties, options)
+    val newAppInfo = ApplicationInfoPropertiesImpl(project = project, productProperties = productProperties, buildOptions = options)
 
     val buildOut = options.outRootDir ?: createBuildOutputRootEvaluator(paths.projectHome, productProperties, options)(project)
     @Suppress("DEPRECATION")
     val artifactDir = if (prepareForBuild) paths.artifactDir.resolve(productProperties.productCode ?: newAppInfo.productCode) else null
     val compilationContextCopy = compilationContext.createCopy(
-      messages, options, computeBuildPaths(options, buildOut, paths.projectHome, artifactDir)
+      messages = messages,
+      options = options,
+      paths = computeBuildPaths(options = options, buildOut = buildOut, projectHome = paths.projectHome, artifactDir = artifactDir)
     )
     val copy = BuildContextImpl(
-      compilationContextCopy, productProperties,
-      productProperties.createWindowsCustomizer(projectHomeForCustomizersAsString),
-      productProperties.createLinuxCustomizer(projectHomeForCustomizersAsString),
-      productProperties.createMacCustomizer(projectHomeForCustomizersAsString),
-      proprietaryBuildTools, newAppInfo, jarCacheManager
+      compilationContext = compilationContextCopy,
+      productProperties = productProperties,
+      windowsDistributionCustomizer = productProperties.createWindowsCustomizer(projectHomeForCustomizers),
+      linuxDistributionCustomizer = productProperties.createLinuxCustomizer(projectHomeForCustomizersAsString),
+      macDistributionCustomizer = productProperties.createMacCustomizer(projectHomeForCustomizers),
+      proprietaryBuildTools = proprietaryBuildTools,
+      applicationInfo = newAppInfo,
+      jarCacheManager = jarCacheManager,
     )
     if (prepareForBuild) {
       copy.compilationContext.prepareForBuild()
@@ -355,81 +376,85 @@ class BuildContextImpl internal constructor(
     if (bcpJarNames.isNotEmpty()) {
       val (pathSeparator, dirSeparator) = if (os == OsFamily.WINDOWS) ";" to "\\" else ":" to "/"
       val bootCp = bcpJarNames.joinToString(pathSeparator) { arrayOf(macroName, "lib", it).joinToString(dirSeparator) }
-      jvmArgs += "-Xbootclasspath/a:${bootCp}".let { if (isScript) '"' + it + '"' else it }
+      jvmArgs.add("-Xbootclasspath/a:${bootCp}".let { if (isScript) '"' + it + '"' else it })
     }
 
     if (productProperties.enableCds) {
       val cacheDir = if (os == OsFamily.WINDOWS) "%IDE_CACHE_DIR%\\" else $$"$IDE_CACHE_DIR/"
-      jvmArgs += "-XX:SharedArchiveFile=${cacheDir}${productProperties.baseFileName}${buildNumber}.jsa"
-      jvmArgs += "-XX:+AutoCreateSharedArchive"
+      jvmArgs.add("-XX:SharedArchiveFile=${cacheDir}${productProperties.baseFileName}${buildNumber}.jsa")
+      jvmArgs.add("-XX:+AutoCreateSharedArchive")
     }
     else {
       productProperties.classLoader?.let {
-        jvmArgs += "-Djava.system.class.loader=${it}"
+        jvmArgs.add("-Djava.system.class.loader=${it}")
       }
     }
 
-    jvmArgs += "-Didea.vendor.name=${applicationInfo.shortCompanyName}"
-    jvmArgs += "-Didea.paths.selector=${systemSelector}"
+    jvmArgs.add("-Didea.vendor.name=${applicationInfo.shortCompanyName}")
+    jvmArgs.add("-Didea.paths.selector=${systemSelector}")
 
     // require bundled JNA dispatcher lib
-    jvmArgs += "-Djna.boot.library.path=${macroName}/lib/jna/${arch.dirName}".let { if (isScript) '"' + it + '"' else it }
-    jvmArgs += "-Djna.nosys=true"
-    jvmArgs += "-Djna.noclasspath=true"
-    jvmArgs += "-Dpty4j.preferred.native.folder=${macroName}/lib/pty4j".let { if (isScript) '"' + it + '"' else it }
-    jvmArgs += "-Dio.netty.allocator.type=pooled"
+    jvmArgs.add("-Djna.boot.library.path=${macroName}/lib/jna/${arch.dirName}".let { if (isScript) '"' + it + '"' else it })
+    jvmArgs.add("-Djna.nosys=true")
+    jvmArgs.add("-Djna.noclasspath=true")
+    jvmArgs.add("-Dpty4j.preferred.native.folder=${macroName}/lib/pty4j".let { if (isScript) '"' + it + '"' else it })
+    jvmArgs.add("-Dio.netty.allocator.type=pooled")
 
     if (useModularLoader || generateRuntimeModuleRepository) {
-      jvmArgs += "-Dintellij.platform.runtime.repository.path=${macroName}/${MODULE_DESCRIPTORS_COMPACT_PATH}".let { if (isScript) '"' + it + '"' else it }
+      jvmArgs.add("-Dintellij.platform.runtime.repository.path=${macroName}/${MODULE_DESCRIPTORS_COMPACT_PATH}".let { if (isScript) '"' + it + '"' else it })
     }
     if (useModularLoader) {
-      jvmArgs += "-Dintellij.platform.root.module=${productProperties.rootModuleForModularLoader!!}"
-      jvmArgs += "-Dintellij.platform.product.mode=${productProperties.productMode.id}"
+      jvmArgs.add("-Dintellij.platform.root.module=${productProperties.rootModuleForModularLoader!!}")
+      jvmArgs.add("-Dintellij.platform.product.mode=${productProperties.productMode.id}")
     }
 
     if (productProperties.platformPrefix != null) {
-      jvmArgs += "-Didea.platform.prefix=${productProperties.platformPrefix}"
+      jvmArgs.add("-Didea.platform.prefix=${productProperties.platformPrefix}")
     }
 
     if (os == OsFamily.WINDOWS) {
-      jvmArgs += "-D${IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY}=${useMultiRoutingFs}"
+      jvmArgs.add("-D${IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY}=${useMultiRoutingFs}")
       if (useMultiRoutingFs) {
-        jvmArgs += MULTI_ROUTING_FILE_SYSTEM_VMOPTIONS
+        jvmArgs.addAll(MULTI_ROUTING_FILE_SYSTEM_VMOPTIONS)
       }
     }
 
-    jvmArgs += productProperties.additionalIdeJvmArguments
-    jvmArgs += productProperties.getAdditionalContextDependentIdeJvmArguments(this)
+    jvmArgs.addAll(productProperties.additionalIdeJvmArguments)
+    jvmArgs.addAll(productProperties.getAdditionalContextDependentIdeJvmArguments(this))
 
     if (productProperties.useSplash) {
       @Suppress("SpellCheckingInspection", "RedundantSuppression")
-      jvmArgs += ("-Dsplash=true")
+      jvmArgs.add("-Dsplash=true")
     }
 
     // https://youtrack.jetbrains.com/issue/IDEA-269280
-    jvmArgs += "-Daether.connector.resumeDownloads=false"
+    jvmArgs.add("-Daether.connector.resumeDownloads=false")
 
-    jvmArgs += "-Dcompose.swing.render.on.graphics=true"
+    jvmArgs.add("-Dcompose.swing.render.on.graphics=true")
 
-    jvmArgs += getCommandLineArgumentsForOpenPackages(context = this, os)
+    if (bundledRuntime.version >= 25) {
+      jvmArgs.add("--enable-native-access=ALL-UNNAMED")
+    }
+
+    jvmArgs.addAll(getCommandLineArgumentsForOpenPackages(context = this, os))
 
     return jvmArgs
   }
 
   override fun addExtraExecutablePattern(os: OsFamily, pattern: String) {
     extraExecutablePatterns.updateAndGet { prev ->
-      prev.with(os, (prev[os] ?: persistentListOf()).add(pattern))
+      prev.with(os, (prev.get(os) ?: persistentListOf()).add(pattern))
     }
   }
 
   override fun getExtraExecutablePattern(os: OsFamily): List<String> = extraExecutablePatterns.get()[os] ?: listOf()
 
   override val appInfoXml: String by lazy {
-    computeAppInfoXml(context = this, applicationInfo)
+    computeAppInfoXml(appInfo = applicationInfo, context = this)
   }
 
   override fun loadRawProductModules(rootModuleName: String, productMode: ProductMode): RawProductModules {
-    val productModulesFile = findProductModulesFile(this, rootModuleName)
+    val productModulesFile = findProductModulesFile(clientMainModuleName = rootModuleName, context = this)
                              ?: error("Cannot find product-modules.xml file in $rootModuleName")
     val resolver = object : ResourceFileResolver {
       override fun readResourceFile(moduleId: RuntimeModuleId, relativePath: String): InputStream? {
@@ -448,9 +473,9 @@ class BuildContextImpl internal constructor(
   }
 
   override suspend fun createProductRunner(additionalPluginModules: List<String>): IntellijProductRunner {
-    when {
-      additionalPluginModules.isEmpty() -> return devModeProductRunner.await()
-      else -> return createDevModeProductRunner(additionalPluginModules = additionalPluginModules, context = this)
+    return when {
+      additionalPluginModules.isEmpty() -> devModeProductRunner.await()
+      else -> createDevModeProductRunner(additionalPluginModules = additionalPluginModules, context = this)
     }
   }
 
@@ -462,8 +487,13 @@ class BuildContextImpl internal constructor(
     attachStdOutToException: Boolean,
   ) {
     runProcess(
-      args, workingDir, timeout, additionalEnvVariables, attachStdOutToException = attachStdOutToException,
-      stdOutConsumer = messages::info, stdErrConsumer = messages::warning,
+      args = args,
+      workingDir = workingDir,
+      timeout = timeout,
+      additionalEnvVariables = additionalEnvVariables,
+      attachStdOutToException = attachStdOutToException,
+      stdOutConsumer = messages::info,
+      stdErrConsumer = messages::warning,
     )
   }
 
@@ -480,11 +510,13 @@ class BuildContextImpl internal constructor(
   }
 }
 
-internal fun findProductModulesFile(context: CompilationContext, clientMainModuleName: String): Path? {
-  return findFileInModuleSources(context.findRequiredModule(clientMainModuleName), "META-INF/$clientMainModuleName/product-modules.xml")
+private fun createBuildOutputRootEvaluator(projectHome: Path, productProperties: ProductProperties, buildOptions: BuildOptions): (JpsProject) -> Path {
+  return { project ->
+    val appInfo = ApplicationInfoPropertiesImpl(project, productProperties, buildOptions)
+    projectHome.resolve("out/${productProperties.getOutputDirectoryName(appInfo)}")
+  }
 }
 
-private fun createBuildOutputRootEvaluator(projectHome: Path, productProperties: ProductProperties, buildOptions: BuildOptions): (JpsProject) -> Path = { project ->
-  val appInfo = ApplicationInfoPropertiesImpl(project, productProperties, buildOptions)
-  projectHome.resolve("out/${productProperties.getOutputDirectoryName(appInfo)}")
+private fun isNightly(buildNumber: String): Boolean {
+  return buildNumber.count { it == '.' } <= 1
 }

@@ -19,6 +19,31 @@ suspend fun runExecutableWithProgress(
   return runExecutableWithProgress(executable, workDir, timeout, env, *args, transformer = ZeroCodeStdoutTransformer)
 }
 
+@Internal
+suspend fun <T> runExecutableWithProgress(
+  binaryToExec: BinaryToExec,
+  timeout: Duration = 10.minutes,
+  env: Map<String, String> = emptyMap(),
+  vararg args: String,
+  transformer: ProcessOutputTransformer<T>,
+  processWeight: ConcurrentProcessWeight = ConcurrentProcessWeight.LIGHT
+): PyResult<T> {
+  val execOptions = ExecOptions(timeout = timeout, env = env, weight = processWeight)
+
+  val errorHandlerTransformer: ProcessOutputTransformer<T> = { output ->
+    when {
+      output.exitCode == 0 -> transformer.invoke(output)
+      else -> Result.failure(null)
+    }
+  }
+
+  return ExecService().execute(
+    binary = binaryToExec,
+    args = Args(*args),
+    options = execOptions,
+    processOutputTransformer = errorHandlerTransformer
+  )
+}
 
 /**
  * Executes a given executable with specified arguments within an optional project directory.
@@ -31,25 +56,18 @@ suspend fun runExecutableWithProgress(
  */
 @Internal
 suspend fun <T> runExecutableWithProgress(
-  executable: Path, workDir: Path?,
+  executable: Path,
+  workDir: Path?,
   timeout: Duration = 10.minutes,
   env: Map<String, String> = emptyMap(),
   vararg args: String,
   transformer: ProcessOutputTransformer<T>,
 ): PyResult<T> {
-  val execOptions = ExecOptions(timeout = timeout, env = env)
-
-  val errorHandlerTransformer: ProcessOutputTransformer<T> = { output ->
-    when {
-      output.exitCode == 0 -> transformer.invoke(output)
-      else -> Result.failure(null)
-    }
-  }
-
-  return ExecService().execute(
-    binary = BinOnEel(executable, workDir),
-    args = Args(*args),
-    options = execOptions,
-    processOutputTransformer = errorHandlerTransformer
+  return runExecutableWithProgress(
+    binaryToExec = BinOnEel(path = executable, workDir = workDir),
+    timeout = timeout,
+    env = env,
+    args = args,
+    transformer = transformer,
   )
 }

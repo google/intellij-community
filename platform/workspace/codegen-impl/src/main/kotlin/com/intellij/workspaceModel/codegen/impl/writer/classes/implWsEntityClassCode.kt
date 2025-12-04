@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.codegen.impl.writer.classes
 
 import com.intellij.workspaceModel.codegen.deft.meta.ObjClass
@@ -18,7 +18,9 @@ fun ObjClass<*>.implWsEntityCode(): String {
   }
 
   return """
-package ${module.implPackage}    
+package ${module.implPackage}   
+ 
+import $module.${defaultJavaBuilderName}
 
 ${implWsEntityAnnotations}
 @OptIn($WorkspaceEntityInternalApi::class)
@@ -63,10 +65,6 @@ private val ObjClass<*>.implWsEntityAnnotations: String
 
 private fun getLinksOfConnectionIds(type: ObjClass<*>): String {
   return lines(2) {
-    line("private val connections = listOf<$ConnectionId>(")
-    type.allRefsFields.forEach {
-      line("    " + it.refsConnectionId + ",")
-    }
-    line(")")
+    line(type.allRefsFields.joinToString(separator = ",", prefix = "private val connections = listOf<$ConnectionId>(", postfix = ")") { it.refsConnectionId })
   }
 }

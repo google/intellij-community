@@ -22,9 +22,11 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.jetbrains.python.PyBundle
+import com.jetbrains.python.errorProcessing.emit
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
 import com.jetbrains.python.sdk.*
+import com.jetbrains.python.sdk.skeleton.PySkeletonUtil
 import com.jetbrains.python.statistics.PipfileWatcherIdsHolder.Companion.RUN_PIPENV_LOCK_SUGGESTION
 import com.jetbrains.python.util.ShowingMessageErrorSync
 import kotlinx.coroutines.Dispatchers
@@ -107,11 +109,11 @@ internal class PipEnvPipFileWatcher : EditorFactoryListener {
       withBackgroundProgress(module.project, description) {
         val sdk = module.pythonSdk ?: return@withBackgroundProgress
         runPipEnv(sdk.associatedModulePath?.let { Path.of(it) }, *args.toTypedArray()).onFailure {
-          ShowingMessageErrorSync.emit(it)
+          ShowingMessageErrorSync.emit(it, module.project)
         }
 
         withContext(Dispatchers.Default) {
-          PythonSdkUtil.getSitePackagesDirectory(sdk)?.refresh(true, true)
+          PySkeletonUtil.getSitePackagesDirectory(sdk)?.refresh(true, true)
           sdk.associatedModuleDir?.refresh(true, false)
         }
       }

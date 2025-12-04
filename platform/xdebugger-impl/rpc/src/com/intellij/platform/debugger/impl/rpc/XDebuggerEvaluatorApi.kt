@@ -8,14 +8,11 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.xdebugger.evaluation.ExpressionInfo
-import com.intellij.xdebugger.impl.evaluate.XEvaluationOrigin
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
 import com.intellij.xdebugger.frame.XDescriptor
 import com.intellij.xdebugger.frame.XPinToTopData
+import com.intellij.xdebugger.impl.evaluate.XEvaluationOrigin
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueHintType
-import com.intellij.xdebugger.impl.rpc.XStackFrameId
-import com.intellij.xdebugger.impl.rpc.XValueGroupId
-import com.intellij.xdebugger.impl.rpc.XValueId
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.core.DeferredSerializer
@@ -61,6 +58,19 @@ sealed interface XValueComputeChildrenEvent {
     val topValues: List<XValueDto>,
   ) : XValueComputeChildrenEvent
 
+  /**
+   * This event is introduced as an optimization for fast node expand on frontend.
+   * Having [XValueSerializedPresentation] passed as [XValueComputeChildrenEvent] helps to avoid an additional round-trip.
+   */
+  @Serializable
+  data class XValuePresentationEvent(val xValueId: XValueId, val presentation: XValueSerializedPresentation) : XValueComputeChildrenEvent
+
+  /**
+   * @see XValuePresentationEvent
+   */
+  @Serializable
+  data class XValueFullValueEvaluatorEvent(val xValueId: XValueId, val fullValueEvaluator: XFullValueEvaluatorDto?) : XValueComputeChildrenEvent
+
   @Serializable
   data class SetAlreadySorted(val value: Boolean) : XValueComputeChildrenEvent
 
@@ -89,7 +99,7 @@ sealed interface XValueComputeChildrenEvent {
 @Serializable
 sealed interface XEvaluationResult {
   @Serializable
-  data class Evaluated(val valueId: XValueDto) : XEvaluationResult
+  data class Evaluated(val xValue: XValueDtoWithPresentation) : XEvaluationResult
 
   @Serializable
   data class EvaluationError(val errorMessage: @NlsContexts.DialogMessage String) : XEvaluationResult
@@ -106,12 +116,19 @@ data class XValueDto(
   val canNavigateToSource: Boolean,
   @Serializable(with = DeferredSerializer::class) val canNavigateToTypeSource: Deferred<Boolean>,
   @Serializable(with = DeferredSerializer::class) val canBeModified: Deferred<Boolean>,
+  @Serializable(with = DeferredSerializer::class) val canMarkValue: Deferred<Boolean>,
   val valueMark: RpcFlow<XValueMarkerDto?>,
-  val presentation: RpcFlow<XValueSerializedPresentation>,
-  val fullValueEvaluator: RpcFlow<XFullValueEvaluatorDto?>,
   val name: String?,
   val textProvider: RpcFlow<XValueTextProviderDto>?,
   @Serializable(with = DeferredSerializer::class) val pinToTopData: Deferred<XPinToTopData>?,
+)
+
+@ApiStatus.Internal
+@Serializable
+data class XValueDtoWithPresentation(
+  val value: XValueDto,
+  val presentation: RpcFlow<XValueSerializedPresentation>,
+  val fullValueEvaluator: RpcFlow<XFullValueEvaluatorDto?>,
 )
 
 @ApiStatus.Internal

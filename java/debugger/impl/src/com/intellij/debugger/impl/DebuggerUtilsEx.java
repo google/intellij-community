@@ -190,6 +190,9 @@ public abstract class DebuggerUtilsEx extends DebuggerUtils {
     catch (PatternSyntaxException e) {
       LOG.debug(e);
     }
+    catch (Exception e) {
+      LOG.error("Exception while matching ClassFilter \"" + classFilter.getPattern() + "\" with the input \"" + qName + "\"", e);
+    }
     return false;
   }
 
@@ -230,7 +233,7 @@ public abstract class DebuggerUtilsEx extends DebuggerUtils {
   /**
    * @deprecated Use {@link DebuggerSettingsUtils#filterEquals} directly
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   public static boolean filterEquals(ClassFilter[] filters1, ClassFilter[] filters2) {
     return DebuggerSettingsUtils.filterEquals(filters1, filters2);
   }

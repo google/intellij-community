@@ -79,6 +79,12 @@ import java.util.function.Supplier;
 
 import static com.intellij.codeInsight.completion.CompletionPhase.CUSTOM_CODE_COMPLETION_ACTION_ID;
 
+/**
+ * See cancellation logic in {@link CompletionPhase.BgCalculation#restartOnWriteAction)}
+ *
+ * @see CompletionService#getCurrentCompletion
+ * @see CompletionServiceImpl#getCurrentCompletionProgressIndicator()
+ */
 @ApiStatus.Internal
 public final class CompletionProgressIndicator extends ProgressIndicatorBase implements CompletionProcessEx, Disposable {
   private static final int TEST_COMPLETION_TIMEOUT = 100 * 1000;
@@ -87,7 +93,7 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
   private final @NotNull Caret myCaret;
   private @Nullable CompletionParameters myParameters;
   private final @NotNull CodeCompletionHandlerBase handler;
-  private final @NotNull CompletionLookupArrangerImpl myArranger;
+  private @NotNull CompletionLookupArrangerImpl myArranger;
   private final @NotNull CompletionType myCompletionType;
   private final int myInvocationCount;
   private @NotNull OffsetsInFile myHostOffsets;
@@ -96,7 +102,7 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
   private final Update myUpdate = new Update("update") {
     @Override
     public void run() {
-      WriteIntentReadAction.run((Runnable)() -> updateLookup());
+      WriteIntentReadAction.run(() -> updateLookup());
       queue.setMergingTimeSpan(ourShowPopupGroupingTime);
     }
   };
@@ -162,14 +168,14 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
    */
   private volatile int myUnfreezeAfterNItems = -1;
 
-  CompletionProgressIndicator(@NotNull Editor editor,
-                              @NotNull Caret caret,
-                              int invocationCount,
-                              @NotNull CodeCompletionHandlerBase handler,
-                              @NotNull OffsetMap offsetMap,
-                              @NotNull OffsetsInFile hostOffsets,
-                              boolean hasModifiers,
-                              @NotNull LookupImpl lookup) {
+  public CompletionProgressIndicator(@NotNull Editor editor,
+                                     @NotNull Caret caret,
+                                     int invocationCount,
+                                     @NotNull CodeCompletionHandlerBase handler,
+                                     @NotNull OffsetMap offsetMap,
+                                     @NotNull OffsetsInFile hostOffsets,
+                                     boolean hasModifiers,
+                                     @NotNull LookupImpl lookup) {
     myEditor = editor;
     myCaret = caret;
     this.handler = handler;
@@ -282,7 +288,7 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
 
   private void addDefaultAdvertisements(@NotNull CompletionParameters parameters) {
     if (DumbService.isDumb(getProject())) {
-      addAdvertisement(IdeBundle.message("dumb.mode.results.might.be.incomplete"), AnimatedIcon.Default.INSTANCE);
+      addAdvertisement(IdeBundle.message("dumb.mode.analyzing.project"), AnimatedIcon.Default.INSTANCE);
       return;
     }
 
@@ -335,7 +341,8 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
   public void dispose() {
   }
 
-  private static int findReplacementOffset(int selectionEndOffset, @NotNull PsiReference reference) {
+  @ApiStatus.Internal
+  public static int findReplacementOffset(int selectionEndOffset, @NotNull PsiReference reference) {
     final List<TextRange> ranges = ReferenceRange.getAbsoluteRanges(reference);
     for (TextRange range : ranges) {
       if (range.contains(selectionEndOffset)) {
@@ -398,6 +405,13 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
   @Override
   public void setParameters(@NotNull CompletionParameters parameters) {
     myParameters = parameters;
+  }
+
+  public void setLookupArranger(@NotNull CompletionLookupArrangerImpl arranger) {
+    myArranger = arranger;
+    lookup.setArranger(arranger);
+    // Refresh to update the presentableArranger in the lookup
+    lookup.refreshUi(true, false);
   }
 
   @Override
@@ -963,7 +977,7 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
 
   public static boolean shouldPreselectFirstSuggestion(@NotNull CompletionParameters parameters) {
     if (Registry.is("ide.completion.lookup.element.preselect.depends.on.context")) {
-      for (CompletionPreselectionBehaviourProvider provider : CompletionPreselectionBehaviourProvider.EP_NAME.getExtensionList()) {
+      for (CompletionPreselectionBehaviourProvider provider : CompletionPreselectionBehaviourProvider.getExtensions()) {
         if (!provider.shouldPreselectFirstSuggestion(parameters)) {
           return false;
         }

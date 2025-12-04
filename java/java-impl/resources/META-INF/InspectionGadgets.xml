@@ -1824,7 +1824,7 @@
                      level="WARNING" implementationClass="com.siyeh.ig.performance.CollectionsMustHaveInitialCapacityInspection"/>
     <localInspection groupPath="Java" language="JAVA" shortName="DynamicRegexReplaceableByCompiledPattern" bundle="messages.InspectionGadgetsBundle"
                      key="dynamic.regex.replaceable.by.compiled.pattern.display.name" groupBundle="messages.InspectionsBundle"
-                     groupKey="group.names.performance.issues" enabledByDefault="false" level="WARNING"
+                     groupKey="group.names.performance.issues" enabledByDefault="true" level="INFORMATION"
                      implementationClass="com.siyeh.ig.performance.DynamicRegexReplaceableByCompiledPatternInspection"/>
     <localInspection groupPath="Java" language="JAVA" shortName="FieldMayBeStatic" bundle="messages.InspectionGadgetsBundle" key="field.may.be.static.display.name"
                      groupBundle="messages.InspectionsBundle" groupKey="group.names.performance.issues" enabledByDefault="false"
@@ -2786,6 +2786,10 @@
                                  targetClass="com.siyeh.ig.format.StringFormatSymbolReferenceProvider$JavaFormatArgumentSymbol"/>
     <searcher forClass="com.intellij.find.usages.api.UsageSearchParameters"
               implementationClass="com.siyeh.ig.format.StringFormatUsageSearcher"/>
+
+    <registryKey key="ide.ignore.call.result.inspection.honor.inferred.pure"
+                 defaultValue="true"
+                 description="Whether inferred @Contract(pure=true) annotations should be taken into account in the &quot;Result of method call ignored&quot; inspection"/>
   </extensions>
 
 </idea-plugin>

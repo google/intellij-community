@@ -4,25 +4,25 @@ package com.intellij.xdebugger.impl.actions;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.platform.debugger.impl.shared.SplitDebuggerAction;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointProxy;
 import com.intellij.util.Range;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerProxy;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy;
-import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointManager;
-import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointProxy;
-import com.intellij.xdebugger.impl.frame.XDebugManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointManagerProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
 @ApiStatus.Internal
-public class ToggleBreakpointEnabledAction extends DumbAwareAction implements ActionRemoteBehaviorSpecification.FrontendOtherwiseBackend {
+public class ToggleBreakpointEnabledAction extends DumbAwareAction implements SplitDebuggerAction {
   @Override
   public void actionPerformed(@NotNull AnActionEvent e) {
     Collection<XBreakpointProxy> breakpoints = findLineBreakpoints(e);
@@ -46,7 +46,7 @@ public class ToggleBreakpointEnabledAction extends DumbAwareAction implements Ac
     Editor editor = e.getData(CommonDataKeys.EDITOR);
     if (project == null || editor == null) return Collections.emptySet();
     XBreakpointManagerProxy breakpointManager = XDebugManagerProxy.getInstance().getBreakpointManagerProxy(project);
-    XLineBreakpointManager lineBreakpointManager = breakpointManager.getLineBreakpointManager();
+    XLineBreakpointManagerProxy lineBreakpointManager = breakpointManager.getLineBreakpointManager();
     Document document = editor.getDocument();
     Collection<Range<Integer>> lineRanges = new ArrayList<>();
     for (Caret caret : editor.getCaretModel().getAllCarets()) {

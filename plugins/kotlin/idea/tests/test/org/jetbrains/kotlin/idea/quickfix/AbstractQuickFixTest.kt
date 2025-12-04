@@ -12,6 +12,7 @@ import com.intellij.codeInspection.ex.QuickFixWrapper
 import com.intellij.internal.statistic.eventLog.StatisticsEventLoggerProvider
 import com.intellij.modcommand.ModCommandAction
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.extensions.LoadingOrder
@@ -25,7 +26,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiUtilBase
 import com.intellij.testFramework.*
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
-import com.intellij.util.ui.UIUtil
 import junit.framework.TestCase
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
@@ -55,6 +55,7 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
         const val FORCE_PACKAGE_FOLDER_DIRECTIVE = "FORCE_PACKAGE_FOLDER"
         const val K1_TOOL_DIRECTIVE = "K1_TOOL:"
         const val K2_TOOL_DIRECTIVE = "K2_TOOL:"
+        const val TEST_PREVIEW = "TEST_PREVIEW:"
 
         private val quickFixesAllowedToResolveInWriteAction = AllowedToResolveUnderWriteActionData(
             IDEA_TEST_DATA_DIR.resolve("quickfix/allowResolveInWriteAction.txt").path,
@@ -338,6 +339,11 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
             val element = PsiUtilBase.getElementAtCaret(editor)
             stubComparisonFailure = try {
                 forceCheckForResolveInDispatchThreadInTests(writeActionResolveHandler) {
+                    val expectedPreviewText = InTextDirectivesUtils.findListWithPrefixes(myFixture.file.text, TEST_PREVIEW).singleOrNull()
+                    if (expectedPreviewText != null && isFirPlugin) {
+                        val text = myFixture.getIntentionPreviewText(intention)
+                        assertEquals("Different preview found:", expectedPreviewText, text)
+                    }
                     myFixture.launchAction(intention)
                 }
                 null
@@ -345,8 +351,10 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
                 comparisonFailure
             }
 
-            UIUtil.dispatchAllInvocationEvents()
-            UIUtil.dispatchAllInvocationEvents()
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+
+            // Wait in case ModCommand actions have scheduled an additional execution step
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
 
             if (!shouldBeAvailableAfterExecution()) {
                 var action = findActionWithText(hint.expectedText, acceptMatchByFamilyName = true)

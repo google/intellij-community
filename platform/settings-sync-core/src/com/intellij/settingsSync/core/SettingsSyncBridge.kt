@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.util.progress.withProgressText
 import com.intellij.settingsSync.core.SettingsSyncBridge.PushRequestMode.*
 import com.intellij.settingsSync.core.communicator.RemoteCommunicatorHolder
+import com.intellij.settingsSync.core.communicator.SettingsSyncUserData
 import com.intellij.settingsSync.core.statistics.SettingsSyncEventsStatistics
 import com.intellij.util.containers.ContainerUtil
 import kotlinx.coroutines.*
@@ -56,6 +57,7 @@ class SettingsSyncBridge(
 
 
   private val eventsMutex = Mutex()
+  private val initializationMutex = Mutex()
 
   private val settingsChangeListener = object : SettingsSyncEventListener {
     override fun settingChanged(event: SyncSettingsEvent) {
@@ -89,27 +91,33 @@ class SettingsSyncBridge(
 
   internal fun initialize(initMode: InitMode) {
     coroutineScope.launch {
-      withProgressText(SettingsSyncBundle.message(initMode.messageKey)) {
-        try {
-          // We only due it on `PushToServer` because  with other init modes this method can be called too early in the IDE initialization process
-          // and cause saving settings to fail — see fhttps://github.com/JetBrains/intellij-community/pull/2793#discussion_r1692737467 for context.
-          if (initMode == InitMode.PushToServer) {
-            // Flush settings explicitly – if this is not done before sending sync events, then remotely synced settings
-            // might not contain the most up–to–date settings state (e.g. sync settings will be stale).
-            saveIdeSettings()
-          }
-          settingsLog.initialize()
-
-          // the queue is not activated initially => events will be collected but not processed until we perform all initialization tasks
-          SettingsSyncEvents.getInstance().addListener(settingsChangeListener)
-          ideMediator.activateStreamProvider()
-
-          applyInitialChanges(initMode)
-
-          startQueue()
+      initializationMutex.withLock {
+        if (isInitialized) {
+          LOG.warn("Settings sync is already initialized, skipping initialization.")
+          return@withLock
         }
-        catch (ex: Exception) {
-          stopSyncingAndRollback(null, ex)
+        withProgressText(SettingsSyncBundle.message(initMode.messageKey)) {
+          try {
+            // We only due it on `PushToServer` because  with other init modes this method can be called too early in the IDE initialization process
+            // and cause saving settings to fail — see fhttps://github.com/JetBrains/intellij-community/pull/2793#discussion_r1692737467 for context.
+            if (initMode == InitMode.PushToServer) {
+              // Flush settings explicitly – if this is not done before sending sync events, then remotely synced settings
+              // might not contain the most up–to–date settings state (e.g. sync settings will be stale).
+              saveIdeSettings()
+            }
+            settingsLog.initialize()
+
+            // the queue is not activated initially => events will be collected but not processed until we perform all initialization tasks
+            SettingsSyncEvents.getInstance().addListener(settingsChangeListener)
+            ideMediator.activateStreamProvider()
+
+            applyInitialChanges(initMode)
+
+            startQueue()
+          }
+          catch (ex: Exception) {
+            stopSyncingAndRollback(null, ex)
+          }
         }
       }
     }
@@ -360,21 +368,9 @@ class SettingsSyncBridge(
   }
 
   private fun deleteServerData(afterDeleting: (DeleteServerDataResult) -> Unit) {
-    val deletionSnapshot = SettingsSnapshot(SettingsSnapshot.MetaInfo(Instant.now(), getLocalApplicationInfo(), isDeleted = true),
-                                            emptySet(), null, emptyMap(), emptySet())
-    val pushResult = pushToCloud(deletionSnapshot, force = true)
-    LOG.info("Deleting server data. Result: $pushResult")
-    when (pushResult) {
-      is SettingsSyncPushResult.Success -> {
-        afterDeleting(DeleteServerDataResult.Success)
-      }
-      is SettingsSyncPushResult.Error -> {
-        afterDeleting(DeleteServerDataResult.Error(pushResult.message))
-      }
-      SettingsSyncPushResult.Rejected -> {
-        afterDeleting(DeleteServerDataResult.Error("Deletion rejected by server"))
-      }
-    }
+    val userData = RemoteCommunicatorHolder.getCurrentUserData()
+                   ?: return afterDeleting(DeleteServerDataResult.Error("No user data"))
+    afterDeleting(removeRemoteData(userData))
   }
 
   private fun checkServer() {
@@ -607,5 +603,24 @@ class SettingsSyncBridge(
 
   companion object {
     private val LOG = logger<SettingsSyncBridge>()
+
+    fun removeRemoteData(userData: SettingsSyncUserData): DeleteServerDataResult {
+      if (RemoteCommunicatorHolder.getCurrentUserData() != userData) {
+        return DeleteServerDataResult.Error("User account has changed")
+      }
+      val remoteCommunicator = RemoteCommunicatorHolder.getRemoteCommunicator()
+                               ?: return DeleteServerDataResult.Error("No remote communicator available")
+      val deletionSnapshot = SettingsSnapshot(SettingsSnapshot.MetaInfo(Instant.now(), getLocalApplicationInfo(), isDeleted = true),
+                                              emptySet(), null, emptyMap(), emptySet())
+
+      val versionId = SettingsSyncLocalSettings.getInstance().knownAndAppliedServerId
+      val pushResult = remoteCommunicator.push(deletionSnapshot, force = true, versionId)
+
+      return when (pushResult) {
+        is SettingsSyncPushResult.Success -> DeleteServerDataResult.Success
+        is SettingsSyncPushResult.Error -> DeleteServerDataResult.Error(pushResult.message)
+        SettingsSyncPushResult.Rejected -> DeleteServerDataResult.Error("Deletion rejected by server")
+      }
+    }
   }
 }

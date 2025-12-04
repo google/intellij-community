@@ -790,7 +790,10 @@
     "TitlePane": {
       "background": "panel",
       "Button.preferredSize": "47,28",
-      "Button.preferredSize.compact": "44,32"
+      "Button.preferredSize.compact": "44,32",
+      "Dialog.Button.preferredWidth": "32",
+      "Dialog.Button.insets": "12,0,12,0",
+      "Dialog.Button.insets.compact": "8,0,8,0"
     },
 
     "activeCaption": "#434E60",
@@ -823,7 +826,17 @@
     "StripeToolbar.Button": {
       "size.compact": "32,32",
       "iconSize.compact": 16,
-      "iconPadding.compact": "4,4,4,4"
+      "leftStripeIcon.padding": "5,5,5,5",
+      "rightStripeIcon.padding": "5,5,5,5",
+      "leftStripeIcon.padding.compact": "4,4,4,4",
+      "rightStripeIcon.padding.compact": "4,4,4,4",
+      "leftStripeIconWithName.padding": "4,4,4,4",
+      "rightStripeIconWithName.padding": "4,4,4,4",
+      "leftStripeIconWithName.padding.compact": "3,3,3,3",
+      "leftStripeTextOffset": 0,
+      "leftStripeTextOffset.compact": 0,
+      "rightStripeTextOffset": 0,
+      "rightStripeTextOffset.compact": 0
     },
 
     "Tooltip": {
@@ -1064,7 +1077,11 @@
       "Projects.actions.background": "#3C5C86",
       "SidePanel.background": "#3C3F41"
     },
-
+    "WelcomeScreen.Frame.DisclosureButton": {
+      "defaultBackground": "Gray2",
+      "hoverOverlay": "#FFFFFF0D",
+      "pressedOverlay": "#FFFFFF1A"
+    },
     "RecentProject": {
       "Color1": {
         "MainToolbarGradientStart": "#654B40",
@@ -1165,6 +1182,29 @@
       "List.selectionBackground": "#36393a",
       "Panel.background": "#313435",
       "percent.foreground": "#404040"
+    },
+    
+    "Recap": {
+      "cardBackground": "#2B2B2B",
+      "cardBorderColor": "#2B2B2B",
+      "cardHeaderTitle": "#D3D3D3",
+      "cardHeaderLinkBackground": "#3D3F41",
+      "cardHeaderSubtitle": "#B4B8BF",
+      "cardFooterForeground": "#CED0D6",
+      "chroniclesBackground": "#3D3F41",
+      "chroniclesBorderColor": "#3D3F41",
+      "chroniclesBackgroundHovered": "#5E6771",
+      "chroniclesForeground": "#DFE1E5",
+      "chroniclesForegroundGreyed": "#868A91"
+    },
+
+    "OpenTelemetry": {
+      "Span.regularBounds": "#CED0D6",
+      "Span.regularFillStart": "#4A83B8",
+      "Span.regularFillEnd": "#7750BA",
+      "Span.selectedBounds": "#F0F1F2",
+      "Span.selectedFillStart": "#23A0FF",
+      "Span.selectedFillEnd": "#AF60FF"
     }
   },
 

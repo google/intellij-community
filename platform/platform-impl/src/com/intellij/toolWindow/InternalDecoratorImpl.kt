@@ -39,7 +39,6 @@ import com.intellij.util.SmartList
 import com.intellij.util.animation.AlphaAnimated
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import org.intellij.lang.annotations.MagicConstant
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -178,22 +177,36 @@ class InternalDecoratorImpl internal constructor(
       return preventRecoloring == true
     }
 
-    internal fun setBackgroundFor(component: Component, bg: Color) {
+    private fun updateBackgroundFor(component: Component): Boolean {
       if (component is ActionButton ||
           component is Divider ||
           component is JTextComponent ||
           component is JComboBox<*> ||
-          component is EditorTextField) return
+          component is EditorTextField) {
+        return false
+      }
       if (component.isBackgroundSet && component.background !is UIResource) {
+        return false
+      }
+      return true
+    }
+
+    private fun setBackgroundFor(component: Component, bg: Color) {
+      if (isRecursiveBackgroundUpdateDisabled(component)) {
         return
       }
-      component.background = bg
+      if (updateBackgroundFor(component)) {
+        component.background = bg
+      }
+      if (component is Container) {
+        for (child in component.components) {
+          setBackgroundFor(child, bg)
+        }
+      }
     }
 
     internal fun setBackgroundRecursively(component: Component, bg: Color) {
-      UIUtil.uiTraverser(component)
-        .expandAndFilter { !isRecursiveBackgroundUpdateDisabled(component) }
-        .forEach { setBackgroundFor(it, bg) }
+      setBackgroundFor(component, bg)
     }
 
     private fun installDefaultFocusTraversalKeys(container: Container, id: Int) {
@@ -484,12 +497,16 @@ class InternalDecoratorImpl internal constructor(
     else null
   }
 
-  private fun getOrderedCells(): List<InternalDecoratorImpl> {
+  /**
+   * Returns the list of all child cells (recursively) if this decorator is split.
+   * Otherwise, will return the list of itself.
+   */
+  fun getOrderedCells(): List<InternalDecoratorImpl> {
     val cells = mutableListOf<InternalDecoratorImpl>()
 
     fun collectCell(decorator: InternalDecoratorImpl) {
       if (decorator.mode.isSplit) {
-        val decorators = nestedDecorators!!
+        val decorators = decorator.nestedDecorators!!
         collectCell(decorators.first)
         collectCell(decorators.second)
       }
@@ -912,9 +929,6 @@ class InternalDecoratorImpl internal constructor(
       log().trace(Throwable("Tool window $toolWindowId shown"))
     }
     super.addNotify()
-    if (isSplitUnsplitInProgress()) {
-      return
-    }
 
     disposable?.let {
       Disposer.dispose(it)
@@ -933,8 +947,7 @@ class InternalDecoratorImpl internal constructor(
     }
     contentUi.update()
 
-    if ((toolWindow.type == ToolWindowType.WINDOWED || toolWindow.type == ToolWindowType.FLOATING) &&
-        ToolWindowContentUi.isTabsReorderingAllowed(toolWindow)) {
+    if (toolWindow.type == ToolWindowType.WINDOWED || toolWindow.type == ToolWindowType.FLOATING) {
       ToolWindowInnerDragHelper(disposable, this).start()
     }
   }
@@ -944,9 +957,6 @@ class InternalDecoratorImpl internal constructor(
       log().trace(Throwable("Tool window $toolWindowId hidden"))
     }
     super.removeNotify()
-    if (isSplitUnsplitInProgress()) {
-      return
-    }
 
     val disposable = disposable
     if (disposable != null && !disposable.isDisposed) {

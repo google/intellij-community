@@ -18,18 +18,20 @@ import com.intellij.xdebugger.frame.*
 import com.intellij.xdebugger.frame.presentation.XValuePresentation
 import com.intellij.xdebugger.impl.pinned.items.PinToTopMemberValue
 import com.intellij.xdebugger.impl.pinned.items.PinToTopParentValue
+import com.intellij.xdebugger.impl.rpc.sourcePosition
 import com.intellij.xdebugger.impl.ui.XValueTextProvider
 import com.intellij.xdebugger.impl.ui.tree.XValueExtendedPresentation
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeEx
-import com.intellij.xdebugger.impl.util.MonolithUtils
+import com.intellij.xdebugger.impl.util.XDebugMonolithUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.asCompletableFuture
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.concurrency.Promise
-import org.jetbrains.concurrency.asCompletableFuture
 import org.jetbrains.concurrency.asPromise
 import java.util.concurrent.CompletableFuture
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 @ApiStatus.Internal
 class FrontendXValue private constructor(
@@ -38,6 +40,7 @@ class FrontendXValue private constructor(
   val xValueDto: XValueDto,
   hasParentValue: Boolean,
   presentation: Flow<XValueSerializedPresentation>,
+  fullValueEvaluatorFlow: Flow<XFullValueEvaluatorDto?>,
 ) : XValue(), XValueTextProvider, PinToTopParentValue, PinToTopMemberValue {
   
   private val statePresentation = cs.async { presentation.stateIn(cs) }
@@ -63,11 +66,13 @@ class FrontendXValue private constructor(
   @Volatile
   private var canNavigateToTypeSource = false
 
-  private val xValueContainer = FrontendXValueContainer(project, cs, hasParentValue) {
-    XValueApi.getInstance().computeChildren(xValueDto.id)
-  }
+  @Volatile
+  var canMarkValue: Boolean = false
+    private set
 
-  private val fullValueEvaluator = xValueDto.fullValueEvaluator.toFlow().map { evaluatorDto ->
+  private val xValueContainer = FrontendXValueContainer(project, cs, hasParentValue, xValueDto.id)
+
+  private val fullValueEvaluator = fullValueEvaluatorFlow.map { evaluatorDto ->
     if (evaluatorDto == null) {
       return@map null
     }
@@ -109,6 +114,10 @@ class FrontendXValue private constructor(
     cs.launch {
       canNavigateToTypeSource = xValueDto.canNavigateToTypeSource.await()
     }
+
+    cs.launch {
+      canMarkValue = xValueDto.canMarkValue.await()
+    }
   }
 
   override fun canNavigateToSource(): Boolean {
@@ -121,10 +130,6 @@ class FrontendXValue private constructor(
 
   override fun canNavigateToTypeSource(): Boolean {
     return canNavigateToTypeSource
-  }
-
-  override fun canNavigateToTypeSourceAsync(): Promise<Boolean?>? {
-    return canNavigateToTypeSourceAsync()?.asCompletableFuture()?.asPromise()
   }
 
   override fun computeInlineDebuggerData(callback: XInlineDebuggerDataCallback): ThreeState {
@@ -223,7 +228,7 @@ class FrontendXValue private constructor(
 
   override fun getReferrersProvider(): XReferrersProvider? {
     // TODO referrersProvider is only supported in monolith
-    return MonolithUtils.findXValueById(xValueDto.id)?.referrersProvider
+    return XDebugMonolithUtils.findXValueById(xValueDto.id)?.referrersProvider
   }
 
   override fun shouldShowTextValue(): Boolean = textProvider?.value?.shouldShowTextValue ?: false
@@ -297,26 +302,27 @@ class FrontendXValue private constructor(
   }
 
   companion object {
-
-    fun asFrontendXValue(value: XValue): FrontendXValue {
-      return asFrontendXValueOrNull(value) ?: error("XValue is not a FrontendXValue: $value")
-    }
-
     fun asFrontendXValueOrNull(value: XValue): FrontendXValue? {
       return value as? FrontendXValue ?: (value as? FrontendXNamedValue)?.delegate
     }
 
     @JvmStatic
-    fun create(project: Project, evaluatorCoroutineScope: CoroutineScope, xValueDto: XValueDto, hasParentValue: Boolean): XValue {
-      // TODO[IJPL-160146]: Is it ok to dispose only when evaluator is changed?
-      //   So, XValues will live more than popups where they appeared
-      //   But it is needed for Mark object functionality at least.
-      //   Since we cannot dispose XValue when evaluation popup is closed
-      //   because it getting closed when Mark Object dialog is shown,
-      //   so we cannot refer to the backend's xValue
-      val cs = evaluatorCoroutineScope.childScope("FrontendXValue")
-      val presentation = xValueDto.presentation.toFlow()
-      val frontendXValue = FrontendXValue(project, cs, xValueDto, hasParentValue, presentation)
+    fun create(project: Project, containerScope: CoroutineScope, dto: XValueDtoWithPresentation, hasParentValue: Boolean): XValue {
+      val presentation = dto.presentation.toFlow()
+      val fullValueEvaluatorFlow = dto.fullValueEvaluator.toFlow()
+      return create(project, containerScope, dto.value, presentation, fullValueEvaluatorFlow, hasParentValue)
+    }
+
+    internal fun create(
+      project: Project,
+      containerScope: CoroutineScope,
+      xValueDto: XValueDto,
+      presentation: Flow<XValueSerializedPresentation>,
+      fullValueEvaluatorFlow: Flow<XFullValueEvaluatorDto?>,
+      hasParentValue: Boolean,
+    ): XValue {
+      val cs = containerScope.childScope("FrontendXValue")
+      val frontendXValue = FrontendXValue(project, cs, xValueDto, hasParentValue, presentation, fullValueEvaluatorFlow)
       val name = xValueDto.name
       return if (name != null) FrontendXNamedValue(frontendXValue, name) else frontendXValue
     }
@@ -364,9 +370,9 @@ private fun renderAdvancedPresentation(renderer: XValuePresentation.XValueTextRe
   }
 }
 
-internal fun Obsolescent.childCoroutineScope(parentScope: CoroutineScope, name: String): CoroutineScope {
+internal fun Obsolescent.childCoroutineScope(parentScope: CoroutineScope, name: String, context: CoroutineContext = EmptyCoroutineContext): CoroutineScope {
   val obsolescent = this
-  val scope = parentScope.childScope(name)
+  val scope = parentScope.childScope(name, context)
   parentScope.launch(context = Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
     while (!obsolescent.isObsolete) {
       delay(ConcurrencyUtil.DEFAULT_TIMEOUT_MS)

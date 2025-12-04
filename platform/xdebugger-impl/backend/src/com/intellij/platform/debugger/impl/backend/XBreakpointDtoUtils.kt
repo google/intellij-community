@@ -1,8 +1,8 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.backend
 
-import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.rpc.util.toRpc
+import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.vfs.rpcId
 import com.intellij.openapi.application.readAction
 import com.intellij.platform.debugger.impl.rpc.*
@@ -10,8 +10,8 @@ import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl
 import com.intellij.xdebugger.impl.breakpoints.*
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointProxy.Monolith.Companion.getEditorsProvider
-import com.intellij.xdebugger.impl.rpc.XBreakpointTypeId
+import com.intellij.xdebugger.impl.proxy.getEditorsProvider
+import com.intellij.xdebugger.impl.rpc.toRpc
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.channelFlow
@@ -30,7 +30,7 @@ internal suspend fun XBreakpointBase<*, *, *>.toRpc(): XBreakpointDto {
     id = breakpointId,
     initialState = getDtoState(xDebuggerManager.currentSession),
     typeId = XBreakpointTypeId(type.id),
-    editorsProviderDto = editorsProvider?.toRpc(),
+    editorsProviderDto = editorsProvider?.toRpc(coroutineScope),
     state = channelFlow {
       val currentSessionFlow = xDebuggerManager.currentSessionFlow
       breakpointChangedFlow().combine(currentSessionFlow) { _, currentSession ->

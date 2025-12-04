@@ -41,6 +41,7 @@ __all__ = [
     "AsyncIterator",
     "Awaitable",
     "BinaryIO",
+    "ByteString",
     "Callable",
     "ChainMap",
     "ClassVar",
@@ -108,9 +109,6 @@ __all__ = [
     "overload",
     "runtime_checkable",
 ]
-
-if sys.version_info < (3, 14):
-    __all__ += ["ByteString"]
 
 if sys.version_info >= (3, 14):
     __all__ += ["evaluate_forward_ref"]
@@ -223,10 +221,6 @@ class TypeVar:
         def evaluate_constraints(self) -> EvaluateFunc | None: ...
         @property
         def evaluate_default(self) -> EvaluateFunc | None: ...
-
-# Used for an undocumented mypy feature. Does not exist at runtime.
-# Obsolete, use _typeshed._type_checker_internals.promote instead.
-_promote = object()
 
 # N.B. Keep this definition in sync with typing_extensions._SpecialForm
 @final
@@ -414,7 +408,13 @@ _TC = TypeVar("_TC", bound=type[object])
 
 def overload(func: _F) -> _F: ...
 def no_type_check(arg: _F) -> _F: ...
-def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]: ...
+
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]: ...
+
+else:
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]: ...
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -579,7 +579,7 @@ class Awaitable(Protocol[_T_co]):
     @abstractmethod
     def __await__(self) -> Generator[Any, Any, _T_co]: ...
 
-# Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
+# Non-default variations to accommodate coroutines, and `AwaitableGenerator` having a 4th type parameter.
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
@@ -726,6 +726,7 @@ class MutableSet(AbstractSet[_T]):
     def __isub__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
 
 class MappingView(Sized):
+    __slots__ = ("_mapping",)
     def __init__(self, mapping: Sized) -> None: ...  # undocumented
     def __len__(self) -> int: ...
 
@@ -922,8 +923,7 @@ class TextIO(IO[str]):
     @abstractmethod
     def __enter__(self) -> TextIO: ...
 
-if sys.version_info < (3, 14):
-    ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
+ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
 
 # Functions
 
@@ -1006,9 +1006,7 @@ class NamedTuple(tuple[Any, ...]):
     @overload
     def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
     @overload
-    @typing_extensions.deprecated(
-        "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
-    )
+    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
@@ -1135,14 +1133,23 @@ if sys.version_info >= (3, 10):
 def _type_repr(obj: object) -> str: ...
 
 if sys.version_info >= (3, 12):
+    _TypeParameter: typing_extensions.TypeAlias = (
+        TypeVar
+        | typing_extensions.TypeVar
+        | ParamSpec
+        | typing_extensions.ParamSpec
+        | TypeVarTuple
+        | typing_extensions.TypeVarTuple
+    )
+
     def override(method: _F, /) -> _F: ...
     @final
     class TypeAliasType:
-        def __new__(cls, name: str, value: Any, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()) -> Self: ...
+        def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
         @property
         def __value__(self) -> Any: ...  # AnnotationForm
         @property
-        def __type_params__(self) -> tuple[TypeVar | ParamSpec | TypeVarTuple, ...]: ...
+        def __type_params__(self) -> tuple[_TypeParameter, ...]: ...
         @property
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property

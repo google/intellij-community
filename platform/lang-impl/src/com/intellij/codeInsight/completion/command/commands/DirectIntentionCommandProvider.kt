@@ -241,7 +241,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
           val profileToUse = getInstance(psiFile.project).getCurrentProfile()
           val inspectionWrapper = InspectionProfileWrapper(profileToUse)
           val inspectionTools = getInspectionTools(inspectionWrapper, originalFile)
-          val lineRange = getLineRange(topLevelFile, topLevelOffset)
+          val lineRange = getLineRange(topLevelFile, topLevelCurrentOffset)
           val indicator = EmptyProgressIndicator()
           val inspectionResult = jobToIndicator(coroutineContext.job, indicator) {
             if (!isInjected) {
@@ -396,7 +396,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
               val suffix = "</html>"
               if (name.startsWith(prefix) && name.endsWith(suffix)) {
                 @Suppress("HardCodedStringLiteral")
-                name = name.substring(prefix.length, name.length - suffix.length)
+                name = name.replace(Regex("<[^>]+>"), "")
               }
               val command = DirectErrorFixCompletionCommand(presentableName = name,
                                                             priority = 100,
