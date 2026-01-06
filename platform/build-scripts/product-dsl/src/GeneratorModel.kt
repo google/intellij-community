@@ -3,7 +3,7 @@
 
 package org.jetbrains.intellij.build.productLayout
 
-import com.intellij.platform.plugins.parser.impl.elements.ModuleLoadingRuleValue
+const val LIB_MODULE_PREFIX: String = "intellij.libraries."
 
 // Constants for magic strings used throughout the generator
 internal const val ADDITIONAL_MODULES_BLOCK = "additional"
@@ -16,7 +16,7 @@ internal const val MODULE_SET_PREFIX = "intellij.moduleSets."
  * Prevents accidental mixing of module set names with other string types.
  */
 @JvmInline
-value class ModuleSetName(val value: String) {
+internal value class ModuleSetName(val value: String) {
   override fun toString(): String = value
 }
 
@@ -28,19 +28,7 @@ data class ContentBlock(
   /** Source identifier for the block (e.g., "essential", "vcs", "additional") */
   @JvmField val source: String,
   /** List of modules with their effective loading modes */
-  @JvmField val modules: List<ModuleWithLoading>,
-)
-
-/**
- * A module with its effective loading mode after applying overrides and exclusions.
- */
-data class ModuleWithLoading(
-  /** Module name */
-  @JvmField val name: String,
-  /** Effective loading mode (null means default/no attribute) */
-  @JvmField val loading: ModuleLoadingRuleValue?,
-  /** Whether to include dependencies of this module */
-  @JvmField val includeDependencies: Boolean = false,
+  @JvmField val modules: List<ContentModule>,
 )
 
 /**

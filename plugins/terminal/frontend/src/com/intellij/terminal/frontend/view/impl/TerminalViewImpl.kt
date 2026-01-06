@@ -1,6 +1,5 @@
 package com.intellij.terminal.frontend.view.impl
 
-import com.intellij.codeInsight.completion.CompletionPhase
 import com.intellij.codeInsight.inline.completion.InlineCompletion
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.DataSink
@@ -8,7 +7,6 @@ import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.MockDocumentEvent
@@ -36,7 +34,6 @@ import com.intellij.ui.components.JBLayeredPane
 import com.intellij.util.AwaitCancellationAndInvoke
 import com.intellij.util.asDisposable
 import com.intellij.util.awaitCancellationAndInvoke
-import com.intellij.util.text.nullize
 import com.intellij.util.ui.components.BorderLayoutPanel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
@@ -257,8 +254,6 @@ class TerminalViewImpl(
       coroutineScope = hyperlinkScope,
     )
 
-    outputEditor.putUserData(CompletionPhase.CUSTOM_CODE_COMPLETION_ACTION_ID, "Terminal.CommandCompletion.Invoke")
-
     val terminalAliasesStorage = TerminalAliasesStorage()
     outputEditor.putUserData(TerminalAliasesStorage.KEY, terminalAliasesStorage)
 
@@ -324,10 +319,12 @@ class TerminalViewImpl(
         )
       }
 
+      val startupOptions = startupOptionsDeferred.await()
       configureCommandCompletion(
         outputEditor,
         sessionModel,
         shellIntegration,
+        startupOptions.envVariables,
         coroutineScope.childScope("TerminalCommandCompletion")
       )
     }
@@ -347,8 +344,7 @@ class TerminalViewImpl(
   }
 
   override fun getCurrentDirectory(): String? {
-    // The initial value of the current directory is an empty string, return null in this case.
-    return sessionModel.terminalState.value.currentDirectory.nullize()
+    return sessionModel.terminalState.value.currentDirectory
   }
 
   override fun sendText(text: String) {
@@ -526,7 +522,7 @@ class TerminalViewImpl(
   ) {
     InlineCompletion.install(editor, coroutineScope)
     // Inline completion handler needs to be manually disposed
-    coroutineScope.awaitCancellationAndInvoke(Dispatchers.UiWithModelAccess) {
+    coroutineScope.awaitCancellationAndInvoke(Dispatchers.EDT) {
       InlineCompletion.remove(editor)
     }
 
@@ -567,12 +563,13 @@ class TerminalViewImpl(
     editor: Editor,
     sessionModel: TerminalSessionModel,
     shellIntegration: TerminalShellIntegration,
+    envVariables: Map<String, String>,
     coroutineScope: CoroutineScope,
   ) {
     val eelDescriptor = LocalEelDescriptor // TODO: it should be determined by where shell is running to work properly in WSL and Docker
     val services = TerminalCommandCompletionServices(
       commandSpecsManager = ShellCommandSpecsManagerImpl.getInstance(),
-      runtimeContextProvider = ShellRuntimeContextProviderReworkedImpl(project, sessionModel, eelDescriptor),
+      runtimeContextProvider = ShellRuntimeContextProviderReworkedImpl(project, sessionModel, envVariables, eelDescriptor),
       dataGeneratorsExecutor = ShellDataGeneratorsExecutorReworkedImpl(
         shellIntegration,
         coroutineScope.childScope("ShellDataGeneratorsExecutorReworkedImpl")

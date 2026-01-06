@@ -9,12 +9,12 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
-              <args>$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-compose-compiler-plugin/2.2.21/kotlin-compose-compiler-plugin-2.2.21.jar</args>
+              <args>$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-compose-compiler-plugin/2.3.0/kotlin-compose-compiler-plugin-2.3.0.jar</args>
             </arrayArg>
           </arrayArguments>
         </compilerArguments>
@@ -44,24 +44,27 @@
     <orderEntry type="module" module-name="intellij.python.community" />
     <orderEntry type="module" module-name="intellij.platform.util.ui" />
     <orderEntry type="module" module-name="intellij.platform.editor.ui" />
-    <orderEntry type="module" module-name="intellij.libraries.compose.foundation.desktop.junit" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="kotlin-test" level="project" />
-    <orderEntry type="library" scope="TEST" name="kotlin-test-assertions-core-jvm" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinTest" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinTestAssertionsCoreJvm" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="kotlin-test-junit" level="project" />
     <orderEntry type="module" module-name="intellij.platform.jewel.intUi.standalone" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.projectModel" />
     <orderEntry type="module" module-name="intellij.platform.execution.impl" />
-    <orderEntry type="library" name="jediterm-core" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.jediterm.core" />
+    <orderEntry type="module" module-name="intellij.libraries.compose.runtime.desktop" />
     <orderEntry type="library" scope="TEST" name="io.mockk" level="project" />
     <orderEntry type="library" scope="TEST" name="io.mockk.jvm" level="project" />
-    <orderEntry type="library" name="kotlin-reflect" level="project" />
-    <orderEntry type="library" name="kotlinx-collections-immutable" level="project" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.common" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.statistics" />
     <orderEntry type="module" module-name="intellij.python.processOutput" />
     <orderEntry type="module" module-name="intellij.python.community.junit5Tests.framework" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.compose.foundation.desktop.junit" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.debug" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.test" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlin.reflect" />
   </component>
 </module>

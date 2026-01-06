@@ -6,7 +6,7 @@ import com.intellij.testFramework.runInEdtAndWait
 import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.debugger.evaluate.AbstractCodeFragmentHighlightingTest
-import org.jetbrains.kotlin.idea.fir.invalidateCaches
+import org.jetbrains.kotlin.test.util.invalidateCaches
 import java.nio.file.Paths
 
 abstract class AbstractK2CodeFragmentHighlightingTest : AbstractCodeFragmentHighlightingTest() {
@@ -31,6 +31,10 @@ abstract class AbstractK2CodeFragmentHighlightingTest : AbstractCodeFragmentHigh
         runTestIfNotDisabledByFileDirective(filePath) {
             super.doTestWithImport(filePath)
         }
+    }
+
+    override fun configureByCodeFragment(filePath: String) {
+        myFixture.configureByK2ModeCodeFragment(filePath)
     }
 
     private fun runTestIfNotDisabledByFileDirective(filePath: String, test: () -> Unit) {

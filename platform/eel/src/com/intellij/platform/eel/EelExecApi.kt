@@ -136,9 +136,16 @@ sealed interface EelExecApi {
         }!!
         try {
           when {
-            expireAt <= now ->
-              return environmentVariables().loginInteractive().onlyActual(true).eelIt().await()
-
+            expireAt <= now -> {
+              val result = environmentVariables().loginInteractive().onlyActual(true).eelIt().await()
+              cacheForObsoleteEnvVarExpireAt.compute(descriptor) { _, expireAtAndSucceeded ->
+                if (expireAtAndSucceeded == expireAt to true)
+                  now + cacheDuration to true
+                else
+                  expireAtAndSucceeded
+              }
+              return result
+            }
             completedSuccessfullyLastTime ->
               return environmentVariables().loginInteractive().onlyActual(false).eelIt().await()
 
@@ -167,6 +174,8 @@ sealed interface EelExecApi {
 
   /**
    * Gets the same environment variables on the remote machine as the user would get.
+   *
+   * *Notice:* use [EelExecApi.expandPathEnvVar] or [EelOsFamily.expandPathEnvVar] for `PATH`.
    *
    * See also [EelExecPosixApi.PosixEnvironmentVariablesOptions].
    */
@@ -238,9 +247,6 @@ sealed interface EelExecApi {
   /**
    * Represents a callback script which can be called from command-line tools like `git`.
    * The script passes its input data to the IDE and then passes back the answer.
-   *
-   * It's important to call [ExternalCliEntrypoint.delete] after the process which could call the script finishes
-   * to avoid resource leak.
    */
   @ApiStatus.Internal
   interface ExternalCliEntrypoint {
@@ -251,6 +257,9 @@ sealed interface EelExecApi {
 
     /**
      * Listens to the invocations of the script and lets [processor] to answer the cli requests.
+     * Must be called exactly once, immediately after object creation.
+     * Consider using [CoroutineStart.ATOMIC] or [CoroutineStart.UNDISPATCHED] for launching [consumeInvocations]
+     * to guarantee that invocation actually happens.
      * Never exits normally, so should be canceled externally when not needed.
      */
     suspend fun consumeInvocations(processor: suspend (ExternalCliProcess) -> Int): Nothing
@@ -267,7 +276,7 @@ sealed interface EelExecApi {
     val args: List<String>
 
     /**
-     * Only the environment variables which are mentioned explicitly in [ExecuteProcessOptions.env] are guaranteed to be here.
+     * Only the environment variables mentioned explicitly in [ExternalCliOptions.envVariablesToCapture] are guaranteed to be here.
      */
     val environment: Map<String, String>
     val pid: EelApi.Pid
@@ -278,28 +287,53 @@ sealed interface EelExecApi {
 
     /**
      * Stop the callback script with exit code [exitCode].
-     * Should be called exactly once, after calling it [stdin] [stdout] and [stderr] should not be used.
+     * Should be called exactly once.
+     * After calling [exit], [stdin] [stdout] and [stderr] should not be used.
      */
     fun exit(exitCode: Int)
   }
 
   @ApiStatus.Internal
-  interface ExternalCliOptions {
-    val filePrefix: String
-    val envVariablesToCapture: List<String>
+  sealed class ExternalCliLifecycle {
+    /**
+     * The entrypoint is created with unique name and will be deleted after the client cancels [ExternalCliEntrypoint.consumeInvocations].
+     */
+    object Default : ExternalCliLifecycle()
+
+    /**
+     * Serving of the external cli entrypoint created with this lifecycle will be suspended instead of stopping
+     * when the client cancels [ExternalCliEntrypoint.consumeInvocations]. And subsequent [createExternalCli] calls
+     * can internally reuse the same entrypoint (in case of coinciding call options), making subsequent [createExternalCli] calls faster.
+     *
+     * Cancelling the [scope] deletes the entrypoint and cancels running [ExternalCliEntrypoint.consumeInvocations] if there is one.
+     */
+    class Reusable(val scope: CoroutineScope) : ExternalCliLifecycle()
   }
 
   @ApiStatus.Internal
-  // TODO remove when local implementation will implement the api properly
-  interface LocalExternalCliOptions : ExternalCliOptions {
-    val mainClass: Class<*>
-    val useBatchFile: Boolean
+  interface ExternalCliOptions {
+    /**
+     * Prefix for an entrypoint executable file that will be created. Since the path to the entrypoint is passed to some command-line tool,
+     * using a self-explaining prefix makes the command line more readable and easier to debug.
+     */
+    val filePrefix: String get() = ""
+
+    val lifecycle: ExternalCliLifecycle get() = ExternalCliLifecycle.Default
+
+    /**
+     * Allowlist of environment variables mentioned here will be captured by the entrypoint and returned in [ExternalCliProcess.environment].
+     * Capturing of other environment variables is not guaranteed.
+     * If no environment variables are specified, no environment variables will be captured.
+     */
+    val envVariablesToCapture: List<String> get() = emptyList()
   }
 
-  // TODO Generate builder?
+  /**
+   * It's obligatory to call [ExternalCliEntrypoint.consumeInvocations] on the resulting value.
+   */
   @CheckReturnValue
   @ApiStatus.Internal
-  suspend fun createExternalCli(options: ExternalCliOptions): ExternalCliEntrypoint
+  suspend fun createExternalCli(@GeneratedBuilder options: ExternalCliOptions): ExternalCliEntrypoint
 
   @Deprecated("Use spawnProcess instead")
   @ApiStatus.Internal

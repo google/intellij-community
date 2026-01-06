@@ -131,7 +131,7 @@
     <applicationInitializedListener implementation="com.intellij.util.net.OverrideDefaultJdkProxy"/>
     <applicationService serviceImplementation="com.intellij.util.net.HttpConfigurable"/>
     <applicationService serviceInterface="com.intellij.util.net.ProxySettings"
-                        serviceImplementation="com.intellij.util.net.OverrideCapableProxySettingsImpl"/>
+                        serviceImplementation="com.intellij.util.net.OverrideCapableProxySettings"/>
     <applicationService serviceInterface="com.intellij.util.net.internal.ProxyMigrationService"
                         serviceImplementation="com.intellij.util.net.internal.ProxyMigrationServiceImpl"/>
 
@@ -530,6 +530,7 @@
 
     <applicationService serviceInterface="com.intellij.ide.actions.ActionsCollector"
                         serviceImplementation="com.intellij.internal.statistic.collectors.fus.actions.persistence.ActionsCollectorImpl"/>
+    <postStartupActivity implementation="com.intellij.internal.statistic.collectors.fus.actions.ProjectStateObserverProjectActivity"/>
     <applicationService serviceInterface="com.intellij.internal.statistic.eventLog.FeatureUsageUiEvents"
                         serviceImplementation="com.intellij.internal.statistic.collectors.fus.ui.FeatureUsageUiEventsImpl"/>
     <dialogInvocationPlace id="Open project action"/>
@@ -1135,6 +1136,8 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.editor.markup.InspectionsFUS"/>
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.build.BuildToolsCollector"/>
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.environment.EditorsCollector"/>
+
+    <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.psi.IElementTypeUsageCollector"/>
 
     <fileTypeUsageSchemaDescriptor schema="DotBazelFile"
                                    implementationClass="com.intellij.internal.statistic.collectors.fus.build.DotBazelFileTypeUsageSchemaDescriptor"/>
@@ -1864,6 +1867,10 @@
                  defaultValue="25"
                  description="Limit of recent items for search everywhere tabs"/>
 
+    <registryKey key="search.everywhere.round.text.field"
+                 defaultValue="true"
+                 description="Enables round search text field"/>
+
     <registryKey key="highlighting.passes.cache"
                  defaultValue="false"
                  description="Enables highlighting passes cache"/>
@@ -1967,9 +1974,6 @@
 
     <projectPreInit implementation="com.intellij.execution.eel.EelProjectPreInit" order="before moduleBridgeLoaderService"/>
     <applicationActivity implementation="com.intellij.ide.SwingTooltipManagerCustomizer"/>
-    <registryKey key="rhizome.progress"
-                 defaultValue="true"
-                 description="Progress will be reported and collected through Rhizome DB. See PlatformTaskSupport for more info"/>
     <registryKey key="rhizome.progress.model"
                  defaultValue="false"
                  description="UI progress retrieves its state directly from Rhizome TaskInfoEntity, avoiding the obsolete use of ProgressIndicator."/>
@@ -2025,6 +2029,8 @@
 
 
     <!--<editor.rd.localSupport filetype="PLAIN_TEXT"/> IJPL-189393 -->
+
+    <remote.customDataContextSerializer implementation="com.intellij.openapi.editor.impl.HonorCamelWordsDataContextSerializer"/>
 
     <registryKey key="ide.suppress.low.memory.notifications.when.dumb" defaultValue="false"
                  description="Disables Low Memory notifications during indexing for the sake of less false-positive detection for users" />

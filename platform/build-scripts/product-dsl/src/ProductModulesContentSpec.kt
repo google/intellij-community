@@ -133,6 +133,20 @@ class ProductModulesContentSpec(
    */
   @JvmField val additionalModules: List<ContentModule>,
 
+  /**
+   * List of bundled plugin module names for dependency generation.
+   * These are JPS modules that contain META-INF/plugin.xml.
+   * Used ONLY for automatic dependency generation in plugin.xml files,
+   * not for determining which plugins are bundled (that's done via productLayout.bundledPluginModules).
+   */
+  @JvmField val bundledPlugins: List<String> = emptyList(),
+
+  /**
+   * Modules that are allowed to be missing during validation.
+   * These are typically provided by plugin layouts rather than module sets.
+   * Example: CIDR modules for CLion/AppCode that come from plugin bundles.
+   */
+  @JvmField val allowedMissingDependencies: Set<String> = emptySet(),
 
   /**
    * Composition graph tracking how this spec was assembled.
@@ -158,6 +172,8 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
   private val xmlIncludes = mutableListOf<DeprecatedXmlInclude>()
   private val moduleSets = mutableListOf<ModuleSetWithOverrides>()
   private val additionalModules = mutableListOf<ContentModule>()
+  private val bundledPlugins = mutableListOf<String>()
+  private val allowedMissingDeps = LinkedHashSet<String>()
 
   // Composition tracking
   private val compositionGraph = mutableListOf<SpecComposition>()
@@ -222,6 +238,7 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
     xmlIncludes.addAll(spec.deprecatedXmlIncludes)
     moduleSets.addAll(spec.moduleSets)
     additionalModules.addAll(spec.additionalModules)
+    allowedMissingDeps.addAll(spec.allowedMissingDependencies)
 
     // Also preserve the nested spec's composition graph for deep analysis
     compositionGraph.addAll(spec.compositionGraph)
@@ -302,7 +319,7 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
       type = CompositionType.DIRECT_MODULE,
       reference = name,
       path = pathStack.toList(),
-      sourceLocation = null
+      sourceLocation = null,
     ))
   }
 
@@ -315,7 +332,7 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
       type = CompositionType.DIRECT_MODULE,
       reference = name,
       path = pathStack.toList(),
-      sourceLocation = null
+      sourceLocation = null,
     ))
   }
 
@@ -332,6 +349,37 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
     ))
   }
 
+  /**
+   * Add bundled plugin modules for automatic dependency generation.
+   * These are JPS modules that contain META-INF/plugin.xml.
+   * The generator will update the `<dependencies>` section in each plugin.xml.
+   *
+   * @param pluginModules List of JPS module names containing META-INF/plugin.xml
+   */
+  fun bundledPlugins(pluginModules: List<String>) {
+    bundledPlugins.addAll(pluginModules)
+  }
+
+  /**
+   * Allow specific modules to be missing during validation.
+   * Use for modules provided by plugin layouts rather than module sets.
+   *
+   * @param modules Module names that are allowed to be missing
+   */
+  fun allowMissingDependencies(vararg modules: String) {
+    allowedMissingDeps.addAll(modules)
+  }
+
+  /**
+   * Allow specific modules to be missing during validation.
+   * Use for modules provided by plugin layouts rather than module sets.
+   *
+   * @param modules Module names that are allowed to be missing
+   */
+  fun allowMissingDependencies(modules: List<String>) {
+    allowedMissingDeps.addAll(modules)
+  }
+
   @PublishedApi
   internal fun build(): ProductModulesContentSpec {
     return ProductModulesContentSpec(
@@ -340,6 +388,8 @@ class ProductModulesContentSpecBuilder @PublishedApi internal constructor() {
       deprecatedXmlIncludes = java.util.List.copyOf(xmlIncludes),
       moduleSets = java.util.List.copyOf(moduleSets),
       additionalModules = java.util.List.copyOf(additionalModules),
+      bundledPlugins = java.util.List.copyOf(bundledPlugins),
+      allowedMissingDependencies = java.util.Set.copyOf(allowedMissingDeps),
       compositionGraph = java.util.List.copyOf(compositionGraph),
       metadata = metadata,
     )

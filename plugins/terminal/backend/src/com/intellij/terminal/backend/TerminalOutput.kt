@@ -105,7 +105,7 @@ internal fun createTerminalOutputFlow(
     isBracketedPasteMode = terminalDisplay.isBracketedPasteMode,
     windowTitle = terminalDisplay.windowTitleText,
     isShellIntegrationEnabled = false,
-    currentDirectory = services.startupOptions.workingDirectory ?: error("Working directory not set"),
+    currentDirectory = null,
   )
 
   controller.addListener(object : JediTerminalListener {
@@ -201,7 +201,7 @@ internal fun createTerminalOutputFlow(
   })
 
   shellIntegrationController.addListener(object : TerminalShellIntegrationEventsListener {
-    override fun initialized() {
+    override fun initialized(currentDirectory: String) {
       textBuffer.withLock {
         curState = curState.copy(isShellIntegrationEnabled = true)
         collectAndSendEvents(contentUpdate = null, otherEvent = TerminalStateChangedEvent(curState.toDto()))
@@ -237,7 +237,14 @@ internal fun createTerminalOutputFlow(
   ) { directory ->
     textBuffer.withLock {
       curState = curState.copy(currentDirectory = directory)
-      collectAndSendEvents(contentUpdate = null, otherEvent = TerminalStateChangedEvent(curState.toDto()))
+      collectAndSendEvents(
+        contentUpdate = null,
+        otherEvent = TerminalStateChangedEvent(curState.toDto()),
+        ensureActive = {
+          workingDirectoryTrackingScope.ensureActive()
+          ensureEmulationActive(services.terminalStarter)
+        }
+      )
     }
   }
 

@@ -9,7 +9,7 @@ import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.Project
 import com.intellij.util.ui.UIUtil
 
-private class ClientCurrentEditorProvider : CurrentEditorProvider {
+internal class ClientCurrentEditorProvider : CurrentEditorProvider {
   override fun getCurrentEditor(project: Project?): FileEditor? {
     if (project == null) {
       // fallback to search by focus
@@ -19,10 +19,9 @@ private class ClientCurrentEditorProvider : CurrentEditorProvider {
     }
     else {
       if (project.currentSession.isController) {
-        // doesn't work in case of other remote clients.
+        // GTW-6595 doesn't work in case of other remote clients.
         // check com.jetbrains.rdct.cwm.distributed.undo.EditorComplicatedUndoTest.testRedoBasicCommandAfterForeignTyping
         FocusBasedCurrentEditorProvider.getCurrentEditorEx()?.let { editor ->
-          // GTW-6595
           return editor
         }
       }

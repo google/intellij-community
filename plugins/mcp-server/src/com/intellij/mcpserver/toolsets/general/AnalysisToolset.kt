@@ -6,8 +6,12 @@ package com.intellij.mcpserver.toolsets.general
 import com.intellij.build.BuildProgressListener
 import com.intellij.build.BuildViewManager
 import com.intellij.build.events.*
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
+import com.intellij.codeInsight.daemon.impl.DaemonProgressIndicator
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.codeInsight.daemon.impl.HighlightingSessionImpl
+import com.intellij.codeInsight.multiverse.defaultContext
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.mcpserver.*
 import com.intellij.mcpserver.annotations.McpDescription
@@ -24,18 +28,19 @@ import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.progress.jobToIndicator
 import com.intellij.openapi.roots.OrderEnumerator
+import com.intellij.openapi.util.ProperTextRange
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.psi.PsiManager
 import com.intellij.task.ProjectTaskContext
 import com.intellij.task.ProjectTaskManager
+import com.intellij.task.impl.ProjectTaskManagerImpl
 import com.intellij.util.asDisposable
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.*
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -87,22 +92,32 @@ class AnalysisToolset : McpToolset {
         val file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
                    ?: mcpFail("Cannot access file: $filePath")
         logger.trace { "File found in VFS: ${file.path}" }
-        readAction {
-          val document = FileDocumentManager.getInstance().getDocument(file)
-                         ?: mcpFail("Cannot read file: $filePath")
-          logger.trace { "Document obtained, text length: ${document.textLength}" }
 
-          DaemonCodeAnalyzerEx.processHighlights(
-            document,
-            project,
-            if (errorsOnly) HighlightSeverity.ERROR else HighlightSeverity.WEAK_WARNING,
-            0,
-            document.textLength
-          ) { highlightInfo ->
-            errors.add(createFileProblem(document, highlightInfo))
-            true
+        val minSeverity = if (errorsOnly) HighlightSeverity.ERROR else HighlightSeverity.WEAK_WARNING
+        logger.trace { "Running main passes with severity: $minSeverity" }
+
+        val psiFile = readAction { PsiManager.getInstance(project).findFile(file) }
+                      ?: mcpFail("Cannot find PSI file: $filePath")
+        val document = readAction { FileDocumentManager.getInstance().getDocument(file) }
+                       ?: mcpFail("Cannot get document: $filePath")
+
+        val daemonIndicator = DaemonProgressIndicator()
+        val range = ProperTextRange(0, document.textLength)
+
+        jobToIndicator(coroutineContext.job, daemonIndicator) {
+          HighlightingSessionImpl.runInsideHighlightingSession(psiFile, defaultContext(), null, range, false) { session ->
+            (session as HighlightingSessionImpl).setMinimumSeverity(minSeverity)
+            val codeAnalyzer = DaemonCodeAnalyzer.getInstance(project) as DaemonCodeAnalyzerImpl
+            val highlightInfos = codeAnalyzer.runMainPasses(psiFile, document, daemonIndicator)
+            logger.trace { "Main passes completed, found ${highlightInfos.size} highlights" }
+
+            for (info in highlightInfos) {
+              if (info.severity.myVal >= minSeverity.myVal) {
+                errors.add(createFileProblem(document, info))
+              }
+            }
+            logger.trace { "Processed highlights, found ${errors.size} problems" }
           }
-          logger.trace { "Processed highlights, found ${errors.size} problems" }
         }
       }
     } == null
@@ -117,16 +132,15 @@ class AnalysisToolset : McpToolset {
 
   @McpTool
   @McpDescription("""
-      |Triggers building of the project, waits for completion, and returns build errors.
-      |Use this tool to build the project and get detailed information about compilation errors and warnings.
-      |The build will compile all modules in the project and return structured error information.
+      |Triggers building of the project or specified files, waits for completion, and returns build errors.
+      |Use this tool to build the project or compile files and get detailed information about compilation errors and warnings.
       |You have to use this tool after performing edits to validate if the edits are valid.
-      |
-      |If you see any unexpected errors after build you may try to call this tool again with `rebuild=true` parameter to perform full rebuild.
     """)
   suspend fun build_project(
-    @McpDescription("Whether to perform full rebuild the project")
+    @McpDescription("Whether to perform full rebuild the project. Defaults to false. Effective only when `filesToRebuild` is not specified.")
     rebuild: Boolean = false,
+    @McpDescription("If specified, only compile files with the specified paths. Paths are relative to the project root.")
+    filesToRebuild: List<String>? = null,
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION)
     timeout: Int = Constants.LONG_TIMEOUT_MILLISECONDS_VALUE,
   ): BuildProjectResult {
@@ -141,10 +155,10 @@ class AnalysisToolset : McpToolset {
     val buildFinished = CompletableDeferred<Unit>()
 
     logger.trace { "Starting build task with timeout ${timeout}ms" }
+    var buildStarted = false
     val buildResult = withTimeoutOrNull(timeout.milliseconds) {
       coroutineScope {
         val buildViewManager = project.serviceAsync<BuildViewManager>()
-        
         // Listen to build events to collect problems directly
         buildViewManager.addListener(BuildProgressListener { buildId, event ->
           logger.trace { "Received build event: ${event.javaClass.simpleName}, buildId=$buildId" }
@@ -152,6 +166,7 @@ class AnalysisToolset : McpToolset {
           when (event) {
             is StartBuildEvent -> {
               logger.trace { "Build started: ${event.buildDescriptor.title}" }
+              buildStarted = true
             }
             
             is FileMessageEvent -> {
@@ -201,8 +216,23 @@ class AnalysisToolset : McpToolset {
           }
         }, this.asDisposable())
 
-        logger.trace { "Creating all modules build task, isIncrementalBuild=${!rebuild}" }
-        val task = ProjectTaskManager.getInstance(project).createAllModulesBuildTask(!rebuild, project)
+        val task = if (!filesToRebuild.isNullOrEmpty()) {
+          val filePaths = filesToRebuild.map { file -> project.resolveInProject(file) }
+          logger.trace { "Refreshing files: $filePaths..." }
+          LocalFileSystem.getInstance().refreshNioFiles(filePaths)
+          val virtualFiles = filePaths.map { file -> LocalFileSystem.getInstance().findFileByNioFile(file) ?: mcpFail("File not found: $file") }
+          logger.trace { "Creating build task for files: ${virtualFiles.joinToString { it.path }}" }
+          readAction {
+            (ProjectTaskManager.getInstance(project) as ProjectTaskManagerImpl).createModulesFilesTask(virtualFiles.toTypedArray())
+          }
+        }
+        else {
+          logger.trace { "Creating all modules build task, isIncrementalBuild=${!rebuild}" }
+          readAction {
+            ProjectTaskManager.getInstance(project).createAllModulesBuildTask(!rebuild, project)
+          }
+        }
+
         val context = ProjectTaskContext(callId)
         logger.trace { "Running build task with context" }
         
@@ -210,15 +240,25 @@ class AnalysisToolset : McpToolset {
         val result = ProjectTaskManager.getInstance(project).run(context, task).await()
 
         logger.trace { "Build task completed, waiting for FinishBuildEvent..." }
-        buildFinished.await()
+        if (buildStarted) {
+          logger.trace { "Build was started, waiting for FinishBuildEvent" }
+          buildFinished.await()
+        }
+        else {
+          logger.trace { "Build was not started, skipping waiting for FinishBuildEvent" }
+        }
 
-        logger.trace { "FinishBuildEvent received or timed out" }
+        logger.trace { "FinishBuildEvent received" }
         result
       }
     }
     logger.trace { "Build completed: result=$buildResult, hasErrors=${buildResult?.hasErrors()}, problemsCount=${problems.size}" }
 
     logger.trace { "build_project completed: buildTimedOut=${buildResult == null}, problemsCount=${problems.size}" }
+    // for the cases when the build doesn't report messages via BuildViewManager
+    if (!buildStarted) {
+      problems.add(ProjectProblem(message = "The project has limited build diagnostics functionality. Build messages cannot be collected."))
+    }
     return BuildProjectResult(
       timedOut = buildResult == null,
       isSuccess = buildResult != null && !buildResult.hasErrors() && problems.none { it.kind == Kind.ERROR.name },

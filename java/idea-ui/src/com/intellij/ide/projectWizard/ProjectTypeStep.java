@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.projectWizard;
 
 import com.intellij.diagnostic.PluginException;
@@ -32,6 +32,7 @@ import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.ui.configuration.ModulesProvider;
 import com.intellij.openapi.roots.ui.configuration.projectRoot.LibrariesContainer;
 import com.intellij.openapi.roots.ui.configuration.projectRoot.LibrariesContainerFactory;
+import com.intellij.openapi.ui.DialogPanel;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.text.StringUtil;
@@ -523,6 +524,9 @@ public final class ProjectTypeStep extends ModuleWizardStep implements SettingsS
 
       JComponent component = step.getComponent();
       if (!(builder instanceof PromoModuleBuilder)) {
+        if (component instanceof DialogPanel dialogPanel) {
+          dialogPanel.withPreferredWidth(Math.max(400, component.getMinimumSize().width));
+        }
         component = new JBScrollPane(component);
         component.setBorder(JBUI.Borders.empty());
       }
@@ -601,6 +605,13 @@ public final class ProjectTypeStep extends ModuleWizardStep implements SettingsS
   }
 
   @Override
+  public void onStepLeaving() {
+    if (myCustomSteps.get(myCurrentCard) instanceof ModuleWizardStep wizardStep) {
+      wizardStep.onStepLeaving();
+    }
+  }
+
+  @Override
   public void onWizardFinished() throws CommitStepException {
     if (isFrameworksMode()) {
       boolean ok = myFrameworksPanel.downloadLibraries(myWizard.getContentComponent());
@@ -642,6 +653,9 @@ public final class ProjectTypeStep extends ModuleWizardStep implements SettingsS
     }
     if (isFrameworksMode() && !myFrameworksPanel.validate()) {
       return false;
+    }
+    if (myCustomSteps.get(myCurrentCard) instanceof ModuleWizardStep wizardStep) {
+      if (!wizardStep.validate()) return false;
     }
     return super.validate();
   }

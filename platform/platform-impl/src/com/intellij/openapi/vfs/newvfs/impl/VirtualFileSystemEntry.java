@@ -5,6 +5,7 @@ import com.intellij.core.CoreBundle;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
+import com.intellij.openapi.diagnostic.ControlFlowException;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil;
 import com.intellij.openapi.fileTypes.FileType;
@@ -173,6 +174,13 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
     }
     return null;
   }
+
+  /**
+   * @return {@link VfsData} this entry is owned by
+   * @throws AlreadyDisposedException if {@link PersistentFS} is disconnected
+   * @throws AssertionError           if the entry is 'alien': i.e. currently connected {@link PersistentFS} has {@link VfsData} different
+   *                                  from {@link VfsData} this entry is owned by
+   */
   VfsData getVfsData() {
     VfsData owningVfsData = segment.owningVfsData();
     Throwable error = owningDiscrepancyError(owningVfsData);
@@ -219,9 +227,16 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
 
   @Override
   public @NotNull String getName() {
-    PersistentFSImpl pfs = owningPersistentFS();
-    if (pfs == null) {
-      return "<FS-is-disposed>";//shutdown-safe
+    VfsData owningVfsData = segment.owningVfsData();
+    PersistentFSImpl pfs = owningVfsData.owningPersistentFS();
+    Throwable error = owningDiscrepancyError(owningVfsData);
+    if (error != null) {
+      if (!pfs.isConnected()) {
+        return "(VFS is disposed: #" + id + ")";
+      }
+      else {
+        return "(alien file: #" + id + ")";
+      }
     }
     return pfs.getName(id);
   }
@@ -598,17 +613,23 @@ public abstract class VirtualFileSystemEntry extends NewVirtualFile {
       //    session. General policy is that such files must not exist: if VFS is reconnected, _all_ the VirtualFiles from
       //    previous session must be thrown out and must not be used _in any way_. By default, we consider _any_ use of such
       //    'alien' files a code bug, so we throw AssertionError if a VFile from a previous VFS epoch is used _in any way_
-      //    (see getVfsData() for details).
+      //    (see owningDiscrepancyError() for details).
       //
       //    Unfortunately, reality always strikes back against our best hopes: there are some cases, mainly in older junit3-4
       //    tests, there VirtualFiles _leaked_ from one test to another, with VFS re-connected in between -- which leads to
       //    flaky 'Alien file object' assertions failing the tests. So we're forced to compromise our integrity: isValid()
       //    is the only method that _doesn't_ throw the AssertionError for alien files, but returns false instead.
       //    In other words: we now consider an 'alien' file as 'invalid' file, instead of a primordial sin.
-      VfsData owningVfsData = getVfsData();
+      VfsData owningVfsData = segment.owningVfsData();
       Throwable error = owningDiscrepancyError(owningVfsData);
       if (error != null) {
-        Logger.getInstance(VirtualFileSystemEntry.class).warn(error);
+        Logger log = Logger.getInstance(VirtualFileSystemEntry.class);
+        if (error instanceof ControlFlowException) {
+          log.warn(new Exception(error));
+        }
+        else{
+          log.warn(error);
+        }
       }
       return error == null && owningVfsData.isFileValid(id);
     }

@@ -119,7 +119,7 @@ internal class TerminalCommandSpecCompletionContributorGen1 : CompletionContribu
       return emptyList()
     }
 
-    val runtimeContext = context.runtimeContextProvider.getContext(tokens.last())
+    val runtimeContext = context.runtimeContextProvider.getContext(tokens)
     val completion = ShellCommandSpecCompletion(
       context.commandSpecsManager,
       context.generatorsExecutor,
@@ -127,8 +127,14 @@ internal class TerminalCommandSpecCompletionContributorGen1 : CompletionContribu
     )
     val commandExecutable = tokens.first()
     val commandArguments = tokens.subList(1, tokens.size)
-    val availableCommandsProvider = suspend { context.generatorsExecutor.execute(runtimeContext, availableCommandsGenerator()) }
-    val fileProducer = suspend { context.generatorsExecutor.execute(runtimeContext, fileSuggestionsGenerator()) }
+    val availableCommandsProvider = suspend {
+      context.generatorsExecutor.execute(runtimeContext, availableCommandsGenerator())
+      ?: emptyList()
+    }
+    val fileProducer = suspend {
+      context.generatorsExecutor.execute(runtimeContext, fileSuggestionsGenerator())
+      ?: emptyList()
+    }
     val specCompletionFunction: suspend (String) -> List<ShellCompletionSuggestion>? = { commandName ->
       tracer.spanBuilder("terminal-completion-compute-completion-items").useWithScope {
         completion.computeCompletionItems(commandName, commandArguments)
@@ -203,9 +209,8 @@ internal class TerminalCommandSpecCompletionContributorGen1 : CompletionContribu
     if (tokens.size < 2) {
       return tokens
     }
-    // aliases generator does not requires actual typed prefix
-    val dummyRuntimeContext = context.runtimeContextProvider.getContext("")
-    val aliases: Map<String, String> = context.generatorsExecutor.execute(dummyRuntimeContext, aliasesGenerator())
+    val dummyRuntimeContext = context.runtimeContextProvider.getContext(tokens)
+    val aliases: Map<String, String> = context.generatorsExecutor.execute(dummyRuntimeContext, aliasesGenerator()) ?: emptyMap()
     val expandedTokens = expandAliases(tokens, aliases, context)
     return expandedTokens
   }

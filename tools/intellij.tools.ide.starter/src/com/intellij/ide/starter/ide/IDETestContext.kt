@@ -67,7 +67,6 @@ open class IDETestContext(
 
     private val SEARCH_EVERYWHERE_REGISTRY_KEYS: List<String> get() = listOf(
       "search.everywhere.new.enabled",
-      "search.everywhere.new.internal.enabled",
       "search.everywhere.new.rider.enabled",
       "search.everywhere.new.clion.enabled",
       "search.everywhere.new.cwm.client.enabled"
@@ -338,7 +337,7 @@ open class IDETestContext(
 
   fun enableCloudRegistry(registryHost: String): IDETestContext = applyVMOptionsPatch {
     addSystemProperty("ide.registry.refresh.debug", true)
-    addSystemProperty("ide.registry.refresh.delay.seconds", 0)
+    addSystemProperty("ide.registry.refresh.initial.delay.seconds", 0)
     addSystemProperty("ide.registry.refresh.host", registryHost)
   }
 
@@ -444,7 +443,7 @@ open class IDETestContext(
         collectNativeThreads = collectNativeThreads,
         stdOut = stdOut
       )
-      runContext.configure()
+      configure(runContext)
 
       try {
         val ideRunResult = runContext.runIdeSuspending()
@@ -567,10 +566,10 @@ open class IDETestContext(
       logOutput("License is not provided")
       return this
     }
-    if (this is IDERemDevTestContext) {
-      frontendIDEContext.setLicense(license)
-      return this
+    this.onRemDevContext {
+      return frontendIDEContext.setLicense(license)
     }
+
     val licenseKeyFileName: String = when (this.ide.productCode) {
       IdeProductProvider.IU.productCode -> "idea.key"
       IdeProductProvider.RM.productCode -> "rubymine.key"

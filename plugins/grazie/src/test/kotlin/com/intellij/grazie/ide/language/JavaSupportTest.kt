@@ -1,4 +1,6 @@
 // Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+@file:Suppress("NonAsciiCharacters")
+
 package com.intellij.grazie.ide.language
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
@@ -180,7 +182,6 @@ class JavaSupportTest : GrazieTestBase() {
     runHighlightTestForFile("ide/language/java/Trailing.java")
   }
 
-  @Suppress("MISSING_DEPENDENCY_SUPERCLASS_IN_TYPE_ARGUMENT")
   fun `test add capitalized word to dictionary`() {
     val isUseSingleDictionary = SpellCheckerSettings.getInstance(project).isUseSingleDictionaryToSave
     Disposer.register(testRootDisposable) {
@@ -238,6 +239,14 @@ class JavaSupportTest : GrazieTestBase() {
     )
     myFixture.checkHighlighting()
   }
+
+  fun `test asian-english mixed texts`() {
+    runHighlightTestForFile("ide/language/java/Mixed.java")
+
+    enableProofreadingFor(setOf(Lang.JAPANESE))
+    runHighlightTestForFile("ide/language/java/Mixed.java")
+  }
+
 
   private fun doTest(beforeText: String, afterText: String, hint: String) {
     myFixture.configureByText("a.java", beforeText)

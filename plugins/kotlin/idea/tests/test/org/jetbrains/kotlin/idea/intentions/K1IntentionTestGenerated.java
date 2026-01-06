@@ -6833,6 +6833,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("classObjectIntTypeParam.kt")
+        public void testClassObjectIntTypeParam() throws Exception {
+            runTest("testData/intentions/convertObjectLiteralToClass/classObjectIntTypeParam.kt");
+        }
+
         @TestMetadata("inClass.kt")
         public void testInClass() throws Exception {
             runTest("testData/intentions/convertObjectLiteralToClass/inClass.kt");
@@ -6853,6 +6858,16 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/convertObjectLiteralToClass/inFunction.kt");
         }
 
+        @TestMetadata("innerClassObjectTypeParam.kt")
+        public void testInnerClassObjectTypeParam() throws Exception {
+            runTest("testData/intentions/convertObjectLiteralToClass/innerClassObjectTypeParam.kt");
+        }
+
+        @TestMetadata("innerClassObjectTypeParamInnerTarget.kt")
+        public void testInnerClassObjectTypeParamInnerTarget() throws Exception {
+            runTest("testData/intentions/convertObjectLiteralToClass/innerClassObjectTypeParamInnerTarget.kt");
+        }
+
         @TestMetadata("objectLiteralNoCapture.kt")
         public void testObjectLiteralNoCapture() throws Exception {
             runTest("testData/intentions/convertObjectLiteralToClass/objectLiteralNoCapture.kt");
@@ -6866,6 +6881,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("objectLiteralWithCapture.kt")
         public void testObjectLiteralWithCapture() throws Exception {
             runTest("testData/intentions/convertObjectLiteralToClass/objectLiteralWithCapture.kt");
+        }
+
+        @TestMetadata("objectWithTypeParam.kt")
+        public void testObjectWithTypeParam() throws Exception {
+            runTest("testData/intentions/convertObjectLiteralToClass/objectWithTypeParam.kt");
         }
 
         @TestMetadata("severalParameters.kt")
@@ -7541,80 +7561,6 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("var.kt")
         public void testVar() throws Exception {
             runTest("testData/intentions/convertPropertyToFunction/var.kt");
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("testData/intentions/convertRangeCheckToTwoComparisons")
-    public static class ConvertRangeCheckToTwoComparisons extends AbstractK1IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K1;
-        }
-
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-        }
-
-        @TestMetadata("differentTypes.kt")
-        public void testDifferentTypes() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/differentTypes.kt");
-        }
-
-        @TestMetadata("double.kt")
-        public void testDouble() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/double.kt");
-        }
-
-        @TestMetadata("downTo.kt")
-        public void testDownTo() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/downTo.kt");
-        }
-
-        @TestMetadata("forLoop.kt")
-        public void testForLoop() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/forLoop.kt");
-        }
-
-        @TestMetadata("insideForLoop.kt")
-        public void testInsideForLoop() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/insideForLoop.kt");
-        }
-
-        @TestMetadata("insideForLoop2.kt")
-        public void testInsideForLoop2() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/insideForLoop2.kt");
-        }
-
-        @TestMetadata("int.kt")
-        public void testInt() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/int.kt");
-        }
-
-        @TestMetadata("nonConstants.kt")
-        public void testNonConstants() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/nonConstants.kt");
-        }
-
-        @TestMetadata("otherOp.kt")
-        public void testOtherOp() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/otherOp.kt");
-        }
-
-        @TestMetadata("rangeUntil.kt")
-        public void testRangeUntil() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/rangeUntil.kt");
-        }
-
-        @TestMetadata("until.kt")
-        public void testUntil() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/until.kt");
-        }
-
-        @TestMetadata("withSideEffects.kt")
-        public void testWithSideEffects() throws Exception {
-            runTest("testData/intentions/convertRangeCheckToTwoComparisons/withSideEffects.kt");
         }
     }
 

@@ -198,6 +198,7 @@ public class ExternalSystemRunnableState extends UserDataHolderBase implements R
     ExternalSystemExecuteTaskTask task = new ExternalSystemExecuteTaskTask(myProject, mySettings, jvmParametersSetup, myConfiguration);
     copyUserDataTo(task);
     addDebugUserDataTo(task);
+
     ExternalSystemTaskNotificationListener listener = myEnv.getUserData(TASK_NOTIFICATION_LISTENER_KEY);
     if (listener != null) {
       ExternalSystemProgressNotificationManager.getInstance().addNotificationListener(task.getId(), listener);

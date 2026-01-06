@@ -19,7 +19,8 @@ import com.intellij.driver.sdk.ui.components.common.ideFrame
 import com.intellij.driver.sdk.ui.components.common.toolwindows.ToolWindowLeftToolbarUi
 import com.intellij.driver.sdk.ui.components.common.toolwindows.ToolWindowRightToolbarUi
 import com.intellij.driver.sdk.ui.components.common.toolwindows.projectView
-import com.intellij.driver.sdk.ui.components.elements.*
+import com.intellij.driver.sdk.ui.components.elements.ActionButtonUi
+import com.intellij.driver.sdk.ui.components.elements.JButtonUiComponent
 import com.intellij.driver.sdk.ui.components.elements.JLabelUiComponent
 import com.intellij.driver.sdk.ui.components.elements.JTextFieldUI
 import com.intellij.driver.sdk.ui.components.elements.JcefOffScreenViewComponent
@@ -28,6 +29,7 @@ import com.intellij.driver.sdk.ui.components.elements.NotebookTableOutputUi
 import com.intellij.driver.sdk.ui.components.elements.popup
 import com.intellij.driver.sdk.ui.hasFocus
 import com.intellij.driver.sdk.ui.pasteText
+import com.intellij.driver.sdk.ui.should
 import com.intellij.driver.sdk.ui.ui
 import com.intellij.driver.sdk.waitFor
 import com.intellij.driver.sdk.waitForCodeAnalysis
@@ -70,8 +72,15 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
     get() = x("//div[@myicon='runAll.svg']")
   private val clearOutputs
     get() = x("//div[@myicon='clearOutputs.svg']")
-  private val restartKernel
-    get() = x("//div[@myicon='restartKernel.svg']")
+
+  class RestartButton(data: ComponentData) : UiComponent(data) {
+    private val actionButtonUi = ActionButtonUi(data)
+    val hasBadge: Boolean get() = actionButtonUi.icon.contains("BadgeIcon")
+  }
+
+  val restartKernelButton: RestartButton
+    get() = x(RestartButton::class.java) { byAttribute("myaction", "Restart Kernel (Restart kernel)") }
+
   private val deleteCell
     get() = x("//div[@myicon='delete.svg']")
   val interruptKernel: UiComponent
@@ -146,7 +155,7 @@ class NotebookEditorUiComponent(private val data: ComponentData) : JEditorUiComp
 
   fun clearAllOutputs(): Unit = clearOutputs.strictClick()
 
-  fun restartKernel(): Unit = restartKernel.strictClick()
+  fun restartKernel(): Unit = restartKernelButton.strictClick()
 
   fun interruptKernel(): Unit = interruptKernel.strictClick()
 
@@ -270,18 +279,14 @@ fun Driver.createNewNotebookWithMouse(name: String = "New Notebook", type: Noteb
         waitFor("wait for project tree to load", 30.seconds) {
           getAllTexts().isNotEmpty()
         }
-        getAllTexts().first().strictClick()
+        moveMouse()
       }
     }
 
     val newFileButton = x { byAccessibleName("New File or Directory…") }
 
-    waitFor(timeout = 30.seconds) {
-      newFileButton.present()
-    }
-    newFileButton.strictClick()
-
-    waitFor("New file popup will be selected", timeout = 15.seconds) {
+    should(message = "new file popup should present and focused", timeout = 30.seconds) {
+      newFileButton.strictClick()
       hasFocus(popup())
     }
 
@@ -345,6 +350,17 @@ fun Driver.openLeftToolWindow(stripeButtonName: String) {
   }
 }
 
+fun Driver.closeLeftToolWindow(stripeButtonName: String) {
+  ideFrame {
+    val leftToolbar = xx(ToolWindowLeftToolbarUi::class.java) { byClass("ToolWindowLeftToolbar") }.list().firstOrNull()
+                      ?: return@ideFrame
+    val varsButton = leftToolbar.stripeButton(stripeButtonName)
+    if (varsButton.present()) {
+      varsButton.close()
+    }
+  }
+}
+
 /**
  * Executes a test block within the context of the notebook editor UI component.
  * Note: only the NotebookEditorUiComponent and its successors are directly available in the context of this block.
@@ -358,7 +374,7 @@ fun Driver.withNotebookEditor(testBody: NotebookEditorUiComponent.() -> Unit): I
   }
 }
 
-fun Driver.openFileWithProjectPanel(fileName: String): IdeaFrameUI = ideFrame {
+fun Driver.openNotebookWithProjectPanel(fileName: String): IdeaFrameUI = ideFrame {
   leftToolWindowToolbar.projectButton.open()
   projectView {
     projectViewTree.run {
@@ -366,6 +382,7 @@ fun Driver.openFileWithProjectPanel(fileName: String): IdeaFrameUI = ideFrame {
     }
   }
   waitFor("the editor is present", timeout = 30.seconds) {
-    editor().present()
+    notebookEditor().present()
+
   }
 }

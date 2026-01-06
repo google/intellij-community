@@ -98,15 +98,15 @@ jvm_import(
 
 jvm_import(
     name = "kotlin-compiler_import",
-    jar = "@kotlin-compiler_http//file",
-    source_jar = "@kotlin-compiler_http//file",
+    jar = "@kotlin-compiler-embeddable_http//file",
+    source_jar = "@kotlin-compiler-embeddable_http//file",
     visibility = ["//visibility:public"],
 )
 
 jvm_import(
-    name = "kotlin-compose-compiler-plugin_import",
-    jar = "@kotlin-compose-compiler-plugin_http//file",
-    source_jar = "@kotlin-compose-compiler-plugin-sources_http//file",
+    name = "kotlin-compose-compiler-plugin-embeddable_import",
+    jar = "@kotlin-compose-compiler-plugin-embeddable_http//file",
+    source_jar = "@kotlin-compose-compiler-plugin-embeddable-sources_http//file",
     visibility = ["//visibility:public"],
 )
 
@@ -125,9 +125,9 @@ jvm_import(
 )
 
 jvm_import(
-    name = "kotlin-serialization-compiler-plugin_import",
-    jar = "@kotlin-serialization-compiler-plugin_http//file",
-    source_jar = "@kotlin-serialization-compiler-plugin-sources_http//file",
+    name = "kotlin-serialization-compiler-plugin-embeddable_import",
+    jar = "@kotlin-serialization-compiler-plugin-embeddable_http//file",
+    source_jar = "@kotlin-serialization-compiler-plugin-embeddable-sources_http//file",
     visibility = ["//visibility:public"],
 )
 
@@ -303,6 +303,68 @@ jvm_import(
     jar = "@qdox_http//file",
     source_jar = "@qdox-sources_http//file",
     visibility = ["//visibility:public"],
+)
+
+java_library(
+  name = "junit5",
+  exports = [
+    ":org_junit_jupiter-junit-jupiter-api-5_13_4_http_import",
+    ":org_opentest4j-opentest4j-1_3_0_http_import",
+    ":org_junit_platform-junit-platform-commons-1_13_4_http_import",
+    ":org_apiguardian-apiguardian-api-1_1_2_http_import",
+  ],
+  visibility = ["//visibility:public"]
+)
+
+jvm_import(
+  name = "org_junit_jupiter-junit-jupiter-api-5_13_4_http_import",
+  jar = "@org_junit_jupiter-junit-jupiter-api-5_13_4_http//file",
+)
+
+jvm_import(
+  name = "org_opentest4j-opentest4j-1_3_0_http_import",
+  jar = "@org_opentest4j-opentest4j-1_3_0_http//file",
+)
+
+jvm_import(
+  name = "org_junit_platform-junit-platform-commons-1_13_4_http_import",
+  jar = "@org_junit_platform-junit-platform-commons-1_13_4_http//file",
+)
+
+jvm_import(
+  name = "org_apiguardian-apiguardian-api-1_1_2_http_import",
+  jar = "@org_apiguardian-apiguardian-api-1_1_2_http//file",
+)
+
+java_library(
+  name = "junit5Launcher",
+  exports = [
+    ":org_junit_platform-junit-platform-launcher-1_13_4_http_import",
+    ":org_junit_platform-junit-platform-engine-1_13_4_http_import",
+    ":org_junit_platform-junit-platform-reporting-1_12_2_http_import",
+    ":org_junit_jupiter-junit-jupiter-engine-5_13_4_http_import",
+  ],
+  visibility = ["//visibility:public"]
+)
+
+jvm_import(
+  name = "org_junit_platform-junit-platform-launcher-1_13_4_http_import",
+  jar = "@org_junit_platform-junit-platform-launcher-1_13_4_http//file",
+)
+
+jvm_import(
+  name = "org_junit_jupiter-junit-jupiter-engine-5_13_4_http_import",
+  jar = "@org_junit_jupiter-junit-jupiter-engine-5_13_4_http//file",
+)
+
+jvm_import(
+  name = "org_junit_platform-junit-platform-engine-1_13_4_http_import",
+  jar = "@org_junit_platform-junit-platform-engine-1_13_4_http//file",
+)
+
+jvm_import(
+  name = "org_junit_platform-junit-platform-reporting-1_12_2_http_import",
+  jar = "@org_junit_platform-junit-platform-reporting-1_12_2_http//file",
 )
 
 kt_javac_options(

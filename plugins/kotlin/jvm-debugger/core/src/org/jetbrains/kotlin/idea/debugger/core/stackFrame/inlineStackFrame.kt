@@ -5,7 +5,7 @@ import com.intellij.debugger.jdi.LocalVariableProxyImpl
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.debugger.ui.tree.render.DescriptorLabelListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.xdebugger.impl.frame.XDebuggerFramesList
+import com.intellij.xdebugger.impl.frame.XStackFrameWithCustomBackgroundColor
 import com.intellij.xdebugger.ui.DebuggerColors
 import com.sun.jdi.Location
 import java.awt.Color
@@ -23,7 +23,7 @@ class InlineStackFrame(
             location, variableInlineDepth, frameProxy, inlineScopeNumber, surroundingScopeNumber
         ),
         visibleVariables
-    ), XDebuggerFramesList.ItemWithCustomBackgroundColor {
+    ), XStackFrameWithCustomBackgroundColor {
     init {
         descriptor.name = name
         descriptor.updateRepresentation(null, DescriptorLabelListener.DUMMY_LISTENER)
@@ -51,9 +51,8 @@ class InlineStackFrame(
         if (!super.equals(other)) {
             return false
         }
-        val thisInlineDepth = inlineDepth ?: return false
-        val otherInlineDepth = other.inlineDepth ?: return false
-        return thisInlineDepth == otherInlineDepth
+        return inlineDepth == other.inlineDepth
+                && descriptor.location == other.descriptor.location
     }
 
     override fun hashCode(): Int {

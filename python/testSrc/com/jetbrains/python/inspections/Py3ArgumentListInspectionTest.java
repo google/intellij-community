@@ -534,6 +534,26 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
                    """);
   }
 
+  public void testDecoratedClassMethod2() {
+    doTestByText("""
+                   from typing import TypeVar, Callable, Any, Generic
+                   
+                   T = TypeVar("T")
+                   
+                   def dec[T](f: Callable[[T, bool], bool]) -> Callable[[T, bool], bool]:
+                       def a(self, b: bool) -> bool:
+                           return f(self, b)
+                       return a
+                   
+                   class A:
+                       @dec
+                       def f(self, a: bool) -> bool:
+                           return True
+                   
+                   a = A()
+                   value = a.f(True)
+                   """);
+  }
 
   // PY-60104 PY-13276
   public void testTypedDecoratorNotChangingSignatureDoesNotSuppressWarnings() {
@@ -618,5 +638,28 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
                    
                    func(<warning descr="Unexpected argument">42</warning>)
                    """);
+  }
+
+  // PY-51768
+  public void testImportedDecoratedFunctionWithParamSpec() {
+    doMultiFileTest();
+  }
+
+  // PY-85027
+  public void testBoundMethodDecoratedWithParamSpec() {
+    doTestByText("""
+      from typing import Callable
+      
+      def outer_decorator[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+          return f
+      
+      class NonWorkingClass:
+          @outer_decorator
+          def add_two(self, x: float, y: float) -> float:
+              return x + y
+      
+      
+      NonWorkingClass().add_two(<warning descr="Parameter 'x' unfilled"><warning descr="Parameter 'y' unfilled">)</warning></warning>
+      """);
   }
 }

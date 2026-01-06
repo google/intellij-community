@@ -9,6 +9,8 @@ import com.intellij.codeInsight.completion.command.configuration.ApplicationComm
 import com.intellij.codeInsight.completion.group.GroupedCompletionContributor
 import com.intellij.codeInsight.completion.impl.CamelHumpMatcher
 import com.intellij.codeInsight.completion.ml.MLWeigherUtil
+import com.intellij.codeInsight.completion.serialization.PrefixMatcherDescriptor
+import com.intellij.codeInsight.completion.serialization.PrefixMatcherDescriptorConverter
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.lookup.LookupElementWeigher
@@ -43,6 +45,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.ProcessingContext
 import com.intellij.util.Processor
+import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Unmodifiable
 
@@ -163,6 +166,8 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
       if (adjustedParameters.injectedFile == null) return
       if (adjustedParameters.injectedOffset == null) return
       if (!commandCompletionFactory.isApplicable(adjustedParameters.injectedFile, adjustedParameters.injectedOffset)) return
+      val originalCompletionFactory = commandCompletionService.getFactory(adjustedParameters.copyFile.language) ?: return
+      if (!originalCompletionFactory.isApplicableForHost(adjustedParameters.copyFile, adjustedParameters.copyOffset)) return
     }
     else {
       if (!commandCompletionFactory.isApplicable(adjustedParameters.copyFile, adjustedParameters.copyOffset)) return
@@ -173,11 +178,9 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
 
     val prefix = commandCompletionType.pattern
     val sorter = createSorter(parameters)
-    val matcher = LimitedToleranceMatcher(prefix)
-    val withPrefixMatcher = resultSet.withPrefixMatcher(matcher)
-      .withRelevanceSorter(sorter)
+    val withRelevanceSorter = resultSet.withRelevanceSorter(sorter)
 
-    withPrefixMatcher.restartCompletionOnPrefixChange(
+    resultSet.restartCompletionOnPrefixChange(
       StandardPatterns.string().with(object : PatternCondition<String>("add filter for command completion") {
         override fun accepts(t: String, context: ProcessingContext?): Boolean {
           return (!isReadOnly && commandCompletionType.suffix + t ==
@@ -197,6 +200,7 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
                               isReadOnly = isReadOnly,
                               isInjected = isInjected,
                               commandCompletionType = commandCompletionType) { commands ->
+      val baseMatcher = CamelHumpMatcher(prefix, false, true)
       commands.forEach { command ->
         ProgressManager.checkCanceled()
         CommandCompletionCollector.shown(command::class.java, originalFile.language, commandCompletionType::class.java)
@@ -211,9 +215,11 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
         }
         else {
           for (element in lookupElements) {
-            if (!matcher.basePrefixMatches(element)) continue
+            if (!baseMatcher.prefixMatches(element)) continue
+            val commandCompletionElement = element.`as`(CommandCompletionLookupElement::class.java)!!
+            val matcher = LimitedToleranceMatcher(prefix, commandCompletionElement.currentTags, commandCompletionElement.otherTags)
             element.putUserData(SHOULD_NOT_CHECK_WHEN_WRAP, true)
-            withPrefixMatcher.addElement(element)
+            withRelevanceSorter.withPrefixMatcher(matcher).addElement(element)
           }
         }
       }
@@ -624,11 +630,14 @@ internal fun findCommandCompletionType(
                                                text.substring(offset - indexOf, offset - indexOf + 1))
   }
   //two points
-  else if (offset - indexOf + 2 <= text.length && text.substring(offset - indexOf, offset - indexOf + 2) == suffix) {
+  else if (offset - indexOf + 2 <= text.length &&
+           offset >= offset - indexOf + 2 &&
+           text.substring(offset - indexOf, offset - indexOf + 2) == suffix) {
     return InvocationCommandType.FullSuffix(text.substring(offset - indexOf + 2, offset),
                                             text.substring(offset - indexOf, offset - indexOf + 2))
   }
-  if (indexOf > 0 && text.substring(offset - indexOf).startsWith(factory.suffix())) {
+  if (indexOf > 0 &&
+      text.substring(offset - indexOf).startsWith(factory.suffix())) {
     //force call with one point
     return InvocationCommandType.PartialSuffix(text.substring(offset - indexOf + 1, offset),
                                                text.substring(offset - indexOf, offset - indexOf + 1))
@@ -640,23 +649,20 @@ internal fun findCommandCompletionType(
   return null
 }
 
-private class LimitedToleranceMatcher(prefix: String) : CamelHumpMatcher(prefix, false, true) {
-
-  fun basePrefixMatches(element: LookupElement): Boolean {
-    return super.prefixMatches(element)
-  }
+internal class LimitedToleranceMatcher(
+  prefix: String,
+  private val currentTags: List<String>,
+  private val otherTags: List<String>
+) : CamelHumpMatcher(prefix, false, true) {
 
   override fun prefixMatches(element: LookupElement): Boolean {
     if (!super.prefixMatches(element)) return false
-    val commandCompletionElement = element.`as`(CommandCompletionLookupElement::class.java) ?: return false
-    val currentTags = commandCompletionElement.currentTags
-    val allLookupStrings = currentTags.ifEmpty { element.allLookupStrings }
+    val allLookupStrings = this.currentTags.ifEmpty { element.allLookupStrings }
     if (!matched(allLookupStrings)) return false
-    val otherTags = commandCompletionElement.otherTags
-    if (otherTags.isEmpty()) return true
-    val indexOfFirst = otherTags.indexOfFirst { allLookupStrings.contains(it) }
+    if (this.otherTags.isEmpty()) return true
+    val indexOfFirst = this.otherTags.indexOfFirst { allLookupStrings.contains(it) }
     if (indexOfFirst <= 0) return true
-    if (matched(otherTags.subList(0, indexOfFirst))) return false
+    if (matched(this.otherTags.subList(0, indexOfFirst))) return false
     return true
   }
 
@@ -688,7 +694,22 @@ private class LimitedToleranceMatcher(prefix: String) : CamelHumpMatcher(prefix,
     if (prefix == this.prefix) {
       return this
     }
-    return LimitedToleranceMatcher(prefix)
+    return LimitedToleranceMatcher(prefix, currentTags, otherTags)
+  }
+
+  class Converter : PrefixMatcherDescriptorConverter<LimitedToleranceMatcher> {
+    override fun toDescriptor(target: LimitedToleranceMatcher): PrefixMatcherDescriptor =
+      Descriptor(target.prefix, target.currentTags, target.otherTags)
+  }
+
+  @Serializable
+  data class Descriptor(
+    private val prefix: String,
+    private val currentTags: List<String>,
+    private val otherTags: List<String>,
+  ) : PrefixMatcherDescriptor {
+    override fun recreateMatcher(): PrefixMatcher =
+      LimitedToleranceMatcher(prefix, currentTags, otherTags)
   }
 }
 

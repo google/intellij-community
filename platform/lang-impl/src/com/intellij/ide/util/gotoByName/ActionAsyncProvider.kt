@@ -17,6 +17,7 @@ import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.util.coroutines.forEachConcurrent
 import com.intellij.platform.util.coroutines.mapConcurrent
@@ -27,6 +28,7 @@ import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.ui.switcher.QuickActionProvider
 import com.intellij.util.CollectConsumer
 import com.intellij.util.gotoByName.FindActionSearchableOptionsFilter
+import com.intellij.util.text.matching.MatchingMode
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.asFlow
@@ -146,7 +148,12 @@ class ActionAsyncProvider(private val model: GotoActionModel) {
   ): Job = launch {
     val weightMatcher = buildWeightMatcher(pattern)
 
-    val list = collectMatchedActions(pattern, allIds, weightMatcher, unmatchedIdsChannel)
+    val list = try {
+      collectMatchedActions(pattern, allIds, weightMatcher, unmatchedIdsChannel)
+    } finally {
+      unmatchedIdsChannel.close()
+    }
+
     LOG.debug { "Matched actions list is collected" }
 
     awaitJob?.join() // wait until all items from the previous step are processed
@@ -254,14 +261,30 @@ class ActionAsyncProvider(private val model: GotoActionModel) {
             else {
               if (action is ActionStubBase) actionManager.getId(action)?.let { unmatchedIdsChannel.send(it) }
             }
-          }.getOrLogException(LOG)
+          }.onFailure { t ->
+            handleCancellationError(t)
+          }
         }
       }
     }.toList()
-    unmatchedIdsChannel.close()
 
     val comparator = Comparator.comparing<MatchedAction, Int> { it.weight ?: 0 }.reversed()
     return@coroutineScope matchedActions.sortedWith(comparator)
+  }
+
+  private fun handleCancellationError(throwable: Throwable) {
+    if (throwable is CancellationException) {
+      try {
+        ProgressManager.checkCanceled()
+      }
+      catch (ce: CancellationException) {
+        ce.addSuppressed(throwable)
+        throw ce
+      }
+      LOG.error(RuntimeException("Improper cancellation propagation", throwable))
+    } else {
+      LOG.error(throwable)
+    }
   }
 
   private fun CoroutineScope.processUnmatchedStubs(nonMatchedIds: ReceiveChannel<String>,
@@ -477,7 +500,7 @@ class ActionAsyncProvider(private val model: GotoActionModel) {
 
   private fun buildWeightMatcher(pattern: String): MinusculeMatcher {
     return NameUtil.buildMatcher("*$pattern")
-      .withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE)
+      .withMatchingMode(MatchingMode.IGNORE_CASE)
       .preferringStartMatches()
       .build()
   }

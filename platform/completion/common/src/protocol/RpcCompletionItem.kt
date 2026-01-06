@@ -12,17 +12,32 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class RpcCompletionItem(
   val lookupString: String,
-  val allLookupStrings: Set<String>,
+  /** null means setOf(lookupString) */
+  val allLookupStrings: Set<String>? = null,
   val presentation: RpcCompletionItemPresentation,
   val id: RpcCompletionItemId,
-  val insertHandler: RpcInsertHandler,
-  val requiresCommittedDocuments: Boolean,
-  val autoCompletionPolicy: AutoCompletionPolicy,
-  val isCaseSensitive: Boolean,
-  val shouldStopLookupInsertion: Boolean,
-  val isDirectInsertion: Boolean,
+  val insertHandler: RpcInsertHandler = RpcInsertHandler.Backend,
+  val requiresCommittedDocuments: Boolean = true,
+  val autoCompletionPolicy: AutoCompletionPolicy = AutoCompletionPolicy.SETTINGS_DEPENDENT,
+  val isCaseSensitive: Boolean = true,
+  val shouldStopLookupInsertion: Boolean = false,
+  val isDirectInsertion: Boolean = false,
   val prefixMatcher: RpcPrefixMatcher,
-)
+) {
+  override fun toString(): String = buildToString("RpcCompletionItem") {
+    field("lookupString", lookupString)
+    fieldWithNullDefault("allLookupStrings", allLookupStrings)
+    field("presentation", presentation)
+    field("id", id)
+    fieldWithDefault("insertHandler", insertHandler, RpcInsertHandler.Backend)
+    fieldWithDefault("requiresCommittedDocuments", requiresCommittedDocuments, true)
+    fieldWithDefault("autoCompletionPolicy", autoCompletionPolicy, AutoCompletionPolicy.SETTINGS_DEPENDENT)
+    fieldWithDefault("isCaseSensitive", isCaseSensitive, true)
+    fieldWithDefault("shouldStopLookupInsertion", shouldStopLookupInsertion, false)
+    fieldWithDefault("isDirectInsertion", isDirectInsertion, false)
+    field("prefixMatcher", prefixMatcher)
+  }
+}
 
 fun CompletionResult.toRpc(): RpcCompletionItem {
   val element = this.lookupElement
@@ -31,7 +46,7 @@ fun CompletionResult.toRpc(): RpcCompletionItem {
   val id = RpcCompletionItemId()
   return RpcCompletionItem(
     lookupString = element.lookupString,
-    allLookupStrings = element.allLookupStrings,
+    allLookupStrings = element.allLookupStrings.takeUnless { it.singleOrNull() == element.lookupString },
     presentation = presentation.toRpc(),
     id = id,
     insertHandler = element.getRpcInsertHandler(),

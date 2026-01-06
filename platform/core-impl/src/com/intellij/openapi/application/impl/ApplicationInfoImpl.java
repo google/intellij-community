@@ -16,10 +16,7 @@ import com.intellij.openapi.util.BuildNumber;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.serviceContainer.NonInjectable;
 import com.intellij.util.xml.dom.XmlElement;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.VisibleForTesting;
+import org.jetbrains.annotations.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -353,6 +350,11 @@ public final class ApplicationInfoImpl extends ApplicationInfoEx {
     return majorReleaseBuildDate == null ? getBuildDate() : GregorianCalendar.from(majorReleaseBuildDate);
   }
 
+  @TestOnly
+  public @Nullable ZonedDateTime getMajorReleaseBuildDateTime() {
+    return majorReleaseBuildDate;
+  }
+
   @Override
   public @NotNull BuildNumber getBuild() {
     return Objects.requireNonNull(BuildNumber.fromString(myBuildNumber));
@@ -404,6 +406,11 @@ public final class ApplicationInfoImpl extends ApplicationInfoEx {
   @Override
   public String getPatchVersion() {
     return myPatchVersion;
+  }
+
+  @TestOnly
+  public @Nullable String getVersionSuffix() {
+    return myVersionSuffix;
   }
 
   @Override

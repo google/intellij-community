@@ -103,6 +103,12 @@ public abstract class XDebuggerUtil {
 
   public abstract <T extends XDebuggerSettings<?>> T getDebuggerSettings(Class<T> aClass);
 
+  /**
+   * Returns an {@link com.intellij.xdebugger.frame.XValue} for the currenlty selected node in the debugger tree.
+   *
+   * @deprecated Use {@link com.intellij.xdebugger.impl.ui.tree.actions.XDebuggerTreeActionBase#getSelectedValue} instead.
+   */
+  @Deprecated
   public abstract @Nullable XValueContainer getValueContainer(DataContext dataContext);
 
   /**

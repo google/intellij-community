@@ -1,6 +1,8 @@
 // Copyright 2000-2017 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python.inspections;
 
+import com.intellij.openapi.util.RecursionManager;
+import com.intellij.openapi.util.StackOverflowPreventedException;
 import com.jetbrains.python.fixtures.PyInspectionTestCase;
 import com.jetbrains.python.psi.LanguageLevel;
 import org.jetbrains.annotations.NotNull;
@@ -1680,6 +1682,17 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                    subClass.foo(subClass.foo(<warning descr="Expected type 'SubClass' (matched generic type 'Self@MyClass'), got 'MyClass' instead">myClass</warning>))""");
   }
 
+  public void testSelfParameterType() {
+    doTestByText("""
+                   class MyClass[T]:
+                       def __init__(self: "MyClass[int]") -> None: ...
+                   
+                   MyClass()
+                   MyClass[int]()
+                   <warning descr="Expected type 'MyClass[int]', got 'MyClass[str]' instead">MyClass[str]</warning>()
+                   """);
+  }
+
   // PY-53104
   public void testProtocolSelfClass() {
     doTestByText("""
@@ -3320,6 +3333,96 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                    """);
   }
 
+  // PY-85123
+  public void testOverloadedMethodInConcreteClassWithGenericProtocol() {
+    doTestByText("""
+                   from typing import TypeVar, overload, Protocol
+                   
+                   T = TypeVar("T", contravariant=True)
+                   
+                   class SupportsWrite(Protocol[T]):
+                       def write(self, s: T): ...
+                   
+                   class B:
+                       @overload
+                       def write(self, s: int): ...
+                   
+                       @overload
+                       def write(self, s: str): ...
+                   
+                   
+                   a: SupportsWrite[str] = B()
+                   """);
+  }
+
+  // PY-85123
+  public void testProtocolPartialSpecializationFixedReturnGenericParam() {
+    doTestByText("""
+                   from typing import Protocol, TypeVar, overload
+                   
+                   T = TypeVar("T", contravariant=True)
+                   S = TypeVar("S", covariant=True)
+                   
+                   class P(Protocol[T, S]):
+                       def write(self, x: T) -> S: ...
+                   
+                   class B:
+                       @overload
+                       def write(self, x: int) -> str: ...
+                       @overload
+                       def write(self, x: str) -> str: ...
+                   
+                   
+                   def accepts_p(arg: P[T, str]) -> None: ...
+                   accepts_p(B())
+                   """);
+  }
+
+  // PY-85123
+  public void testProtocolPartialSpecializationUnionConcreteAndGeneric() {
+    doTestByText("""
+                   from typing import Protocol, TypeVar, overload
+                   
+                   T = TypeVar("T", contravariant=True)
+                   
+                   class SupportsWrite(Protocol[T]):
+                       def write(self, s: T): ...
+                   
+                   class B:
+                       @overload
+                       def write(self, s: int): ...
+                       @overload
+                       def write(self, s: str): ...
+                   
+                   
+                   def accepts_union(x: SupportsWrite[str] | SupportsWrite[T]) -> None: ...
+                   accepts_union(B())
+                   """);
+  }
+
+  // PY-86463
+  public void testInheritedGenericProtocol() {
+    doTestByText("""
+      from typing import Protocol, overload
+      
+      class P[T](Protocol):
+          def method(self, x: T) -> T:
+              pass
+      
+      class P2[T](P[T], Protocol):
+          pass
+      
+      class Impl:
+          def method(self, x: int) -> int:
+              ...
+      
+      def expects_P2_str(x: P2[str]):
+          pass
+      
+      expr = expects_P2_str(<warning descr="Expected type 'P2[str]', got 'Impl' instead">Impl()</warning>)
+      """);
+  }
+
   // PY-76822
   public void testExplicitAnyInConcreteType() {
     doTestByText("""
@@ -3368,6 +3471,35 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                    """);
   }
 
+  // PY-86249
+  public void testProtocolAndFrozenDataclassWithMethod() {
+    doTestByText("""
+                   import abc
+                   import dataclasses
+                   from typing import Protocol
+                   
+                   
+                   class Proto(Protocol):
+                       @abc.abstractmethod
+                       def to_kwargs(self) -> dict:
+                           pass
+                   
+                   
+                   @dataclasses.dataclass(frozen=True)
+                   class Impl:
+                       name: str
+                   
+                       def to_kwargs(self) -> dict:
+                           return {"name": self.name}
+                   
+                   
+                   def do(arg: Proto) -> None: ...
+                   
+                   
+                   do(Impl(name="vrf1"))
+                   """);
+  }
+
   // PY-85771
   public void testFlagName() {
     doTestByText("""
@@ -3386,25 +3518,24 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
     doTestByText("""
                    from collections.abc import Iterable
                    from typing import assert_type
-
-
+                   
                    # PY-84544
                    def foo(iterable: Iterable[int] | Iterable[str]) -> None:
                        assert_type(next(iter(iterable)), int | str)
-
-
+                   
+                   
                    # PY-25989
                    assert_type(max(1, 2.6), float)
                    assert_type(max(2.6, 1), float)
                    max(1, <warning descr="Expected type 'int' (matched generic type 'SupportsRichComparisonT ≤: SupportsDunderLT[Any] | SupportsDunderGT[Any]'), got 'object' instead">object()</warning>)    
-
-
+                   
+                   
                    def bar[T: int, str](v1: T, v2: T) -> T:
                        if (bool(input())):
                            return v1
                        return v2
-
-
+                   
+                   
                    _ = bar(1, <warning descr="Expected type 'int' (matched generic type 'T ≤: int'), got 'str' instead">"a"</warning>)
                    """);
   }
@@ -3583,4 +3714,109 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                        x = 1
                    """);
   }
+
+  // PY-85988
+  public void testClsCallResult() {
+    doTestByText("""
+                   from dataclasses import dataclass
+                   from typing import Self
+                   
+                   
+                   @dataclass
+                   class Foo:
+                       @classmethod
+                       def bar(cls) -> Self:
+                           return cls()
+                   """);
+  }
+
+  // PY-85997
+  public void testBuiltinMapTypeIsIterator() {
+    //RecursionManager.assertOnRecursionPrevention(myFixture.getTestRootDisposable());
+    doTestByText("""
+                   from typing import Iterator
+                   
+                   
+                   def foo() -> Iterator[str]:
+                       return map(str, range(5))
+                   """);
+  }
+
+  // PY-85997
+  public void testRecursiveIteratorProtocol() {
+    //RecursionManager.assertOnRecursionPrevention(myFixture.getTestRootDisposable());
+    // It simulates how the `builtins.map` type is declared using Self.
+    doTestByText("""
+                   from typing import Iterator, Self
+                   
+                   class MyIterable[T]:
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> Self: ...
+                   
+                   ys: MyIterable[str]
+                   xs: Iterator[str] = ys
+                   """);
+  }
+
+  public void testIdenticalGenericProtocolAndImplementationUsingSelf() {
+    RecursionManager.assertOnRecursionPrevention(myFixture.getTestRootDisposable());
+    doTestByText("""
+                   
+                   from typing import Self, Protocol
+                   
+                   class MyProtocol[T](Protocol):
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> Self: ...
+                   
+                   class MyIterable[T]:
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> Self: ...
+                   
+                   ys: MyIterable[str] = MyIterable[str]()
+                   xs: MyProtocol[str] = ys
+                   """);
+  }
+
+  // PY-85997
+  public void testRecursiveProtocolAndImplementationUsingSelf() {
+    fixme("Recursive protocol definitions cause infinite recursion during matching", StackOverflowPreventedException.class, () -> {
+      RecursionManager.assertOnRecursionPrevention(myFixture.getTestRootDisposable());
+      doTestByText("""
+                   from typing import Self, Protocol
+                   
+                   class MyProtocol[T](Protocol):
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> MyProtocol[T]: ...
+                   
+                   class MyIterable[T]:
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> Self: ...
+                   
+                   ys: MyIterable[str] = MyIterable[str]()
+                   xs: MyProtocol[str] = ys
+                   """);
+    });
+  }
+
+  // PY-85997
+  public void testRecursiveProtocolAndImplementationReferringToItself() {
+    fixme("Recursive protocol definitions cause infinite recursion during matching", StackOverflowPreventedException.class, () -> {
+      RecursionManager.assertOnRecursionPrevention(myFixture.getTestRootDisposable());
+      doTestByText("""
+                   from typing import Self, Protocol
+                   
+                   class MyProtocol[T](Protocol):
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> MyProtocol[T]: ...
+                   
+                   class MyIterable[T]:
+                       def __next__(self) -> T: ...
+                       def __iter__(self) -> MyIterable[T]: ...
+                   
+                   ys: MyIterable[str] = MyIterable[str]()
+                   xs: MyProtocol[str] = ys
+                   """);
+    });
+  }
 }
+

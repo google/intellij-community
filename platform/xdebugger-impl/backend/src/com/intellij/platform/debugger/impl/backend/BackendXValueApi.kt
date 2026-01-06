@@ -2,6 +2,7 @@
 package com.intellij.platform.debugger.impl.backend
 
 import com.intellij.ide.ui.icons.rpcId
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.util.coroutines.childScope
@@ -23,7 +24,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.await
 import org.jetbrains.concurrency.asCompletableFuture
 import java.awt.Font
+import java.awt.event.MouseEvent
 import javax.swing.Icon
+import javax.swing.JPanel
 
 internal class BackendXValueApi : XValueApi {
   override suspend fun computeTooltipPresentation(xValueId: XValueId): Flow<XValueSerializedPresentation> {
@@ -127,6 +130,14 @@ internal class BackendXValueApi : XValueApi {
       }
     })
     return XInlineDebuggerDataDto(state, channel.asColdFlow().toRpc())
+  }
+
+  override suspend fun nodeLinkClicked(linkId: XDebuggerHyperlinkId) {
+    val link = linkId.findValue() ?: return
+    withContext(Dispatchers.EDT) {
+      val dummyEvent = MouseEvent(JPanel(), 0, 0, 0, 0, 0, 1, false)
+      link.onClick(dummyEvent)
+    }
   }
 }
 
@@ -285,10 +296,20 @@ private sealed interface RawComputeChildrenEvent {
         }
       }
 
+      fun subscribeToAdditionalLinkFlow(model: BackendXValueModel) {
+        parentCoroutineScope.launch {
+          model.additionalLinkFlow.collectLatest {
+            channel.send(XValueComputeChildrenEvent.XValueAdditionalLinkEvent(model.id, it?.toRpc(model.cs)))
+          }
+        }
+      }
+
       childrenXValueEntities.forEach(::subscribeToPresentationsFlow)
       childrenXValueEntities.forEach(::subscribeToFullValueFlow)
+      childrenXValueEntities.forEach(::subscribeToAdditionalLinkFlow)
       topValuesEntities.forEach(::subscribeToPresentationsFlow)
       topValuesEntities.forEach(::subscribeToFullValueFlow)
+      topValuesEntities.forEach(::subscribeToAdditionalLinkFlow)
     }
   }
 
@@ -300,16 +321,13 @@ private sealed interface RawComputeChildrenEvent {
 
   data class SetErrorMessage(val message: String, val link: XDebuggerTreeNodeHyperlink?) : RawComputeChildrenEvent {
     override suspend fun convertToRpcEvent(parentCoroutineScope: CoroutineScope): XValueComputeChildrenEvent {
-      // TODO[IJPL-160146]: support XDebuggerTreeNodeHyperlink serialization
-      return XValueComputeChildrenEvent.SetErrorMessage(message, link)
+      return XValueComputeChildrenEvent.SetErrorMessage(message, link?.toRpc(parentCoroutineScope))
     }
   }
 
-  data class SetMessage(val message: String, val icon: Icon?, val attributes: SimpleTextAttributes?, val link: XDebuggerTreeNodeHyperlink?) : RawComputeChildrenEvent {
+  data class SetMessage(val message: String, val icon: Icon?, val attributes: SimpleTextAttributes, val link: XDebuggerTreeNodeHyperlink?) : RawComputeChildrenEvent {
     override suspend fun convertToRpcEvent(parentCoroutineScope: CoroutineScope): XValueComputeChildrenEvent {
-      // TODO[IJPL-160146]: support SimpleTextAttributes serialization
-      // TODO[IJPL-160146]: support XDebuggerTreeNodeHyperlink serialization
-      return XValueComputeChildrenEvent.SetMessage(message, icon?.rpcId(), attributes, link)
+      return XValueComputeChildrenEvent.SetMessage(message, icon?.rpcId(), attributes.toRpc(), link?.toRpc(parentCoroutineScope))
     }
   }
 

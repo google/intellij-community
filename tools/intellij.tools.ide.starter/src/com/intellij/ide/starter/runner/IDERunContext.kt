@@ -8,6 +8,8 @@ import com.intellij.ide.starter.di.di
 import com.intellij.ide.starter.ide.IDERemDevTestContext
 import com.intellij.ide.starter.ide.IDEStartConfig
 import com.intellij.ide.starter.ide.IDETestContext
+import com.intellij.ide.starter.ide.asRemDevContext
+import com.intellij.ide.starter.ide.isRemDevContext
 import com.intellij.ide.starter.models.IDEStartResult
 import com.intellij.ide.starter.models.VMOptions
 import com.intellij.ide.starter.path.IDEDataPaths
@@ -27,6 +29,8 @@ import com.intellij.tools.ide.performanceTesting.commands.MarshallableCommand
 import com.intellij.tools.ide.starter.bus.EventsBus
 import com.intellij.tools.ide.util.common.logError
 import com.intellij.tools.ide.util.common.logOutput
+import com.intellij.util.containers.ConcurrentList
+import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.io.createDirectories
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -40,7 +44,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.io.path.bufferedReader
 import kotlin.io.path.exists
+import kotlin.io.path.name
 import kotlin.io.path.readText
+import kotlin.io.path.walk
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -68,7 +74,9 @@ data class IDERunContext(
   val launchDir: Path = testContext.paths.testHome.resolve(launchName).createDirectoriesIfNotExist()
   val logsDir: Path = testContext.paths.testHome.resolve(launchName).resolve("log").createDirectoriesIfNotExist()
 
-  private val patchesForVMOptions: MutableList<VMOptions.() -> Unit> = mutableListOf()
+  private val patchesForVMOptions: ConcurrentList<VMOptions.() -> Unit> = ContainerUtil.createConcurrentList()
+
+  var artifactsPublishingEnabled: Boolean = true
 
   private fun Path.createDirectoriesIfNotExist(): Path {
     if (exists()) {
@@ -88,7 +96,9 @@ data class IDERunContext(
     }
   }
 
-  fun publishArtifacts() {
+  fun publishArtifacts(publish: Boolean = artifactsPublishingEnabled) {
+    if (!publish) return
+
     testContext.publishArtifact(
       source = logsDir,
       artifactPath = contextName,
@@ -149,7 +159,7 @@ data class IDERunContext(
       setFatalErrorNotificationEnabled()
       setFlagIntegrationTests()
       setJcefJsQueryPoolSize(10_000)
-      if (testContext !is IDERemDevTestContext) {
+      if (!testContext.isRemDevContext()) {
         takeScreenshotsPeriodically()
       }
       withJvmCrashLogDirectory(jvmCrashLogDirectory)
@@ -237,7 +247,7 @@ data class IDERunContext(
     snapshotsDir: Path,
     runContext: IDERunContext,
   ) {
-    if (!runContext.calculateVmOptions().hasHeadlessMode()) {
+    if (!runContext.calculateVmOptions().hasHeadlessMode() && runContext.testContext !is IDERemDevTestContext) {
       catchAll {
         takeScreenshot(logsDir)
       }
@@ -274,7 +284,7 @@ data class IDERunContext(
   }
 
   private fun isLowMemorySignalPresent(logsDir: Path): Boolean {
-    return logsDir.resolve("idea.log").bufferedReader().useLines { lines ->
+    return logsDir.walk().single { it.name == "idea.log"}.bufferedReader().useLines { lines ->
       lines.any { line ->
         line.contains("Low memory signal received: afterGc=true")
       }
@@ -360,7 +370,7 @@ data class IDERunContext(
   }
 
   fun withScreenRecording() {
-    if (testContext is IDERemDevTestContext && testContext != testContext.frontendIDEContext && !calculateVmOptions().hasHeadlessMode()) {
+    if (testContext.isRemDevContext() && testContext != testContext.asRemDevContext().frontendIDEContext && !calculateVmOptions().hasHeadlessMode()) {
       logOutput("Will not record screen for a backend of remote dev")
       return
     }

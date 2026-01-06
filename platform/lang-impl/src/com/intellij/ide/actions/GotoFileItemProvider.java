@@ -18,10 +18,13 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.*;
+import com.intellij.psi.PsiDirectory;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFileSystemItem;
 import com.intellij.psi.codeStyle.FixingLayoutMatcher;
 import com.intellij.psi.codeStyle.MinusculeMatcher;
 import com.intellij.psi.codeStyle.NameUtil;
+import com.intellij.psi.codeStyle.PlatformKeyboardLayoutConverter;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiUtilCore;
@@ -30,6 +33,7 @@ import com.intellij.util.UriUtil;
 import com.intellij.util.containers.*;
 import com.intellij.util.indexing.FindSymbolParameters;
 import com.intellij.util.indexing.ProcessorWithThrottledCancellationCheck;
+import com.intellij.util.text.matching.MatchingMode;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -96,7 +100,7 @@ public class GotoFileItemProvider extends DefaultChooseByNameItemProvider {
 
       Ref<Boolean> hasSuggestionsFixedPattern = Ref.create(false);
       if (processItems) { // stay within the original logic that was before adding the fuzzy search
-        String fixedPattern = FixingLayoutMatcher.fixLayout(pattern);
+        String fixedPattern = FixingLayoutMatcher.fixLayout(pattern, PlatformKeyboardLayoutConverter.INSTANCE);
         // With fuzzy search: The process was interrupt but there are suggestions.
         if (fixedPattern != null &&
             !processItemsForPattern(base, parameters.withCompletePattern(fixedPattern), consumer, indicator, hasSuggestionsFixedPattern) &&
@@ -188,9 +192,9 @@ public class GotoFileItemProvider extends DefaultChooseByNameItemProvider {
     // Find all directories and files names similar to the last component in patternComponents
     List<MatchResult> matchingNames = new ArrayList<>();
     final String fullPattern = String.join("", patternComponents);
-    final MinusculeMatcher fullMatcher = buildPatternMatcher(fullPattern, true);
+    final MinusculeMatcher fullMatcher = buildPatternMatcher(fullPattern, true, base.getModel());
     String lastPatternComponent = patternComponents.get(patternComponents.size() - 1);
-    MinusculeMatcher matcher = buildPatternMatcher(lastPatternComponent, true);
+    MinusculeMatcher matcher = buildPatternMatcher(lastPatternComponent, true, base.getModel());
     var nameMatchingCheck = new ProcessorWithThrottledCancellationCheck<>(
       (CharSequence fileNameCharSeq) -> {
         indicator.checkCanceled();
@@ -230,7 +234,7 @@ public class GotoFileItemProvider extends DefaultChooseByNameItemProvider {
       if (patternComponents.size() > 1) {
         int patternSize = patternComponents.size();
         LevenshteinCalculator calculator = new LevenshteinCalculator(patternComponents.subList(0, patternSize - 1));
-        float distance = calculator.distanceToVirtualFile(psiFileItem.getVirtualFile().getParent(), false, false);
+        float distance = calculator.distanceToVirtualFile(psiFileItem.getVirtualFile().getParent(), false, false, base.getModel());
         if (distance >= LevenshteinCalculator.MIN_ACCEPTABLE_DISTANCE) {
           int avgWeight = (psiFileItemWeight + LevenshteinCalculator.weightFromDistance(distance) * (patternSize - 1)) / patternSize;
           matchingItems.add(new FoundItemDescriptor<>(psiFileItem, avgWeight));
@@ -342,7 +346,7 @@ public class GotoFileItemProvider extends DefaultChooseByNameItemProvider {
     pattern = "*" + StringUtil.replace(StringUtil.replace(pattern, "\\", "*\\*"), "/", "*/*");
 
     return NameUtil.buildMatcher(pattern)
-      .withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE)
+      .withMatchingMode(MatchingMode.IGNORE_CASE)
       .preferringStartMatches()
       .build();
   }
@@ -584,12 +588,12 @@ public class GotoFileItemProvider extends DefaultChooseByNameItemProvider {
       boolean preferStartMatches = from == 0 && !patternSuffix.startsWith("*");
       String matchPattern = (from > 0 ? " " : "*") + patternSuffix;
 
-      NameUtil.MatcherBuilder builder = NameUtil.buildMatcher(matchPattern).withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE);
+      NameUtil.MatcherBuilder builder = NameUtil.buildMatcher(matchPattern).withMatchingMode(MatchingMode.IGNORE_CASE);
       if (preferStartMatches) {
         builder.preferringStartMatches();
       }
 
-      final var fullBuilder = NameUtil.buildMatcher(patternSuffix).withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE);
+      final var fullBuilder = NameUtil.buildMatcher(patternSuffix).withMatchingMode(MatchingMode.IGNORE_CASE);
       if (preferStartMatches) {
         builder.preferringStartMatches();
       }

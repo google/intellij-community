@@ -1,12 +1,13 @@
 *a:com.intellij.codeInsight.ModNavigatorTailType
 - com.intellij.codeInsight.TailType
 - <init>():V
+- s:dotType():com.intellij.codeInsight.ModNavigatorTailType
 - s:humbleSpaceBeforeWordType():com.intellij.codeInsight.ModNavigatorTailType
 - s:insertSpaceType():com.intellij.codeInsight.ModNavigatorTailType
 - isApplicable(com.intellij.codeInsight.completion.InsertionContext):Z
 - s:noneType():com.intellij.codeInsight.ModNavigatorTailType
 - processTail(com.intellij.openapi.editor.Editor,I):I
-- a:processTail(com.intellij.openapi.project.Project,com.intellij.openapi.editor.ModNavigator,I):I
+- a:processTail(com.intellij.openapi.editor.ModNavigator,I):I
 - s:semicolonType():com.intellij.codeInsight.ModNavigatorTailType
 - s:spaceType():com.intellij.codeInsight.ModNavigatorTailType
 a:com.intellij.codeInsight.completion.CompletionService
@@ -18,6 +19,7 @@ a:com.intellij.codeInsight.completion.CompletionService
 - createFile(com.intellij.psi.PsiFile,java.lang.String):com.intellij.psi.PsiFile
 - filterSuffix():java.lang.Character
 - isApplicable(com.intellij.psi.PsiFile,I):Z
+- isApplicableForHost(com.intellij.psi.PsiFile,I):Z
 - suffix():C
 - supportFiltersWithDoublePrefix():Z
 *f:com.intellij.codeInsight.completion.command.CommandCompletionProviderContext

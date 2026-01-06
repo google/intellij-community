@@ -136,13 +136,11 @@ open class WebStarterInitialStep(contextProvider: WebStarterContextProvider) : C
     wizardContext.projectName = entityName
     wizardContext.setProjectFileDirectory(FileUtil.join(location, entityName))
 
-    val sdk = jdkIntentProperty.get().prepareJdk()
-    if (wizardContext.project == null) {
-      wizardContext.projectJdk = sdk
-    }
-    else {
-      moduleBuilder.moduleJdk = sdk
-    }
+    moduleBuilder.moduleJdk = wizardContext.projectJdk
+  }
+
+  override fun onStepLeaving() {
+    contentPanel.apply()
   }
 
   private fun suggestPackageName(): String {
@@ -246,7 +244,9 @@ open class WebStarterInitialStep(contextProvider: WebStarterContextProvider) : C
       addSampleCodeUi()
 
       addFieldsAfter(this)
-    }.withVisualPadding()
+    }
+      .withVisualPadding()
+      .apply { registerValidators(parentDisposable) }
   }
 
   private fun createServerUrlLink(): ActionLink {
@@ -289,6 +289,10 @@ open class WebStarterInitialStep(contextProvider: WebStarterContextProvider) : C
     val passTechnologyName = if (starterSettings.languageLevels.size > 1) null else moduleBuilder.presentableName
     if (languageLevel.javaVersion.isNotBlank() &&
         !validateJdkIntentVersion(jdkIntentProperty, languageLevel.javaVersion, passTechnologyName)) {
+      return false
+    }
+
+    if (contentPanel.validateAll().isNotEmpty()) {
       return false
     }
 

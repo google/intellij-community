@@ -370,15 +370,6 @@
       "UserMessage.Snippet.MoreLines.foreground": "#808080"
     },
 
-    "HelpTooltip": {
-      "descriptionSizeDelta": {
-        "os.linux": -2
-      },
-      "fontSizeDelta": {
-        "os.linux": -2
-      }
-    },
-
     "Hyperlink.linkColor": "#589df6",
 
     "InternalFrame": {
@@ -1336,6 +1327,7 @@
       }
     },
     "Recap": {
+      "ijnext": "#DCCBFB",
       "cardBackground": "#FFFFFF",
       "cardBorderColor": "#FFFFFF",
       "cardHeaderTitle": "#000000",
@@ -1346,7 +1338,10 @@
       "chroniclesBorderColor": "#F7F8FA",
       "chroniclesBackgroundHovered": "#E9EAEE",
       "chroniclesForeground": "#000000",
-      "chroniclesForegroundGreyed": "#868A91"
+      "chroniclesForegroundGreyed": "#868A91",
+      "errorBackground": "#FFFAEB",
+      "errorBorder": "#FED277",
+      "errorForeground": "#000000"
     }
   },
 

@@ -13,8 +13,6 @@ import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.options.advanced.AdvancedSettings
-import com.intellij.openapi.options.advanced.AdvancedSettingsImpl
 import com.intellij.openapi.projectRoots.JavaSdkVersion
 import com.intellij.openapi.projectRoots.JavaSdkVersionUtil
 import com.intellij.openapi.roots.LibraryOrderEntry
@@ -398,7 +396,7 @@ abstract class KotlinGradleImportingTestCase : GradleImportingTestCase(),
 
         const val LATEST_STABLE_GRADLE_PLUGIN_VERSION = "2.0.0"
 
-        val SUPPORTED_GRADLE_VERSIONS = arrayOf("6.8.3", "7.6")
+        val SUPPORTED_GRADLE_VERSIONS = arrayOf("6.8.3", "7.6")//, "9.0.0", "9.1.0") // To support them in KTIJ-36754
 
         // https://kotlinlang.org/docs/gradle-configure-project.html#targeting-the-jvm
         val GRADLE_TO_KGP_VERSION = mapOf(
@@ -413,7 +411,3 @@ abstract class KotlinGradleImportingTestCase : GradleImportingTestCase(),
     }
 }
 
-fun GradleImportingTestCase.enableExperimentalMPP(enable: Boolean) {
-    //enable experimental MPP features e.g. an import K/JS run tasks
-    (AdvancedSettings.getInstance() as AdvancedSettingsImpl).setSetting("kotlin.mpp.experimental", enable, testRootDisposable)
-}

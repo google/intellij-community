@@ -9,7 +9,7 @@ import com.intellij.collaboration.ui.setHtmlBody
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.HtmlBuilder
 import com.intellij.openapi.util.text.HtmlChunk
-import com.intellij.openapi.vcs.changes.ui.CurrentBranchComponent
+import com.intellij.openapi.vcs.changes.ui.BranchPresentation
 import com.intellij.ui.ColorUtil
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.Nls
@@ -86,9 +86,9 @@ internal class GHPRTimelineEventComponentFactoryImpl(
     override fun createComponent(event: GHPRTimelineEvent.Simple): JComponent {
       return when (event) {
         is GHPRAssignedEvent ->
-          eventItem(event, assigneesText(assigned = listOf(event.user)))
+          eventItem(event, assigneesText(assigned = event.user?.let { listOf(it) } ?: emptyList()))
         is GHPRUnassignedEvent ->
-          eventItem(event, assigneesText(unassigned = listOf(event.user)))
+          eventItem(event, assigneesText(unassigned = event.user?.let { listOf(it) } ?: emptyList()))
 
         is GHPRReviewRequestedEvent ->
           eventItem(event, reviewersText(added = listOf(event.requestedReviewer)))
@@ -249,8 +249,8 @@ internal class GHPRTimelineEventComponentFactoryImpl(
 
   companion object {
     internal fun branchHTML(name: @Nls String): HtmlChunk {
-      val foreground = CurrentBranchComponent.TEXT_COLOR
-      val background = CurrentBranchComponent.getBranchPresentationBackground(UIUtil.getListBackground())
+      val foreground = BranchPresentation.TEXT_COLOR
+        val background = BranchPresentation.getBranchPresentationBackground(UIUtil.getListBackground())
 
       val iconChunk = HtmlChunk
         .tag("icon-inline")

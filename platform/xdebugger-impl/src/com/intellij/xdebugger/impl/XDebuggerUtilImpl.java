@@ -26,6 +26,7 @@ import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.debugger.impl.shared.DebuggerAsyncActionUtilsKt;
 import com.intellij.platform.debugger.impl.shared.XDebuggerUtilImplShared;
 import com.intellij.platform.debugger.impl.shared.proxy.*;
 import com.intellij.pom.Navigatable;
@@ -48,12 +49,13 @@ import com.intellij.xdebugger.frame.XExecutionStack;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.frame.XValueContainer;
-import com.intellij.xdebugger.impl.breakpoints.*;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerImpl;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointUtil;
+import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl;
 import com.intellij.xdebugger.impl.breakpoints.ui.grouping.XBreakpointFileGroupingRule;
 import com.intellij.xdebugger.impl.evaluate.ValueLookupManagerController;
-import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
 import com.intellij.xdebugger.impl.frame.XStackFrameContainerEx;
-import com.intellij.xdebugger.impl.proxy.MonolithBreakpointTypeProxyKt;
 import com.intellij.xdebugger.impl.proxy.MonolithLineBreakpointProxy;
 import com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl;
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
@@ -305,7 +307,9 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     final @Nullable Editor editor,
     boolean canRemove
   ) {
-    var proxyTypes = ContainerUtil.map(types, t -> MonolithBreakpointTypeProxyKt.asProxy(t, project));
+    var proxyTypes = XDebugManagerProxy.getInstance().getBreakpointManagerProxy(project).getLineBreakpointTypes().stream()
+      .filter(type -> ContainerUtil.exists(types, t -> t.getId().equals(type.getId())))
+      .toList();
     var future = toggleAndReturnLineBreakpointProxy(
       project, proxyTypes, position, selectVariantByPositionColumn,
       temporary, editor, canRemove, false, null);
@@ -607,8 +611,10 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
    * @see DebuggerAsyncActionUtilsKt#performDebuggerActionAsync
    */
   public static void performDebuggerAction(@NotNull AnActionEvent e, @NotNull Runnable action) {
-    action.run();
-    reshowInlayRunToCursor(e);
+    DebuggerAsyncActionUtilsKt.performDebuggerAction(e.getProject(), e.getDataContext(), () -> {
+      action.run();
+      return Unit.INSTANCE;
+    });
   }
 
   public static void reshowInlayRunToCursor(@NotNull AnActionEvent e) {
@@ -703,6 +709,10 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     return XDebuggerSettingManagerImpl.getInstanceImpl().getSettings(aClass);
   }
 
+  /**
+   * @deprecated Use {@link XDebuggerTreeActionBase#getSelectedValue(DataContext)} instead.
+   */
+  @Deprecated
   @Override
   public XValueContainer getValueContainer(DataContext dataContext) {
     return XDebuggerTreeActionBase.getSelectedValue(dataContext);
@@ -869,25 +879,6 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
       return fileEditorManager.openTextEditor(descriptor, isEditorAreaFocused);
     }
     return null;
-  }
-
-  /**
-   * The returned Navigatable overrides requesting focus based on whether the editor area is focused or not.
-   */
-  public static @NotNull Navigatable wrapKeepEditorAreaFocusNavigatable(@NotNull Project project, @NotNull Navigatable navigatable) {
-    return new Navigatable() {
-      @Override
-      public void navigate(boolean requestFocus) {
-        boolean isEditorAreaFocused = FileEditorManager.getInstance(project).getFocusedEditor() != null;
-        navigatable.navigate(requestFocus && isEditorAreaFocused);
-      }
-
-      @Override
-      public boolean canNavigate() { return navigatable.canNavigate(); }
-
-      @Override
-      public boolean canNavigateToSource() { return navigatable.canNavigateToSource(); }
-    };
   }
 
   public static void rebuildAllSessionsViews(@Nullable Project project) {

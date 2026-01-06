@@ -181,6 +181,7 @@ a:com.intellij.dvcs.commit.AmendCommitService
 - pf:getProject():com.intellij.openapi.project.Project
 f:com.intellij.dvcs.commit.CommitAndPushExecutorKt
 - sf:getCommitAndPushActionName(com.intellij.vcs.commit.CommitWorkflowHandlerState):java.lang.String
+f:com.intellij.dvcs.commit.EditedCommitDetailsExtKt
 f:com.intellij.dvcs.ignore.IgnoredToExcludedSynchronizer
 - com.intellij.openapi.vcs.FilesProcessor
 - <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
@@ -630,20 +631,19 @@ a:com.intellij.dvcs.ui.NewBranchAction
 com.intellij.dvcs.ui.PopupElementWithAdditionalInfo
 - getInfoText():java.lang.String
 c:com.intellij.dvcs.ui.RepositoryChangesBrowserNode
-- com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
-- com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode$NodeWithFilePath
+- com.intellij.openapi.vcs.changes.ui.RepositoryChangesBrowserNodeBase
 - sf:Companion:com.intellij.dvcs.ui.RepositoryChangesBrowserNode$Companion
 - <init>(com.intellij.dvcs.repo.Repository,com.intellij.vcs.log.ui.VcsLogColorManager):V
 - b:<init>(com.intellij.dvcs.repo.Repository,com.intellij.vcs.log.ui.VcsLogColorManager,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - compareUserObjects(com.intellij.dvcs.repo.Repository):I
+- pf:getBranchText(com.intellij.vcs.branch.BranchData):java.lang.String
+- pf:getBranchTooltipText(com.intellij.vcs.branch.BranchData):java.lang.String
+- pf:getCurrentBranch(com.intellij.dvcs.repo.Repository):com.intellij.vcs.branch.BranchData
+- p:getIcon():javax.swing.Icon
 - getNodeFilePath():com.intellij.openapi.vcs.FilePath
-- getSortWeight():I
 - getTextPresentation():java.lang.String
-- render(com.intellij.openapi.vcs.changes.ui.ChangesBrowserNodeRenderer,Z,Z,Z):V
 f:com.intellij.dvcs.ui.RepositoryChangesBrowserNode$Companion
 - f:getColorManager(com.intellij.openapi.project.Project):com.intellij.vcs.log.ui.VcsLogColorManager
-- f:getRepositoryIcon(com.intellij.dvcs.repo.Repository,com.intellij.vcs.log.ui.VcsLogColorManager):com.intellij.util.ui.ColorIcon
-- bs:getRepositoryIcon$default(com.intellij.dvcs.ui.RepositoryChangesBrowserNode$Companion,com.intellij.dvcs.repo.Repository,com.intellij.vcs.log.ui.VcsLogColorManager,I,java.lang.Object):com.intellij.util.ui.ColorIcon
 f:com.intellij.dvcs.ui.RepositoryComboboxListCellRenderer
 - com.intellij.ui.SimpleListCellRenderer
 - <init>():V

@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -39,7 +39,7 @@
     <orderEntry type="module" module-name="intellij.platform.uast" />
     <orderEntry type="module" module-name="intellij.kotlin.uast" />
     <orderEntry type="module" module-name="intellij.kotlin.gradle.gradle" scope="RUNTIME" />
-    <orderEntry type="module" module-name="kotlin.test-framework" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.testFramework" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.util" />
     <orderEntry type="module" module-name="kotlin.refactorings.common" />
     <orderEntry type="module" module-name="intellij.kotlin.base.analysis.utils" />

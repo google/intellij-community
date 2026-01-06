@@ -4,6 +4,7 @@ package com.intellij.psi.formatter.java;
 import com.intellij.formatting.*;
 import com.intellij.formatting.alignment.AlignmentStrategy;
 import com.intellij.lang.ASTNode;
+import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
@@ -16,7 +17,6 @@ import com.intellij.psi.formatter.java.wrap.ReservedWrapsProvider;
 import com.intellij.psi.impl.source.SourceTreeToPsiMap;
 import com.intellij.psi.impl.source.codeStyle.ShiftIndentInsideHelper;
 import com.intellij.psi.impl.source.tree.*;
-import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
 import com.intellij.psi.impl.source.tree.java.ClassElement;
 import com.intellij.psi.javadoc.PsiMarkdownCodeBlock;
 import com.intellij.psi.jsp.JspClassLevelDeclarationStatementType;
@@ -198,11 +198,11 @@ public abstract class AbstractJavaBlock extends AbstractBlock implements JavaBlo
     if (isStatement(child, child.getTreeParent())) {
       return new CodeBlockBlock(child, wrap, alignment, actualIndent, settings, javaSettings, myFormattingMode);
     }
-    if (!isBuildIndentsOnly() &&
-        child instanceof PsiComment &&
-        child instanceof PsiLanguageInjectionHost &&
-        InjectedLanguageUtil.hasInjections((PsiLanguageInjectionHost)child)) {
-      return new CommentWithInjectionBlock(child, wrap, alignment, indent, settings, javaSettings, formattingMode);
+    if (!isBuildIndentsOnly() && child instanceof PsiComment && child instanceof PsiLanguageInjectionHost psiLanguageInjectionHost) {
+      InjectedLanguageManager injectedLanguageManager = InjectedLanguageManager.getInstance(childPsi.getProject());
+      if (injectedLanguageManager.getInjectedPsiFiles(psiLanguageInjectionHost) != null) {
+        return new CommentWithInjectionBlock(child, wrap, alignment, indent, settings, javaSettings, formattingMode);
+      }
     }
     if (child instanceof LeafElement || child instanceof PsiMarkdownCodeBlock) {
       if (child.getElementType() == JavaTokenType.C_STYLE_COMMENT) {
@@ -625,8 +625,8 @@ public abstract class AbstractJavaBlock extends AbstractBlock implements JavaBlo
                                   WrappingStrategy.DO_NOT_WRAP,
                                   mySettings.ALIGN_MULTILINE_PARENTHESIZED_EXPRESSION);
       }
-      else if (childType == JavaElementType.ENUM_CONSTANT && myNode instanceof ClassElement) {
-        child = processEnumBlock(result, child, ((ClassElement)myNode).findEnumConstantListDelimiterPlace());
+      else if (childType == JavaElementType.ENUM_CONSTANT && myNode instanceof ClassElement classElement) {
+        child = processEnumBlock(result, child, classElement.findEnumConstantListDelimiterPlace());
       }
       else if (mySettings.TERNARY_OPERATION_SIGNS_ON_NEXT_LINE && isTernaryOperationSign(child)) {
         child = processTernaryOperationRange(result, child, defaultWrap, childIndent);
@@ -1251,14 +1251,14 @@ public abstract class AbstractJavaBlock extends AbstractBlock implements JavaBlo
   }
 
   protected static @Nullable ASTNode getTreeNode(final Block block) {
-    if (block instanceof JavaBlock) {
-      return ((JavaBlock)block).getFirstTreeNode();
+    if (block instanceof JavaBlock javaBlock) {
+      return javaBlock.getFirstTreeNode();
     }
-    if (block instanceof LeafBlock) {
-      return ((LeafBlock)block).getTreeNode();
+    if (block instanceof LeafBlock leafBlock) {
+      return leafBlock.getTreeNode();
     }
-    if (block instanceof CStyleCommentBlock) {
-      return ((CStyleCommentBlock)block).getNode();
+    if (block instanceof CStyleCommentBlock commentBlock) {
+      return commentBlock.getNode();
     }
     return null;
   }
@@ -1286,8 +1286,8 @@ public abstract class AbstractJavaBlock extends AbstractBlock implements JavaBlo
   protected boolean isAfter(final int newChildIndex, final IElementType @NotNull [] elementTypes) {
     if (newChildIndex == 0) return false;
     final Block previousBlock = getSubBlocks().get(newChildIndex - 1);
-    if (!(previousBlock instanceof AbstractBlock)) return false;
-    final IElementType previousElementType = ((AbstractBlock)previousBlock).getNode().getElementType();
+    if (!(previousBlock instanceof AbstractBlock block)) return false;
+    final IElementType previousElementType = block.getNode().getElementType();
     return ArrayUtil.contains(previousElementType, elementTypes);
   }
 

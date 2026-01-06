@@ -153,7 +153,6 @@ class CombinedDiffViewer(
   init {
     blockState.addListener({ old, new -> changeSelection(old, new) }, this)
     blockListeners.listeners.add(blockListener)
-    selectDiffBlock(blockState.currentBlock, true)
 
     cs.launch {
       viewState.separatorState.collect { visible ->
@@ -190,7 +189,10 @@ class CombinedDiffViewer(
     }
 
     if (blockState.currentBlock == blockId) {
-      scrollToFirstChange(blockId, false, ScrollPolicy.SCROLL_TO_CARET)
+      if (newContent.viewer !is CombinedDiffLoadingBlock) {
+        selectDiffBlock(blockId, true)
+        scrollToFirstChange(blockId, false, ScrollPolicy.SCROLL_TO_CARET)
+      }
     }
   }
 
@@ -382,11 +384,19 @@ class CombinedDiffViewer(
     afterViewport: List<CombinedBlockId>,
     hidden: ArrayList<CombinedBlockId>,
   ) {
-    if (hidden.isNotEmpty()) {
-      blockListeners.multicaster.blocksHidden(hidden)
+    val currentBlock = blockState.currentBlock
+    val totalVisible = getBlocksAroundCurrent(currentBlock)
+
+    val blocksToHide =
+      hidden.filter { it !in totalVisible } +
+      inViewport.filter { it !in totalVisible } +
+      beforeViewport.filter { it !in totalVisible } +
+      afterViewport.filter { it !in totalVisible }
+
+    if (blocksToHide.isNotEmpty()) {
+      blockListeners.multicaster.blocksHidden(blocksToHide)
     }
 
-    val totalVisible = inViewport + afterViewport + beforeViewport
     if (totalVisible.isNotEmpty()) {
       blockListeners.multicaster.blocksVisible(totalVisible)
       if (context.getUserData(DISABLE_LOADING_BLOCKS) == true) {
@@ -400,6 +410,15 @@ class CombinedDiffViewer(
         updateBlockContent(content)
       }
     }
+  }
+
+  private fun getBlocksAroundCurrent(currentBlock: CombinedBlockId): List<CombinedBlockId> {
+    val delta = CombinedDiffRegistry.getPreloadedBlocksCount()
+    val currentIndex = blockState.indexOf(currentBlock)
+    val startIndex = maxOf(0, currentIndex - delta)
+    val endIndex = minOf(blockState.blocksCount - 1, currentIndex + delta)
+
+    return (startIndex..endIndex).mapNotNull { blockState.getOrNull(it) }
   }
 
   private fun updateStickyHeader() {

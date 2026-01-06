@@ -32,8 +32,8 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
     return DefaultUiPluginManagerController.resetSession(sessionId, removeSession)
   }
 
-  override suspend fun isModified(sessionId: String): Boolean {
-    return DefaultUiPluginManagerController.isModified(sessionId)
+  override suspend fun isModified(): Boolean {
+    return DefaultUiPluginManagerController.isModified()
   }
 
   override suspend fun setEnableStateForDependencies(sessionId: String, descriptorIds: Set<PluginId>, enable: Boolean): SetEnabledStateResult {
@@ -51,7 +51,7 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
     }
   }
 
-  override suspend fun installOrUpdatePlugin(sessionId: String, descriptor: PluginDto, updateDescriptor: PluginDto?, installSource: FUSEventSource?, customRepoPlugins: List<PluginDto>): InstallPluginResult {
+  override suspend fun installOrUpdatePlugin(sessionId: String, descriptor: PluginDto, updateDescriptor: PluginDto?, installSource: FUSEventSource?, customRepoPlugins: List<PluginDto>?): InstallPluginResult {
     return installPlugin(sessionId) { enabler ->
       DefaultUiPluginManagerController.installOrUpdatePlugin(sessionId,
                                                              null,
@@ -64,7 +64,7 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
     }
   }
 
-  override suspend fun continueInstallation(sessionId: String, pluginId: PluginId, enableRequiredPlugins: Boolean, allowInstallWithoutRestart: Boolean, customRepoPlugins: List<PluginDto>): InstallPluginResult {
+  override suspend fun continueInstallation(sessionId: String, pluginId: PluginId, enableRequiredPlugins: Boolean, allowInstallWithoutRestart: Boolean, customRepoPlugins: List<PluginDto>?): InstallPluginResult {
     return installPlugin(sessionId) { enabler ->
       DefaultUiPluginManagerController.continueInstallation(sessionId,
                                                             pluginId,
@@ -104,9 +104,9 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
     return DefaultUiPluginManagerController.updatePluginDependencies(sessionId)
   }
 
-  override suspend fun applyPluginSession(sessionId: String, projectId: ProjectId?): ApplyPluginsStateResult {
+  override suspend fun apply(projectId: ProjectId?): ApplyPluginsStateResult {
     return withContext(Dispatchers.EDT) {
-      DefaultUiPluginManagerController.applySession(sessionId, null, projectId?.findProjectOrNull())
+      DefaultUiPluginManagerController.apply(project = projectId?.findProjectOrNull())
     }
   }
 

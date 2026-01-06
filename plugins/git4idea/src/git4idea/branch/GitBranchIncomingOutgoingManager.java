@@ -2,6 +2,7 @@
 package git4idea.branch;
 
 import com.intellij.concurrency.JobScheduler;
+import com.intellij.dvcs.repo.RepositoryExtKt;
 import com.intellij.externalProcessAuthHelper.AuthenticationMode;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
@@ -17,7 +18,7 @@ import com.intellij.openapi.util.NotNullLazyValue;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.platform.vcs.impl.shared.rpc.RepositoryId;
+import com.intellij.platform.vcs.impl.shared.RepositoryId;
 import com.intellij.util.Alarm;
 import com.intellij.util.EnvironmentUtil;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
@@ -177,7 +178,7 @@ public final class GitBranchIncomingOutgoingManager implements GitRepositoryChan
         Integer outgoing = getOutgoingFor(r, localBranch);
         if (incoming == null && outgoing == null) return null;
 
-        return new Pair<>(r.getRpcId(), new GitInOutCountersInRepo(incoming, outgoing));
+        return new Pair<>(RepositoryExtKt.repositoryId(r), new GitInOutCountersInRepo(incoming, outgoing));
       })
       .filter(Objects::nonNull)
       .collect(Collectors.toMap(pair -> pair.first, pair -> pair.second));
@@ -310,7 +311,7 @@ public final class GitBranchIncomingOutgoingManager implements GitRepositoryChan
 
   private static @NotNull Map<RepositoryId, Map<String, Integer>> mapState(@NotNull Map<GitRepository, Map<GitLocalBranch, Integer>> projectState) {
     var result = new HashMap<RepositoryId, Map<String, Integer>>();
-    projectState.forEach((repo, branches) -> result.put(repo.getRpcId(), remapLocalBranchToName(branches)));
+    projectState.forEach((repo, branches) -> result.put(RepositoryExtKt.repositoryId(repo), remapLocalBranchToName(branches)));
     return result;
   }
 

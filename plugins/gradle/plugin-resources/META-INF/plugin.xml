@@ -76,7 +76,6 @@
 
     <projectResolve implementation="org.jetbrains.plugins.gradle.service.project.BaseResolverExtension"/>
     <projectResolve implementation="org.jetbrains.plugins.gradle.service.project.CommonGradleProjectResolverExtension"/>
-    <projectResolve implementation="org.jetbrains.plugins.gradle.service.telemetry.GradleOpenTelemetryResolverExtension"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.UnsupportedGradleVersionIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.UnsupportedGradleJvmByIdeaIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.IncompatibleGradleJvmAndGradleIssueChecker"/>
@@ -259,9 +258,8 @@
 
     <!--advanced settings-->
     <advancedSetting id="gradle.run.using.gradle" default="true" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
-    <advancedSetting id="gradle.download.sources" default="false" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
+    <advancedSetting id="gradle.download.sources" default="true" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
     <advancedSetting id="gradle.attach.scripts.dependencies.sources" default="false" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
-    <advancedSetting id="gradle.download.sources.automatically" default="true" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
     <experimentalFeature id="gradle.parallel.model.fetch" percentOfUsers="0">
       <description>
         Enable Building of models in parallel during Gradle project sync.

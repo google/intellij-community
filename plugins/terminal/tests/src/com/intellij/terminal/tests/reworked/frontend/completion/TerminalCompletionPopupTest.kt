@@ -1,13 +1,17 @@
 package com.intellij.terminal.tests.reworked.frontend.completion
 
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
+import com.intellij.terminal.tests.reworked.frontend.completion.TerminalCompletionPopupTest.Companion.MAX_ITEMS_COUNT
 import com.intellij.terminal.tests.reworked.util.TerminalTestUtil.update
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.Dispatchers
 import org.assertj.core.api.Assertions.assertThat
+import org.jetbrains.plugins.terminal.block.completion.TerminalCommandCompletionShowingMode
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpec
+import org.jetbrains.plugins.terminal.block.completion.spec.ShellCompletionSuggestion
 import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -25,20 +29,41 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
       subcommand("stop")
       subcommand("set")
       subcommand("sync")
-      subcommand("show")
+      subcommand("show") {
+        argument {
+          optional()
+          suggestions("roots", "files", "statuses")
+        }
+      }
 
       subcommand("start") {
         argument {
-          isOptional = true
+          optional()
           suggestions("platform/", "platform-ui/", "shared\\", "shared-ui\\")
         }
       }
     }
 
     subcommands {
-      subcommand("build")
       subcommand("bind")
       subcommand("branch")
+      subcommand("build") {
+        argument {
+          suggestions {
+            val count = MAX_ITEMS_COUNT + 10
+            val items = buildList {
+              repeat(count) {
+                add("ab$it")
+                add("ac$it")
+              }
+            }
+
+            val abPriority = ShellCompletionSuggestion("ab") { priority(100) }
+            val acPriority = ShellCompletionSuggestion("ac") { priority(100) }
+            listOf(abPriority, acPriority) + items.map { ShellCompletionSuggestion(it) }
+          }
+        }
+      }
     }
   }
 
@@ -120,8 +145,8 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
     val startResult = fixture.getLookupElements().map { it.lookupString }
     assertSameElements(startResult, listOf("start", "status", "stop"))
     fixture.pressKey(VK_LEFT)
-    assertSameElements(fixture.getLookupElements().map { it.lookupString },
-                       listOf("set", "show", "start", "status", "stop", "sync"))
+    fixture.awaitLookupElementsEqual("set", "show", "start", "status", "stop", "sync")
+
     fixture.pressKey(VK_RIGHT)
     assertSameElements(fixture.getLookupElements().map { it.lookupString }, startResult)
   }
@@ -145,8 +170,48 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
                        listOf("start", "status", "stop"))
 
     fixture.pressKey(VK_BACK_SPACE)
-    assertSameElements(fixture.getLookupElements().map { it.lookupString },
-                       listOf("set", "show", "start", "status", "stop", "sync"))
+    fixture.awaitLookupElementsEqual("set", "show", "start", "status", "stop", "sync")
+  }
+
+  @Test
+  fun `test completion popup is reopened on any prefix change when suggestions count reach the limit`() = timeoutRunBlocking(context = Dispatchers.EDT) {
+    val fixture = createFixture()
+
+    fixture.type("test_cmd build a")
+    fixture.callCompletionPopup()
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && !items.all { it.startsWith("ab") }
+    }
+
+    // Popup should reopen with items for the "ab" prefix
+    fixture.type("b")
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && items.all { it.startsWith("ab") }
+    }
+
+    // Popup should reopen with items for the "a" prefix
+    fixture.pressKey(VK_LEFT)
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && !items.all { it.startsWith("ab") }
+    }
+
+    // Popup should reopen with items for the "ab" prefix
+    fixture.pressKey(VK_RIGHT)
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && items.all { it.startsWith("ab") }
+    }
+
+    // Popup should reopen with items for the "a" prefix
+    fixture.pressKey(VK_BACK_SPACE)
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && !items.all { it.startsWith("ab") }
+    }
+
+    // Popup should reopen with items for the "ac" prefix
+    fixture.type("c")
+    fixture.awaitLookupElementsSatisfy { items ->
+      items.size == MAX_ITEMS_COUNT_AFTER_TRIM && items.all { it.startsWith("ac") }
+    }
   }
 
   @Test
@@ -157,10 +222,10 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
     fixture.callCompletionPopup()
 
     fixture.pressKey(VK_BACK_SPACE)
-    assertSameElements(fixture.getLookupElements().map { it.lookupString },
-                       listOf("set", "show", "start", "status", "stop", "sync"))
+    fixture.awaitLookupElementsEqual("set", "show", "start", "status", "stop", "sync")
 
     fixture.pressKey(VK_BACK_SPACE)
+    fixture.awaitPendingRequestsProcessed()
     assertFalse(fixture.isLookupActive())
   }
 
@@ -172,10 +237,24 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
     fixture.callCompletionPopup()
 
     fixture.pressKey(VK_LEFT)
-    assertSameElements(fixture.getLookupElements().map { it.lookupString },
-                       listOf("set", "show", "start", "status", "stop", "sync"))
+    fixture.awaitLookupElementsEqual("set", "show", "start", "status", "stop", "sync")
 
     fixture.pressKey(VK_LEFT)
+    fixture.awaitPendingRequestsProcessed()
+    assertFalse(fixture.isLookupActive())
+  }
+
+  @Test
+  fun `test completion popup closes on pressing left when completion called on empty prefix`() = timeoutRunBlocking(context = Dispatchers.EDT) {
+    val fixture = createFixture()
+
+    fixture.type("test_cmd show ")
+    fixture.callCompletionPopup()
+    assertSameElements(fixture.getLookupElements().map { it.lookupString },
+                       listOf("roots", "files", "statuses"))
+
+    fixture.pressKey(VK_LEFT)
+    fixture.awaitPendingRequestsProcessed()
     assertFalse(fixture.isLookupActive())
   }
 
@@ -189,6 +268,19 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
                        listOf("start", "status", "stop"))
 
     fixture.type("x")
+    assertFalse(fixture.isLookupActive())
+  }
+
+  @Test
+  fun `test completion popup closes when single item is fully typed`() = timeoutRunBlocking(context = Dispatchers.EDT) {
+    val fixture = createFixture()
+
+    fixture.type("test_cmd st")
+    fixture.callCompletionPopup()
+    assertSameElements(fixture.getLookupElements().map { it.lookupString },
+                       listOf("start", "status", "stop"))
+
+    fixture.type("art")
     assertFalse(fixture.isLookupActive())
   }
 
@@ -247,20 +339,6 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
   }
 
   @Test
-  fun `test TerminalCommandCompletion#COMPLETING_COMMAND_KEY is set in lookup when completion popup is shown`() = timeoutRunBlocking(context = Dispatchers.EDT) {
-    val fixture = createFixture()
-
-    fixture.type("test_cmd st")
-    fixture.callCompletionPopup()
-
-    val lookup = fixture.getActiveLookup() ?: error("No active lookup")
-    assertThat(lookup.items).isNotEmpty
-    assertThat(lookup.getUserData(TerminalCommandCompletion.COMPLETING_COMMAND_KEY))
-      .isEqualTo("test_cmd st")
-    Unit
-  }
-
-  @Test
   fun `test TerminalCommandCompletion#LAST_SELECTED_ITEM_KEY is updated in the lookup on selected item change`() = timeoutRunBlocking(context = Dispatchers.EDT) {
     val fixture = createFixture()
 
@@ -298,7 +376,20 @@ class TerminalCompletionPopupTest : BasePlatformTestCase() {
   private suspend fun createFixture(): TerminalCompletionFixture {
     val fixture = TerminalCompletionFixture(project, testRootDisposable)
     fixture.mockTestShellCommand(testCommandSpec)
+    fixture.setCompletionOptions(
+      showPopupAutomatically = false,
+      showingMode = TerminalCommandCompletionShowingMode.ONLY_PARAMETERS,
+      parentDisposable = testRootDisposable
+    )
     fixture.awaitShellIntegrationFeaturesInitialized()
     return fixture
+  }
+
+  companion object {
+    /** Max items count to be shown in lookup */
+    private val MAX_ITEMS_COUNT = Registry.intValue("ide.completion.variant.limit")
+
+    /** Once [MAX_ITEMS_COUNT] limit is reached, lookup trims half of the items and this value becomes true max size */
+    private val MAX_ITEMS_COUNT_AFTER_TRIM = MAX_ITEMS_COUNT / 2
   }
 }

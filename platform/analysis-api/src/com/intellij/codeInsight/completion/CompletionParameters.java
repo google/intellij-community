@@ -72,6 +72,7 @@ public final class CompletionParameters implements BaseCompletionParameters {
     return myPosition;
   }
 
+  @Override
   public @Nullable PsiElement getOriginalPosition() {
     return myOriginalFile.findElementAt(myPosition.getTextRange().getStartOffset());
   }
@@ -81,6 +82,7 @@ public final class CompletionParameters implements BaseCompletionParameters {
     return myOriginalFile;
   }
 
+  @Override
   public @NotNull CompletionType getCompletionType() {
     return myCompletionType;
   }

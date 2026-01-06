@@ -22,6 +22,7 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionManagerEx;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.*;
+import com.intellij.openapi.application.impl.InternalUICustomization;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
 import com.intellij.openapi.diagnostic.Logger;
@@ -44,6 +45,7 @@ import com.intellij.openapi.editor.impl.event.MarkupModelListener;
 import com.intellij.openapi.editor.impl.stickyLines.StickyLinesManager;
 import com.intellij.openapi.editor.impl.stickyLines.StickyLinesModel;
 import com.intellij.openapi.editor.impl.stickyLines.VisualStickyLines;
+import com.intellij.openapi.editor.impl.stickyLines.ui.StickyLineColors;
 import com.intellij.openapi.editor.impl.stickyLines.ui.StickyLineShadowBorder;
 import com.intellij.openapi.editor.impl.stickyLines.ui.StickyLineShadowPainter;
 import com.intellij.openapi.editor.impl.stickyLines.ui.StickyLinesPanel;
@@ -99,7 +101,6 @@ import kotlin.Unit;
 import org.intellij.lang.annotations.JdkConstants;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.*;
-
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.border.Border;
@@ -133,6 +134,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import kotlinx.coroutines.Job;
 
 
 public final class EditorImpl extends UserDataHolderBase implements EditorEx, HighlighterClient, Queryable, Dumpable,
@@ -1155,9 +1157,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
     myFractionalMetricsHintValue = UISettings.getEditorFractionalMetricsHint();
 
-    if (myStickyLinesManager != null) {
-      myStickyLinesManager.reinitSettings();
-    }
+    reinitStickyLines();
   }
 
   @Contract("_->fail")
@@ -1207,6 +1207,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         Disposer.dispose(myAdEditorModel);
       }
       clearCaretThread();
+      if (caretAnimationJob != null) {
+        caretAnimationJob.cancel(null);
+        caretAnimationJob = null;
+      }
 
       myFocusListeners.clear();
       myMouseListeners.clear();
@@ -2310,6 +2314,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myHeaderPanel.revalidate();
     myHeaderPanel.repaint();
 
+    InternalUICustomization customization = InternalUICustomization.getInstance();
+    if (customization != null) {
+      customization.updateEditorHeader(myHeaderPanel);
+    }
+
     if (SystemInfo.isMac) {
       TouchbarSupport.onUpdateEditorHeader(this);
     }
@@ -3186,7 +3195,30 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @ApiStatus.Internal
   final ConcurrentHashMap<Caret, Point2D> lastPosMap = new ConcurrentHashMap<>();
 
+  @ApiStatus.Internal
+  @Nullable
+  Job caretAnimationJob = null;
+
+  @ApiStatus.Internal
+  double caretAnimationElapsed;
+
   private final @NotNull EditorCaretMoveService caretMoveService = EditorCaretMoveService.getInstance();
+
+  @ApiStatus.Internal
+  void pauseBlinking() {
+    synchronized (caretRepaintService) {
+      caretRepaintService.setEditor(this);
+      caretRepaintService.pause();
+    }
+  }
+
+  @ApiStatus.Internal
+  void resumeBlinking() {
+    synchronized (caretRepaintService) {
+      caretRepaintService.setEditor(this);
+      caretRepaintService.restart();
+    }
+  }
 
   private void setCursorPosition() {
     synchronized (caretMoveService) {
@@ -3296,11 +3328,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     public final @Nullable Caret myCaret;
     public final boolean myIsRtl;
 
-    CaretRectangle(@NotNull Point2D point, float width, @Nullable Caret caret, boolean isRtl) {
+    @ApiStatus.Internal
+    public final float myOpacity;
+
+    CaretRectangle(@NotNull Point2D point, float width, @Nullable Caret caret, boolean isRtl, float opacity) {
       myPoint = point;
       myWidth = Math.max(width, 2);
       myCaret = caret;
       myIsRtl = isRtl;
+      myOpacity = opacity;
     }
 
     Point2D getPoint() {
@@ -3309,10 +3345,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   final class CaretCursor {
-    private CaretRectangle @NotNull [] myLocations = {new CaretRectangle(new Point(0, 0), 0, null, false)};
+    private CaretRectangle @NotNull [] myLocations = {new CaretRectangle(new Point(0, 0), 0, null, false, 1.0f)};
     private boolean myEnabled = true;
 
     private boolean myIsShown;
+    private float myBlinkOpacity = 1.0f;
     private long myStartTime;
 
     public boolean isEnabled() {
@@ -3353,6 +3390,18 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
     }
 
+    float getBlinkOpacity() {
+      synchronized (caretRepaintService) {
+        return myBlinkOpacity;
+      }
+    }
+
+    void setBlinkOpacity(float opacity) {
+      synchronized (caretRepaintService) {
+        myBlinkOpacity = opacity;
+      }
+    }
+
     long getStartTime() {
       synchronized (caretRepaintService) {
         return myStartTime;
@@ -3389,6 +3438,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
       return myLocations;
     }
+  }
+
+  @ApiStatus.Internal
+  public float getCaretBlinkOpacity() {
+    return myCaretCursor.getBlinkOpacity();
   }
 
   private final class ScrollingTimer {
@@ -5478,18 +5532,31 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 
+  void reinitStickyLines() {
+    if (myStickyLinesManager != null) {
+      myStickyLinesManager.reinitSettings();
+    }
+  }
+
   private @Nullable StickyLinesManager createStickyLinesPanel() {
     if (myProject != null && myKind == EditorKind.MAIN_EDITOR && !isMirrored()) {
       StickyLinesModel stickyModel = StickyLinesModel.getModel(myEditorFilteringMarkupModel.getDelegate());
       VisualStickyLines visualStickyLines = new VisualStickyLines(this, stickyModel);
-      StickyLineShadowPainter shadowPainter = new StickyLineShadowPainter();
-      StickyLineShadowBorder border = new StickyLineShadowBorder(this, shadowPainter);
-      StickyLinesPanel stickyPanel = new StickyLinesPanel(this, visualStickyLines, border);
+      StickyLineColors colors = new StickyLineColors(getColorsScheme());
+      StickyLinesPanel stickyPanel = new StickyLinesPanel(
+        this,
+        visualStickyLines,
+        new StickyLineShadowBorder(
+          this,
+          colors,
+          new StickyLineShadowPainter(colors)
+        )
+      );
       StickyLinesManager stickyManager = new StickyLinesManager(
         this,
         stickyModel,
         stickyPanel,
-        shadowPainter,
+        colors,
         visualStickyLines,
         myDisposable
       );

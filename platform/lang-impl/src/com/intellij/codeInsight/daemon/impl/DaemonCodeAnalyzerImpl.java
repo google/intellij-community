@@ -563,9 +563,9 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
     CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
 
-    waitForUpdateFileStatusBackgroundQueueInTests(); // update the file status map before prohibiting its modifications
     PsiDocumentManager.getInstance(myProject).commitAllDocuments();
     PsiConsistencyAssertions.assertNoFileTextMismatch(psiFile, editor.getDocument(), null);
+    waitForUpdateFileStatusBackgroundQueueInTests(); // update the file status map before prohibiting its modifications
     FileStatusMap fileStatusMap = getFileStatusMap();
     fileStatusMap.runAllowingDirt(canChangeDocument, () -> {
       for (int ignoreId : passesToIgnore) {
@@ -906,7 +906,9 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
 
   @ApiStatus.Internal
   @VisibleForTesting
+  @RequiresEdt
   public boolean isAllAnalysisFinished() {
+    ThreadingAssertions.assertEventDispatchThread();
     if (myDisposed) {
       return false;
     }
@@ -914,9 +916,17 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     synchronized (this) {
       updateCompleted = myUpdateRunnableFuture.isDone();
     }
+    List<Document> documents = ContainerUtil.mapNotNull(getSelectedEditors(), fe -> {
+      Editor editor = fe instanceof TextEditor te ? te.getEditor() : null;
+      VirtualFile virtualFile = getVirtualFile(fe);
+      Document document = editor == null
+                          ? virtualFile == null ? null : FileDocumentManager.getInstance().getCachedDocument(virtualFile)
+                          : editor.getDocument();
+      return document;
+    });
     return
       !PsiDocumentManager.getInstance(myProject).hasUncommitedDocuments() &&
-      myFileStatusMap.allDirtyScopesAreNull() &&
+      myFileStatusMap.allDirtyScopesAreNullFor(documents) &&
       updateCompleted;
   }
 
@@ -1353,6 +1363,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
   }
 
   // return update outcome for debug
+  @RequiresEdt
   private @NotNull @NonNls String runUpdate() {
     ThreadingAssertions.assertEventDispatchThread();
     synchronized (this) {
@@ -1686,7 +1697,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     }
     DaemonProgressIndicator oldProgress = myUpdateProgress.put(fileEditor, progress);
     if (oldProgress != null && !oldProgress.isCanceled()) {
-      oldProgress.cancel(new Throwable(), "Old indicator: " + oldProgress);
+      cancelIndicator(oldProgress, true, new Throwable(), "daemon restarted for existing indicator: " + fileEditor);
     }
     if (PassExecutorService.LOG.isDebugEnabled()) {
       PassExecutorService.log(progress, null, "createUpdateProgress(" + fileEditor + "); oldProgress=" + oldProgress);
@@ -1731,6 +1742,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx
     return Map.copyOf(myUpdateProgress);
   }
 
+  @RequiresEdt
   private @NotNull Collection<? extends FileEditor> getSelectedEditors() {
     ThreadingAssertions.assertEventDispatchThread();
     // editors in modal context

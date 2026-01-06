@@ -62,7 +62,7 @@ internal class BackendChangesTreeCompatibilityProvider : ChangesTreeCompatibilit
     return VcsImplUtil.findValidParentAccurately(filePath)
   }
 
-  override fun acceptIgnoredFilesDrop(project: Project, dragOwner: ChangeListOwner, dragBean: ChangeListDragBean) {
+  override fun acceptIgnoredFilesDrop(project: Project, dragBean: ChangeListDragBean) {
     val tree = dragBean.sourceComponent as? Tree ?: return
     val vcs = dragBean.unversionedFiles.firstNotNullOfOrNull { file -> getVcsFor(project, file) } ?: return
 

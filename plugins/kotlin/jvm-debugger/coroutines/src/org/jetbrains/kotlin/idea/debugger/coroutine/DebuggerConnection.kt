@@ -9,10 +9,8 @@ import com.intellij.execution.configurations.RunConfigurationBase
 import com.intellij.execution.ui.RunnerLayoutUi
 import com.intellij.execution.ui.layout.PlaceInGrid
 import com.intellij.execution.ui.layout.impl.RunnerLayoutUiImpl
-import com.intellij.idea.AppMode
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration
 import com.intellij.openapi.project.Project
@@ -26,8 +24,6 @@ import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerManagerListener
 import com.intellij.xdebugger.impl.XDebugSessionImpl
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.jetbrains.kotlin.idea.debugger.coroutine.util.CreateContentParamsProvider
 import org.jetbrains.kotlin.idea.debugger.coroutine.util.logger
 import org.jetbrains.kotlin.idea.debugger.coroutine.view.CoroutineView
@@ -64,26 +60,21 @@ class DebuggerConnection(
 
     override fun processStarted(debugProcess: XDebugProcess) {
         val session = debugProcess.session as? XDebugSessionImpl ?: return
-        session.coroutineScope.launch(Dispatchers.EDT) {
-            if (!AppMode.isRemoteDevHost()) {
-                // in monolith, the tab may be created later
-                // in remdev, the tab does not exist on the backend, but we can add a LUXed tab
-                session.sessionTabDeferred.await()
-            }
+        session.runWhenUiReady { ui ->
             if (debugProcess is JavaDebugProcess &&
                 !isDisposed &&
                 coroutinesPanelShouldBeShown() &&
-                !coroutinePanelIsRegistered(session)
+                !coroutinePanelIsRegistered(ui)
             ) {
-                registerXCoroutinesPanel(session)?.let {
+                registerXCoroutinesPanel(session, ui)?.let {
                     Disposer.register(this@DebuggerConnection, it)
                 }
             }
         }
     }
 
-    private fun coroutinePanelIsRegistered(session: XDebugSession): Boolean {
-        val ui = session.ui as? RunnerLayoutUiImpl ?: return false
+    private fun coroutinePanelIsRegistered(ui: RunnerLayoutUi): Boolean {
+        if (ui !is RunnerLayoutUiImpl) return false
         val contentUi = ui.contentUI
         val content = invokeAndWaitIfNeeded {
             contentUi.findContent(CoroutineDebuggerContentInfo.XCOROUTINE_THREADS_CONTENT)
@@ -97,8 +88,7 @@ class DebuggerConnection(
         }
     }
 
-    private fun registerXCoroutinesPanel(session: XDebugSession): Disposable? {
-        val ui = session.ui ?: return null
+    private fun registerXCoroutinesPanel(session: XDebugSession, ui: RunnerLayoutUi): Disposable? {
         val javaDebugProcess = session.debugProcess as? JavaDebugProcess ?: return null
         val coroutineThreadView = CoroutineView(project, javaDebugProcess)
         val framesContent: Content = createContent(ui, coroutineThreadView)

@@ -309,11 +309,8 @@
 
     "HelpTooltip": {
       "descriptionSizeDelta": {
-        "os.linux": -2,
+        "os.linux": -1,
         "os.mac": -1
-      },
-      "fontSizeDelta": {
-        "os.linux": -2
       },
       "mouseCursorOffset": {
         "os.mac": 17
@@ -1185,6 +1182,7 @@
     },
     
     "Recap": {
+      "ijnext": "#55339C",
       "cardBackground": "#2B2B2B",
       "cardBorderColor": "#2B2B2B",
       "cardHeaderTitle": "#D3D3D3",
@@ -1195,7 +1193,10 @@
       "chroniclesBorderColor": "#3D3F41",
       "chroniclesBackgroundHovered": "#5E6771",
       "chroniclesForeground": "#DFE1E5",
-      "chroniclesForegroundGreyed": "#868A91"
+      "chroniclesForegroundGreyed": "#868A91",
+      "errorBackground": "#3D3223",
+      "errorBorder": "#5E4D33",
+      "errorForeground": "#DFE1E5"
     },
 
     "OpenTelemetry": {

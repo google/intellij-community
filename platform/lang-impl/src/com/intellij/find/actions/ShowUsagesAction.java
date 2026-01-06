@@ -51,7 +51,6 @@ import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogPanel;
-import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.Splitter;
 import com.intellij.openapi.ui.popup.*;
 import com.intellij.openapi.ui.popup.util.PopupUtil;
@@ -1083,7 +1082,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       }.installOn(table);
 
       builder.setAutoselectOnMouseMove(false).setCloseOnEnter(false).
-        registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), __ -> itemChoseCallback.run());
+        registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), __ -> WriteIntentReadAction.run(itemChoseCallback));
 
       Runnable updatePreviewRunnable = () -> {
         if (popupRef.get().isDisposed()) return;
@@ -1563,7 +1562,9 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
             @Override
             protected void hyperlinkActivated(@NotNull HyperlinkEvent e) {
               if (FIND_OPTIONS_HREF_TARGET.equals(e.getDescription())) {
-                showDialogAndRestart(parameters, actionHandler);
+                WriteIntentReadAction.run(() -> {
+                  showDialogAndRestart(parameters, actionHandler);
+                });
               }
             }
           };

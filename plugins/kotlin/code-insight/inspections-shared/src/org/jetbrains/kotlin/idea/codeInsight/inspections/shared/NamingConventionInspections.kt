@@ -121,7 +121,7 @@ class NamingConventionInspectionSettings(
         if (name != null && nameIdentifier != null && nameRegex?.matches(name) == false && additionalCheck()) {
             val message = getNameMismatchMessage(name, rules)
             @NlsSafe
-            val descriptionTemplate = "$entityName ${KotlinBundle.message("text.name")} <code>#ref</code> $message #loc"
+            val descriptionTemplate = "$entityName ${KotlinBundle.message("text.name")} <code>#ref</code> $message"
             holder.registerProblem(
                 element.nameIdentifier!!,
                 descriptionTemplate,
@@ -222,7 +222,7 @@ class FunctionNameInspection : NamingConventionInspection(
             if (function.hasModifier(KtTokens.OVERRIDE_KEYWORD)) {
                 return@namedFunctionVisitor
             }
-            val virtualFile = function.containingFile.virtualFile
+            val virtualFile = function.containingFile.virtualFile ?: return@namedFunctionVisitor
             if (!ProjectFileIndex.getInstance(function.project).isInTestSource(virtualFile)) {
                 verifyName(function, holder) { !function.isFactoryFunction() }
             }
@@ -270,7 +270,7 @@ class TestFunctionNameInspection : NamingConventionInspection(
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
         return namedFunctionVisitor { function ->
-            val virtualFile = function.containingFile.virtualFile
+            val virtualFile = function.containingFile.virtualFile ?: return@namedFunctionVisitor
             if (!ProjectFileIndex.getInstance(function.project).isInTestSource(virtualFile)) {
                 return@namedFunctionVisitor
             }
@@ -466,9 +466,9 @@ private data class CheckResult(val errorMessage: String, val isForPart: Boolean)
     @NlsSafe
     fun toProblemTemplateString(): String {
         return KotlinBundle.message("package.name") + if (isForPart) {
-            " <code>#ref</code> ${KotlinBundle.message("text.part")} $errorMessage #loc"
+            " <code>#ref</code> ${KotlinBundle.message("text.part")} $errorMessage"
         } else {
-            " <code>#ref</code> $errorMessage #loc"
+            " <code>#ref</code> $errorMessage"
         }
     }
 }

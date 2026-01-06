@@ -1,5 +1,5 @@
-<idea-plugin visibility="internal">
-  <!-- editor-fold desc="Generated dependencies - do not edit manually" -->
+<idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.libraries.caffeine"/>
     <module name="intellij.libraries.cli.parser"/>
@@ -23,7 +23,10 @@
     <module name="intellij.libraries.miglayout.swing"/>
     <module name="intellij.libraries.oro.matcher"/>
     <module name="intellij.libraries.pty4j"/>
+    <module name="intellij.libraries.rd.core"/>
+    <module name="intellij.libraries.rd.swing"/>
     <module name="intellij.libraries.stream"/>
+    <module name="intellij.libraries.swingx"/>
     <module name="intellij.libraries.velocity"/>
     <module name="intellij.libraries.xstream"/>
     <module name="intellij.libraries.xz"/>
@@ -43,7 +46,7 @@
     <module name="intellij.platform.projectModel"/>
     <module name="intellij.platform.projectModel.impl"/>
   </dependencies>
-  <!-- end editor-fold -->
+  <!-- endregion -->
 
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.canBeSelectedInProjectPaneProvider"
@@ -58,5 +61,17 @@
       implementation="com.intellij.ide.projectView.impl.canBeSelected.ArchiveCanBeSelectedInProjectPaneProvider"/>
     <canBeSelectedInProjectPaneProvider
       implementation="com.intellij.ide.projectView.impl.canBeSelected.ScratchCanBeSelectedInProjectPaneProvider"/>
+
+    <completion.frontendFriendlyPrefixMatcher target="com.intellij.codeInsight.completion.command.LimitedToleranceMatcher"
+                                              converter="com.intellij.codeInsight.completion.command.LimitedToleranceMatcher$Converter"
+                                              descriptor="com.intellij.codeInsight.completion.command.LimitedToleranceMatcher$Descriptor"/>
+
+    <completion.frontendFriendlyPrefixMatcher target="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher"
+                                              converter="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$Converter"
+                                              descriptor="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$Descriptor"/>
+
+    <completion.frontendFriendlyPrefixMatcher target="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$AutoRestarting"
+                                              converter="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$AutoRestarting$Converter"
+                                              descriptor="com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$AutoRestarting$Descriptor"/>
   </extensions>
 </idea-plugin>

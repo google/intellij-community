@@ -38,7 +38,7 @@ jvm_library(
     "//platform/diff-impl",
     "//platform/refactoring",
     "//platform/vcs-log/api:vcs-log",
-    "@lib//:swingx",
+    "//libraries/swingx",
     "//libraries/miglayout-swing",
     "//libraries/stream",
     "//platform/statistics",
@@ -81,6 +81,7 @@ jvm_library(
     "//platform/platform-impl/rpc",
     "//platform/polySymbols",
     "//platform/execution",
+    "//platform/eel",
   ]
 )
 
@@ -117,7 +118,7 @@ jvm_library(
     "//platform/diff-impl",
     "//platform/refactoring",
     "//platform/vcs-log/api:vcs-log",
-    "@lib//:swingx",
+    "//libraries/swingx",
     "//libraries/miglayout-swing",
     "//libraries/stream",
     "//platform/statistics",
@@ -168,6 +169,7 @@ jvm_library(
     "//platform/diff-impl/tests:tests_test_lib",
     "//platform/polySymbols",
     "//platform/execution",
+    "//platform/eel",
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.impl` end

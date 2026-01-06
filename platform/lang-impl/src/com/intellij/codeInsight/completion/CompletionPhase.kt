@@ -6,6 +6,7 @@ import com.intellij.codeInsight.completion.CompletionPhase.Companion.NoCompletio
 import com.intellij.codeInsight.completion.impl.CompletionServiceImpl
 import com.intellij.codeInsight.completion.impl.CompletionServiceImpl.Companion.assertPhase
 import com.intellij.codeWithMe.ClientId
+import com.intellij.codeWithMe.ClientId.Companion.withExplicitClientId
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationListener
@@ -57,7 +58,7 @@ import kotlin.math.max
  *  *  [Synchronous] - completion is computing candidates synchronously.
  *  *  [BgCalculation] - inferring candidates on background
  *  *  [ItemsCalculated] - completion items have been calculated
- *  *  [EmptyAutoPopup] -  completion was triggered by typing, but no completion items were found, and the lookup is not shown
+ *  *  [EmptyAutoPopup] - completion was triggered by typing, but no completion items were found, and the lookup is not shown
  *  *  [InsertedSingleItem] - a single item was found, and it was inserted into the document
  *  *  [NoSuggestionsHint] - candidate inference has finished, but no candidates were found and a warning "no suggestions found" is shown.
  *
@@ -72,14 +73,14 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
 
   override fun dispose() {}
 
+  /** see doc of [CompletionPhase] */
   class CommittingDocuments private constructor(
     indicator: CompletionProgressIndicator?,
     editor: Editor,
     private val event: TypedEvent?
   ) : CompletionPhase(indicator) {
-    @ApiStatus.Internal
     @JvmField
-    var replaced: Boolean = false
+    internal var replaced: Boolean = false
 
     private val myTracker: ActionTracker = ActionTracker(editor, this)
     private var myState: CommittingState = InProgress(1) // access available on EDT only
@@ -374,6 +375,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class Synchronous internal constructor(indicator: CompletionProgressIndicator) : CompletionPhase(indicator) {
     override fun newCompletionStarted(time: Int, repeated: Boolean): Int {
       assertPhase(NoCompletion.javaClass) // will fail and log valuable info
@@ -382,6 +384,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class BgCalculation internal constructor(indicator: CompletionProgressIndicator) : CompletionPhase(indicator) {
     @JvmField
     internal var modifiersChanged: Boolean = false
@@ -395,21 +398,23 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     private fun restartOnWriteAction() {
       ApplicationManager.getApplication().addApplicationListener(object : ApplicationListener {
         override fun beforeWriteActionStart(action: Any) {
-          if (!indicator!!.lookup.isLookupDisposed && !indicator.isCanceled && ownerId == ClientId.current) {
-            indicator.cancel()
-            if (EDT.isCurrentThreadEdt()) {
-              indicator.scheduleRestart()
-            }
-            else {
-              // this branch is possible because completion can be canceled on background write action
-              ApplicationManager.getApplication().invokeLater(
-                /* runnable = */ { indicator.scheduleRestart() },
+          if (!indicator!!.lookup.isLookupDisposed && !indicator.isCanceled) {
+            withExplicitClientId(ownerId) {
+              indicator.cancel()
+              if (EDT.isCurrentThreadEdt()) {
+                indicator.scheduleRestart()
+              }
+              else {
+                // this branch is possible because completion can be canceled on background write action
+                ApplicationManager.getApplication().invokeLater(
+                  /* runnable = */ { indicator.scheduleRestart() },
 
-                // since we break the synchronous execution here, it is possible that some other EDT event finishes completion before us
-                // in this case, the current indicator becomes obsolete, and we don't need to reschedule the session anymore
+                  // since we break the synchronous execution here, it is possible that some other EDT event finishes completion before us
+                  // in this case, the current indicator becomes obsolete, and we don't need to reschedule the session anymore
 
-                /* expired = */ { CompletionServiceImpl.currentCompletionProgressIndicator != indicator }
-              )
+                  /* expired = */ { CompletionServiceImpl.currentCompletionProgressIndicator != indicator }
+                )
+              }
             }
           }
         }
@@ -440,6 +445,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class ItemsCalculated internal constructor(indicator: CompletionProgressIndicator) : CompletionPhase(indicator) {
     override fun newCompletionStarted(time: Int, repeated: Boolean): Int {
       requireNotNull(indicator) { "`ItemsCalculated#indicator` is not-null as its constructor accepts not-null `indicator`" }.closeAndFinish(false)
@@ -467,6 +473,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class InsertedSingleItem internal constructor(
     indicator: CompletionProgressIndicator,
     @JvmField
@@ -485,6 +492,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class NoSuggestionsHint internal constructor(hint: LightweightHint?, indicator: CompletionProgressIndicator) : ZombiePhase(indicator) {
     init {
       expireOnAnyEditorChange(indicator.editor)
@@ -501,6 +509,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   class EmptyAutoPopup internal constructor(
     editor: Editor,
     private val restartingPrefixConditions: Set<Pair<Int, ElementPattern<String>>>
@@ -522,6 +531,7 @@ sealed class CompletionPhase @ApiStatus.Internal constructor(
     }
   }
 
+  /** see doc of [CompletionPhase] */
   private object NoCompletionImpl: CompletionPhase(null) {
     override fun newCompletionStarted(time: Int, repeated: Boolean): Int {
       return time

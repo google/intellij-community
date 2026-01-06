@@ -8,7 +8,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="intellij.java" />
+    <orderEntry type="module" module-name="intellij.java" exported="" />
     <orderEntry type="module" module-name="intellij.java.testFramework.shared" exported="" />
     <orderEntry type="module" module-name="intellij.platform.analysis" />
     <orderEntry type="module" module-name="intellij.platform.codeStyle" />
@@ -61,6 +61,7 @@
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5.codeInsight" />
     <orderEntry type="module" module-name="intellij.java.frontback.psi.impl" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.shared" />
+    <orderEntry type="module" module-name="intellij.java.testFramework.backend" />
   </component>
   <component name="copyright">
     <Base>

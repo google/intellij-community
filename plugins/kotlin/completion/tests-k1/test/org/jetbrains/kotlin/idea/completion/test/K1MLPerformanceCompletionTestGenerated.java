@@ -3094,6 +3094,16 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
+            @TestMetadata("PreferExpectedTypeTypeAlias.kt")
+            public void testPreferExpectedTypeTypeAlias() throws Exception {
+                runTest("../testData/basic/common/typeAliasTypes/PreferExpectedTypeTypeAlias.kt");
+            }
+
+            @TestMetadata("PreferExpectedTypeTypeAliasReverse.kt")
+            public void testPreferExpectedTypeTypeAliasReverse() throws Exception {
+                runTest("../testData/basic/common/typeAliasTypes/PreferExpectedTypeTypeAliasReverse.kt");
+            }
+
             @TestMetadata("TypeAliasParameter.kt")
             public void testTypeAliasParameter() throws Exception {
                 runTest("../testData/basic/common/typeAliasTypes/TypeAliasParameter.kt");
@@ -3262,6 +3272,11 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/CallLocalLambda.kt");
             }
 
+            @TestMetadata("chainCompletionDontDuplicate.kt")
+            public void testChainCompletionDontDuplicate() throws Exception {
+                runTest("../testData/basic/common/chainCompletionDontDuplicate.kt");
+            }
+
             @TestMetadata("classObjectElementsInClass.kt")
             public void testClassObjectElementsInClass() throws Exception {
                 runTest("../testData/basic/common/classObjectElementsInClass.kt");
@@ -3310,6 +3325,16 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("DataClassMembers2.kt")
             public void testDataClassMembers2() throws Exception {
                 runTest("../testData/basic/common/DataClassMembers2.kt");
+            }
+
+            @TestMetadata("DebounceDurationPreferringCompletion.kt")
+            public void testDebounceDurationPreferringCompletion() throws Exception {
+                runTest("../testData/basic/common/DebounceDurationPreferringCompletion.kt");
+            }
+
+            @TestMetadata("DelayDurationPreferringCompletion.kt")
+            public void testDelayDurationPreferringCompletion() throws Exception {
+                runTest("../testData/basic/common/DelayDurationPreferringCompletion.kt");
             }
 
             @TestMetadata("DoWhile.kt")
@@ -3965,6 +3990,11 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("PreferExceptionsInCatch.kt")
             public void testPreferExceptionsInCatch() throws Exception {
                 runTest("../testData/basic/common/PreferExceptionsInCatch.kt");
+            }
+
+            @TestMetadata("PreferExceptionsInThrow.kt")
+            public void testPreferExceptionsInThrow() throws Exception {
+                runTest("../testData/basic/common/PreferExceptionsInThrow.kt");
             }
 
             @TestMetadata("PreferLessParameters.kt")

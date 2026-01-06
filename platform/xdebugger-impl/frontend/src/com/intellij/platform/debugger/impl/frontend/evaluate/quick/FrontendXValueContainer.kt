@@ -8,16 +8,17 @@ import com.intellij.platform.debugger.impl.frontend.frame.VariablesPreloadManage
 import com.intellij.platform.debugger.impl.rpc.*
 import com.intellij.platform.debugger.impl.shared.XValuesPresentationBuilder
 import com.intellij.ui.SimpleTextAttributes
-import com.intellij.xdebugger.frame.XCompositeNode
-import com.intellij.xdebugger.frame.XNamedValue
-import com.intellij.xdebugger.frame.XValueChildrenList
-import com.intellij.xdebugger.frame.XValueContainer
+import com.intellij.xdebugger.frame.*
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTreeState
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueContainerNode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import org.jetbrains.annotations.Nls
+import java.awt.event.MouseEvent
+import java.util.function.Supplier
+import javax.swing.Icon
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -57,8 +58,11 @@ internal class FrontendXValueContainer(
 
   override fun computeChildren(node: XCompositeNode) {
     val childrenManager = getOrCreteChildrenManager(node)
-    val scope = node.childCoroutineScope(parentScope = cs, "FrontendXValueContainer#computeChildren", childrenManager)
-    scope.launch(Dispatchers.EDT) {
+    // Children of this container should be tied to the container scope,
+    // not the node scope. The XValue may be reused in other nodes, e.g. inline debugger.
+    val containerScope = cs
+    val nodeScope = node.childCoroutineScope(containerScope, "FrontendXValueContainer#computeChildren", childrenManager)
+    nodeScope.launch(Dispatchers.EDT) {
       val flow = childrenManager.getChildrenEventsFlow(id)
       val builder = XValuesPresentationBuilder()
       flow.collect { event ->
@@ -66,13 +70,13 @@ internal class FrontendXValueContainer(
           is XValueComputeChildrenEvent.AddChildren -> {
             val childrenList = XValueChildrenList()
             for ((name, xValue) in event.names zip event.children) {
-              val (presentationFlow, fullValueEvaluatorFlow) = builder.createFlows(xValue.id)
-              val value = FrontendXValue.create(project, scope, xValue, presentationFlow, fullValueEvaluatorFlow, hasParentValue)
+              val flows = builder.createFlows(xValue.id)
+              val value = FrontendXValue.create(project, containerScope, xValue, flows, hasParentValue)
               childrenList.add(name, value)
             }
 
             fun List<XValueGroupDto>.toFrontendXValueGroups() = map {
-              FrontendXValueGroup(project, scope, it, hasParentValue)
+              FrontendXValueGroup(project, containerScope, it, hasParentValue)
             }
 
             for (group in event.topGroups.toFrontendXValueGroups()) {
@@ -84,8 +88,8 @@ internal class FrontendXValueContainer(
             }
 
             for (topValue in event.topValues) {
-              val (presentationFlow, fullValueEvaluatorFlow) = builder.createFlows(topValue.id)
-              val xValue = FrontendXValue.create(project, scope, topValue, presentationFlow, fullValueEvaluatorFlow, hasParentValue)
+              val flows = builder.createFlows(topValue.id)
+              val xValue = FrontendXValue.create(project, containerScope, topValue, flows, hasParentValue)
               childrenList.addTopValue(xValue as XNamedValue)
             }
 
@@ -95,15 +99,14 @@ internal class FrontendXValueContainer(
             node.setAlreadySorted(event.value)
           }
           is XValueComputeChildrenEvent.SetErrorMessage -> {
-            node.setErrorMessage(event.message, event.link)
+            node.setErrorMessage(event.message, event.link?.hyperlink(nodeScope))
           }
           is XValueComputeChildrenEvent.SetMessage -> {
-            // TODO[IJPL-160146]: support SimpleTextAttributes serialization -- don't pass SimpleTextAttributes.REGULAR_ATTRIBUTES
             node.setMessage(
               event.message,
               event.icon?.icon(),
-              event.attributes ?: SimpleTextAttributes.REGULAR_ATTRIBUTES,
-              event.link
+              event.attributes.toSimpleTextAttributes(),
+              event.link?.hyperlink(nodeScope)
             )
           }
           is XValueComputeChildrenEvent.TooManyChildren -> {
@@ -122,8 +125,47 @@ internal class FrontendXValueContainer(
           is XValueComputeChildrenEvent.XValuePresentationEvent -> {
             builder.consume(event)
           }
+          is XValueComputeChildrenEvent.XValueAdditionalLinkEvent -> {
+            builder.consume(event)
+          }
         }
       }
+    }
+  }
+}
+
+internal fun XDebuggerTreeNodeHyperlinkDto.hyperlink(cs: CoroutineScope): XDebuggerTreeNodeHyperlink {
+  // prefer local for better onClick handling
+  val localLink = local
+  if (localLink != null) return localLink
+
+  val dto = this
+  return object : XDebuggerTreeNodeHyperlink(text) {
+    override fun alwaysOnScreen(): Boolean {
+      return dto.alwaysOnScreen
+    }
+
+    override fun getLinkIcon(): Icon? {
+      return dto.icon?.icon()
+    }
+
+    override fun getLinkTooltip(): @Nls String? {
+      return dto.tooltip
+    }
+
+    override fun getShortcutSupplier(): Supplier<String?>? {
+      return dto.shortcut?.let { Supplier { it } }
+    }
+
+    override fun getTextAttributes(): SimpleTextAttributes {
+      return dto.attributes ?: TEXT_ATTRIBUTES
+    }
+
+    override fun onClick(event: MouseEvent?) {
+      cs.launch {
+        XValueApi.getInstance().nodeLinkClicked(dto.id)
+      }
+      event?.consume()
     }
   }
 }

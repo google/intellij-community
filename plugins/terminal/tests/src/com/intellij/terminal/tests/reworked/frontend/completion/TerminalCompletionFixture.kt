@@ -1,7 +1,6 @@
 package com.intellij.terminal.tests.reworked.frontend.completion
 
-import com.intellij.codeInsight.lookup.LookupElement
-import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.codeInsight.lookup.*
 import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
@@ -17,28 +16,37 @@ import com.intellij.platform.util.coroutines.childScope
 import com.intellij.terminal.completion.spec.ShellCommandSpec
 import com.intellij.terminal.frontend.view.TerminalView
 import com.intellij.terminal.frontend.view.activeOutputModel
+import com.intellij.terminal.frontend.view.completion.TerminalCommandCompletionService
 import com.intellij.terminal.frontend.view.completion.TerminalLookupPrefixUpdater
 import com.intellij.terminal.frontend.view.impl.TerminalViewImpl
 import com.intellij.terminal.frontend.view.impl.TimedKeyEvent
 import com.intellij.terminal.tests.block.util.TestCommandSpecsProvider
+import com.intellij.terminal.tests.reworked.util.EchoingTerminalSession
 import com.intellij.testFramework.ExtensionTestUtil
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import org.assertj.core.api.Assertions
 import org.jetbrains.plugins.terminal.JBTerminalSystemSettingsProvider
+import org.jetbrains.plugins.terminal.TerminalOptionsProvider
+import org.jetbrains.plugins.terminal.block.completion.TerminalCommandCompletionShowingMode
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecConflictStrategy
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecInfo
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecsProvider
 import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
-import org.jetbrains.plugins.terminal.session.impl.TerminalStartupOptionsImpl
 import org.jetbrains.plugins.terminal.util.terminalProjectScope
-import org.jetbrains.plugins.terminal.view.TerminalOffset
+import org.jetbrains.plugins.terminal.view.TerminalContentChangeEvent
+import org.jetbrains.plugins.terminal.view.TerminalCursorOffsetChangeEvent
 import org.jetbrains.plugins.terminal.view.TerminalOutputModel
+import org.jetbrains.plugins.terminal.view.TerminalOutputModelListener
 import org.jetbrains.plugins.terminal.view.impl.MutableTerminalOutputModel
-import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus
-import org.jetbrains.plugins.terminal.view.shellIntegration.impl.TerminalShellIntegrationImpl
-import org.junit.Assert.assertEquals
 import org.junit.Assume
 import java.awt.event.KeyEvent
 import java.awt.event.KeyEvent.VK_UNDEFINED
+import kotlin.coroutines.resume
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 class TerminalCompletionFixture(val project: Project, val testRootDisposable: Disposable) {
@@ -49,29 +57,18 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     get() = view.activeOutputModel() as MutableTerminalOutputModel
 
   init {
+    Registry.get("terminal.type.ahead").setValue(true, testRootDisposable)
+    TerminalCommandCompletion.enableForTests(testRootDisposable)
+    // Terminal completion might still be disabled if not supported yet on some OS.
+    Assume.assumeTrue(TerminalCommandCompletion.isEnabled(project))
+
     val terminalScope = terminalProjectScope(project).childScope("TerminalViewImpl")
     Disposer.register(testRootDisposable) {
       terminalScope.cancel()
     }
     view = TerminalViewImpl(project, JBTerminalSystemSettingsProvider(), null, terminalScope)
-    val shellIntegration = TerminalShellIntegrationImpl(outputModel, view.sessionModel, terminalScope.childScope("TerminalShellIntegration"))
-    view.shellIntegrationDeferred.complete(shellIntegration)
-
-    // Need to specify some options to make `TerminalCommandCompletion.isSupportedForShell` pass.
-    val startupOptions = TerminalStartupOptionsImpl(
-      shellCommand = listOf("/bin/zsh", "--login", "-i"),
-      workingDirectory = project.basePath!!,
-      envVariables = emptyMap(),
-    )
-    view.startupOptionsDeferred.complete(startupOptions)
-
-    shellIntegration.onPromptFinished(TerminalOffset.ZERO)  // To make TerminalOutputStatus = TypingCommand
-    assertEquals(TerminalOutputStatus.TypingCommand, shellIntegration.outputStatus.value)
-
-    Registry.get("terminal.type.ahead").setValue(true, testRootDisposable)
-    TerminalCommandCompletion.enableForTests(testRootDisposable)
-    // Terminal completion might still be disabled if not supported yet on some OS.
-    Assume.assumeTrue(TerminalCommandCompletion.isEnabled(project))
+    val session = EchoingTerminalSession(coroutineScope = terminalScope.childScope("EchoingTerminalSession"))
+    view.connectToSession(session)
   }
 
   suspend fun awaitShellIntegrationFeaturesInitialized() {
@@ -86,15 +83,88 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
   }
 
   private fun typeChar(keyChar: Char) {
-    val keyEvent = KeyEvent(view.outputEditor.component, KeyEvent.KEY_TYPED, 1, 0,
-                            VK_UNDEFINED, keyChar, KeyEvent.KEY_LOCATION_UNKNOWN)
-    val timedKeyEvent = TimedKeyEvent(keyEvent, TimeSource.Monotonic.markNow())
-    view.outputEditorEventsHandler.keyTyped(timedKeyEvent)
+    // Key pressed event shouldn't be handled, but it is required
+    // to clear the ` ignoreNextKeyTypedEvent ` state in `TerminalEventsHandlerImpl`.
+    // Otherwise, the next key typed event might be ignored.
+    val fakeKeyPressEvent = KeyEvent(view.outputEditor.component, KeyEvent.KEY_PRESSED, 0, 0,
+                                     0, KeyEvent.CHAR_UNDEFINED, KeyEvent.KEY_LOCATION_STANDARD)
+    view.outputEditorEventsHandler.keyPressed(TimedKeyEvent(fakeKeyPressEvent, TimeSource.Monotonic.markNow()))
+
+    val keyTypedEvent = KeyEvent(view.outputEditor.component, KeyEvent.KEY_TYPED, 0, 0,
+                                 VK_UNDEFINED, keyChar, KeyEvent.KEY_LOCATION_UNKNOWN)
+    view.outputEditorEventsHandler.keyTyped(TimedKeyEvent(keyTypedEvent, TimeSource.Monotonic.markNow()))
   }
 
-  suspend fun callCompletionPopup() {
+  suspend fun callCompletionPopup(waitForPopup: Boolean = true) {
     runActionById("Terminal.CommandCompletion.Invoke")
-    awaitLookupPrefixUpdated()
+    if (waitForPopup) {
+      awaitNewCompletionPopupOpened()
+    }
+  }
+
+  suspend fun awaitNewCompletionPopupOpened() {
+    withTimeout(3.seconds) {
+      suspendCancellableCoroutine { continuation ->
+        val connection = project.messageBus.connect()
+        continuation.invokeOnCancellation { connection.disconnect() }
+
+        val showingListener = object : LookupListener {
+          override fun lookupShown(event: LookupEvent) {
+            event.lookup.removeLookupListener(this)
+            connection.disconnect()
+            continuation.resume(Unit)
+          }
+        }
+
+        connection.subscribe(LookupManagerListener.TOPIC, LookupManagerListener { _, newLookup ->
+          newLookup?.addLookupListener(showingListener)
+        })
+      }
+    }
+  }
+
+  suspend fun awaitLookupElementsEqual(vararg expected: String) {
+    awaitLookupElementsSatisfy {
+      it.toSet() == expected.toSet()
+    }
+  }
+
+  suspend fun awaitLookupElementsSatisfy(condition: (List<String>) -> Boolean) {
+    // Remember the stacktrace of calling code to log it in case of failure,
+    // because at the moment of logging the stacktrace might be irrelevant (coroutines)
+    val callLocationThrowable = Throwable()
+
+    val success = withTimeoutOrNull(3.seconds) {
+      suspendCancellableCoroutine { continuation ->
+        val lookup = getActiveLookup() ?: error("No active lookup")
+        if (condition(lookup.itemStrings)) {
+          continuation.resume(Unit)
+          return@suspendCancellableCoroutine
+        }
+
+        val listener = object : LookupListener {
+          override fun uiRefreshed() {
+            if (condition(lookup.itemStrings)) {
+              lookup.removeLookupListener(this)
+              continuation.resume(Unit)
+            }
+          }
+        }
+        lookup.addLookupListener(listener)
+        continuation.invokeOnCancellation { lookup.removeLookupListener(listener) }
+      }
+    }
+
+    if (success == null) {
+      Assertions.fail<Unit>(
+        "Condition is not satisfied, actual lookup elements: ${getActiveLookup()?.itemStrings}",
+        callLocationThrowable
+      )
+    }
+  }
+
+  suspend fun awaitPendingRequestsProcessed() {
+    TerminalCommandCompletionService.getInstance(project).awaitPendingRequestsProcessed()
   }
 
   fun getActiveLookup(): LookupImpl? {
@@ -115,6 +185,10 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     val lookupManager = LookupManager.getInstance(project)
     val activeLookup = lookupManager.activeLookup
     return activeLookup?.currentItem
+  }
+
+  fun insertSelectedItem() {
+    runActionById("Terminal.CommandCompletion.InsertSuggestion")
   }
 
   fun downCompletionPopup() {
@@ -167,6 +241,41 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     }
   }
 
+  /** Returns true if the output model state met the condition in the given timeout */
+  suspend fun awaitOutputModelState(timeout: Duration, condition: (TerminalOutputModel) -> Boolean): Boolean {
+    val result = withTimeoutOrNull(timeout) {
+      suspendCancellableCoroutine { continuation ->
+        val model = view.activeOutputModel()
+        if (condition(model)) {
+          continuation.resume(Unit)
+          return@suspendCancellableCoroutine
+        }
+
+        val disposable = Disposer.newDisposable()
+        continuation.invokeOnCancellation { Disposer.dispose(disposable) }
+
+        fun check() {
+          if (condition(model)) {
+            Disposer.dispose(disposable)
+            continuation.resume(Unit)
+          }
+        }
+
+        model.addListener(disposable, object : TerminalOutputModelListener {
+          override fun afterContentChanged(event: TerminalContentChangeEvent) {
+            check()
+          }
+
+          override fun cursorOffsetChanged(event: TerminalCursorOffsetChangeEvent) {
+            check()
+          }
+        })
+      }
+    }
+
+    return result != null
+  }
+
   fun mockTestShellCommand(testCommandSpec: ShellCommandSpec) {
     val specsProvider: ShellCommandSpecsProvider = TestCommandSpecsProvider(
       ShellCommandSpecInfo.create(testCommandSpec, ShellCommandSpecConflictStrategy.DEFAULT)
@@ -174,9 +283,32 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     ExtensionTestUtil.maskExtensions(ShellCommandSpecsProvider.EP_NAME, listOf(specsProvider), testRootDisposable)
   }
 
+  fun setCompletionOptions(
+    showPopupAutomatically: Boolean,
+    showingMode: TerminalCommandCompletionShowingMode,
+    parentDisposable: Disposable,
+  ) {
+    val options = TerminalOptionsProvider.instance
+    val curShowPopupAutomatically = options.showCompletionPopupAutomatically
+    val curShowingMode = options.commandCompletionShowingMode
+
+    options.showCompletionPopupAutomatically = showPopupAutomatically
+    options.commandCompletionShowingMode = showingMode
+
+    Disposer.register(parentDisposable) {
+      options.showCompletionPopupAutomatically = curShowPopupAutomatically
+      options.commandCompletionShowingMode = curShowingMode
+    }
+  }
+
   private suspend fun awaitLookupPrefixUpdated() {
     val lookup = LookupManager.getInstance(project).activeLookup as? LookupImpl ?: return
     val prefixUpdater = TerminalLookupPrefixUpdater.get(lookup) ?: return
     prefixUpdater.awaitPrefixUpdated()
+  }
+
+  companion object {
+    val Lookup.itemStrings: List<String>
+      get() = items.map { it.lookupString }
   }
 }

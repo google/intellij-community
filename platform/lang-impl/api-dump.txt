@@ -117,9 +117,15 @@ com.intellij.codeInsight.codeVision.ui.model.CodeVisionPredefinedActionEntry
 com.intellij.codeInsight.codeVision.ui.renderers.painters.ICodeVisionEntryBasePainter
 - a:paint(com.intellij.openapi.editor.Editor,com.intellij.openapi.editor.markup.TextAttributes,java.awt.Graphics,java.lang.Object,java.awt.Point,com.intellij.codeInsight.codeVision.ui.model.RangeCodeVisionModel$InlayState,Z,com.intellij.codeInsight.codeVision.CodeVisionEntry):V
 - a:size(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.codeVision.ui.model.RangeCodeVisionModel$InlayState,java.lang.Object):java.awt.Dimension
+c:com.intellij.codeInsight.completion.CodeCompletionHandlerBase
+- s:setAutoInsertTimeout(I,com.intellij.openapi.Disposable):V
 com.intellij.codeInsight.completion.CompletionPhaseListener
 - sf:TOPIC:com.intellij.util.messages.Topic
 - a:completionPhaseChanged(Z):V
+f:com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$AutoRestarting
+- b:<init>(com.intellij.codeInsight.completion.PrefixMatcher,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+pe:com.intellij.codeInsight.completion.impl.BetterPrefixMatcher$MatchingOutcome
+- s:getEntries():kotlin.enums.EnumEntries
 com.intellij.codeInsight.daemon.ProjectSdkSetupValidator
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - doFix(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):V
@@ -296,6 +302,7 @@ f:com.intellij.codeInsight.intention.impl.IntentionActionWithTextCaching
 - isSelectable():Z
 - isShowIcon():Z
 - suggestionShown(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):V
+c:com.intellij.codeInsight.intention.impl.IntentionListStep
 com.intellij.codeInsight.intention.impl.IntentionsOrderProvider
 - sf:EXTENSION:com.intellij.lang.LanguageExtension
 - a:getSortedIntentions(com.intellij.codeInsight.intention.impl.CachedIntentions,java.util.List):java.util.List
@@ -634,6 +641,8 @@ com.intellij.ide.fileTemplates.CreateFromTemplateHandler
 - a:isNameRequired():Z
 - a:prepareProperties(java.util.Map):V
 - prepareProperties(java.util.Map,java.lang.String,com.intellij.ide.fileTemplates.FileTemplate,com.intellij.openapi.project.Project):V
+f:com.intellij.ide.fileTemplates.impl.FileTemplateManagerImpl
+- getDefaultContextMap():java.util.Map
 com.intellij.ide.highlighter.custom.CustomHighlighterColors
 - sf:CUSTOM_INVALID_STRING_ESCAPE:com.intellij.openapi.editor.colors.TextAttributesKey
 - sf:CUSTOM_KEYWORD1_ATTRIBUTES:com.intellij.openapi.editor.colors.TextAttributesKey

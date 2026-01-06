@@ -1,18 +1,18 @@
 package com.intellij.terminal.frontend.view.completion
 
 import com.google.common.base.Ascii
-import com.intellij.codeInsight.completion.CompletionProcessEx
-import com.intellij.codeInsight.completion.CompletionService
 import com.intellij.codeInsight.lookup.*
 import com.intellij.codeInsight.lookup.impl.EmptyLookupItem
 import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.codeInsight.lookup.impl.PrefixChangeListener
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.terminal.TerminalUiSettingsManager
+import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
 import com.intellij.terminal.frontend.view.impl.TerminalInput
 import kotlinx.coroutines.cancel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
@@ -74,11 +74,25 @@ private class TerminalLookupListener : LookupListener {
       return false
     }
 
+    // First step - remove the typed prefix
     val commandSize = lookup.itemPattern(item).length
     if (commandSize > 0) {
       terminalInput.sendBytes(ByteArray(commandSize) { Ascii.DEL })
     }
+
+    // Second step - insert the completion item
     terminalInput.sendString(item.lookupString)
+
+    // Third step - move the cursor to the custom position if it is specified
+    val suggestion = item.`object` as ShellCompletionSuggestion
+    val cursorOffset = suggestion.insertValue?.indexOf("{cursor}")
+    if (cursorOffset != null && cursorOffset != -1) {
+      val delta = item.lookupString.length - cursorOffset
+      repeat(delta) {
+        terminalInput.sendLeft()
+      }
+    }
+
     // if one of the listeners returns false - the item is not inserted
     return false
   }
@@ -116,16 +130,6 @@ private class TerminalLookupListener : LookupListener {
   }
 
   /**
-   * Adds [TerminalCommandCompletion.COMPLETING_COMMAND_KEY] to the lookup once it is shown.
-   */
-  override fun lookupShown(event: LookupEvent) {
-    val process = CompletionService.getCompletionService().currentCompletion as? CompletionProcessEx ?: return
-    val command = process.getUserData(TerminalCommandCompletion.COMPLETING_COMMAND_KEY) ?: return
-    val lookup = event.lookup as? LookupImpl ?: return
-    lookup.putUserData(TerminalCommandCompletion.COMPLETING_COMMAND_KEY, command)
-  }
-
-  /**
    * Stores the last selected item in the lookup by [TerminalCommandCompletion.LAST_SELECTED_ITEM_KEY].
    */
   override fun currentItemChanged(event: LookupEvent) {
@@ -139,15 +143,23 @@ private class TerminalLookupListener : LookupListener {
  * Set's the [AllIcons.Actions.Execute] icon for the selected item in the lookup if it matches the user input.
  * To indicate that insertion of the item will cause immediate execution of the command.
  */
-private class TerminalSelectedItemIconUpdater(private val lookup: Lookup) : PrefixChangeListener {
+private class TerminalSelectedItemIconUpdater(private val lookup: LookupImpl) : PrefixChangeListener {
   private var curSelectedItem: LookupElement? = null
 
   override fun afterAppend(c: Char) {
-    updateSelectedItemIcon()
+    scheduleUpdate()
   }
 
   override fun afterTruncate() {
-    updateSelectedItemIcon()
+    scheduleUpdate()
+  }
+
+  private fun scheduleUpdate() {
+    invokeLater(ModalityState.stateForComponent(lookup.component)) {
+      if (!lookup.isLookupDisposed) {
+        updateSelectedItemIcon()
+      }
+    }
   }
 
   private fun updateSelectedItemIcon() {

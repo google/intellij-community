@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -66,14 +66,14 @@
     <orderEntry type="module" module-name="kotlin.completion.tests.shared" />
     <orderEntry type="module" module-name="kotlin.fir" />
     <orderEntry type="module" module-name="intellij.gradle.tests" />
-    <orderEntry type="module" module-name="kotlin.idea.tests" />
     <orderEntry type="module" module-name="intellij.xml.psi" />
-    <orderEntry type="module" module-name="kotlin.test-framework" />
+    <orderEntry type="module" module-name="intellij.kotlin.testFramework" />
     <orderEntry type="module" module-name="intellij.kotlin.base.indices" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.gradle.gradle-java.tests.shared" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.formatter.minimal" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.codeInsight.minimal" scope="TEST" />
-    <orderEntry type="module" module-name="kotlin.tests-common" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.common.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.jvm.debugger.core" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.jvm-debugger.evaluation" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.analysis.platform" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.analysis.platform" scope="TEST" />

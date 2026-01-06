@@ -45,7 +45,6 @@ import com.intellij.openapi.progress.util.ProgressIndicatorBase;
 import com.intellij.openapi.progress.util.ProgressWindow;
 import com.intellij.openapi.progress.util.TooManyUsagesStatus;
 import com.intellij.openapi.project.*;
-import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.ui.popup.ListItemDescriptorAdapter;
@@ -67,8 +66,10 @@ import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.ui.*;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBList;
+import com.intellij.ui.components.SearchFieldWithExtension;
 import com.intellij.ui.components.fields.ExtendableTextComponent;
 import com.intellij.ui.components.fields.ExtendableTextField;
+import com.intellij.ui.components.panels.Wrapper;
 import com.intellij.ui.popup.PopupUpdateProcessorBase;
 import com.intellij.ui.popup.list.GroupedItemsListRenderer;
 import com.intellij.ui.scale.JBUIScale;
@@ -86,6 +87,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBusConnection;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.text.MatcherHolder;
+import com.intellij.util.text.matching.MatchingMode;
 import com.intellij.util.ui.*;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
@@ -660,6 +662,26 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     return res;
   }
 
+  @ApiStatus.Internal
+  @Override
+  protected @NotNull JComponent wrapSearchField() {
+    if (!Registry.is("search.everywhere.round.text.field", false)) {
+      return mySearchField;
+    }
+
+    Wrapper wrapper = new Wrapper(new SearchFieldWithExtension(mySearchField, JBUI.CurrentTheme.Popup.BACKGROUND));
+    wrapper.setOpaque(true);
+    wrapper.setBackground(JBUI.CurrentTheme.Popup.BACKGROUND);
+    wrapper.setBorder(JBUI.Borders.empty(3, 5));
+    return wrapper;
+  }
+
+  @ApiStatus.Internal
+  @Override
+  protected int getTextFieldExtraHeight() {
+    return Registry.is("search.everywhere.round.text.field", false) ? JBUI.scale(-1) : super.getTextFieldExtraHeight();
+  }
+
   private void showPopup(@NotNull RelativePoint relativePoint) {
     List<String> items = ((SearchEverywhereManagerImpl)SearchEverywhereManager.getInstance(myProject)).getHistoryItems();
     if (items.isEmpty()) return;
@@ -898,7 +920,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
   @ApiStatus.Internal
   public static void associateMatcherToResultsList(JComponent resultsList, String rawPattern, String namePattern) {
     MinusculeMatcher matcher =
-      NameUtil.buildMatcherWithFallback("*" + rawPattern, "*" + namePattern, NameUtil.MatchingCaseSensitivity.NONE);
+      NameUtil.buildMatcherWithFallback("*" + rawPattern, "*" + namePattern, MatchingMode.IGNORE_CASE);
     MatcherHolder.associateMatcher(resultsList, matcher);
   }
 

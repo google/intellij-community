@@ -3,7 +3,7 @@ package com.intellij.java.codeInsight.daemon.inlays
 
 import com.intellij.JavaTestUtil
 import com.intellij.codeInsight.hints.AnnotationInlayProvider
-import com.intellij.openapi.util.registry.Registry
+import com.intellij.codeInsight.hints.AnnotationInlaySettings
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.psi.CommonClassNames
 import com.intellij.psi.JavaPsiFacade
@@ -13,6 +13,7 @@ import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase.JAVA_21
 import com.intellij.testFramework.utils.inlays.declarative.DeclarativeInlayHintsProviderTestCase
 import org.intellij.lang.annotations.Language
+import java.util.regex.Pattern
 
 class AnnotationHintsTest : DeclarativeInlayHintsProviderTestCase() {
 
@@ -279,32 +280,33 @@ public final class Optional</*<# @NotNull #>*/T> {
     }
 }
 """
-    val registry = Registry.get("java.exclamation.mark.inlay.for.inferred.and.external.notnull.annotations")
-    val old = registry.asBoolean()
-    registry.setValue(true)
-    doTestProviderWithConfigured(myFixture.editor.document.text,
-                                 convert(expected),
-                                 AnnotationInlayProvider(),
-                                 enabledOptions = mapOf(AnnotationInlayProvider.SHOW_INFERRED to false,
-                                                        AnnotationInlayProvider.SHOW_EXTERNAL to true),
-                                 testMode = ProviderTestMode.SIMPLE)
-    registry.setValue(old)
+    val settings = AnnotationInlaySettings.getInstance()
+    val old = settings.shortenNotNull
+    settings.shortenNotNull = true
+    try {
+      doTestProviderWithConfigured(myFixture.editor.document.text,
+                                   convert(expected),
+                                   AnnotationInlayProvider(),
+                                   enabledOptions = mapOf(AnnotationInlayProvider.SHOW_INFERRED to false,
+                                                          AnnotationInlayProvider.SHOW_EXTERNAL to true),
+                                   testMode = ProviderTestMode.SIMPLE)
+    } finally {
+      settings.shortenNotNull = old
+    }
   }
   
   private fun convert(text: String): String{
-    var from = 0
-    var to = text.indexOf("/*<# @NotNull #>*/")
+    val matcher = Pattern.compile("/\\*<# @(NotNull|Nullable) #>\\*/").matcher(text)
     val result = StringBuilder()
-    while (to >= 0) {
-      result.append(text.substring(from, to))
-      to += 18
-      while (Character.isAlphabetic(text[to].code)) {
-        result.append(text[to])
-        to++
+    var from = 0
+    while (matcher.find()) {
+      result.append(text.substring(from, matcher.start()))
+      from = matcher.end();
+      while (Character.isAlphabetic(text[from].code)) {
+        result.append(text[from])
+        from++
       }
-      result.append("/*<# ! #>*/")
-      from = to
-      to = text.indexOf("/*<# @NotNull #>*/", from + 1)
+      result.append(if (matcher.group(1).equals("NotNull")) "/*<# ! #>*/" else "/*<# ? #>*/")
     }
     result.append(text.substring(from))
     return result.toString()
@@ -315,24 +317,27 @@ public final class Optional</*<# @NotNull #>*/T> {
     @Language("JAVA") nullnessMarkerText: String,
     enabledOptions: Map<String, Boolean> = mapOf("showInferred" to true, "showExternal" to true),
   ) {
-    val registry = Registry.get("java.exclamation.mark.inlay.for.inferred.and.external.notnull.annotations")
-    val old = registry.asBoolean()
-    registry.setValue(false)
-    doTestProvider(
-      "test.java",
-      annotatedText,
-      AnnotationInlayProvider(),
-      enabledOptions,
-      testMode = ProviderTestMode.SIMPLE,
-    )
-    registry.setValue(true)
-    doTestProvider(
-      "test.java",
-      nullnessMarkerText,
-      AnnotationInlayProvider(),
-      enabledOptions,
-      testMode = ProviderTestMode.SIMPLE,
-    )
-    registry.setValue(old)
+    val settings = AnnotationInlaySettings.getInstance()
+    val old = settings.shortenNotNull
+    settings.shortenNotNull = false
+    try {
+      doTestProvider(
+        "test.java",
+        annotatedText,
+        AnnotationInlayProvider(),
+        enabledOptions,
+        testMode = ProviderTestMode.SIMPLE,
+      )
+      settings.shortenNotNull = true
+      doTestProvider(
+        "test.java",
+        nullnessMarkerText,
+        AnnotationInlayProvider(),
+        enabledOptions,
+        testMode = ProviderTestMode.SIMPLE,
+      )
+    } finally {
+      settings.shortenNotNull = old
+    }
   }
 }

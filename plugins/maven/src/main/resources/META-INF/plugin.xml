@@ -66,6 +66,7 @@
     <module name="intellij.properties.backend"/>
     <plugin id="com.intellij.java"/>
     <plugin id="org.jetbrains.idea.reposearch"/>
+    <module name="intellij.java.aetherDependencyResolver"/>
   </dependencies>
 
   <depends optional="true" config-file="groovy-support.xml">org.intellij.groovy</depends>
@@ -491,6 +492,9 @@
 
     <registryKey key="maven.sync.refresh.resolved.artifacts" defaultValue="true"
                  description="Refresh resolved artifacts after Maven sync"/>
+
+    <registryKey key="maven.download.sources.build.output.notifications" defaultValue="true"
+                 description="Notify about errors in progress of downloading sources of libraries into the Build Output"/>
 
     <registryKey key="maven.incremental.sync.resolve.dependencies.incrementally" defaultValue="true"
                  description="During incremental sync, resolve dependencies incrementally"/>
@@ -1038,6 +1042,10 @@
     <listener class="org.jetbrains.idea.maven.project.MavenImportListenerBridge"
               topic="org.jetbrains.idea.maven.project.MavenSyncListener"
               activeInTestMode="true" activeInHeadlessMode="true"/>
+
+    <listener class="org.jetbrains.idea.maven.project.source.MavenDownloadLibrarySourcesSyncListener"
+              topic="org.jetbrains.idea.maven.project.MavenSyncListener"
+              activeInTestMode="false" activeInHeadlessMode="false"/>
 
     <listener class="org.jetbrains.idea.maven.plugins.compatibility.PluginCompatibilityConfiguratorListener"
               topic="org.jetbrains.idea.maven.project.MavenSyncListener"

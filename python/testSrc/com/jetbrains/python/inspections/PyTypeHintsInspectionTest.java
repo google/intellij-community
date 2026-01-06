@@ -373,6 +373,13 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                    """);
   }
 
+  public void testSelfAnnotationUsesClassScopedTypeParameters() {
+    doTestByText("""
+                   class MyClass[T1, T2]:
+                       def __init__(self: <warning descr="Class-scoped type variables should not be used in the annotation for 'self' parameter of '__init__' method">MyClass[T2, T1]</warning>) -> None: ...
+                   """);
+  }
+
   // PY-28249
   public void testInstanceAndClassChecksOnAny() {
     doTestByText("""
@@ -3233,6 +3240,15 @@ public class PyTypeHintsInspectionTest extends PyInspectionTestCase {
                    
                    if a:
                        _ = a[1]  # No error expected
+                   """);
+  }
+
+  // PY-86310
+  public void testTargetExpressionWithReassignmentNotProcessedAsImplicitTypeAlias() {
+    doTestByText("""
+                   b = []
+                   a = b
+                   _ = a[0] # No error expected
                    """);
   }
 

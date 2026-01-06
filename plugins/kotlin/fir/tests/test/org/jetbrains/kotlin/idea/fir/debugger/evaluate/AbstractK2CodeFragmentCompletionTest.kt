@@ -7,6 +7,10 @@ import java.nio.file.Paths
 
 abstract class AbstractK2CodeFragmentCompletionTest : AbstractCodeFragmentCompletionTest() {
 
+    override fun configureFixture(testPath: String) {
+        myFixture.configureByK2ModeCodeFragment(testPath)
+    }
+
     override fun doTest(filePath: String) {
         IgnoreTests.runTestIfNotDisabledByFileDirective(
             Paths.get(filePath),

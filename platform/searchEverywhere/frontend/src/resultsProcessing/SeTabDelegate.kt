@@ -15,6 +15,8 @@ import com.intellij.platform.searchEverywhere.frontend.SeFrontendItemDataProvide
 import com.intellij.platform.searchEverywhere.frontend.SeFrontendOnlyItemsProviderFactory
 import com.intellij.platform.searchEverywhere.frontend.SeFrontendService
 import com.intellij.platform.searchEverywhere.impl.SeRemoteApi
+import com.intellij.platform.searchEverywhere.presentations.SeActionItemPresentation
+import com.intellij.platform.searchEverywhere.presentations.SeItemPresentation
 import com.intellij.platform.searchEverywhere.providers.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
@@ -330,7 +332,10 @@ class SeTabDelegate(
 
       ensureActive()
       val localProvidersHolder = SeFrontendService.getInstance(project).localProvidersHolder
-                                 ?: error("Local providers holder is not initialized")
+                                 ?: run {
+                                   SeLog.error("Local providers holder is not initialized")
+                                   return@coroutineScope Providers(emptyMap(), null, emptySet())
+                                 }
 
       val localFactories = SeItemsProviderFactory.EP_NAME.extensionList.associateBy { SeProviderId(it.id) }
       val frontendOnlyIds = localFactories.filter { it.value is SeFrontendOnlyItemsProviderFactory }.map { it.key }.toSet()

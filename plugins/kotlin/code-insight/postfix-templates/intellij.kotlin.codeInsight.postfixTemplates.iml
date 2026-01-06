@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -44,7 +44,6 @@
     <orderEntry type="module" module-name="intellij.kotlin.codeInsight.shared" />
     <orderEntry type="module" module-name="kotlin.code-insight.live-templates.shared" />
     <orderEntry type="module" module-name="intellij.kotlin.codeInsight.liveTemplates" />
-    <orderEntry type="module" module-name="kotlin.idea.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.lang" />
     <orderEntry type="module" module-name="intellij.platform.lang.impl" />
     <orderEntry type="module" module-name="intellij.platform.testFramework" scope="TEST" />
@@ -54,5 +53,6 @@
     <orderEntry type="module" module-name="kotlin.fir.frontend-independent" />
     <orderEntry type="module" module-name="intellij.kotlin.base.analysis.utils" />
     <orderEntry type="module" module-name="intellij.kotlin.codeInsight.utils" />
+    <orderEntry type="module" module-name="intellij.kotlin.base.test" scope="TEST" />
   </component>
 </module>

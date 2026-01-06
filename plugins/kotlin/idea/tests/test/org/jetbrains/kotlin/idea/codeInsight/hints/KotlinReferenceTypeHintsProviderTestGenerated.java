@@ -19,7 +19,7 @@ import org.junit.runner.RunWith;
 @TestDataPath("$CONTENT_ROOT")
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("testData/codeInsight/hints/types")
-public class KotlinReferenceTypeHintsProviderTestGenerated extends AbstractKotlinReferenceTypeHintsProviderTest {
+public class KotlinReferenceTypeHintsProviderTestGenerated extends AbstractK1KotlinReferenceTypeHintsProviderTest {
     @java.lang.Override
     @org.jetbrains.annotations.NotNull
     public final KotlinPluginMode getPluginMode() {
@@ -68,6 +68,11 @@ public class KotlinReferenceTypeHintsProviderTestGenerated extends AbstractKotli
     @TestMetadata("ConstructorWithoutTypeParametersType.kt")
     public void testConstructorWithoutTypeParametersType() throws Exception {
         runTest("testData/codeInsight/hints/types/ConstructorWithoutTypeParametersType.kt");
+    }
+
+    @TestMetadata("ContextParameters.kt")
+    public void testContextParameters() throws Exception {
+        runTest("testData/codeInsight/hints/types/ContextParameters.kt");
     }
 
     @TestMetadata("DefinitelyNonNullTypes.kt")

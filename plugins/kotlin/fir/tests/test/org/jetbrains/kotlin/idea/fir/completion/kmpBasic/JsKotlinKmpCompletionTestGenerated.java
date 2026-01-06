@@ -3278,6 +3278,16 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("PreferExpectedTypeTypeAlias.kt")
+        public void testPreferExpectedTypeTypeAlias() throws Exception {
+            runTest("../../completion/testData/basic/common/typeAliasTypes/PreferExpectedTypeTypeAlias.kt");
+        }
+
+        @TestMetadata("PreferExpectedTypeTypeAliasReverse.kt")
+        public void testPreferExpectedTypeTypeAliasReverse() throws Exception {
+            runTest("../../completion/testData/basic/common/typeAliasTypes/PreferExpectedTypeTypeAliasReverse.kt");
+        }
+
         @TestMetadata("TypeAliasParameter.kt")
         public void testTypeAliasParameter() throws Exception {
             runTest("../../completion/testData/basic/common/typeAliasTypes/TypeAliasParameter.kt");
@@ -3456,6 +3466,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
             runTest("../../completion/testData/basic/common/CallLocalLambda.kt");
         }
 
+        @TestMetadata("chainCompletionDontDuplicate.kt")
+        public void testChainCompletionDontDuplicate() throws Exception {
+            runTest("../../completion/testData/basic/common/chainCompletionDontDuplicate.kt");
+        }
+
         @TestMetadata("classObjectElementsInClass.kt")
         public void testClassObjectElementsInClass() throws Exception {
             runTest("../../completion/testData/basic/common/classObjectElementsInClass.kt");
@@ -3504,6 +3519,16 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("DataClassMembers2.kt")
         public void testDataClassMembers2() throws Exception {
             runTest("../../completion/testData/basic/common/DataClassMembers2.kt");
+        }
+
+        @TestMetadata("DebounceDurationPreferringCompletion.kt")
+        public void testDebounceDurationPreferringCompletion() throws Exception {
+            runTest("../../completion/testData/basic/common/DebounceDurationPreferringCompletion.kt");
+        }
+
+        @TestMetadata("DelayDurationPreferringCompletion.kt")
+        public void testDelayDurationPreferringCompletion() throws Exception {
+            runTest("../../completion/testData/basic/common/DelayDurationPreferringCompletion.kt");
         }
 
         @TestMetadata("DoWhile.kt")
@@ -4159,6 +4184,11 @@ public abstract class JsKotlinKmpCompletionTestGenerated extends AbstractKotlinK
         @TestMetadata("PreferExceptionsInCatch.kt")
         public void testPreferExceptionsInCatch() throws Exception {
             runTest("../../completion/testData/basic/common/PreferExceptionsInCatch.kt");
+        }
+
+        @TestMetadata("PreferExceptionsInThrow.kt")
+        public void testPreferExceptionsInThrow() throws Exception {
+            runTest("../../completion/testData/basic/common/PreferExceptionsInThrow.kt");
         }
 
         @TestMetadata("PreferLessParameters.kt")

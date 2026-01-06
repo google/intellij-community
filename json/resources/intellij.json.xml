@@ -25,6 +25,7 @@
     <syntax.elementTypeConverter language="JSON" implementationClass="com.intellij.json.psi.JsonElementTypeConverterFactory"/>
     <syntax.elementTypeConverter language="JSON" implementationClass="com.intellij.json.JsonFileTypeConverterFactory"/>
     <syntax.syntaxDefinition language="JSON" implementationClass="com.intellij.json.syntax.JsonLanguageDefinition"/>
+    <syntax.syntaxDefinition language="JSON5" implementationClass="com.intellij.json.syntax.json5.Json5LanguageDefinition"/>
 
 
     <!-- Highlighting -->
@@ -43,7 +44,7 @@
     <applicationService serviceImplementation="com.intellij.json.editor.JsonEditorOptions"/>
     <applicationService serviceImplementation="com.intellij.json.editor.folding.JsonFoldingSettings"/>
     <applicationSettings service="com.intellij.json.editor.JsonEditorOptions"/>
-    <codeFoldingOptionsProvider instance="com.intellij.json.editor.folding.JsonFoldingOptionsProvider"/>
+    <codeFoldingOptionsProvider instance="com.intellij.json.editor.folding.JsonFoldingOptionsProvider" id="JSON" order="after Android,after C++,after Dart,after General,after Go,after Handlebars,after JAVA,after JavaScript,after JPAQL,after ObjectiveC"/>
     <rdct.remoteSettingProvider implementation="com.intellij.json.editor.JSONRemoteSettingInfoProvider"/>
 
     <editorSmartKeysConfigurable instance="com.intellij.json.editor.JsonSmartKeysConfigurable" id="editor.preferences.jsonOptions"/>

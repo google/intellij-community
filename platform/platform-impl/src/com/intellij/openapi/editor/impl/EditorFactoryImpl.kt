@@ -115,13 +115,13 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
     return document
   }
 
-  fun createDocument(allowUpdatesWithoutWriteAction: Boolean): Document {
+  override fun createDocument(allowUpdatesWithoutWriteAction: Boolean): Document {
     val document = DocumentImpl("", allowUpdatesWithoutWriteAction)
     editorEventMulticaster.registerDocument(document)
     return document
   }
 
-  fun createDocument(text: CharSequence, acceptsSlashR: Boolean, allowUpdatesWithoutWriteAction: Boolean): Document {
+  override fun createDocument(text: CharSequence, acceptsSlashR: Boolean, allowUpdatesWithoutWriteAction: Boolean): Document {
     val document = DocumentImpl(text, acceptsSlashR, allowUpdatesWithoutWriteAction)
     editorEventMulticaster.registerDocument(document)
     return document
@@ -301,7 +301,7 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
 }
 
 @Suppress("unused")
-private class MyRawTypedHandler(private val delegate: TypedActionHandler) : TypedActionHandlerEx {
+internal class MyRawTypedHandler(private val delegate: TypedActionHandler) : TypedActionHandlerEx {
   override fun execute(editor: Editor, charTyped: Char, dataContext: DataContext) {
     editor.putUserData(EditorImpl.DISABLE_CARET_SHIFT_ON_WHITESPACE_INSERTION, true)
     try {

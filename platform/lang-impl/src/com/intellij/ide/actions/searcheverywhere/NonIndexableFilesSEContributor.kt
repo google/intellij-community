@@ -4,6 +4,7 @@ package com.intellij.ide.actions.searcheverywhere
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.GotoFileItemProvider
 import com.intellij.ide.actions.SearchEverywherePsiRenderer
+import com.intellij.ide.actions.searcheverywhere.footer.createPsiExtendedInfo
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.runReadAction
@@ -19,6 +20,7 @@ import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.util.Processor
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.contentNonIndexableRoots
+import com.intellij.util.text.matching.MatchingMode
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexEx
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
@@ -47,13 +49,14 @@ interface FilesTabSEContributor {
 private val LOG = Logger.getInstance(NonIndexableFilesSEContributor::class.java)
 
 @ApiStatus.Internal
-class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEverywhereContributor<Any>, DumbAware, FilesTabSEContributor {
+class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEverywhereContributor<Any>,
+                                                             DumbAware,
+                                                             FilesTabSEContributor,
+                                                             SearchEverywhereExtendedInfoProvider {
   private val project: Project = event.project!!
   private val navigationHandler: SearchEverywhereNavigationHandler = FileSearchEverywhereNavigationContributionHandler(project)
 
-  override fun getSearchProviderId(): String {
-    return javaClass.simpleName
-  }
+  override fun getSearchProviderId(): String = ID
 
   override fun getGroupName(): @Nls String {
     return IdeBundle.message("search.everywhere.group.name.non.indexable.files")
@@ -100,7 +103,7 @@ class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEvery
     val pathMatcher = GotoFileItemProvider.getQualifiedNameMatcher(pathPattern)
 
     val nameMatcher = NameUtil.buildMatcher("*" + namePattern)
-      .withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE)
+      .withMatchingMode(MatchingMode.IGNORE_CASE)
       .preferringStartMatches()
       .build()
 
@@ -125,7 +128,9 @@ class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEvery
         if (matchingDegree > 0) {
           val psiItem = PsiManager.getInstance(project).getPsiFileSystemItem(file) ?: return@iterateNonIndexableFiles true
           val itemDescriptor = FoundItemDescriptor<Any>(psiItem, matchingDegree)
-          runReadAction { consumer.process(itemDescriptor) }
+          ReadAction.computeCancellable<Boolean, Throwable> {
+            consumer.process(itemDescriptor)
+          }
         }
         else {
           suboptimalMatches.add(file)
@@ -141,7 +146,7 @@ class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEvery
 
     val otherNameMatchers = List(namePattern.length - 1) { i ->
       NameUtil.buildMatcher(" " + namePattern.substring(i + 1))
-        .withCaseSensitivity(NameUtil.MatchingCaseSensitivity.NONE)
+        .withMatchingMode(MatchingMode.IGNORE_CASE)
         .build()
     }
 
@@ -154,13 +159,21 @@ class NonIndexableFilesSEContributor(event: AnActionEvent) : WeightedSearchEvery
           val psiItem = PsiManager.getInstance(project).getPsiFileSystemItem(file) ?: continue
           val weight = matchingDegree * (otherNameMatchers.size - i) / (otherNameMatchers.size + 1)
           val itemDescriptor = FoundItemDescriptor<Any>(psiItem, weight)
-          if (!runReadAction { consumer.process(itemDescriptor) }) return
+          if (!ReadAction.computeCancellable<Boolean, Throwable> {
+            consumer.process(itemDescriptor)
+          }) return
           break
         }
       }
     }
   }
 
+  override fun createExtendedInfo(): @Nls ExtendedInfo = createPsiExtendedInfo()
+
+  companion object {
+    @ApiStatus.Internal
+    const val ID: String = "NonIndexableFilesSEContributor"
+  }
 
   @ApiStatus.Internal
   class Factory : SearchEverywhereContributorFactory<Any?> {

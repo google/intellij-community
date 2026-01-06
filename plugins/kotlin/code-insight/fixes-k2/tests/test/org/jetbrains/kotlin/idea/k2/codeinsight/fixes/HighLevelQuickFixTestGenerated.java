@@ -6158,6 +6158,16 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             runTest("../../../idea/tests/testData/quickfix/createLabel/continueNoLoop.kt");
         }
 
+        @TestMetadata("exisitingLabel.kt")
+        public void testExisitingLabel() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/createLabel/exisitingLabel.kt");
+        }
+
+        @TestMetadata("exisitingLabelLambda.kt")
+        public void testExisitingLabelLambda() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/createLabel/exisitingLabelLambda.kt");
+        }
+
         @TestMetadata("returnInLambda.kt")
         public void testReturnInLambda() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/createLabel/returnInLambda.kt");
@@ -8013,6 +8023,55 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             public void testRight() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/equalityNotApplicable/numberConversion/right.kt");
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/destructingShortForm")
+    public static class DestructingShortForm extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("entryUsedInLambda.kt")
+        public void testEntryUsedInLambda() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/entryUsedInLambda.kt");
+        }
+
+        @TestMetadata("featureDisabled.kt")
+        public void testFeatureDisabled() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/featureDisabled.kt");
+        }
+
+        @TestMetadata("fullForm.kt")
+        public void testFullForm() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/fullForm.kt");
+        }
+
+        @TestMetadata("fullFormLambda.kt")
+        public void testFullFormLambda() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/fullFormLambda.kt");
+        }
+
+        @TestMetadata("multipleEntriesSameOriginalName.kt")
+        public void testMultipleEntriesSameOriginalName() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/multipleEntriesSameOriginalName.kt");
+        }
+
+        @TestMetadata("nestedScopeConflict.kt")
+        public void testNestedScopeConflict() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/nestedScopeConflict.kt");
+        }
+
+        @TestMetadata("nonDataClass.kt")
+        public void testNonDataClass() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/destructingShortForm/nonDataClass.kt");
         }
     }
 

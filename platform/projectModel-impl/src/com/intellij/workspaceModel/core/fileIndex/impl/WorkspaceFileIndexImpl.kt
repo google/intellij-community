@@ -17,6 +17,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.LowMemoryWatcher
 import com.intellij.openapi.vfs.*
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.NewVirtualFile
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.virtualFile
@@ -187,8 +188,14 @@ class WorkspaceFileIndexImpl : WorkspaceFileIndexEx, Disposable.Default {
         }
       }
     }
-    val result = VfsUtilCore.visitChildrenRecursively(fileOrDir, visitor)
-    return result.skipToParent != fileOrDir
+    // wrap non-indexable files as CacheAvoiding to prevent them from loading into VFS
+    val isIndexable = runReadAction { isIndexable(fileOrDir) }
+    val cacheAvoidingIfNecessary = when {
+      isIndexable -> fileOrDir
+      else -> NewVirtualFile.asCacheAvoiding(fileOrDir)
+    }
+    val result = VfsUtilCore.visitChildrenRecursively(cacheAvoidingIfNecessary, visitor)
+    return result.skipToParent != cacheAvoidingIfNecessary
   }
 
   private fun processContentFilesUnderExcludedDirectory(
@@ -215,16 +222,16 @@ class WorkspaceFileIndexImpl : WorkspaceFileIndexEx, Disposable.Default {
     val virtualFileUrl = virtualFileUrlManager.findByUrl(dir.url) ?: return VirtualFileVisitor.SKIP_CHILDREN
     val processed = virtualFileUrlManager.processChildrenRecursively(virtualFileUrl) { childUrl ->
       val childFile = childUrl.virtualFile ?: return@processChildrenRecursively TreeNodeProcessingResult.SKIP_CHILDREN
-      val isChildInIndexableContent = runReadAction {
+      val isChildInContent = runReadAction {
         findFileSet(file = childFile,
                     honorExclusion = true,
                     includeContentSets = true,
-                    includeContentNonIndexableSets = false,
+                    includeContentNonIndexableSets = true,
                     includeExternalSets = false,
                     includeExternalSourceSets = false,
                     includeCustomKindSets = false) != null
       }
-      return@processChildrenRecursively if (isChildInIndexableContent) {
+      return@processChildrenRecursively if (isChildInContent) {
         if (processContentUnderDirectory(childFile, processor, customFilter, fileSetFilter, numberOfExcludedParentDirectories + 1)) {
           TreeNodeProcessingResult.SKIP_CHILDREN
         }

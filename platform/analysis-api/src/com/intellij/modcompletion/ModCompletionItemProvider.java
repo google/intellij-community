@@ -6,11 +6,13 @@ import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNullByDefault;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -59,6 +61,7 @@ public interface ModCompletionItemProvider {
   record CompletionContext(
     PsiFile originalFile,
     int offset,
+    @Nullable PsiElement original,
     PsiElement element,
     PrefixMatcher matcher,
     int invocationCount,
@@ -99,6 +102,20 @@ public interface ModCompletionItemProvider {
     @Override
     public PsiElement getPosition() {
       return element;
+    }
+
+    @Override
+    public CompletionType getCompletionType() {
+      return type;
+    }
+
+    @Override
+    public @Nullable PsiElement getOriginalPosition() {
+      return original;
+    }
+
+    public Project getProject() {
+      return originalFile.getProject();
     }
   }
 }

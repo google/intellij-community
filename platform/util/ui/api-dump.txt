@@ -4704,7 +4704,6 @@ com.intellij.util.ui.JBUI$CurrentTheme$ToolWindow$DragAndDrop
 - sf:BUTTON_DROP_BACKGROUND:java.awt.Color
 - sf:BUTTON_DROP_BORDER:java.awt.Color
 - sf:BUTTON_FLOATING_BACKGROUND:java.awt.Color
-- sf:STRIPE_BACKGROUND:java.awt.Color
 f:com.intellij.util.ui.JBUI$CurrentTheme$Toolbar
 - sf:SEPARATOR_COLOR:java.awt.Color
 - <init>():V
@@ -5618,26 +5617,27 @@ a:com.intellij.util.ui.accessibility.AccessibleContextDelegateWithContextMenu
 - pa:doShowContextMenu():V
 - getAccessibleAction():javax.accessibility.AccessibleAction
 f:com.intellij.util.ui.accessibility.AccessibleContextUtil
-- <init>():V
-- s:combineAccessibleStrings(java.lang.String,java.lang.String):java.lang.String
-- s:combineAccessibleStrings(java.lang.String,java.lang.String,java.lang.String):java.lang.String
-- s:combineAccessibleStrings(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String):java.lang.String
-- s:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
-- s:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
-- s:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
-- s:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
-- s:getCombinedName(java.lang.String,java.awt.Component[]):java.lang.String
-- s:getUniqueDescription(javax.accessibility.AccessibleContext,java.lang.String):java.lang.String
-- s:replaceLineSeparatorsWithPunctuation(java.lang.String):java.lang.String
-- s:setCombinedDescription(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component):V
-- s:setCombinedDescription(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):V
-- s:setCombinedName(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component):V
-- s:setCombinedName(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):V
-- s:setDescription(java.awt.Component,java.awt.Component):V
-- s:setDescription(java.awt.Component,java.lang.String):V
-- s:setName(java.awt.Component,java.awt.Component):V
-- s:setName(java.awt.Component,java.lang.String):V
-- s:setParent(java.awt.Component,java.awt.Component):V
+- sf:INSTANCE:com.intellij.util.ui.accessibility.AccessibleContextUtil
+- sf:combineAccessibleStrings(java.lang.String,java.lang.String):java.lang.String
+- sf:combineAccessibleStrings(java.lang.String,java.lang.String,java.lang.String):java.lang.String
+- sf:combineAccessibleStrings(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String):java.lang.String
+- sf:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
+- sf:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
+- sf:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
+- sf:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
+- sf:getCombinedName(java.lang.String,java.awt.Component[]):java.lang.String
+- sf:getUniqueDescription(javax.accessibility.AccessibleContext,java.lang.String):java.lang.String
+- sf:joinAccessibleStrings(java.lang.String,java.lang.String[]):java.lang.String
+- sf:replaceLineSeparatorsWithPunctuation(java.lang.String):java.lang.String
+- sf:setCombinedDescription(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component):V
+- sf:setCombinedDescription(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):V
+- sf:setCombinedName(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component):V
+- sf:setCombinedName(java.awt.Component,java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):V
+- sf:setDescription(java.awt.Component,java.awt.Component):V
+- sf:setDescription(java.awt.Component,java.lang.String):V
+- sf:setName(java.awt.Component,java.awt.Component):V
+- sf:setName(java.awt.Component,java.lang.String):V
+- sf:setParent(java.awt.Component,java.awt.Component):V
 f:com.intellij.util.ui.accessibility.ScreenReader
 - sf:ACCESS_BRIDGE:java.lang.String
 - sf:ATK_WRAPPER:java.lang.String

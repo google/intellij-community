@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -59,7 +59,7 @@
     <orderEntry type="module" module-name="intellij.libraries.junit5.launcher" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.junit5.params" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.junit5.pioneer" scope="TEST" />
-    <orderEntry type="library" name="rd-framework" level="project" />
-    <orderEntry type="library" name="rd-core" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.rd.framework" />
+    <orderEntry type="module" module-name="intellij.libraries.rd.core" />
   </component>
 </module>

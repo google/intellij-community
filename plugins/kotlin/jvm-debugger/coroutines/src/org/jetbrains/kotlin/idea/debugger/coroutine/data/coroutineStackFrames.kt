@@ -11,7 +11,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XValueChildrenList
-import com.intellij.xdebugger.impl.frame.XDebuggerFramesList
+import com.intellij.xdebugger.impl.frame.XStackFrameWithSeparatorAbove
 import com.sun.jdi.Location
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.idea.debugger.base.util.safeLocation
@@ -46,7 +46,7 @@ class CreationCoroutineStackFrame(
     sourcePosition: XSourcePosition?,
     private var withSeparator: Boolean,
     location: Location? = frame.safeLocation()
-) : CoroutineStackFrame(frame, sourcePosition, emptyList(), false, location), XDebuggerFramesList.ItemWithSeparatorAbove {
+) : CoroutineStackFrame(frame, sourcePosition, emptyList(), false, location), XStackFrameWithSeparatorAbove {
 
     override fun getCaptionAboveOf() =
         KotlinDebuggerCoroutinesBundle.message("coroutine.dump.creation.trace")
@@ -88,12 +88,7 @@ open class CoroutineStackFrame(
         val frame = other as? CoroutineStackFrame ?: return false
 
         return descriptor.frameProxy == frame.descriptor.frameProxy
-                && samePosition(frame)
-    }
-
-    private fun samePosition(other: CoroutineStackFrame): Boolean {
-        if (position == null) return other.position == null
-        return position == other.position
+                && position == frame.position
     }
 
     override fun hashCode(): Int {

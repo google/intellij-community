@@ -35,7 +35,9 @@
                      implementationClass="com.jetbrains.python.sdk.poetry.PoetryPackageVersionsInspection"
                      key="INSP.poetry.package.versions.display.name" bundle="messages.PyBundle" groupKey="INSP.GROUP.python"
                      suppressId="PoetryPackageVersions" shortName="PoetryPackageVersionsInspection"/>
-    <registryKey defaultValue="10" description="How ofter system pythons must be refreshed (minutes)" key="python.system.refresh.minutes"/>
+    <registryKey defaultValue="10" description="How often system pythons must be refreshed (minutes)" key="python.system.refresh.minutes" restartRequired="true"/>
+    <registryKey defaultValue="20" description="How often conda environments cache must be refreshed (seconds)" key="python.conda.envs.refresh.seconds" restartRequired="true"/>
+    <registryKey defaultValue="60" description="TTL of conda environments cache (seconds)" key="python.conda.envs.cache.ttl.seconds" restartRequired="true"/>
     <!-- Only modules with `baseDir` support Python SDKs -->
     <registryKey defaultValue="true" description="Show non-python modules(different type, no python facet) in Python configurable when they have base dir" key="python.show.modules.with.base.dir" restartRequired="true"/>
     <fileType name="Requirements.txt"
@@ -67,6 +69,17 @@
       <option bundle="messages.PyPsiBundle" descriptionKey="INLAY.function.return" enabledByDefault="false" nameKey="INLAY.function.return"
               optionId="python.type.inlays.function.return"/>
     </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider group="TYPES_GROUP"
+                                          bundle="messages.PyPsiBundle"
+                                          implementationClass="com.jetbrains.python.inlayHints.PyPseudoKeywordPatternInlayHintsProvider"
+                                          isEnabledByDefault="true"
+                                          language="Python"
+                                          nameKey="INLAY.positional.args.patterns"
+                                          providerId="python.pseudo.keyword.pattern.inlays"/>
+
+    <codeInsight.inlayActionHandler implementationClass="com.jetbrains.python.inlayHints.PyPseudoKeywordPatternInlayActionHandler"
+                                    handlerId="py.pseudo.keyword.pattern"/>
 
 
     <!-- Requirements.txt support. Can't extract module due to circular dependency between it and community.impl (RequirementsFile inspection)-->
@@ -499,7 +512,7 @@
                                implementationClass="com.jetbrains.python.refactoring.invertBoolean.PyInvertBooleanDelegate"/>
 
     <!--folding-->
-    <codeFoldingOptionsProvider instance="com.jetbrains.python.PythonFoldingOptionsProvider"/>
+    <codeFoldingOptionsProvider instance="com.jetbrains.python.PythonFoldingOptionsProvider" id="Python" order="after Android,after C++,after Dart,after General,after Go,after Handlebars,after JAVA,after JavaScript,after JPAQL,after JSON,after Kubernetes,after LinkerScript,after Markdown,after ObjectiveC,after PHP"/>
 
     <!-- postfix templates!-->
     <codeInsight.template.postfixTemplateProvider language="Python"
@@ -530,7 +543,6 @@
     <statistics.projectUsagesCollector implementation="com.jetbrains.python.statistics.PyInterpreterUsagesCollector"/>
     <statistics.projectUsagesCollector implementation="com.jetbrains.python.statistics.PyPackageVersionUsagesCollector"/>
     <statistics.projectUsagesCollector implementation="com.jetbrains.python.statistics.PyPackageInEditorUsageCollector"/>
-    <statistics.projectUsagesCollector implementation="com.jetbrains.python.statistics.PyProjectTomlUsageCollector"/>
     <statistics.projectUsagesCollector implementation="com.jetbrains.python.statistics.PyCompatibilityInspectionCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.python.namespacePackages.PyNamespacePackagesStatisticsCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.python.codeInsight.codeVision.PyCodeVisionUsageCollector"/>
@@ -734,8 +746,6 @@
     <extensionPoint qualifiedName="Pythonid.remoteInterpreterManager"
                     interface="com.jetbrains.python.remote.PythonRemoteInterpreterManager"
                     dynamic="true"/>
-    <extensionPoint qualifiedName="Pythonid.remoteSkeletonGeneratorFactory"
-                    interface="com.jetbrains.python.remote.PyRemoteSkeletonGeneratorFactory" dynamic="true"/>
     <extensionPoint qualifiedName="Pythonid.remoteProcessStarterManager" interface="com.jetbrains.python.run.PyRemoteProcessStarterManager"
                     dynamic="true"/>
     <extensionPoint qualifiedName="Pythonid.remoteConsoleProcessCreator"

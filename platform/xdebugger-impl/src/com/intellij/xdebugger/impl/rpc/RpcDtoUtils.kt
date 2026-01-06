@@ -3,17 +3,22 @@ package com.intellij.xdebugger.impl.rpc
 
 import com.intellij.ide.rpc.util.textRange
 import com.intellij.ide.rpc.util.toRpc
+import com.intellij.ide.ui.icons.rpcId
 import com.intellij.ide.vfs.rpcId
 import com.intellij.ide.vfs.virtualFile
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.debugger.impl.rpc.XDebuggerTreeNodeHyperlinkDto
 import com.intellij.platform.debugger.impl.rpc.XSourcePositionDto
 import com.intellij.platform.debugger.impl.shared.XDebuggerUtilImplShared
 import com.intellij.pom.Navigatable
 import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
+import com.intellij.xdebugger.impl.rpc.models.storeGlobally
 import com.intellij.xdebugger.impl.ui.ExecutionPointHighlighter
+import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.ApiStatus
 
 
@@ -54,4 +59,18 @@ private class SerializedXSourcePosition(private val dto: XSourcePositionDto) : X
   }
 
   override fun getHighlightRange(): TextRange? = dto.textRangeDto?.textRange()
+}
+
+fun XDebuggerTreeNodeHyperlink.toRpc(cs: CoroutineScope): XDebuggerTreeNodeHyperlinkDto {
+  val id = storeGlobally(cs)
+  return XDebuggerTreeNodeHyperlinkDto(
+    id,
+    linkText,
+    linkTooltip,
+    linkIcon?.rpcId(),
+    shortcutSupplier?.get(),
+    alwaysOnScreen(),
+    textAttributes,
+    this,
+  )
 }

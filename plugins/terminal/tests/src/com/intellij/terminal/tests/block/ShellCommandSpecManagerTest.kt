@@ -171,6 +171,12 @@ internal class ShellCommandSpecManagerTest : BasePlatformTestCase() {
   }
 
   private fun createDummyRuntimeContext(): ShellRuntimeContext {
-    return ShellRuntimeContextImpl("", "", ShellName("dummy"), DummyShellCommandExecutor)
+    return ShellRuntimeContextImpl(
+      currentDirectory = "",
+      envVariables = emptyMap(),
+      commandTokens = listOf(""),
+      definedShellName = ShellName("dummy"),
+      generatorCommandsRunner = DummyShellCommandExecutor
+    )
   }
 }

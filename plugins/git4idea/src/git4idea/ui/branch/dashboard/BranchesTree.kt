@@ -3,6 +3,8 @@ package git4idea.ui.branch.dashboard
 
 import com.intellij.dvcs.DvcsUtil
 import com.intellij.dvcs.branch.GroupingKey
+import com.intellij.dvcs.repo.repositoryId
+import com.intellij.dvcs.ui.VcsRepositoryIconsProvider
 import com.intellij.ide.dnd.TransferableList
 import com.intellij.ide.dnd.aware.DnDAwareTree
 import com.intellij.ide.util.treeView.TreeState
@@ -19,12 +21,13 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.codeStyle.FixingLayoutMatcher
 import com.intellij.psi.codeStyle.MinusculeMatcher
-import com.intellij.psi.codeStyle.NameUtil
+import com.intellij.psi.codeStyle.PlatformKeyboardLayoutConverter
 import com.intellij.ui.*
 import com.intellij.ui.hover.TreeHoverListener
 import com.intellij.ui.speedSearch.SpeedSearchSupply
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.containers.FList
+import com.intellij.util.text.matching.MatchingMode
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.launchOnShow
@@ -106,8 +109,8 @@ internal class BranchesTreeComponent(project: Project) : DnDAwareTree() {
           selected = selected
         )
         is BranchNodeDescriptor.Group, is BranchNodeDescriptor.RemoteGroup -> GitBranchesTreeIconProvider.forGroup()
-        is BranchNodeDescriptor.Repository ->
-          GitBranchesTreeIconProvider.forRepository(descriptor.repository.project, descriptor.repository.rpcId)
+          is BranchNodeDescriptor.Repository ->
+            VcsRepositoryIconsProvider.getInstance(descriptor.repository.project).getIcon(descriptor.repository.repositoryId())
         else -> null
       }
 
@@ -232,11 +235,6 @@ internal class FilteringBranchesTree(
       override fun onTreeChange() {
         updateTree()
       }
-
-      override fun onTreeDataChange() {
-        tree.revalidate()
-        tree.repaint()
-      }
     }
 
     tree.launchOnShow("Git Dashboard Tree") {
@@ -321,11 +319,11 @@ internal class FilteringBranchesTree(
 private val BRANCH_TREE_TRANSFER_HANDLER = object : TransferHandler() {
   override fun createTransferable(tree: JComponent): Transferable? {
     if (tree is BranchesTreeComponent) {
-      val branches = tree.getSelection().selectedBranches
-      if (branches.isEmpty()) return null
+      val refs = tree.getSelection().selectedRefs
+      if (refs.isEmpty()) return null
 
-      return object : TransferableList<BranchInfo>(branches.toList()) {
-        override fun toString(branch: BranchInfo) = branch.toString()
+      return object : TransferableList<RefInfo>(refs.toList()) {
+        override fun toString(ref: RefInfo) = ref.toString()
       }
     }
     return null
@@ -504,7 +502,7 @@ private class BranchesTreeMatcher(rawPattern: String?) : MinusculeMatcher() {
     const val PARTIAL_MATCH_DEGREE = 1
 
     private fun createMatcher(word: String) =
-      GitBranchesMatcherWrapper(FixingLayoutMatcher("*$word", NameUtil.MatchingCaseSensitivity.NONE, ""))
+      GitBranchesMatcherWrapper(FixingLayoutMatcher("*$word", MatchingMode.IGNORE_CASE, "", PlatformKeyboardLayoutConverter))
   }
 }
 

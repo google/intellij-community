@@ -35,6 +35,7 @@ import com.intellij.workspaceModel.core.fileIndex.DependencyDescription.OnParent
 import com.intellij.workspaceModel.core.fileIndex.impl.ModuleRelatedRootData
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl.Companion.EP_NAME
 import com.intellij.workspaceModel.core.fileIndex.impl.getEntityPointer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -76,34 +77,55 @@ class ProjectEntityIndexingService(
     if (!Registry.`is`("use.workspace.file.index.for.partial.scanning")) return
     if (FileBasedIndex.getInstance() !is FileBasedIndexImpl) return
     if (LightEdit.owns(project)) return
-    if (invalidateProjectFilterIfFirstScanningNotRequested(project)) return
 
     if (ModalityState.defaultModalityState() === ModalityState.any()) {
       LOG.error("Unexpected modality: should not be ANY. Replace with NON_MODAL (130820241337)")
     }
 
     if (event.registeredFileSets.isNotEmpty() || event.removedFileSets.isNotEmpty()) {
-      val parameters =  computeScanningParametersFromWFIEvent(event)
-      UnindexedFilesScanner(project, parameters).queue()
+      val registeredIndexableFileSets = event.registeredFileSets.filter { it.kind.isIndexable }
+      val removedIndexableFileSets = event.removedFileSets.filter { it.kind.isIndexable }
+
+      if (registeredIndexableFileSets.isNotEmpty() || removedIndexableFileSets.isNotEmpty()) {
+        if (invalidateProjectFilterIfFirstScanningNotRequested(project)) return
+
+        val event  = WorkspaceFileIndexChangedEvent(
+          removedFileSets = removedIndexableFileSets,
+          registeredFileSets = registeredIndexableFileSets,
+          storageBefore = event.storageBefore,
+          storageAfter = event.storageAfter,
+        )
+        val parameters =  computeScanningParametersFromWFIEvent(event)
+        UnindexedFilesScanner(project, parameters).queue()
+      }
     }
   }
 
   private fun computeScanningParametersFromWFIEvent(event: WorkspaceFileIndexChangedEvent): Deferred<ScanningParameters> {
-    return scope.async {
-      ReadAction.nonBlocking(Callable {
-        val iterators = ArrayList<IndexableFilesIterator>()
-
-        //generateIteratorsFromWFIChangedEvent(event.removedFileSets, event.storageBefore, iterators)
-        generateIteratorsFromWFIChangedEvent(event.registeredFileSets, event.storageAfter, iterators)
-
-        return@Callable if (iterators.isEmpty()) {
-          CancelledScanning
-        }
-        else {
-          ScanningIterators("Changes from WorkspaceFileIndex", predefinedIndexableFilesIterators = iterators)
-        }
-      }).executeSynchronously()
+    return if (Registry.`is`("create.coroutines.for.wfi.events.processing")) {
+      scope.async {
+        processWfiEvent(event)
+      }
     }
+    else {
+      CompletableDeferred(processWfiEvent(event))
+    }
+  }
+
+  private fun processWfiEvent(event: WorkspaceFileIndexChangedEvent): ScanningParameters {
+    return ReadAction.nonBlocking(Callable {
+      val iterators = ArrayList<IndexableFilesIterator>()
+
+      //generateIteratorsFromWFIChangedEvent(event.removedFileSets, event.storageBefore, iterators)
+      generateIteratorsFromWFIChangedEvent(event.registeredFileSets, event.storageAfter, iterators)
+
+      return@Callable if (iterators.isEmpty()) {
+        CancelledScanning
+      }
+      else {
+        ScanningIterators("Changes from WorkspaceFileIndex", predefinedIndexableFilesIterators = iterators)
+      }
+    }).executeSynchronously()
   }
 
   private enum class Change {
@@ -133,7 +155,6 @@ class ProjectEntityIndexingService(
     for (fileSet in fileSets) {
       fileSet as WorkspaceFileSetWithCustomData<*>
       val entityPointer = fileSet.getEntityPointer() ?: continue
-      if (!fileSet.kind.isIndexable) continue
       if (fileSet.data is ModuleRelatedRootData) continue
       if (fileSet.kind.isContent) continue
 

@@ -5,7 +5,6 @@ package com.intellij.grazie.spellcheck.engine
 
 import ai.grazie.nlp.langs.Language
 import ai.grazie.nlp.langs.LanguageISO
-import ai.grazie.nlp.langs.alphabet.Alphabet
 import ai.grazie.nlp.utils.normalization.StripAccentsNormalizer
 import ai.grazie.spell.GrazieSpeller
 import ai.grazie.spell.GrazieSplittingSpeller
@@ -24,10 +23,8 @@ import com.intellij.grazie.spellcheck.ranker.DiacriticSuggestionRanker
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
-import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.io.FileUtil
@@ -38,7 +35,6 @@ import com.intellij.spellchecker.dictionary.Loader
 import com.intellij.spellchecker.engine.SpellCheckerEngine
 import com.intellij.spellchecker.engine.SpellCheckerEngineListener
 import com.intellij.spellchecker.engine.Transformation
-import com.intellij.spellchecker.grazie.SpellcheckerLifecycle
 import com.intellij.spellchecker.settings.CustomDictionarySettingsListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,8 +43,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 
-private const val MAX_WORD_LENGTH = 32
-internal val LIFECYCLE_EP_NAME: ExtensionPointName<SpellcheckerLifecycle> = ExtensionPointName("com.intellij.spellchecker.lifecycle")
+internal const val MAX_WORD_LENGTH: Int = 32
 
 class GrazieSpellCheckerEngine(
   project: Project,
@@ -57,7 +52,7 @@ class GrazieSpellCheckerEngine(
 
   companion object {
     @JvmStatic
-    fun getInstance(project: Project): GrazieSpellCheckerEngine = project.service<SpellCheckerEngine>() as GrazieSpellCheckerEngine
+    fun getInstance(project: Project): GrazieSpellCheckerEngine = SpellCheckerEngine.getInstance(project) as GrazieSpellCheckerEngine
 
     val enDictionary: HunspellDictionary by lazy {
       val dic = Resources.text("/dictionary/en.dic")
@@ -87,11 +82,6 @@ class GrazieSpellCheckerEngine(
     override suspend fun execute(project: Project) {
       getInstance(project).initializeSpeller(project)
       project.serviceAsync<SpellCheckerManager>()
-
-      // heavy classloading to avoid freezes from FJP thread starvation
-      for (lifecycle in LIFECYCLE_EP_NAME.extensionList) {
-        lifecycle.preload(project)
-      }
     }
   }
 
@@ -119,12 +109,12 @@ class GrazieSpellCheckerEngine(
     val wordList = ExtendedWordListWithFrequency(enDictionary.dict, adapter)
     return GrazieSpeller.UserConfig(model = LanguageModel(
       language = Language.ENGLISH,
-      words = ExtendedWordListWithFrequency(enDictionary.dict, adapter),
+      words = wordList,
       rules = RuleDictionary.Aggregated(this.replacingRules),
       ranker = DiacriticSuggestionRanker(LanguageModel.getRanker(Language.ENGLISH, wordList)),
       filter = RadiusSuggestionFilter(0.05),
       normalizer = StripAccentsNormalizer(),
-      isAlien = { !Alphabet.ENGLISH.matchAny(it) && adapter.isAlien(it) }
+      isAlien = { adapter.isAlien(it) }
     ))
   }
 
@@ -178,7 +168,7 @@ class GrazieSpellCheckerEngine(
     if (speller.isAlien(word)) {
       return true
     }
-    return !speller.isMisspelled(word = word, caseSensitive = false)
+    return !speller.isMisspelled(word, caseSensitive = false)
   }
 
   override fun getSuggestions(word: String, maxSuggestions: Int, maxMetrics: Int): List<String> {

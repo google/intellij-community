@@ -23,7 +23,8 @@ import org.jetbrains.idea.packagesearch.api.PackageSearchApiClientService
 import org.jetbrains.idea.reposearch.DependencySearchProvider
 import org.jetbrains.idea.reposearch.DependencySearchProvidersFactory
 
-private class PackageSearchProviderFactory : DependencySearchProvidersFactory {
+// package search has been set down, this code can be removed
+internal class PackageSearchProviderFactory : DependencySearchProvidersFactory {
   override fun getProviders(project: Project): Collection<DependencySearchProvider> {
     return when {
       !RegistryManager.getInstance().`is`("maven.packagesearch.enabled") -> emptyList()

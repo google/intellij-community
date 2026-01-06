@@ -14,6 +14,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.scopes.SearchScopesInfo
 import com.intellij.platform.searchEverywhere.*
+import com.intellij.platform.searchEverywhere.presentations.SeItemPresentation
+import com.intellij.platform.searchEverywhere.presentations.SeTextSearchItemPresentation
 import com.intellij.platform.searchEverywhere.providers.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,21 +55,24 @@ class SeTextItemsProvider(project: Project, private val contributorWrapper: SeAs
     get() = contributor.fullGroupName
   override val contributor: SearchEverywhereContributor<Any> get() = contributorWrapper.contributor
   private val findModel = FindManager.getInstance(project).findInProjectModel
-  private val scopeProviderDelegate = ScopeChooserActionProviderDelegate(contributorWrapper)
+  private val scopeProviderDelegate = ScopeChooserActionProviderDelegate.createOrNull(contributorWrapper)
 
   override suspend fun collectItems(params: SeParams, collector: SeItemsProvider.Collector) {
     val inputQuery = params.inputQuery
 
     val textFilter = SeTextFilter.from(params.filter)
 
-    val scopeToApply: String? = SeEverywhereFilter.isEverywhere(params.filter)?.let { isEverywhere ->
-      scopeProviderDelegate.searchScopesInfo.getValue()?.let { searchScopesInfo ->
-        if (isEverywhere) searchScopesInfo.everywhereScopeId else searchScopesInfo.projectScopeId
+    scopeProviderDelegate?.let { scopeProviderDelegate ->
+      val scopeToApply: String? = SeEverywhereFilter.isEverywhere(params.filter)?.let { isEverywhere ->
+        scopeProviderDelegate.searchScopesInfo.getValue()?.let { searchScopesInfo ->
+          if (isEverywhere) searchScopesInfo.everywhereScopeId else searchScopesInfo.projectScopeId
+        }
+      } ?: run {
+        textFilter?.selectedScopeId
       }
-    } ?: run {
-      textFilter?.selectedScopeId
+
+      scopeProviderDelegate.applyScope(scopeToApply, false)
     }
-    applyScope(scopeToApply)
 
     var originalModel: FindModel? = null
     val isAllTab: Boolean = SeEverywhereFilter.isAllTab(params.filter) == true
@@ -112,12 +117,8 @@ class SeTextItemsProvider(project: Project, private val contributorWrapper: SeAs
     return contributor.showInFindResults()
   }
 
-  private fun applyScope(scopeId: String?) {
-    scopeProviderDelegate.applyScope(scopeId, false)
-  }
-
   override suspend fun getSearchScopesInfo(): SearchScopesInfo? {
-    return scopeProviderDelegate.searchScopesInfo.getValue()
+    return scopeProviderDelegate?.searchScopesInfo?.getValue()
   }
 
   override suspend fun performExtendedAction(item: SeItem): Boolean {
@@ -131,7 +132,7 @@ class SeTextItemsProvider(project: Project, private val contributorWrapper: SeAs
     val legacyItem = (item as? SeTextSearchItem)?.item ?: return null
     val navigationOffsets = legacyItem.usage.mergedInfos.map { it.navigationRange.startOffset to it.navigationRange.endOffset }
 
-    return SePreviewInfo(legacyItem.usage.file.rpcId(), navigationOffsets)
+    return SePreviewInfoFactory().create(legacyItem.usage.file.rpcId(), navigationOffsets)
   }
 
   override fun dispose() {

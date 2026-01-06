@@ -11,6 +11,7 @@ import com.intellij.util.Function
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.MultiMap
 import com.intellij.vcs.log.*
+import com.intellij.vcs.log.impl.DetachedHeadRefGroup
 import com.intellij.vcs.log.impl.SimpleRefGroup
 import com.intellij.vcs.log.impl.SimpleRefGroup.Companion.buildGroups
 import com.intellij.vcs.log.impl.SimpleRefType
@@ -79,7 +80,7 @@ class GitRefManager(project: Project, private val repositoryManager: RepositoryM
     }
 
     val result = ArrayList(simpleGroups)
-    if (!localBranches.isEmpty()) result.add(SimpleRefGroup(GitBundle.message("git.log.refGroup.local"), localBranches, false))
+    if (!localBranches.isEmpty()) result.add(SimpleRefGroup(GitBundle.message("git.log.refGroup.local"), localBranches))
     for ((key, value) in remoteRefGroups.entrySet()) {
       result.add(RemoteRefGroup(key, value))
     }
@@ -114,7 +115,7 @@ class GitRefManager(project: Project, private val repositoryManager: RepositoryM
     val result = ArrayList<RefGroup>()
     result.addAll(refGroups)
     if (repository != null && !repository.isOnBranch) {
-      result.add(0, SimpleRefGroup("!", headRefs.toMutableList()))
+      result.add(0, DetachedHeadRefGroup(headRefs.toMutableList()))
     }
     else {
       if (!result.isEmpty()) {
@@ -178,7 +179,6 @@ class GitRefManager(project: Project, private val repositoryManager: RepositoryM
   }
 
   private inner class RemoteRefGroup(private val remote: GitRemote, private val branches: Collection<VcsRef>) : RefGroup {
-    override fun isExpanded() = false
     override fun getName() = remote.name + "/..."
     override fun getRefs() = ContainerUtil.sorted(branches, labelsOrderComparator)
     override fun getColors() = listOf(VcsLogStandardColors.Refs.BRANCH_REF)

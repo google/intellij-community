@@ -14,6 +14,7 @@ import com.intellij.codeInsight.lookup.impl.LookupImpl;
 import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.ide.DataManager;
 import com.intellij.lang.Language;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionManagerImpl;
 import com.intellij.openapi.application.*;
@@ -77,7 +78,7 @@ public class CodeCompletionHandlerBase {
   final boolean invokedExplicitly;
   final boolean synchronous;
   final boolean autopopup;
-  private static int ourAutoInsertItemTimeout = Registry.intValue("ide.completion.auto.insert.item.timeout", 2000);
+  private static int ourAutoInsertItemTimeout = getDefaultAutoInsertTimeout();
 
   private final Tracer completionTracer = TelemetryManager.getInstance().getTracer(CodeCompletion);
 
@@ -155,8 +156,7 @@ public class CodeCompletionHandlerBase {
     invokeCompletionWithTracing(project, editor, time, hasModifiers, editor.getCaretModel().getPrimaryCaret());
   }
 
-  @ApiStatus.Internal
-  protected void invokeCompletion(@NotNull Project project, @NotNull Editor editor, int time, boolean hasModifiers, @NotNull Caret caret) {
+  private void invokeCompletion(@NotNull Project project, @NotNull Editor editor, int time, boolean hasModifiers, @NotNull Caret caret) {
     markCaretAsProcessed(caret);
 
     if (invokedExplicitly) {
@@ -307,7 +307,7 @@ public class CodeCompletionHandlerBase {
     if (synchronous && isValidContext) {
       OffsetsInFile hostCopyOffsets = withTimeout(calcSyncTimeOut(startingTime), () -> {
         PsiDocumentManager.getInstance(initContext.getProject()).commitAllDocuments();
-        return CompletionInitializationUtil.insertDummyIdentifier(initContext, indicator).get();
+        return CompletionInitializationUtil.insertDummyIdentifier(initContext, indicator).ensureUpdatedAndGetNewOffsets();
       });
       if (hostCopyOffsets != null) {
         trySynchronousCompletion(initContext, hasModifiers, startingTime, indicator, hostCopyOffsets);
@@ -317,8 +317,7 @@ public class CodeCompletionHandlerBase {
     scheduleContributorsAfterAsyncCommit(initContext, indicator, hasModifiers);
   }
 
-  @ApiStatus.Internal
-  protected void scheduleContributorsAfterAsyncCommit(@NotNull CompletionInitializationContextImpl initContext,
+  private void scheduleContributorsAfterAsyncCommit(@NotNull CompletionInitializationContextImpl initContext,
                                                     @NotNull CompletionProgressIndicator indicator,
                                                     boolean hasModifiers) {
     CompletionPhase phase;
@@ -336,7 +335,7 @@ public class CodeCompletionHandlerBase {
       .expireWith(phase)
       .withDocumentsCommitted(indicator.getProject())
       .finishOnUiThread(ModalityState.defaultModalityState(), applyPsiChanges -> {
-        OffsetsInFile hostCopyOffsets = applyPsiChanges.get();
+        OffsetsInFile hostCopyOffsets = applyPsiChanges.ensureUpdatedAndGetNewOffsets();
 
         if (phase instanceof CompletionPhase.CommittingDocuments) {
           ((CompletionPhase.CommittingDocuments)phase).replaced = true;
@@ -353,8 +352,7 @@ public class CodeCompletionHandlerBase {
    * 2. It waits for them to be computed for the given timeout.
    * 3. If candidates are computed until timeout, the UI is updated immediately, otherwise computation continues and the phase is set to BgCalculation.
    */
-  @ApiStatus.Internal
-  protected void trySynchronousCompletion(@NotNull CompletionInitializationContextImpl initContext,
+  private void trySynchronousCompletion(@NotNull CompletionInitializationContextImpl initContext,
                                         boolean hasModifiers,
                                         long startingTime,
                                         @NotNull CompletionProgressIndicator indicator,
@@ -832,15 +830,13 @@ public class CodeCompletionHandlerBase {
     };
   }
 
-  @ApiStatus.Internal
-  protected static void clearCaretMarkers(@NotNull Editor editor) {
+  private static void clearCaretMarkers(@NotNull Editor editor) {
     for (Caret caret : editor.getCaretModel().getAllCarets()) {
       caret.putUserData(CARET_PROCESSED, null);
     }
   }
 
-  @ApiStatus.Internal
-  protected static void markCaretAsProcessed(@NotNull Caret caret) {
+  private static void markCaretAsProcessed(@NotNull Caret caret) {
     caret.putUserData(CARET_PROCESSED, Boolean.TRUE);
   }
 
@@ -861,15 +857,20 @@ public class CodeCompletionHandlerBase {
     return ProgressIndicatorUtils.withTimeout(maxDurationMillis, task);
   }
 
-  @ApiStatus.Internal
-  protected static int calcSyncTimeOut(long startTime) {
+  private static int calcSyncTimeOut(long startTime) {
     return (int)Math.max(300, ourAutoInsertItemTimeout - (System.currentTimeMillis() - startTime));
   }
 
   @TestOnly
-  public static void setAutoInsertTimeout(int timeout) {
+  public static void setAutoInsertTimeout(int timeout, @NotNull Disposable parentDisposable) {
     ourAutoInsertItemTimeout = timeout;
+    Disposer.register(parentDisposable, () -> ourAutoInsertItemTimeout = getDefaultAutoInsertTimeout());
   }
+
+  private static int getDefaultAutoInsertTimeout() {
+    return Registry.intValue("ide.completion.auto.insert.item.timeout", 2000);
+  }
+
 
   protected boolean isTestingCompletionQualityMode() {
     return false;

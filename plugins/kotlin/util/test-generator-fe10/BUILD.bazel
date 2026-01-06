@@ -34,7 +34,7 @@ jvm_library(
     "//plugins/kotlin/project-wizard/cli",
     "//plugins/kotlin/project-wizard/tests:tests_test_lib",
     "//plugins/kotlin/j2k/k1.new/tests:tests_test_lib",
-    "//plugins/kotlin/tests-common:tests-common_test_lib",
+    "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common",
     "//platform/testFramework",
@@ -56,7 +56,8 @@ jvm_library(
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k1:kotlin-gradle-scripting-k1",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k1:kotlin-gradle-scripting-k1_test_lib",
-  ]
+  ],
+  runtime_deps = [":test-generator-fe10"]
 )
 ### auto-generated section `build kotlin.util.test-generator-fe10` end
 

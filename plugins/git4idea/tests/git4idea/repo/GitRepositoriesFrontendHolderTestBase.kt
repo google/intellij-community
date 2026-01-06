@@ -1,9 +1,11 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.repo
 
+import com.intellij.dvcs.repo.repositoryId
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.vcs.git.repo.GitRepositoriesHolder
 import com.intellij.vcs.git.repo.GitRepositoryModel
+import com.intellij.vcsUtil.VcsUtil.getFilePath
 import git4idea.GitWorkingTree
 import git4idea.test.GitSingleRepoTest
 import git4idea.test.git
@@ -32,8 +34,8 @@ abstract class GitRepositoriesFrontendHolderTestBase : GitSingleRepoTest() {
   }
 
   protected fun GitRepositoriesHolder.getTestRepo(): GitRepositoryModel {
-    val holderRepo = checkNotNull(get(repo.rpcId))
-    assertEquals(holderRepo.root, repo.root)
+    val holderRepo = checkNotNull(get(repo.repositoryId()))
+    assertEquals(holderRepo.root, getFilePath(repo.root))
     return holderRepo
   }
 

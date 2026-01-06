@@ -18,12 +18,14 @@ import com.intellij.openapi.vcs.impl.projectlevelman.AllVcsesI
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.vcs.changes.ChangesUtil
 import com.intellij.testFramework.LightPlatformTestCase
 import com.intellij.testFramework.common.runAll
 import com.intellij.util.io.createDirectories
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcsUtil.VcsUtil
-import org.mockito.Mockito
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import java.nio.file.Paths
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -33,9 +35,9 @@ abstract class BaseChangeListsTest : LightPlatformTestCase() {
     val DEFAULT = LocalChangeList.getDefaultName()
 
     fun createMockFileEditor(document: Document): FileEditor {
-      val editor = Mockito.mock(FileEditor::class.java, Mockito.withSettings().extraInterfaces(DocumentReferenceProvider::class.java))
+      val editor = mock<FileEditor>(extraInterfaces = arrayOf(DocumentReferenceProvider::class))
       val references = listOf(DocumentReferenceManager.getInstance().create(document))
-      Mockito.`when`((editor as DocumentReferenceProvider).documentReferences).thenReturn(references)
+      whenever((editor as DocumentReferenceProvider).documentReferences).thenReturn(references)
       return editor
     }
   }
@@ -124,10 +126,15 @@ abstract class BaseChangeListsTest : LightPlatformTestCase() {
   }
 
 
-  protected fun addLocalFile(name: String, content: String): VirtualFile {
+  protected fun addLocalFile(name: String, content: String, baseContent: String? = null): VirtualFile {
     val file = createLocalFile(name, content)
     assertFalse(changeProvider.files.contains(file))
     changeProvider.files.add(file)
+
+    if (baseContent != null) {
+      setBaseVersion(name, baseContent)
+    }
+
     return file
   }
 
@@ -244,22 +251,30 @@ abstract class BaseChangeListsTest : LightPlatformTestCase() {
     val changes = mutableMapOf<FilePath, ContentRevision?>()
     val files = mutableSetOf<VirtualFile>()
 
-    override fun getChanges(dirtyScope: VcsDirtyScope,
-                            builder: ChangelistBuilder,
-                            progress: ProgressIndicator,
-                            addGate: ChangeListManagerGate) {
+    override fun getChanges(
+      dirtyScope: VcsDirtyScope,
+      builder: ChangelistBuilder,
+      progress: ProgressIndicator,
+      addGate: ChangeListManagerGate,
+    ) {
       markerSemaphore.release()
       semaphore.acquireOrThrow()
       try {
-        for ((filePath, beforeRevision) in changes) {
+        val changesToProcess = changes.map { (filePath, beforeRevision) ->
           val afterContent: ContentRevision? =
             if (files.find { VcsUtil.getFilePath(it) == filePath } == null)
               null
             else CurrentContentRevision(filePath)
+          Change(beforeRevision, afterContent)
+        }
 
-          val change = Change(beforeRevision, afterContent)
+        changesToProcess.forEach { change -> builder.processChange(change, MockAbstractVcs.getKey()) }
 
-          builder.processChange(change, MockAbstractVcs.getKey())
+        for (file in files) {
+          val path = VcsUtil.getFilePath(file)
+          if (changesToProcess.none { ChangesUtil.matches(it, path) }) {
+            builder.processUnversionedFile(path)
+          }
         }
       }
       finally {

@@ -71,12 +71,7 @@ open class StarterInitialStep(contextProvider: StarterContextProvider) : CommonS
     wizardContext.projectName = entityName
     wizardContext.setProjectFileDirectory(FileUtil.join(location, entityName))
 
-    val sdk = jdkIntentProperty.get().prepareJdk()
-    moduleBuilder.moduleJdk = sdk
-
-    if (wizardContext.project == null) {
-      wizardContext.projectJdk = sdk
-    }
+    moduleBuilder.moduleJdk = wizardContext.projectJdk
   }
 
   override fun getComponent(): JComponent {
@@ -147,7 +142,9 @@ open class StarterInitialStep(contextProvider: StarterContextProvider) : CommonS
       addSampleCodeUi()
 
       addFieldsAfter(this)
-    }.withVisualPadding(topField = true)
+    }
+      .withVisualPadding(topField = true)
+      .apply { registerValidators(parentDisposable) }
   }
 
   override fun validate(): Boolean {
@@ -157,7 +154,14 @@ open class StarterInitialStep(contextProvider: StarterContextProvider) : CommonS
     if (!validateJdkIntentVersion(jdkIntentProperty, moduleBuilder.getMinJavaVersionInternal()?.toFeatureString(), moduleBuilder.presentableName)) {
       return false
     }
+    if (contentPanel.validateAll().isNotEmpty()) {
+      return false
+    }
     return true
+  }
+
+  override fun onStepLeaving() {
+    contentPanel.apply()
   }
 
   private fun updateStartersDependencies(starterPack: StarterPack) {

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.impl;
 
 import com.intellij.concurrency.ConcurrentCollectionFactory;
@@ -31,6 +31,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.RunnableCallable;
+import com.intellij.util.SlowOperations;
 import com.intellij.util.concurrency.*;
 import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
@@ -43,6 +44,8 @@ import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
 import kotlin.reflect.KClass;
 import kotlinx.coroutines.Job;
+import kotlinx.coroutines.JobKt;
+import kotlinx.coroutines.future.FutureKt;
 import org.jetbrains.annotations.*;
 import org.jetbrains.concurrency.AsyncPromise;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -341,6 +344,23 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
       }
     }
 
+    @Nullable
+    @Override
+    public T get() {
+      SlowOperations.assertSlowOperationsAreAllowed();
+      return super.get();
+    }
+
+    @Nullable
+    @Override
+    public T get(long timeout, @NotNull TimeUnit unit) {
+      // allow the 'get-if-finished-fast' pattern
+      if (unit.toMillis(timeout) > 50) {
+        SlowOperations.assertSlowOperationsAreAllowed();
+      }
+      return super.get(timeout, unit);
+    }
+
     private void expireWithDisposables(Disposable @NotNull [] disposables) {
       for (int i = 0; i < disposables.length; i++) {
         Disposable parent = disposables[i];
@@ -561,7 +581,18 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
           }
           finally {
             if (builder.myCoalesceEquality != null) {
-              release();
+              if (AppExecutorUtil.propagateContext()) {
+                // `release` should be called under [myChildContext] as well
+                // since it executes some code to check when to call computation, and this code may rely on the context
+                // e.g. in analyzer: Application and Project are stored in context and `release` uses Application
+                ThreadContext.installThreadContext(myChildContext.getContext(), true, () -> {
+                  release();
+                  return Unit.INSTANCE;
+                });
+              }
+              else {
+                release();
+              }
             }
           }
         };
@@ -590,10 +621,11 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
             else {
               context = ThreadContext.currentThreadContext();
             }
-            ThreadContext.installThreadContext(context, true, () -> {
-              attemptComputation();
-              return Unit.INSTANCE;
-            });
+            boolean couldRun = ThreadContext.installThreadContext(context, true, this::attemptComputation);
+
+            if (!couldRun) {
+              blockUntilWriteActionIsDone(context);
+            }
 
             if (isDone()) {
               if (isCancelled()) {
@@ -632,6 +664,25 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
       }
       finally {
         cleanupIfNeeded();
+      }
+    }
+
+    private static void blockUntilWriteActionIsDone(CoroutineContext context) {
+      ThreadingAssertions.assertNoReadAccess();
+      CompletableFuture<Unit> future = FutureKt.asCompletableFuture(JobKt.Job(context.get(Job.Key)));
+      Objects.requireNonNull(ApplicationManager.getApplication().getThreadingSupport()).runWhenWriteActionIsCompleted(() -> {
+        future.complete(Unit.INSTANCE);
+        return Unit.INSTANCE;
+      });
+      try {
+        future.get();
+      }
+      catch (InterruptedException e) {
+        throw new ProcessCanceledException(e);
+      }
+      catch (ExecutionException e) {
+        // should be impossible
+        throw new RuntimeException(e);
       }
     }
 

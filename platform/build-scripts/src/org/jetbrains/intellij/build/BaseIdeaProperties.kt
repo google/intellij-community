@@ -37,6 +37,7 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.vcs.github",
   "intellij.vcs.gitlab",
   "intellij.groovy",
+  "intellij.groovy.live.templates",
   "intellij.junit",
   "intellij.testng",
   "intellij.java.i18n",
@@ -73,8 +74,8 @@ val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
   "plugins/gradle/lib/gradle-tooling-extension-api.jar" to "1.8",
   "plugins/gradle/lib/gradle-tooling-extension-impl.jar" to "1.8",
   "plugins/maven/lib/maven-server.jar" to "1.8",
-  "plugins/maven/lib/maven3-server-common.jar" to "1.8",
-  "plugins/maven/lib/maven3-server.jar" to "1.8",
+  "plugins/maven/lib/intellij.maven.server3/maven3-server-common.jar" to "1.8",
+  "plugins/maven/lib/intellij.maven.server3/maven3-server.jar" to "1.8",
   "plugins/maven/lib/artifact-resolver-m31.jar" to "1.8",
   "plugins/java/lib/sa-jdwp" to "",  // ignored
   "plugins/java/lib/rt/debugger-agent.jar" to "1.7",

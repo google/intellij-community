@@ -18,7 +18,11 @@ import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DelicateCoroutinesApi
+import org.jetbrains.annotations.ApiStatus.Experimental
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.intellij.build.ApplicationInfoProperties
 import org.jetbrains.intellij.build.ApplicationInfoPropertiesImpl
 import org.jetbrains.intellij.build.BuildContext
@@ -67,6 +71,68 @@ import kotlin.time.Duration
 
 @Suppress("SpellCheckingInspection")
 private val PLUGIN_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
+
+@OptIn(DelicateCoroutinesApi::class)
+suspend fun createBuildContext(
+  projectHome: Path,
+  productProperties: ProductProperties,
+  setupTracer: Boolean = true,
+  proprietaryBuildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
+  options: BuildOptions = BuildOptions(),
+  scope: CoroutineScope? = null,
+): BuildContext {
+  val compilationContext = createCompilationContext(
+    projectHome = projectHome,
+    buildOutputRootEvaluator = createBuildOutputRootEvaluator(projectHome, productProperties, options),
+    options = options,
+    setupTracer = setupTracer,
+  ).toBazelIfNeeded(scope).toArchivedIfNeeded(scope)
+  return createBuildContext(
+    compilationContext = compilationContext,
+    projectHome = projectHome,
+    productProperties = productProperties,
+    proprietaryBuildTools = proprietaryBuildTools,
+  )
+}
+
+@Experimental
+@Internal
+suspend fun createCompilationContext(
+  projectHome: Path,
+  productProperties: ProductProperties,
+  options: BuildOptions,
+  scope: CoroutineScope,
+  setupTracer: Boolean,
+): CompilationContext {
+  return createCompilationContext(
+    projectHome = projectHome,
+    buildOutputRootEvaluator = createBuildOutputRootEvaluator(projectHome = projectHome, productProperties = productProperties, buildOptions = options),
+    options = options,
+    setupTracer = setupTracer,
+  ).toBazelIfNeeded(scope).toArchivedIfNeeded(scope)
+}
+
+fun createBuildContext(
+  compilationContext: CompilationContext,
+  projectHome: Path,
+  productProperties: ProductProperties,
+  proprietaryBuildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
+): BuildContextImpl {
+  val projectHomeAsString = projectHome.invariantSeparatorsPathString
+  val jarCacheManager = compilationContext.options.jarCacheDir?.let {
+    LocalDiskJarCacheManager(cacheDir = it, productionClassOutDir = compilationContext.classesOutputDirectory.resolve("production"))
+  } ?: NonCachingJarCacheManager
+  return BuildContextImpl(
+    compilationContext = compilationContext.asArchivedIfNeeded,
+    productProperties = productProperties,
+    windowsDistributionCustomizer = productProperties.createWindowsCustomizer(projectHome),
+    linuxDistributionCustomizer = productProperties.createLinuxCustomizer(projectHomeAsString),
+    macDistributionCustomizer = productProperties.createMacCustomizer(projectHome),
+    proprietaryBuildTools = proprietaryBuildTools,
+    applicationInfo = ApplicationInfoPropertiesImpl(project = compilationContext.project, productProperties = productProperties, buildOptions = compilationContext.options),
+    jarCacheManager = jarCacheManager,
+  )
+}
 
 class BuildContextImpl internal constructor(
   internal val compilationContext: CompilationContext,
@@ -141,7 +207,7 @@ class BuildContextImpl internal constructor(
 
   private var builtinModulesData: BuiltinModulesFileData? = null
 
-  internal val jarPackagerDependencyHelper: JarPackagerDependencyHelper by lazy { JarPackagerDependencyHelper(this.compilationContext) }
+  internal val jarPackagerDependencyHelper: JarPackagerDependencyHelper by lazy { JarPackagerDependencyHelper(outputProvider) }
 
   override val nonBundledPlugins: Path by lazy { paths.artifactDir.resolve("${applicationInfo.productCode}-plugins") }
 
@@ -176,6 +242,7 @@ class BuildContextImpl internal constructor(
   }
 
   companion object {
+    @Deprecated("Use `createBuildContext`", ReplaceWith("createBuildContext(projectHome, productProperties, proprietaryBuildTools, options)"))
     suspend fun createContext(
       projectHome: Path,
       productProperties: ProductProperties,
@@ -183,39 +250,12 @@ class BuildContextImpl internal constructor(
       proprietaryBuildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
       options: BuildOptions = BuildOptions(),
     ): BuildContext {
-      val compilationContext = CompilationContextImpl.createCompilationContext(
+      return createBuildContext(
         projectHome = projectHome,
-        buildOutputRootEvaluator = createBuildOutputRootEvaluator(projectHome, productProperties, options),
+        productProperties = productProperties,
+        setupTracer = setupTracer,
+        proprietaryBuildTools = proprietaryBuildTools,
         options = options,
-        setupTracer = setupTracer
-      ).asBazelIfNeeded
-      return createContext(
-        compilationContext = compilationContext,
-        projectHome = projectHome,
-        productProperties = productProperties,
-        proprietaryBuildTools = proprietaryBuildTools,
-      )
-    }
-
-    fun createContext(
-      compilationContext: CompilationContext,
-      projectHome: Path,
-      productProperties: ProductProperties,
-      proprietaryBuildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
-    ): BuildContextImpl {
-      val projectHomeAsString = projectHome.invariantSeparatorsPathString
-      val jarCacheManager = compilationContext.options.jarCacheDir?.let {
-        LocalDiskJarCacheManager(cacheDir = it, productionClassOutDir = compilationContext.classesOutputDirectory.resolve("production"))
-      } ?: NonCachingJarCacheManager
-      return BuildContextImpl(
-        compilationContext = compilationContext.asArchivedIfNeeded,
-        productProperties = productProperties,
-        windowsDistributionCustomizer = productProperties.createWindowsCustomizer(projectHome),
-        linuxDistributionCustomizer = productProperties.createLinuxCustomizer(projectHomeAsString),
-        macDistributionCustomizer = productProperties.createMacCustomizer(projectHome),
-        proprietaryBuildTools = proprietaryBuildTools,
-        applicationInfo = ApplicationInfoPropertiesImpl(project = compilationContext.project, productProperties = productProperties, buildOptions = compilationContext.options),
-        jarCacheManager = jarCacheManager,
       )
     }
   }
@@ -277,7 +317,7 @@ class BuildContextImpl internal constructor(
     val rootModule = productProperties.embeddedFrontendRootModule
     if (rootModule != null && options.enableEmbeddedFrontend) {
       val productModules = loadRawProductModules(rootModule, ProductMode.FRONTEND)
-      FrontendModuleFilterImpl.createFrontendModuleFilter(project = project, productModules = productModules, context = this@BuildContextImpl)
+      FrontendModuleFilterImpl.createFrontendModuleFilter(project = project, productModules = productModules, outputProvider = outputProvider)
     }
     else {
       EmptyFrontendModuleFilter
@@ -291,7 +331,7 @@ class BuildContextImpl internal constructor(
   private fun computeContentModuleFilter(): ContentModuleFilter {
     if (productProperties.productMode == ProductMode.MONOLITH) {
       if (productProperties.productLayout.skipUnresolvedContentModules) {
-        return SkipUnresolvedOptionalContentModuleFilter(context = this)
+        return SkipUnresolvedOptionalContentModuleFilter(outputProvider)
       }
       return IncludeAllContentModuleFilter
     }
@@ -400,6 +440,9 @@ class BuildContextImpl internal constructor(
     jvmArgs.add("-Dpty4j.preferred.native.folder=${macroName}/lib/pty4j".let { if (isScript) '"' + it + '"' else it })
     jvmArgs.add("-Dio.netty.allocator.type=pooled")
 
+    // require bundled Skiko
+    jvmArgs.add("-Dskiko.library.path=${macroName}/lib/skiko-awt-runtime-all")
+
     if (useModularLoader || generateRuntimeModuleRepository) {
       jvmArgs.add("-Dintellij.platform.runtime.repository.path=${macroName}/${MODULE_DESCRIPTORS_COMPACT_PATH}".let { if (isScript) '"' + it + '"' else it })
     }
@@ -454,7 +497,7 @@ class BuildContextImpl internal constructor(
   }
 
   override fun loadRawProductModules(rootModuleName: String, productMode: ProductMode): RawProductModules {
-    val productModulesFile = findProductModulesFile(clientMainModuleName = rootModuleName, context = this)
+    val productModulesFile = findProductModulesFile(clientMainModuleName = rootModuleName, provider = outputProvider)
                              ?: error("Cannot find product-modules.xml file in $rootModuleName")
     val resolver = object : ResourceFileResolver {
       override fun readResourceFile(moduleId: RuntimeModuleId, relativePath: String): InputStream? {

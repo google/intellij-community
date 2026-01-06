@@ -2,49 +2,84 @@ package com.intellij.lambda.testFramework.starter
 
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.splitMode
-import com.intellij.ide.starter.coroutine.testSuiteSupervisorScope
+import com.intellij.ide.starter.coroutine.perClassSupervisorScope
+import com.intellij.ide.starter.ide.isRemDevContext
+import com.intellij.ide.starter.junit5.cancelSupervisorScope
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.runner.Starter
+import com.intellij.ide.starter.runner.events.IdeLaunchEvent
 import com.intellij.ide.starter.utils.catchAll
 import com.intellij.lambda.testFramework.junit.IdeRunMode
-import com.intellij.lambda.testFramework.utils.BackgroundRunWithLambda
-import com.intellij.lambda.testFramework.utils.IdeLambdaStarter.runIdeWithLambda
-import com.intellij.lambda.testFramework.utils.LambdaTestPluginHolder
-import com.intellij.tools.ide.util.common.starterLogger
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlin.time.Duration.Companion.seconds
+import com.intellij.lambda.testFramework.utils.IdeWithLambda
+import com.intellij.lambda.testFramework.utils.runIdeWithLambda
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.tools.ide.starter.bus.EventsBus
 
-private val LOG = starterLogger<IdeInstance>()
+data class RunContext(var frontendContext: IDERunContext, var backendContext: IDERunContext? = null)
 
 object IdeInstance {
-  private var _ide: BackgroundRunWithLambda? = null
-  val ide: BackgroundRunWithLambda
+
+  private val LOG by lazy { logger<IdeInstance>() }
+
+  private var _ide: IdeWithLambda? = null
+  val ide: IdeWithLambda
     get() = _ide ?: throw IllegalStateException("IDE is not started yet")
 
   lateinit var currentIdeMode: IdeRunMode
     private set
-  private lateinit var runContext: IDERunContext
+
+  private lateinit var currentIdeConfig: IdeStartConfig
+  lateinit var runContext: RunContext
+    private set
 
   fun isStarted(): Boolean = _ide != null
 
-  fun startIde(runMode: IdeRunMode): BackgroundRunWithLambda = synchronized(this) {
+  fun startIde(runMode: IdeRunMode): IdeWithLambda = synchronized(this) {
     try {
-      LOG.info("Starting IDE in mode: $runMode")
-
-      if (isStarted() && currentIdeMode == runMode) {
-        LOG.info("IDE is already running in mode: $runMode. Reusing the current instance of IDE.")
+      if (isStarted() && currentIdeMode == runMode && IdeStartConfig.current == currentIdeConfig) {
+        LOG.info("IDE is already running in mode: $runMode and there were no requests to change it's config. Reusing the current instance of IDE.")
         return ide
+      }
+      else {
+        LOG.info("Starting IDE in mode: $runMode")
       }
 
       stopIde()
       currentIdeMode = runMode
+      currentIdeConfig = IdeStartConfig.current
       ConfigurationStorage.splitMode(currentIdeMode == IdeRunMode.SPLIT)
 
-      val testContext = Starter.newContextWithLambda(runMode.name,
-                                                     UltimateTestCases.JpsEmptyProject,
-                                                     *LambdaTestPluginHolder.additionalPluginIds().toTypedArray())
-      _ide = testContext.runIdeWithLambda(configure = { runContext = this })
+      EventsBus.subscribe(IdeInstance) { event: IdeLaunchEvent ->
+        if (event.runContext.testContext.isRemDevContext()) {
+          LOG.info("$runMode mode run context hash ${event.runContext.hashCode()} object ${event.runContext}")
+
+          if (this::runContext.isInitialized) {
+            runContext = runContext.copy(backendContext = event.runContext)
+          }
+          else {
+            runContext = RunContext(backendContext = event.runContext, frontendContext = event.runContext)
+          }
+        }
+        else {
+          val frontendName = if (runMode == IdeRunMode.SPLIT) "Frontend" else "Monolith"
+          LOG.info("$frontendName run context hash ${event.runContext.hashCode()} object ${event.runContext}")
+
+          if (this::runContext.isInitialized) {
+            runContext = runContext.copy(frontendContext = event.runContext)
+          }
+          else {
+            runContext = RunContext(frontendContext = event.runContext)
+          }
+        }
+      }
+
+      val testContext = Starter.newContextWithLambda(runMode.name, IdeStartConfig.current)
+      _ide = testContext.runIdeWithLambda(configure = {
+        IdeStartConfig.current.configureRunContext(this)
+        // Artifacts will be published after each test by invoking IdeInstance.publishArtifacts
+        this.artifactsPublishingEnabled = false
+      })
+
       return ide
     }
     catch (e: Throwable) {
@@ -54,25 +89,20 @@ object IdeInstance {
   }
 
   fun stopIde(): Unit = synchronized(this) {
-    if (!isStarted()) return
+    if (isStarted()) {
+      LOG.info("Stopping IDE with current ide mode: $currentIdeMode")
+      catchAll { _ide?.forceKill() }
+      _ide = null
+    }
+    else {
+      LOG.info("IDE wasn't started. Skipping stopping it.")
+    }
 
-    LOG.info("Stopping IDE that is running in mode: $currentIdeMode")
-    catchAll { _ide?.forceKill() }
-    _ide = null
+    cancelSupervisorScope(perClassSupervisorScope, "IDE was stopped/not running so cancelling it's scope as well")
   }
 
   fun publishArtifacts(): Unit = synchronized(this) {
-    runContext.publishArtifacts()
-  }
-
-  fun cleanup() = synchronized(this) {
-    @Suppress("RAW_RUN_BLOCKING")
-    runBlocking(testSuiteSupervisorScope.coroutineContext) {
-      withTimeout(5.seconds) {
-        catchAll("IDE instance cleanup") {
-          ide.cleanUp()
-        }
-      }
-    }
+    runContext.frontendContext.publishArtifacts(publish = true)
+    runContext.backendContext?.publishArtifacts(publish = true)
   }
 }

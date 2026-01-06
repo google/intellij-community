@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -65,5 +65,8 @@
     <orderEntry type="module" module-name="intellij.platform.util.classLoader" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" />
+    <orderEntry type="module" module-name="intellij.platform.workspace.jps" />
+    <orderEntry type="module" module-name="intellij.platform.backend.workspace" />
+    <orderEntry type="module" module-name="intellij.platform.workspace.storage" />
   </component>
 </module>

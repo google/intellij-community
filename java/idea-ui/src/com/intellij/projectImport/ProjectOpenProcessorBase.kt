@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.projectImport
 
 import com.intellij.CommonBundle
@@ -12,7 +12,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.StorageScheme
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.progress.runBlockingModalWithRawProgressReporter
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ex.ProjectManagerEx
@@ -27,6 +26,9 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.ide.progress.ModalTaskOwner
+import com.intellij.platform.ide.progress.TaskCancellation
+import com.intellij.platform.ide.progress.withModalProgress
+import com.intellij.platform.util.progress.withRawProgressReporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -94,7 +96,7 @@ abstract class ProjectOpenProcessorBase<T : ProjectImportBuilder<*>> protected c
       }
       wizardContext.setProjectFileDirectory(resolvedVirtualFile.parent.toNioPath(), false)
 
-      if (!doQuickImport(resolvedVirtualFile, wizardContext)) {
+      if (!withContext(Dispatchers.EDT) { doQuickImport(resolvedVirtualFile, wizardContext) }) {
         return null
       }
 
@@ -158,12 +160,13 @@ abstract class ProjectOpenProcessorBase<T : ProjectImportBuilder<*>> protected c
       }
 
       try {
-        @Suppress("DialogTitleCapitalization")
-        val project = runBlockingModalWithRawProgressReporter(ModalTaskOwner.guess(), IdeBundle.message("title.open.project")) {
-          if (importToProject) {
-            options = options.copy(beforeOpen = { project -> importToProject(project, projectToClose, wizardContext) })
+        val project = withModalProgress(ModalTaskOwner.guess(), IdeBundle.message("title.open.project"), TaskCancellation.cancellable()) {
+          withRawProgressReporter {
+            if (importToProject) {
+              options = options.copy(beforeOpen = { project -> importToProject(project, projectToClose, wizardContext) })
+            }
+            ProjectManagerEx.getInstanceEx().openProjectAsync(pathToOpen, options)
           }
-          ProjectManagerEx.getInstanceEx().openProjectAsync(pathToOpen, options)
         }
         ProjectUtil.updateLastProjectLocation(pathToOpen)
         return project

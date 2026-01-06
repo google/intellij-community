@@ -58,6 +58,7 @@ jvm_library(
     "//platform/tips-of-the-day:tips",
     "//platform/diagnostic",
     "//platform/execution",
+    "//platform/xdebugger-impl/ui",
   ],
   exports = [
     "@lib//:assert_j",
@@ -73,7 +74,7 @@ jvm_library(
   associates = [":featuresTrainer"],
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlin-test",
+    "//libraries/kotlin/test:libraries-kotlinTest",
     "//libraries/guava",
     "@lib//:assert_j",
     "@lib//:assertj-swing",
@@ -121,6 +122,7 @@ jvm_library(
     "@lib//:mockito-kotlin",
     "//libraries/mockito",
     "//platform/execution",
+    "//platform/xdebugger-impl/ui",
   ],
   exports = [
     "@lib//:assert_j",

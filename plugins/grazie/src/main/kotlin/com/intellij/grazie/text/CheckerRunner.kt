@@ -123,30 +123,14 @@ class CheckerRunner(val text: TextContent) {
     }
   }
 
-  private fun filter(problems: List<TextProblem>): List<TextProblem> {
-    val filtered = ArrayList<TextProblem>()
-    problems.forEach { problem ->
-      processProblem(problem, filtered)
-    }
-    return filtered
-  }
+  private fun filter(problems: List<TextProblem>): List<TextProblem> =
+    TextProblemAggregator.aggregate(text.toString(), problems.filterNot { shouldBeIgnored(it) })
 
-  private fun processProblem(problem: TextProblem, filtered: MutableList<TextProblem>): Boolean {
-    require(problem.text == text)
-
-    if (isSuppressed(problem) ||
-        hasIgnoredCategory(problem) ||
-        isIgnoredByStrategies(problem) ||
-        ProblemFilter.allIgnoringFilters(problem).findAny().isPresent) {
-      return false
-    }
-
-    if (filtered.none { it.highlightRanges.any { r1 -> problem.highlightRanges.any { r2 -> r1.intersects(r2) } } }) {
-      filtered.add(problem)
-      return true
-    }
-    return false
-  }
+  private fun shouldBeIgnored(problem: TextProblem): Boolean =
+    isSuppressed(problem) ||
+    hasIgnoredCategory(problem) ||
+    isIgnoredByStrategies(problem) ||
+    ProblemFilter.allIgnoringFilters(problem).findAny().isPresent
 
   fun toProblemDescriptors(problem: TextProblem, isOnTheFly: Boolean): List<ProblemDescriptor> {
     val parent = text.commonParent
@@ -274,16 +258,9 @@ class CheckerRunner(val text: TextContent) {
       }
     })
     result.add(GrazieRuleSettingsAction(problem.rule, problem.text.getTextDomain()))
+    result.add(GrazieMassApplyAction())
     result.add(GrazieEnableCloudAction())
     return result.toTypedArray()
-  }
-
-  private fun fileHighlightRanges(problem: TextProblem): List<TextRange> {
-    return problem.highlightRanges.asSequence()
-      .map { text.textRangeToFile(it) }
-      .flatMap { range -> text.intersection(range) }
-      .filterNot { it.isEmpty }
-      .toList()
   }
 
   // used in rider
@@ -299,6 +276,17 @@ class CheckerRunner(val text: TextContent) {
 
   private fun highlightSpan(problem: TextProblem) =
     TextRange(problem.highlightRanges[0].startOffset, problem.highlightRanges.last().endOffset)
+
+  companion object {
+    @JvmStatic
+    fun fileHighlightRanges(problem: TextProblem): List<TextRange> {
+      return problem.highlightRanges.asSequence()
+        .map { problem.text.textRangeToFile(it) }
+        .flatMap { range -> problem.text.intersection(range) }
+        .filterNot { it.isEmpty }
+        .toList()
+    }
+  }
 }
 
 private data class CachedResults(val configStamp: Long, val problems: List<TextProblem>)

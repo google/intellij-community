@@ -415,7 +415,7 @@ class EditorWindow internal constructor(
       attachAsChildTo(composite.coroutineScope)
       composite.selectedEditorWithProvider.collectLatest {
         val tabActions = it?.fileEditor?.tabActions
-        withContext(Dispatchers.UiWithModelAccess) {
+        withContext(Dispatchers.EDT) {
           if (tab.tabPaneActions != tabActions) {
             tab.setTabPaneActions(tabActions)
             if (tab == tabbedPane.editorTabs.selectedInfo) {
@@ -458,7 +458,7 @@ class EditorWindow internal constructor(
         composite.waitForAvailable()
         // In the case of the JetBrains client, the project is opened under a modal dialog, and closing it removes the focus from the editor
         val modalityState = if (PlatformUtils.isJetBrainsClient()) ModalityState.nonModal() else ModalityState.any()
-        if (withContext(Dispatchers.UiWithModelAccess + modalityState.asContextElement()) {
+        if (withContext(Dispatchers.EDT + modalityState.asContextElement()) {
             focusEditorOnComposite(composite = composite, splitters = owner, toFront = false)
           }) {
           // update frame title only when the first file editor is ready to load (editor is not yet fully loaded at this moment)
@@ -730,8 +730,12 @@ class EditorWindow internal constructor(
     fileBeingClosed: VirtualFile,
     componentIndex: Int,
   ): TabInfo? {
-    tabBeingClosed.previousSelection?.let {
-      return it
+    val previousSelection = tabBeingClosed.previousSelection
+    if (previousSelection != null) {
+      // the WeakReference might reference an already closed tab
+      if (tabbedPane.editorTabs.getVisibleInfos().contains(previousSelection)) {
+        return previousSelection
+      }
     }
 
     val indexToSelect = computeIndexToSelect(fileBeingClosed = fileBeingClosed, fileIndex = componentIndex)

@@ -3,7 +3,7 @@ package com.intellij.maven.testFramework
 
 import com.intellij.application.options.CodeStyle
 import com.intellij.compiler.CompilerConfiguration
-import com.intellij.compiler.CompilerTestUtil
+import com.intellij.java.testFramework.backend.CompilerTestUtil
 import com.intellij.java.library.LibraryWithMavenCoordinatesProperties
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.*
@@ -521,7 +521,14 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   }
 
   protected suspend fun downloadArtifacts(): ArtifactDownloadResult {
-    return projectsManager.downloadArtifacts(projectsManager.projects, null, true, true)
+    return projectsManager.downloadArtifacts(
+      MavenDownloadSourcesRequest.builder()
+        .forProjects(projectsManager.projects)
+        .forAllArtifacts()
+        .withSources()
+        .withDocs()
+        .build()
+    )
   }
 
   @Throws(Exception::class)
@@ -551,7 +558,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   protected fun setupJdkForModule(moduleName: String): Sdk {
     val sdk = JavaAwareProjectJdkTableImpl.getInstanceEx().getInternalJdk()
-    WriteAction.runAndWait<RuntimeException> { ProjectJdkTable.getInstance().addJdk(sdk, getTestRootDisposable()) }
+    WriteAction.runAndWait<RuntimeException> { ProjectJdkTable.getInstance(project).addJdk(sdk, getTestRootDisposable()) }
     ModuleRootModificationUtil.setModuleSdk(getModule(moduleName), sdk)
     return sdk
   }

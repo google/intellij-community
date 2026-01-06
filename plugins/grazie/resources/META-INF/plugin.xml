@@ -24,15 +24,12 @@
   ]]></description>
 
   <dependencies>
-    <module name="intellij.libraries.lucene.common"/>
     <module name="intellij.spellchecker"/>
     <module name="intellij.platform.vcs.impl"/>
-    <module name="intellij.libraries.grpc"/>
-    <module name="intellij.libraries.commons.text"/>
-    <module name="intellij.libraries.javax.activation"/>
   </dependencies>
 
   <content namespace="jetbrains">
+    <module name="intellij.grazie.core" loading="embedded"/>
     <module name="intellij.grazie.java"/>
     <module name="intellij.grazie.json"/>
     <module name="intellij.grazie.markdown"/>
@@ -43,6 +40,7 @@
   </content>
 
   <extensions defaultExtensionNs="com.intellij">
+    <typedHandler implementation="com.intellij.grazie.ide.inspection.auto.GrazieTypedHandler"/>
     <projectConfigurable parentId="proofread" instance="com.intellij.grazie.spellcheck.settings.SpellCheckerSettingsManager"
                          id="reference.settings.ide.settings.spelling"
                          key="spelling"
@@ -114,9 +112,9 @@
     <additionalTextAttributes scheme="Darcula" file="colorSchemes/GrazieDarcula.xml"/>
 
     <severitiesProvider implementation="com.intellij.grazie.ide.TextProblemSeverities"/>
-    <spellchecker.lifecycle implementation="com.intellij.grazie.spellcheck.GrazieSpellcheckerLifecycle"/>
     <nameSuggestionProvider id="SpellcheckingSuggestionProvider" implementation="com.intellij.grazie.spellcheck.suggestion.SpellcheckingNameSuggestionProvider" order="first"/>
 
+    <registryKey key="spellchecker.suggestion.provider.enabled" defaultValue="true" description="Enables spellchecking name suggestion provider"/>
     <registryKey key="spellchecker.grazie.enabled" defaultValue="true" description="Enables Grazie text-level spellchecking"/>
     <registryKey key="spellchecker.cloud.enabled" defaultValue="true" description="Enables spellchecking via Cloud when it is available"/>
     <registryKey key="grazie.enable.status.bar.widget" defaultValue="true" description="Controls if the new Grazie status bar widget is available"/>
@@ -127,19 +125,34 @@
                  description="Controls whether expensive linguistic checks should be performed during pre-commit code analysis"/>
     <registryKey key="grazie.show.gpl.warning" defaultValue="false" description="Whether to show warning for GPL licensed languages"/>
 
-    <!-- Order matters here, please do not change it until it's on purpose -->
-    <grazie.textChecker implementation="com.intellij.grazie.text.AsyncTreeRuleChecker$Grammar" id="treeRules"/>
+    <grazie.textChecker implementation="com.intellij.grazie.text.AsyncTreeRuleChecker" id="treeRules"/>
     <grazie.textChecker implementation="com.intellij.grazie.grammar.LanguageToolChecker" id="languageTool"/>
     <grazie.textChecker implementation="com.intellij.grazie.mlec.MlecChecker" id="mlec"/>
-    <grazie.textChecker implementation="com.intellij.grazie.text.AsyncTreeRuleChecker$GrammarLowPriority" id="grammarLowPriority"/>
-    <grazie.textChecker implementation="com.intellij.grazie.text.AsyncTreeRuleChecker$Style" id="styleTreeRules"/>
+
+    <spellchecker.quickFixFactory implementation="com.intellij.grazie.ide.inspection.grammar.quickfix.GrazieMassApplyActionProvider"/>
 
     <intentionAction>
       <language/>
       <bundleName>messages.GrazieBundle</bundleName>
       <categoryKey>intention.category.natural.languages</categoryKey>
-      <className>com.intellij.grazie.ide.inspection.rephrase.RephraseAction</className>
+      <className>com.intellij.grazie.ide.inspection.ai.RephraseAction</className>
       <descriptionDirectoryName>RephraseAction</descriptionDirectoryName>
+    </intentionAction>
+
+    <intentionAction>
+      <language/>
+      <bundleName>messages.GrazieBundle</bundleName>
+      <categoryKey>intention.category.natural.languages</categoryKey>
+      <className>com.intellij.grazie.ide.inspection.ai.TranslateAction</className>
+      <descriptionDirectoryName>TranslateAction</descriptionDirectoryName>
+    </intentionAction>
+
+    <intentionAction>
+      <language/>
+      <bundleName>messages.GrazieBundle</bundleName>
+      <categoryKey>intention.category.natural.languages</categoryKey>
+      <className>com.intellij.grazie.ide.inspection.ai.WordDefinitions</className>
+      <descriptionDirectoryName>WordDefinitions</descriptionDirectoryName>
     </intentionAction>
   </extensions>
 
@@ -148,6 +161,7 @@
     <textExtractor language="TEXT" implementationClass="com.intellij.grazie.text.PlainTextExtractor"/>
 
     <problemFilter language="" implementationClass="com.intellij.grazie.text.CodeProblemFilter"/>
+    <problemFilter language="" implementationClass="com.intellij.grazie.text.CommitProblemFilter"/>
     <problemFilter language="TEXT" implementationClass="com.intellij.grazie.text.CodeProblemFilter$InPlainText"/>
 
     <problemFilter language="" implementationClass="com.intellij.grazie.text.CommentProblemFilter"/>

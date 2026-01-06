@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="11" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -30,6 +30,6 @@
     <orderEntry type="module" module-name="intellij.libraries.cli.parser" />
     <orderEntry type="module" module-name="intellij.platform.jps.model.serialization" />
     <orderEntry type="module" module-name="intellij.platform.jps.build.javac.rt" />
-    <orderEntry type="library" name="protobuf" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.protobuf" />
   </component>
 </module>

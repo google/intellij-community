@@ -1,16 +1,13 @@
 package com.intellij.lambda.testFramework.junit
 
-import com.intellij.ide.starter.coroutine.perTestSupervisorScope
-import com.intellij.ide.starter.utils.catchAll
-import com.intellij.lambda.testFramework.starter.IdeInstance
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.testFramework.common.cleanApplicationState
-import com.intellij.tools.ide.util.common.starterLogger
+import com.intellij.ide.starter.coroutine.testSuiteSupervisorScope
+import com.intellij.lambda.testFramework.starter.IdeInstance.ide
+import com.intellij.lambda.testFramework.starter.IdeInstance.isStarted
+import com.intellij.lambda.testFramework.utils.IdeWithLambda
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.testFramework.recordErrorsLoggedInTheCurrentThreadAndReportThemAsFailures
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import org.junit.jupiter.api.extension.AfterEachCallback
-import org.junit.jupiter.api.extension.ExtensionContext
-import kotlin.time.Duration.Companion.seconds
+import org.junit.jupiter.api.extension.*
 
 /**
  * Ensures `BackgroundRunWithLambda.cleanUp()` is executed automatically after each test.
@@ -18,29 +15,50 @@ import kotlin.time.Duration.Companion.seconds
  * - Tolerates absence of a started IDE (no-op).
  * - Logs failures but does not fail the test to avoid masking the original result.
  */
-class BackgroundLambdaCleanupAfterEach : AfterEachCallback {
-  override fun afterEach(context: ExtensionContext) {
-    starterLogger<BackgroundLambdaCleanupAfterEach>().info("Cleaning up Lambda test session(s) after test: ${context.displayName}")
-
-    invokeIdeApplicationCleanup()
-    IdeInstance.cleanup()
+class BackgroundLambdaCleanupAfterEach : BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+  override fun beforeAll(context: ExtensionContext) {
+    runLifecycleCallback("Before all", context.requiredTestClass.name) {
+      ide.beforeAll(context.requiredTestClass.name)
+    }
   }
 
-  private fun invokeIdeApplicationCleanup() {
-    @Suppress("RAW_RUN_BLOCKING")
-    runBlocking(perTestSupervisorScope.coroutineContext) {
-      withTimeout(5.seconds) {
-        catchAll("Invoking test application cleanup") {
-          IdeInstance.ide.apply {
-            run("IDE test application cleanup") {
-              ApplicationManager.getApplication().cleanApplicationState()
-            }
-            runInBackend("IDE test application cleanup") {
-              ApplicationManager.getApplication().cleanApplicationState()
-            }
-          }
+  override fun beforeEach(context: ExtensionContext) {
+    val contextName = context.requiredTestClass.name + "." + context.requiredTestMethod.name + " " + context.displayName
+    runLifecycleCallback("Before each", contextName) {
+      ide.beforeEach(contextName)
+    }
+  }
+
+  override fun afterEach(context: ExtensionContext) {
+    val contextName = context.requiredTestClass.name + "." + context.requiredTestMethod.name + " " + context.displayName
+    runLifecycleCallback("After each", contextName) {
+      ide.afterEach(contextName)
+    }
+  }
+
+  override fun afterAll(context: ExtensionContext) {
+    runLifecycleCallback("After all", context.requiredTestClass.name) {
+      ide.afterAll(context.requiredTestClass.name)
+    }
+  }
+
+
+  private inline fun runLifecycleCallback(
+    callbackName: String,
+    contextName: String,
+    crossinline action: suspend IdeWithLambda.() -> Unit,
+  ): Unit = synchronized(this) {
+    if (!isStarted()) {
+      thisLogger().warn("IDE wasn't started yet. Skipping $callbackName for $contextName")
+      return@synchronized
+    }
+    recordErrorsLoggedInTheCurrentThreadAndReportThemAsFailures {
+      runCatching {
+        @Suppress("RAW_RUN_BLOCKING")
+        runBlocking(testSuiteSupervisorScope.coroutineContext) {
+          ide.action()
         }
-      }
+      }.onFailure { thisLogger().error("Problems in $callbackName: ${it.message}", it, contextName) }
     }
   }
 }

@@ -1,6 +1,4 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet", "OVERRIDE_DEPRECATION", "ReplacePutWithAssignment", "LeakingThis")
-
 package com.intellij.openapi.wm.impl.status
 
 import com.intellij.accessibility.AccessibilityUtils
@@ -19,7 +17,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.extensions.LoadingOrder.Orderable
 import com.intellij.openapi.fileEditor.FileEditor
-import com.intellij.openapi.progress.ProgressIndicatorModel
 import com.intellij.openapi.progress.ProgressModel
 import com.intellij.openapi.progress.TaskInfo
 import com.intellij.openapi.progress.impl.BridgeTaskSupport
@@ -32,7 +29,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.SystemInfoRt
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.Strings
 import com.intellij.openapi.wm.*
 import com.intellij.openapi.wm.StatusBarWidget.*
@@ -69,7 +65,6 @@ import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
-import org.jetbrains.annotations.NonNls
 import java.awt.*
 import java.awt.event.MouseEvent
 import java.util.function.Supplier
@@ -84,6 +79,8 @@ import kotlin.math.max
 private const val UI_CLASS_ID = "IdeStatusBarUI"
 private val WIDGET_ID = Key.create<String>("STATUS_BAR_WIDGET_ID")
 
+private val LOG = logger<IdeStatusBarImpl>()
+
 private val minIconHeight: Int
   get() = JBUIScale.scale(18 + 1 + 1)
 
@@ -95,12 +92,15 @@ internal interface ChildStatusBarWidget {
   fun createForChild(childStatusBar: IdeStatusBarImpl): StatusBarWidget
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 open class IdeStatusBarImpl @Internal constructor(
   parentCs: CoroutineScope,
   private val getProject: () -> Project?,
   addToolWindowWidget: Boolean,
-  internal val currentFileEditorFlow: StateFlow<FileEditor?>? = null,
+  currentFileEditorFlow: StateFlow<FileEditor?>? = null,
 ) : JComponent(), Accessible, StatusBarEx, UiDataProvider {
+  private val customCurrentFileEditorFlow: MutableStateFlow<StateFlow<FileEditor?>?> = MutableStateFlow(currentFileEditorFlow)
+
   internal val coroutineScope = parentCs.childScope("IdeStatusBarImpl", supervisor = false)
   private var infoAndProgressPanel: InfoAndProgressPanel? = null
 
@@ -132,8 +132,6 @@ open class IdeStatusBarImpl @Internal constructor(
     internal val HOVERED_WIDGET_ID: DataKey<String> = DataKey.create("HOVERED_WIDGET_ID")
 
     const val NAVBAR_WIDGET_KEY: String = "NavBar"
-
-    private val LOG = logger<IdeStatusBarImpl>()
   }
 
   override fun findChild(c: Component): StatusBar {
@@ -253,10 +251,12 @@ open class IdeStatusBarImpl @Internal constructor(
     childManager.setVisibilityForAll(aFlag)
   }
 
+  @Suppress("OVERRIDE_DEPRECATION")
   override fun addWidget(widget: StatusBarWidget) {
     addWidget(widget, Position.RIGHT, LoadingOrder.ANY)
   }
 
+  @Suppress("OVERRIDE_DEPRECATION")
   override fun addWidget(widget: StatusBarWidget, anchor: String) {
     val order = LoadingOrder.anchorToOrder(anchor)
     EdtInvocationManager.invokeLaterIfNeeded { addWidget(widget, Position.RIGHT, order) }
@@ -474,13 +474,8 @@ open class IdeStatusBarImpl @Internal constructor(
 
   @Suppress("UsagesOfObsoleteApi")
   override fun addProgress(indicator: ProgressIndicatorEx, info: TaskInfo) {
-    if (Registry.`is`("rhizome.progress")) {
-      @Suppress("DEPRECATION")
-      BridgeTaskSupport.getInstance().withBridgeBackgroundProgress(project, indicator, info)
-    }
-    else {
-      addProgressImpl(ProgressIndicatorModel(indicator, info.title, info.isCancellable), info)
-    }
+    @Suppress("DEPRECATION")
+    BridgeTaskSupport.getInstance().withBridgeBackgroundProgress(project, indicator, info)
   }
 
   internal fun addProgressImpl(progressModel: ProgressModel, info: TaskInfo) {
@@ -690,7 +685,7 @@ open class IdeStatusBarImpl @Internal constructor(
   override val allWidgets: Collection<StatusBarWidget>?
     get() = widgetRegistry.getAllWidgets()
 
-  override fun getWidgetAnchor(id: String): @NonNls String? = widgetRegistry.getAnchor(id)
+  override fun getWidgetAnchor(id: String): String? = widgetRegistry.getAnchor(id)
 
   //todo: make private after removing all external usages
   @Internal
@@ -700,12 +695,19 @@ open class IdeStatusBarImpl @Internal constructor(
     get() = getProject()
 
   @get:Internal
-  override val currentEditor: StateFlow<FileEditor?>
-    get() = currentFileEditorFlow ?: defaultEditorFlow
+  override val currentEditor: StateFlow<FileEditor?> by lazy {
+    customCurrentFileEditorFlow
+      .flatMapLatest { customFlow ->
+        customFlow
+        ?: project?.serviceAsync<StatusBarWidgetsManager>()?.dataContext?.currentFileEditor
+        ?: emptyFlow()
+      }
+      .stateIn(coroutineScope, SharingStarted.Eagerly, null)
+  }
 
-  private val defaultEditorFlow: StateFlow<FileEditor?> by lazy {
-    val project = project ?: return@lazy MutableStateFlow(null)
-    project.service<StatusBarWidgetsManager>().dataContext.currentFileEditor
+  @Internal
+  fun setCurrentFileEditorFlow(flow: StateFlow<FileEditor?>?) {
+    customCurrentFileEditorFlow.value = flow
   }
 
   override fun getAccessibleContext(): AccessibleContext {
@@ -720,15 +722,15 @@ open class IdeStatusBarImpl @Internal constructor(
     listeners.addListener(listener, parentDisposable)
   }
 
-  private fun fireWidgetAdded(widget: StatusBarWidget, anchor: @NonNls String?) {
+  private fun fireWidgetAdded(widget: StatusBarWidget, anchor: String?) {
     listeners.multicaster.widgetAdded(widget, anchor)
   }
 
-  private fun fireWidgetUpdated(id: @NonNls String) {
+  private fun fireWidgetUpdated(id: String) {
     listeners.multicaster.widgetUpdated(id)
   }
 
-  private fun fireWidgetRemoved(id: @NonNls String) {
+  private fun fireWidgetRemoved(id: String) {
     listeners.multicaster.widgetRemoved(id)
   }
 
@@ -923,7 +925,9 @@ private class StatusBarWidgetClickListener(private val clickConsumer: (MouseEven
   override fun onClick(e: MouseEvent, clickCount: Int): Boolean {
     if (!e.isPopupTrigger && MouseEvent.BUTTON1 == e.button) {
       StatusBarWidgetClicked.log(clickConsumer.javaClass)
-      clickConsumer(e)
+      WriteIntentReadAction.run {
+        clickConsumer(e)
+      }
     }
     return true
   }

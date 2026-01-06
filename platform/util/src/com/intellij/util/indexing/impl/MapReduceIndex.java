@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing.impl;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -451,11 +451,13 @@ public abstract class MapReduceIndex<Key, Value, Input> implements InvertedIndex
     public boolean update() {
       checkNonCancellableSection();
       try {
+        //MAYBE RC: why we do not return true/false to indicate 'nothing has changed'?
         MapReduceIndex.this.updateWith(updateData);
       }
       catch (StorageException | CancellationException ex) {
         logStorageUpdateException(ex);
 
+        //MAYBE RC: ClosedStorageException could legally happen (e.g., during indexes' shutdown), maybe ignore it here?
         MapReduceIndex.this.requestRebuild(ex);
         return false;
       }

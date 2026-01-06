@@ -3,6 +3,8 @@ package com.intellij.openapi.command.impl;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
+import com.intellij.openapi.command.impl.cmd.CmdEvent;
+import com.intellij.openapi.command.impl.cmd.CmdMeta;
 import com.intellij.openapi.command.undo.DocumentReference;
 import com.intellij.openapi.command.undo.UndoableAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -75,7 +77,7 @@ final class CommandBuilder {
   void addUndoableAction(@NotNull UndoableAction action) {
     assertInsideCommand();
     if (isRefresh()) {
-      originalDocument = null;
+      resetOriginalDocument();
     }
     undoableActions.add(action);
     affectedDocuments.addAffected(action.getAffectedDocuments());
@@ -109,6 +111,15 @@ final class CommandBuilder {
     assertInsideCommand();
     if (affectedDocuments.affects(docRef)) {
       isValid = false;
+    }
+  }
+
+  void resetOriginalDocument() {
+    assertInsideCommand();
+    originalDocument = null;
+    UndoSpy undoSpy = UndoSpy.getInstance();
+    if (undoSpy != null) {
+      undoSpy.undoableActionAdded(undoProject, ResetOriginatorAction.INSTANCE, UndoableActionType.RESET_ORIGINATOR);
     }
   }
 
@@ -256,6 +267,9 @@ final class CommandBuilder {
 
     @Override
     public boolean isTransparent() { throw new UnsupportedOperationException(); }
+
+    @Override
+    public @NotNull CmdMeta meta() { throw new UnsupportedOperationException(); }
 
     // endregion
   }

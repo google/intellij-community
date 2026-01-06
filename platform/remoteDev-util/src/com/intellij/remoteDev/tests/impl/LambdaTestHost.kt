@@ -7,12 +7,11 @@ import com.intellij.codeWithMe.clientId
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.diagnostic.enableCoroutineDump
+import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginModuleDescriptor
 import com.intellij.ide.plugins.PluginModuleId
 import com.intellij.idea.AppMode
-import com.intellij.notification.Notification
-import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.client.ClientKind
@@ -21,33 +20,25 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.rd.util.setSuspend
-import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.remoteDev.tests.*
-import com.intellij.remoteDev.tests.impl.utils.SerializedLambdaLoader
-import com.intellij.remoteDev.tests.impl.utils.getArtifactsFileName
+import com.intellij.remoteDev.tests.impl.utils.SerializedLambdaWithIdeContextHelper
 import com.intellij.remoteDev.tests.impl.utils.runLogged
 import com.intellij.remoteDev.tests.impl.utils.waitSuspendingNotNull
 import com.intellij.remoteDev.tests.modelGenerated.LambdaRdIdeType
-import com.intellij.remoteDev.tests.modelGenerated.LambdaRdKeyValueEntry
+import com.intellij.remoteDev.tests.modelGenerated.LambdaRdTestActionParameters
 import com.intellij.remoteDev.tests.modelGenerated.lambdaTestModel
-import com.intellij.ui.WinFocusStealer
-import com.intellij.util.ui.ImageUtil
 import com.jetbrains.rd.framework.*
 import com.jetbrains.rd.util.lifetime.EternalLifetime
 import com.jetbrains.rd.util.reactive.viewNotNull
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
-import java.awt.Component
-import java.awt.Window
-import java.awt.image.BufferedImage
 import java.io.File
 import java.io.Serializable
 import java.net.InetAddress
 import java.net.URLClassLoader
-import java.time.LocalTime
-import javax.imageio.ImageIO
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.io.path.Path
 import kotlin.reflect.KClass
 import kotlin.reflect.full.companionObject
 import kotlin.reflect.full.isSubclassOf
@@ -79,8 +70,8 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
     // TODO: plugin: PluginModuleDescriptor might be passed as a context parameter and not via constructor
     abstract class NamedLambda<T : LambdaIdeContext>(protected val lambdaIdeContext: T, protected val plugin: PluginModuleDescriptor) {
       fun name(): String = this::class.qualifiedName ?: error("Can't get qualified name of lambda $this")
-      abstract suspend fun T.lambda(args: List<LambdaRdKeyValueEntry>): Any?
-      suspend fun runLambda(args: List<LambdaRdKeyValueEntry>) {
+      abstract suspend fun T.lambda(args: LambdaRdTestActionParameters): Any?
+      suspend fun runLambda(args: LambdaRdTestActionParameters) {
         with(lambdaIdeContext) {
           lambda(args = args)
         }
@@ -113,13 +104,22 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         }
         coroutineDumperOnTimeout.cancel()
         withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+          runLogged("Flush queue before tests") {
+            withContext(Dispatchers.EDT) {
+              IdeEventQueue.getInstance().flushQueue()
+            }
+          }
           createProtocol(hostAddress, port)
         }
       }
     }
   }
 
-  private fun findLambdaClasses(lambdaReference: String, testModuleDescriptor: PluginModuleDescriptor, ideContext: LambdaIdeContext): List<NamedLambda<*>> {
+  private fun findLambdaClasses(
+    lambdaReference: String,
+    testModuleDescriptor: PluginModuleDescriptor,
+    ideContext: LambdaIdeContext,
+  ): List<NamedLambda<*>> {
     val className = if (lambdaReference.contains(".Companion")) {
       lambdaReference.substringBeforeLast(".").removeSuffix(".Companion")
     }
@@ -134,7 +134,8 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
       .filter { it.isSubclassOf(NamedLambda::class) }
       .mapNotNull {
         runCatching {
-          it.constructors.single().call(ideContext, testModuleDescriptor) as NamedLambda<*> //todo maybe we can filter out constuctor in a more clever way
+          //todo maybe we can filter out constuctor in a more clever way
+          it.constructors.single().call(ideContext, testModuleDescriptor) as NamedLambda<*>
         }.getOrNull()
       }
 
@@ -169,12 +170,6 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         @OptIn(ExperimentalCoroutinesApi::class)
         val sessionBgtDispatcher = Dispatchers.Default.limitedParallelism(1, "Lambda test session dispatcher")
 
-        // Needed to enable proper focus behaviour
-        if (SystemInfoRt.isWindows) {
-          WinFocusStealer.setFocusStealingEnabled(true)
-        }
-
-
         val testModuleDescriptor = run {
           val testModuleId = System.getProperty(TEST_MODULE_ID_PROPERTY_NAME)
                              ?: return@run null
@@ -190,7 +185,7 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
 
         LOG.info("All test code will be loaded using '${testModuleDescriptor?.pluginClassLoader}'")
 
-        fun getLambdaIdeContext(): LambdaIdeContext {
+        fun getLambdaIdeContext(): LambdaIdeContextClass {
           val currentTestCoroutineScope = CoroutineScope(Dispatchers.Default + CoroutineName("Lambda test session scope") + SupervisorJob())
 
           currentTestCoroutineScope.coroutineContext.job.invokeOnCompletion {
@@ -205,12 +200,35 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
 
         var ideContext = getLambdaIdeContext()
 
-        session.cleanUp.setSuspend(sessionBgtDispatcher) { _, _ ->
-          LOG.info("Resetting scopes")
-          ideContext.coroutineContext.job.cancelAndJoin()
+        session.beforeAll.setSuspend(sessionBgtDispatcher) { _, testClassName ->
+          LOG.info("========================= Test class '$testClassName' started ==========================")
+        }
+
+        session.beforeEach.setSuspend(sessionBgtDispatcher) { _, testName ->
+          LOG.info("------------------------- Test '$testName' started -------------------------")
+          runLogged("Flush queue in between tests") {
+            withContext(Dispatchers.EDT) {
+              IdeEventQueue.getInstance().flushQueue()
+            }
+          }
+          runLogged("Sync front and back protocol events") {
+            LambdaTestBridge.getInstance().syncProtocolEvents()
+          }
           ideContext = getLambdaIdeContext()
         }
 
+        session.afterEach.setSuspend(sessionBgtDispatcher) { _, testName ->
+          ideContext.runAfterEachCleanup()
+          runLogged("Cancelling scopes in after each") {
+            ideContext.coroutineContext.job.cancelAndJoin()
+          }
+          LOG.info("------------------------- Test '$testName' finished -------------------------")
+        }
+
+        session.afterAll.setSuspend(sessionBgtDispatcher) { _, testClassName ->
+          ideContext.runAfterAllCleanup()
+          LOG.info("========================= Test class '$testClassName' finished =========================")
+        }
         // Advice for processing events
         session.runLambda.setSuspend(sessionBgtDispatcher) { _, parameters ->
           LOG.info("'${parameters.reference}': received lambda execution request")
@@ -220,7 +238,7 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
           }
           try {
             val lambdaReference = parameters.reference
-            val namedLambdas = findLambdaClasses(lambdaReference = lambdaReference, testModuleDescriptor = testModuleDescriptor!!, ideContext = ideContext)
+            val namedLambdas = findLambdaClasses(lambdaReference, testModuleDescriptor!!, ideContext)
 
             val ideAction = namedLambdas.singleOrNull { it.name() == lambdaReference } ?: run {
               val text = "There is no Action with reference '${lambdaReference}', something went terribly wrong, " +
@@ -239,7 +257,7 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
               assert(ClientId.current == clientId) { "ClientId '${ClientId.current}' should equal $clientId one when test method starts" }
 
               runLogged(parameters.reference, 1.minutes) {
-                ideAction.runLambda(parameters.parameters ?: listOf())
+                ideAction.runLambda(parameters)
               }
             }
           }
@@ -250,7 +268,7 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         }
 
         // Advice for processing events
-        session.runSerializedLambda.setSuspend(sessionBgtDispatcher) { _, serializedLambda ->
+        session.runSerializedLambda.setSuspend(sessionBgtDispatcher) { _, lambda ->
           suspend fun clientIdContextToRunLambda() = if (session.rdIdeType == LambdaRdIdeType.BACKEND && AppMode.isRemoteDevHost()) {
             waitSuspendingNotNull("Got remote client id", 10.seconds) {
               ClientSessionsManager.getAppSessions(ClientKind.REMOTE).singleOrNull()?.clientId
@@ -260,25 +278,31 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
             EmptyCoroutineContext
           }
 
-          try {
-            assert(ClientId.current.isLocal) { "ClientId '${ClientId.current}' should be local before test method starts" }
-            LOG.info("'$serializedLambda': received serialized lambda execution request")
-            return@setSuspend withContext(Dispatchers.Default + CoroutineName("Lambda task: ${serializedLambda.stepName}") + clientIdContextToRunLambda()) {
-              runLogged(serializedLambda.stepName, 10.minutes) {
-                val urls = serializedLambda.classPath.map { File(it).toURI().toURL() }
-                URLClassLoader(urls.toTypedArray(), testModuleDescriptor?.pluginClassLoader ?: this::class.java.classLoader).use { cl ->
-                  withContext(ideContext.coroutineContext) {
-                    val params: List<Serializable> = serializedLambda.parametersBase64.map { SerializedLambdaLoader().loadObject(it, classLoader = cl) }
-                    val result = SerializedLambdaLoader().load<LambdaIdeContext>(serializedLambda.serializedDataBase64, classLoader = cl).accept(ideContext, params)
-                    SerializedLambdaLoader().save(serializedLambda.stepName, result)
+          assert(ClientId.current.isLocal) { "ClientId '${ClientId.current}' should be local before test method starts" }
+          withContext(ideContext.coroutineContext + Dispatchers.Default + CoroutineName("Lambda task: ${lambda.stepName}") + clientIdContextToRunLambda()) {
+            runLogged(lambda.stepName, 10.minutes) {
+              val urls = lambda.classPath.map { Path(it).toUri().toURL() }
+              URLClassLoader(urls.toTypedArray(), testModuleDescriptor?.pluginClassLoader ?: this::class.java.classLoader).use { cl ->
+                SerializedLambdaWithIdeContextHelper().let { loader ->
+                  val params = lambda.parametersBase64.map {
+                    loader.decodeObject<String>(it, classLoader = cl) ?: error("Parameter $it is not serializable")
+                  }
+                  val serializableConsumer = loader.getSuspendingSerializableConsumer<LambdaIdeContext, Any>(lambda.serializedDataBase64, classLoader = cl)
+                  val result = with(serializableConsumer) {
+                    with(ideContext) {
+                      runSerializedLambda(params)
+                    }
+                  }
+                  if (result is Serializable) {
+                    loader.serialize(result)
+                  }
+                  else {
+                    LOG.warn("Lambda '${lambda.stepName}' didn't return serializable result")
+                    "<NO RESULT>"
                   }
                 }
               }
             }
-          }
-          catch (ex: Throwable) {
-            LOG.warn("${session.rdIdeType}: '${serializedLambda.stepName}' hasn't finished successfully", ex)
-            throw ex
           }
         }
 
@@ -324,25 +348,16 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         }
 
         session.closeAllOpenedProjects.setSuspend(sessionBgtDispatcher) { _, _ ->
-          try {
-            leaveAllModals(throwErrorIfModal = true)
+          leaveAllModals(throwErrorIfModal = true)
 
-            ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
-            withContext(Dispatchers.EDT + NonCancellable) {
-              writeIntentReadAction {
-                ProjectManagerEx.getInstanceEx().closeAndDisposeAllProjects(checkCanClose = false)
-              }
+          ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
+          withContext(Dispatchers.EDT + NonCancellable) {
+            writeIntentReadAction {
+              ProjectManagerEx.getInstanceEx().closeAndDisposeAllProjects(checkCanClose = false)
             }
           }
-          catch (ce: CancellationException) {
-            throw ce
-          }
-
         }
 
-        session.makeScreenshot.setSuspend(sessionBgtDispatcher) { _, fileName ->
-          makeScreenshot(fileName)
-        }
 
         session.projectsAreInitialised.setSuspend(sessionBgtDispatcher) { _, _ ->
           ProjectManagerEx.getOpenProjects().map { it.isInitialized }.all { true }
@@ -357,66 +372,4 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
       }
     }
   }
-
-  private fun screenshotFile(actionName: String, suffix: String, timeStamp: LocalTime): File {
-    val fileName = getArtifactsFileName(actionName, suffix, "png", timeStamp)
-
-    return File(PathManager.getLogPath()).resolve(fileName)
-  }
-
-  private suspend fun makeScreenshotOfComponent(screenshotFile: File, component: Component) {
-    runLogged("Making screenshot of ${component}") {
-      val img = ImageUtil.createImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
-      component.printAll(img.createGraphics())
-      withContext(Dispatchers.IO + NonCancellable) {
-        try {
-          ImageIO.write(img, "png", screenshotFile)
-          LOG.info("Screenshot is saved at: $screenshotFile")
-        }
-        catch (t: Throwable) {
-          LOG.warn("Exception while writing screenshot image to file", t)
-        }
-      }
-    }
-  }
-
-  private suspend fun makeScreenshot(actionName: String): Boolean {
-    if (ApplicationManager.getApplication().isHeadlessEnvironment) {
-      LOG.warn("Can't make screenshot on application in headless mode.")
-      return false
-    }
-
-    return runLogged("'$actionName': Making screenshot") {
-      withContext(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) { // even if there is a modal window opened
-        val timeStamp = LocalTime.now()
-
-        return@withContext try {
-          val windows = Window.getWindows().filter { it.height != 0 && it.width != 0 }.filter { it.isShowing }
-          windows.forEachIndexed { index, window ->
-            val screenshotFile = if (window.isFocused) {
-              screenshotFile(actionName, "_${index}_focusedWindow", timeStamp)
-            }
-            else {
-              screenshotFile(actionName, "_$index", timeStamp)
-            }
-            makeScreenshotOfComponent(screenshotFile, window)
-          }
-          true
-        }
-        catch (e: Throwable) {
-          LOG.warn("Test action 'makeScreenshot' hasn't finished successfully", e)
-          false
-        }
-      }
-    }
-  }
-}
-
-@Suppress("HardCodedStringLiteral", "DialogTitleCapitalization")
-private fun showNotification(text: String?) {
-  if (ApplicationManager.getApplication().isHeadlessEnvironment || text.isNullOrBlank()) {
-    return
-  }
-
-  Notification("TestFramework", "Test Framework", text, NotificationType.INFORMATION).notify(null)
 }

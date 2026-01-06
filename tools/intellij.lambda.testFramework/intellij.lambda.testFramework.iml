@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="21" />
-            <stringArg name="apiVersion" arg="2.2" />
-            <stringArg name="languageVersion" arg="2.2" />
+            <stringArg name="apiVersion" arg="2.3" />
+            <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -57,7 +57,8 @@
     <orderEntry type="module" module-name="intellij.tools.ide.starter.junit5" />
     <orderEntry type="module" module-name="intellij.platform.ide.codeinsight.inline" />
     <orderEntry type="module" module-name="intellij.tools.ide.starter.driver" />
-    <orderEntry type="library" name="rd-framework" level="project" />
-    <orderEntry type="library" name="rd-core" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.rd.framework" />
+    <orderEntry type="module" module-name="intellij.libraries.rd.core" />
+    <orderEntry type="module" module-name="intellij.platform.projectModel" />
   </component>
 </module>

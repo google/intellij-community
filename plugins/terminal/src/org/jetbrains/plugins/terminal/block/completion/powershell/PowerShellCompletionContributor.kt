@@ -48,14 +48,14 @@ class PowerShellCompletionContributor : CompletionContributor(), DumbAware {
 
     val command = promptModel.commandText
     val caretPosition = parameters.editor.caretModel.offset - promptModel.commandStartOffset  // relative to command start
-    // PowerShell's completion generator receives typed prefix directly, so we can create dummy context
-    val runtimeContext = completionServices.runtimeContextProvider.getContext("")
+    // PowerShell's completion generator receives typed prefix directly, so we can create a dummy context
+    val runtimeContext = completionServices.runtimeContextProvider.getContext(listOf(""))
 
-    val completionResult: CompletionResult = runBlockingCancellable {
+    val completionResult: CompletionResult? = runBlockingCancellable {
       completionServices.dataGeneratorsExecutor.execute(runtimeContext, powerShellCompletionGenerator(command, caretPosition))
     }
 
-    if (completionResult.matches.isEmpty()) {
+    if (completionResult == null || completionResult.matches.isEmpty()) {
       return
     }
 

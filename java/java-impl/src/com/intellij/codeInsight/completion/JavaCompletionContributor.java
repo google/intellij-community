@@ -17,6 +17,7 @@ import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.lang.LangBundle;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.jvm.types.JvmPrimitiveTypeKind;
+import com.intellij.modcompletion.ModCompletionItemProvider;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -74,8 +75,6 @@ import com.intellij.util.containers.ContainerUtil;
 import com.siyeh.ig.psiutils.JavaDeprecationUtils;
 import com.siyeh.ig.psiutils.TypeUtils;
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
-import one.util.streamex.EntryStream;
-import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.*;
 
 import java.util.*;
@@ -471,22 +470,24 @@ public final class JavaCompletionContributor extends CompletionContributor imple
         shouldAddExpressionVariants && addExpectedTypeMembers(parameters, false, expectedInfos,
                                                               item -> session.registerBatchItems(Collections.singleton(item)));
 
-      if (!smart) {
-        PsiAnnotation anno = findAnnotationWhoseAttributeIsCompleted(position);
-        if (anno != null) {
-          PsiClass annoClass = anno.resolveAnnotationType();
-          mayCompleteReference = mayCompleteValueExpression(position, annoClass);
-          if (annoClass != null) {
-            completeAnnotationAttributeName(result, position, anno, annoClass);
-            JavaKeywordCompletion.addPrimitiveTypes(result, position, session);
+      if (!ModCompletionItemProvider.modCommandCompletionEnabled()) {
+        if (!smart) {
+          PsiAnnotation anno = findAnnotationWhoseAttributeIsCompleted(position);
+          if (anno != null) {
+            PsiClass annoClass = anno.resolveAnnotationType();
+            mayCompleteReference = mayCompleteValueExpression(position, annoClass);
+            if (annoClass != null) {
+              completeAnnotationAttributeName(result, position, anno, annoClass);
+              JavaKeywordCompletion.addPrimitiveTypes(result, position, session);
+            }
           }
         }
-      }
 
-      PsiReference ref = position.getContainingFile().findReferenceAt(parameters.getOffset());
-      if (ref instanceof PsiLabelReference) {
-        session.registerBatchItems(processLabelReference((PsiLabelReference)ref));
-        result.stopHere();
+        PsiReference ref = position.getContainingFile().findReferenceAt(parameters.getOffset());
+        if (ref instanceof PsiLabelReference labelRef) {
+          session.registerBatchItems(processLabelReference(labelRef));
+          result.stopHere();
+        }
       }
 
       List<LookupElement> refSuggestions = Collections.emptyList();
@@ -894,7 +895,7 @@ public final class JavaCompletionContributor extends CompletionContributor imple
     }
 
     if (parameters.getInvocationCount() > 0) {
-      items.addAll(getInnerScopeVariables(parameters, position));
+      items.addAll(getInnerScopeVariables(position));
     }
 
     if (ref.getQualifier() instanceof PsiExpression qualifierExpression &&
@@ -942,56 +943,12 @@ public final class JavaCompletionContributor extends CompletionContributor imple
     return null;
   }
 
-  private static @Unmodifiable Collection<LookupElement> getInnerScopeVariables(CompletionParameters parameters, PsiElement position) {
-    PsiElement container = BringVariableIntoScopeFix.getContainer(position);
-    if (container == null) return Collections.emptyList();
-    Map<String, Optional<PsiLocalVariable>> variableMap =
-      EntryStream.ofTree(container, (depth, element) -> depth > 2 ? null : StreamEx.of(element.getChildren()))
-      .values()
-      .select(PsiCodeBlock.class)
-      .flatArray(PsiCodeBlock::getStatements)
-      .select(PsiDeclarationStatement.class)
-      .flatArray(PsiDeclarationStatement::getDeclaredElements)
-      .select(PsiLocalVariable.class)
-      .remove(var -> PsiTreeUtil.isAncestor(var, position, true))
-      .toMap(PsiLocalVariable::getName, Optional::of, (v1, v2) -> Optional.empty());
-    PsiResolveHelper helper = JavaPsiFacade.getInstance(parameters.getOriginalFile().getProject()).getResolveHelper();
-    variableMap.values().removeAll(Collections.singleton(Optional.<PsiLocalVariable>empty()));
-    variableMap.keySet().removeIf(name -> helper.resolveReferencedVariable(name, position) != null);
-    int offset = position.getTextRange().getStartOffset();
-    variableMap.values().removeIf(v -> v.orElseThrow().getTextRange().getStartOffset() > offset);
-    if (variableMap.isEmpty()) return Collections.emptyList();
-    return ContainerUtil.map(variableMap.values(), optVar -> {
-      assert optVar.isPresent();
-      PsiLocalVariable variable = optVar.get();
-      String place = getPlace(variable);
-      return new VariableLookupItem(variable, JavaBundle.message("completion.inner.scope.tail.text", place)).setPriority(-1);
-    });
-  }
-
-  private static @Nls @NotNull String getPlace(PsiLocalVariable variable) {
-    String place = JavaBundle.message("completion.inner.scope");
-    PsiCodeBlock block = PsiTreeUtil.getParentOfType(variable, PsiCodeBlock.class);
-    PsiElement statement = block == null ? null : block.getParent();
-    if (statement instanceof PsiTryStatement) {
-      place = ((PsiTryStatement)statement).getFinallyBlock() == block ? JavaKeywords.TRY + "-" + JavaKeywords.FINALLY : JavaKeywords.TRY;
-    }
-    else if (statement instanceof PsiCatchSection) {
-      place = JavaKeywords.CATCH;
-    }
-    else if (statement instanceof PsiSynchronizedStatement) {
-      place = JavaKeywords.SYNCHRONIZED;
-    }
-    else if (statement instanceof PsiBlockStatement) {
-      PsiElement parent = statement.getParent();
-      if (parent instanceof PsiWhileStatement) {
-        place = JavaKeywords.WHILE;
-      }
-      else if (parent instanceof PsiIfStatement) {
-        place = ((PsiIfStatement)parent).getThenBranch() == statement ? JavaKeywords.IF + "-then" : JavaKeywords.IF + "-" + JavaKeywords.ELSE;
-      }
-    }
-    return place;
+  private static @Unmodifiable Collection<LookupElement> getInnerScopeVariables(PsiElement position) {
+    List<PsiLocalVariable> list = BringVariableIntoScopeFix.findInnerScopeVariables(position);
+    return ContainerUtil.map(list, variable -> 
+      new VariableLookupItem(
+        variable, JavaBundle.message("completion.inner.scope.tail.text", BringVariableIntoScopeFix.getVariableDeclarationPlace(variable)))
+        .setPriority(-1));
   }
 
   private static @NotNull List<LookupElement> completePermitsListReference(@NotNull CompletionParameters parameters,

@@ -29,7 +29,7 @@
     <orderEntry type="library" scope="TEST" name="kotlinc.kotlin-compiler-tests" level="project" />
     <orderEntry type="module" module-name="intellij.libraries.guava" />
     <orderEntry type="library" scope="TEST" name="JUnit4" level="project" />
-    <orderEntry type="library" scope="TEST" name="kotlin-test" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinTest" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.plugin.k1" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.util" />
     <orderEntry type="module" module-name="intellij.kotlin.base.projectModel" />
@@ -54,8 +54,8 @@
     <orderEntry type="module" module-name="intellij.kotlin.gradle.tooling.impl" />
     <orderEntry type="module" module-name="kotlin.gradle.gradle-java" />
     <orderEntry type="module" module-name="intellij.groovy.psi" scope="TEST" />
-    <orderEntry type="module" module-name="kotlin.tests-common" scope="TEST" />
-    <orderEntry type="module" module-name="kotlin.test-framework" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.common.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.testFramework" scope="TEST" />
     <orderEntry type="module" module-name="intellij.gradle.java" />
     <orderEntry type="module" module-name="intellij.gradle.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlin.reflect" />

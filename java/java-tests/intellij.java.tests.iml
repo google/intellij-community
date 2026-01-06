@@ -124,17 +124,18 @@
     <orderEntry type="module" module-name="intellij.java.codeserver.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5.projectStructure" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.syntax.psi" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="maven-resolver-provider" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.maven.resolver.provider" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.syntax" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.lang.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.xml.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.syntax.scripts" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="byte-buddy" level="project" />
     <orderEntry type="module" module-name="intellij.grazie.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5.codeInsight" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.psi.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.execution" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="jetCheck" level="project" />
     <orderEntry type="module" module-name="intellij.java.guiForms.rt" />
+    <orderEntry type="module" module-name="intellij.java.testFramework.backend" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.groovy.live.templates" scope="TEST" />
   </component>
 </module>

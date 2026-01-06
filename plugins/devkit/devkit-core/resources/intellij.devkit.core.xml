@@ -7,6 +7,9 @@
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
     <module name="intellij.libraries.xerces"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.aetherDependencyResolver"/>
+    <!-- endregion -->
   </dependencies>
 
   <resource-bundle>messages.DevKitBundle</resource-bundle>
@@ -29,7 +32,6 @@
     <automaticRenamerFactory implementation="org.jetbrains.idea.devkit.refactoring.InspectionAutomaticRenamerFactory"/>
     <httpRequestHandler implementation="org.jetbrains.idea.devkit.requestHandlers.HttpDebugListener"/>
     <httpRequestHandler implementation="org.jetbrains.idea.devkit.requestHandlers.BuildHttpRequestHandler"/>
-    <httpRequestHandler implementation="org.jetbrains.idea.devkit.requestHandlers.CompileHttpRequestHandler"/>
 
     <junitPatcher implementation="org.jetbrains.idea.devkit.run.JUnitDevKitPatcher"/>
     <runConfigurationExtension implementation="org.jetbrains.idea.devkit.run.DevKitApplicationPatcher"/>
@@ -732,15 +734,13 @@
 
     <!-- INTERNAL -->
     <consoleFilterProvider implementation="org.jetbrains.idea.devkit.run.ModulePathFilterProvider"/>
+    <registryKey key="devkit.module.hyperlink.show.chooser" defaultValue="false"
+                 description="Show file chooser when clicking module names in console (iml + descriptor xml)"/>
 
     <properties.extendedUseScopeProvider implementation="org.jetbrains.idea.devkit.references.BundleExtendedUseScopeProvider"/>
     <properties.spellcheckerMnemonicsTokenizer implementation="org.jetbrains.idea.devkit.spellchecker.DevKitMnemonicsTokenizer"/>
 
     <useScopeEnlarger implementation="org.jetbrains.idea.devkit.references.DomTargetUseScopeEnlarger"/>
-
-    <registryKey key="devkit.compose.hot.reload.enabled" defaultValue="false" description="Enable 'Compose Hot Reload' agent for run configurations"/>
-    <registryKey key="devkit.compose.hot.reload.agent.version" defaultValue="" description="'Compose Hot Reload' agent version override"/>
-    <runConfigurationExtension implementation="org.jetbrains.idea.devkit.composeHotReload.ComposeHotReloadCommandLinePatcher" />
 
     <postStartupActivity implementation="org.jetbrains.idea.devkit.templates.UpdateFileTemplatesSchemeToProjectActivity"/>
   </extensions>
@@ -778,10 +778,6 @@
       language="JAVA"
       implementationClass="org.jetbrains.idea.devkit.threadingModelHelper.java.JavaLockReqPsiOps"/>
   </extensions>
-  <applicationListeners>
-    <listener class="org.jetbrains.idea.devkit.composeHotReload.ComposeHotReloadCommandLinePatcher$ComposeHotReloadRegistryListener"
-              topic="com.intellij.openapi.util.registry.RegistryValueListener" />
-  </applicationListeners>
 
   <extensions defaultExtensionNs="JavaScript.JsonSchema">
     <ProviderFactory implementation="org.jetbrains.idea.devkit.inspections.metaInformation.MetaInformationJsonSchemaProviderFactory"/>

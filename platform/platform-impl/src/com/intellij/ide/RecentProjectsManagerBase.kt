@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment", "OVERRIDE_DEPRECATION", "LiftReturnOrAssignment")
 
 package com.intellij.ide
@@ -66,6 +66,7 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
@@ -290,7 +291,8 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       }
     }
     set(value) {
-      val newValue = value?.takeIf { it.isNotBlank() && isLocal(it)}?.let { FileUtilRt.toSystemIndependentName(it) }
+      if (value?.let { !isLocal(it) } ?: false) return // Do not update location if the value is not from the local file system
+      val newValue = value?.takeIf { it.isNotBlank() }?.let { FileUtilRt.toSystemIndependentName(it) }
       synchronized(stateLock) {
         state.lastProjectLocation = newValue
       }
@@ -642,7 +644,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     disableUpdatingRecentInfo.set(true)
     try {
       if (openPaths.size == 1 || isOpenProjectsOneByOneRequired()) {
-        FUSProjectHotStartUpMeasurer.reportReopeningProjects(openPaths)
+        FUSProjectHotStartUpMeasurer.reportReopeningProjects(openPaths.map { Paths.get(it.key) })
         return openOneByOne(openPaths, index = 0, someProjectWasOpened = false)
       }
 
@@ -653,7 +655,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
         }.getOrLogException(LOG)
       }
 
-      FUSProjectHotStartUpMeasurer.reportReopeningProjects(toOpen)
+      FUSProjectHotStartUpMeasurer.reportReopeningProjects(toOpen.map { it.first })
 
       if (toOpen.size == 1) {
         val pair = toOpen.get(0)

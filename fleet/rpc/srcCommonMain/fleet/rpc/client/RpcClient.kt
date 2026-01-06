@@ -128,17 +128,23 @@ private class RpcClient(
   }
 
   private suspend fun <T> ChannelResult<T>.receiveSuccess(f: suspend (T) -> Unit): Boolean {
-    return when {
-      this.isSuccess -> {
-        f(this.getOrThrow())
-        true
+    return if (isSuccess) {
+      f(this.getOrThrow())
+      true
+    }
+    else {
+      // the operation has failed
+      if (isClosed) {
+        when (val ex = this.exceptionOrNull()) {
+          null -> false // closed normally
+          else -> throw ex // closed exceptionally
+        }
       }
-      this.isClosed -> false
-      this.isFailure -> {
-        throw this.exceptionOrNull() ?: error("receive is a failure without exception")
-      }
-      else -> {
-        error("unreachable")
+      else {
+        // this branch should never trigger
+        // * It is guaranteed that the only way this function can return a [failed][ChannelResult.isFailure] result is when
+        //  * the channel is [closed for `receive`][isClosedForReceive], so [ChannelResult.isClosed] is also true.
+        throw (this.exceptionOrNull() ?: error("receive is a failure without exception"))
       }
     }
   }
@@ -146,6 +152,8 @@ private class RpcClient(
   @OptIn(ExperimentalCoroutinesApi::class)
   internal suspend fun work(abortOnError: Boolean) {
     supervisorScope {
+      val rpcScope = this
+
       val receiver = async(start = CoroutineStart.ATOMIC) {
         consumeAll(transport.incoming, eventLoopChannel) {
           val mergedIncomingAndTransport = flow {
@@ -165,7 +173,7 @@ private class RpcClient(
                   logger.trace { "Received ${event.message}" }
                   when (val message = event.message) {
                     is TransportMessage.Envelope -> {
-                      acceptMessage(message.parseMessage(), message.origin)
+                      acceptMessage(message.parseMessage(), message.origin, rpcScope)
                     }
                     is TransportMessage.RouteClosed -> {
                       grayList.putIfAbsent(message.address, CompletableDeferred())
@@ -293,7 +301,7 @@ private class RpcClient(
     }
   }
 
-  private fun CoroutineScope.acceptMessage(message: RpcMessage, senderRoute: UID) {
+  private fun acceptMessage(message: RpcMessage, senderRoute: UID, rpcScope: CoroutineScope) {
     when (message) {
       is RpcMessage.CallResult -> {
         logger.trace { "Got CallResult: requestId = ${message.requestId}" }
@@ -324,7 +332,7 @@ private class RpcClient(
                 }
                 return@run resource to emptyList()
               }
-              val (de, streamDescriptors) = withSerializationContext(rpc.call.displayName, rpc.token, this) {
+              val (de, streamDescriptors) = withSerializationContext(rpc.call.displayName, rpc.token, rpcScope) {
                 val kser = rpc.returnType.serializer(rpc.call.classMethodDisplayName())
                 val json = rpcJsonImplementationDetail()
                 json.decodeFromJsonElement(kser, message.result)
@@ -362,7 +370,7 @@ private class RpcClient(
         if (stream != null) {
           when (stream) {
             is InternalStreamDescriptor.FromRemote -> {
-              val (element, streamDescriptors) = withSerializationContext(stream.displayName, stream.token, this) {
+              val (element, streamDescriptors) = withSerializationContext(stream.displayName, stream.token, rpcScope) {
                 rpcJsonImplementationDetail().decodeFromJsonElement(stream.elementSerializer, message.data)
               }
               for (internalDescriptor in registerStreams(streamDescriptors, stream.route, stream.prefetchStrategy)) {

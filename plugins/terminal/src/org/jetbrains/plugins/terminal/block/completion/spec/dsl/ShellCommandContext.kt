@@ -11,30 +11,28 @@ import org.jetbrains.annotations.ApiStatus
  * Shell command is either the main command or the subcommand of some command.
  * For example, `git` is a command, `branch` is a subcommand of the command `git`.
  * Both `git` and `branch` can be declared using this part of the DSL.
- * Commands can have its own subcommands, options, and arguments.
+ * Commands can have their own subcommands, options, and arguments.
  */
 @ApiStatus.Experimental
 @ShellCommandSpecDsl
 sealed interface ShellCommandContext : ShellSuggestionContext {
   /**
-   * Whether this command can't be executed without mentioning the subcommand.
-   *
-   * False by default.
+   * Specifies that this command can't be executed without mentioning the subcommand.
    */
-  var requiresSubcommand: Boolean
+  fun requiresSubcommand()
 
   /**
    * Allows modifying default parser options.
    * @see [ShellCommandParserOptions]
    */
-  var parserOptions: ShellCommandParserOptions
+  fun parserOptions(options: ShellCommandParserOptions)
 
   /**
    * Specify the subcommands of the current command.
    *
    * @param [content] is suspending function that will be executed at the moment of requesting the subcommands.
    * Inside [content] you can access the values of [ShellRuntimeContext] and generate the list of subcommands depending on
-   * current shell directory, typed prefix, project and so on.
+   * current shell directory, typed prefix, project, and so on.
    */
   fun subcommands(content: suspend ShellChildCommandsContext.(ShellRuntimeContext) -> Unit)
 
@@ -45,7 +43,7 @@ sealed interface ShellCommandContext : ShellSuggestionContext {
    *
    * @param [content] is suspending function that will be executed at the moment of requesting the options.
    * Inside [content] you can access the values of [ShellRuntimeContext] and generate the list of options depending on
-   * current shell directory, typed prefix, project and so on.
+   * current shell directory, typed prefix, project, and so on.
    */
   fun dynamicOptions(content: suspend ShellChildOptionsContext.(ShellRuntimeContext) -> Unit)
 
@@ -62,7 +60,7 @@ sealed interface ShellCommandContext : ShellSuggestionContext {
   /**
    * Specifies that this Shell command should have an argument.
    * Note that arguments are not optional by default.
-   * If your argument is not necessary to be specified, then set [ShellArgumentContext.isOptional] to true.
+   * If your argument is not necessary to be specified, specify [ShellArgumentContext.optional].
    * Arguments should be defined in the same order as it is expected in the command line.
    * @param [content] description of the argument
    */

@@ -185,7 +185,7 @@
       <reference ref="ChangesView.Move"/>
       <reference ref="Diff.ShowDiff"/>
       <reference ref="Diff.ShowStandaloneDiff"/>
-      <reference ref="EditSource"/>
+      <action id="ChangesView.EditSource" class="com.intellij.openapi.vcs.actions.ChangesViewPopupJumpToSourceAction"/>
       <separator/>
       <reference ref="$Delete"/>
       <action id="ChangesView.AddUnversioned"
@@ -671,6 +671,10 @@
     <action id="MarkFileDirty" internal="true" class="com.intellij.openapi.vcs.changes.actions.MarkFileDirtyAction">
       <add-to-group group-id="Internal.VFS"/>
     </action>
+
+    <group id="Vcs.Internal" internal="true" popup="true">
+      <add-to-group group-id="Internal"/>
+    </group>
   </actions>
 
   <actions resource-bundle="messages.VcsBundle">

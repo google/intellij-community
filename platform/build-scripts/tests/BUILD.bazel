@@ -42,16 +42,17 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/util-ex",
     "@community//build:zip",
-    "@lib//:netty-buffer",
+    "//libraries/netty/buffer",
     "//libraries/hash4j",
     "//libraries/fastutil",
-    "@lib//:maven-resolver-provider",
+    "//libraries/maven-resolver-provider",
     "//libraries/mockito",
     "@lib//:mockito-kotlin",
     "//jps/model-serialization",
     "//jps/model-api:model",
     "//libraries/jsoup",
-  ]
+  ],
+  runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.platform.buildScripts.tests` end
 

@@ -90,6 +90,10 @@ com.intellij.codeInsight.completion.CompletionLookupArranger
 - a:addElement(com.intellij.codeInsight.lookup.LookupElement,com.intellij.codeInsight.completion.CompletionSorter,com.intellij.codeInsight.completion.PrefixMatcher,com.intellij.codeInsight.lookup.LookupElementPresentation):V
 - a:arrangeItems():com.intellij.openapi.util.Pair
 - a:itemMatcher(com.intellij.codeInsight.lookup.LookupElement):com.intellij.codeInsight.completion.PrefixMatcher
+com.intellij.codeInsight.completion.CopyFileUpdateTask
+- a:ensureUpdatedAndGetNewOffsets():com.intellij.codeInsight.completion.OffsetsInFile
+f:com.intellij.codeInsight.completion.OffsetsInFile
+- f:replaceInCopy(com.intellij.psi.PsiFile,I,I,java.lang.String):com.intellij.codeInsight.completion.CopyFileUpdateTask
 c:com.intellij.codeInsight.daemon.DaemonCodeAnalyzerSettings
 - sf:AUTOREPARSE_DELAY_DEFAULT:I
 com.intellij.codeInsight.daemon.ReferenceImporter
@@ -219,6 +223,10 @@ com.intellij.codeInsight.daemon.impl.analysis.ErrorQuickFixProvider
 - com.intellij.openapi.project.PossiblyDumbAware
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - registerErrorQuickFix(com.intellij.psi.PsiErrorElement,com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder):V
+c:com.intellij.codeInsight.lookup.EqTailType
+- com.intellij.codeInsight.ModNavigatorTailType
+- p:isSpaceAroundAssignmentOperators(com.intellij.psi.PsiFile,I):Z
+- processTail(com.intellij.openapi.editor.ModNavigator,I):I
 com.intellij.codeInsight.template.CaretAutoMoveController
 - sf:KEY:com.intellij.openapi.util.Key
 - s:forbidCaretMovementInsideIfNeeded(com.intellij.openapi.editor.Editor,java.lang.Runnable):V

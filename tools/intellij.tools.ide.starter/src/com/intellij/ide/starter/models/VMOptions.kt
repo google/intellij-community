@@ -173,16 +173,16 @@ data class VMOptions(
    * [categories] - Could be packages, classes ...
    */
   fun configureLoggers(logLevel: LogLevel, vararg categories: String) {
+    configureLoggers(logLevel.name.lowercase(), *categories)
+  }
+
+  fun configureLoggers(logLevel: String, vararg categories: String) {
     if (categories.isNotEmpty()) {
-      val logLevelName = logLevel.name.lowercase()
+      val logLevelName = logLevel.lowercase()
       addSystemPropertyValue("idea.log.${logLevelName}.categories", categories.joinToString(separator = ",") {
         "#" + it.removePrefix("#")
       })
     }
-  }
-
-  fun configureLoggers(logLevel: String, vararg categories: String) {
-    configureLoggers(LogLevel.valueOf(logLevel), *categories)
   }
 
   fun dropDebug() {
@@ -217,6 +217,7 @@ data class VMOptions(
   fun hasHeadlessMode(): Boolean = data.any { it.contains("-Djava.awt.headless=true") }
 
   fun inUnitTestMode(): Unit = addSystemProperty("idea.is.unit.test", true)
+  fun hasUnitTestMode(): Boolean = data.any { it.contains("-Didea.is.unit.test=true") }
 
   fun disableStartupDialogs() {
     addSystemProperty("jb.consents.confirmation.enabled", false)

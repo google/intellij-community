@@ -5,15 +5,17 @@ package org.jetbrains.intellij.build.impl
 
 import com.intellij.util.io.URLUtil
 import io.opentelemetry.api.trace.Span
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
-import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.intellij.build.BuildMessages
 import org.jetbrains.intellij.build.BuildOptions
 import org.jetbrains.intellij.build.BuildPaths
 import org.jetbrains.intellij.build.CompilationContext
 import org.jetbrains.intellij.build.JpsCompilationData
+import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.dependencies.DependenciesProperties
 import org.jetbrains.intellij.build.impl.moduleBased.buildOriginalModuleRepository
 import org.jetbrains.intellij.build.moduleBased.OriginalModuleRepository
@@ -23,20 +25,19 @@ import org.jetbrains.jps.model.java.JpsJavaClasspathKind
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.model.module.JpsModuleReference
-import java.io.File
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.inputStream
 import kotlin.io.path.name
 import kotlin.io.path.pathString
 
-@ApiStatus.Internal
+@Internal
 class BazelCompilationContext(
   private val delegate: CompilationContext,
+  private val scope: CoroutineScope?,
 ) : CompilationContext {
-
-  private val moduleOutputProvider by lazy {
-    BazelModuleOutputProvider(delegate.project.modules, delegate.paths.projectHome, bazelOutputRoot!!)
+  override val outputProvider: ModuleOutputProvider by lazy {
+    BazelModuleOutputProvider(modules = delegate.project.modules, projectHome = delegate.paths.projectHome, bazelOutputRoot = bazelOutputRoot!!, scope = scope)
   }
 
   override val options: BuildOptions
@@ -69,18 +70,6 @@ class BazelCompilationContext(
 
   override suspend fun getOriginalModuleRepository(): OriginalModuleRepository = originalModuleRepository.await()
 
-  override fun findRequiredModule(name: String): JpsModule = delegate.findRequiredModule(name)
-
-  override fun findLibraryRoots(libraryName: String, moduleLibraryModuleName: String?): List<Path> {
-    return moduleOutputProvider.findLibraryRoots(libraryName, moduleLibraryModuleName)
-  }
-
-  override fun findModule(name: String): JpsModule? = delegate.findModule(name)
-
-  override fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
-    return moduleOutputProvider.getModuleOutputRoots(module, forTests)
-  }
-
   override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): Collection<Path> {
     val enumerator = JpsJavaExtensionService.dependencies(module).recursively()
       .also {
@@ -93,14 +82,14 @@ class BazelCompilationContext(
     val result = LinkedHashSet<Path>()
     enumerator.processModuleAndLibraries(
       { depModule ->
-        result.addAll(moduleOutputProvider.getModuleOutputRoots(depModule, forTests = forTests))
+        result.addAll(outputProvider.getModuleOutputRoots(depModule, forTests = forTests))
         if (forTests) {  // incl. production
-          result.addAll(moduleOutputProvider.getModuleOutputRoots(depModule, forTests = false))
+          result.addAll(outputProvider.getModuleOutputRoots(depModule, forTests = false))
         }
       },
       { library ->
         val moduleLibraryModuleName = (library.createReference().parentReference as? JpsModuleReference)?.moduleName
-        for (path in moduleOutputProvider.findLibraryRoots(library.name, moduleLibraryModuleName)) {
+        for (path in outputProvider.findLibraryRoots(library.name, moduleLibraryModuleName)) {
           result.add(path)
         }
       }
@@ -112,14 +101,10 @@ class BazelCompilationContext(
 
   override fun findFileInModuleSources(module: JpsModule, relativePath: String, forTests: Boolean): Path? = delegate.findFileInModuleSources(module, relativePath, forTests)
 
-  override fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
-    return moduleOutputProvider.readFileContentFromModuleOutput(module, relativePath, forTests)
-  }
-
   override fun notifyArtifactBuilt(artifactPath: Path): Unit = delegate.notifyArtifactBuilt(artifactPath)
 
   override fun createCopy(messages: BuildMessages, options: BuildOptions, paths: BuildPaths): CompilationContext {
-    return BazelCompilationContext(delegate.createCopy(messages, options, paths)/*, modulesToOutputRoots*/)
+    return BazelCompilationContext(delegate = delegate.createCopy(messages, options, paths), scope = scope)
   }
 
   override suspend fun prepareForBuild(): Unit = delegate.prepareForBuild()
@@ -131,63 +116,63 @@ class BazelCompilationContext(
 
   override suspend fun withCompilationLock(block: suspend () -> Unit): Unit = delegate.withCompilationLock(block)
 
-  fun replaceWithCompressedIfNeededLF(files: List<File>): List<File> {
-    val out = ArrayList<File>(files.size)
-    for (file in files) {
-      val path = file.toPath()
+  fun replaceAllWithCompressedIfNeeded(files: List<Path>): List<Path> {
+    val out = ArrayList<Path>(files.size)
+    for (path in files) {
       if (!path.startsWith(classesOutputDirectory)) {
-        out.add(file)
+        out.add(path)
         continue
       }
 
-      val module = findModule(path.name)
+      val module = outputProvider.findModule(path.name)
       if (module == null) {
-        out.add(file)
+        out.add(path)
         continue
       }
 
-      val roots = moduleOutputProvider.getModuleOutputRoots(module, path.parent.name == "test")
-      roots.mapTo(out, Path::toFile)
+      val roots = outputProvider.getModuleOutputRoots(module, path.parent.name == "test")
+      out.addAll(roots)
     }
     return out
   }
-
-  class BazelTargetsInfo {
-    companion object {
-      fun bazelTargetsJsonFile(projectHome: Path): Path = projectHome.resolve("build").resolve("bazel-targets.json")
-
-      fun loadBazelTargetsJson(projectRoot: Path): TargetsFile {
-        val targetsFile = bazelTargetsJsonFile(projectRoot).inputStream().use { Json.decodeFromStream<TargetsFile>(it) }
-        return targetsFile
-      }
-    }
-
-    @Serializable
-    data class TargetsFileModuleDescription(
-      val productionTargets: List<String>,
-      val productionJars: List<String>,
-      val testTargets: List<String>,
-      val testJars: List<String>,
-      val exports: List<String>,
-      val moduleLibraries: Map<String, LibraryDescription>,
-    )
-
-    @Serializable
-    data class LibraryDescription(
-      val target: String,
-      val jars: List<String>,
-      val sourceJars: List<String>,
-    )
-
-    @Serializable
-    data class TargetsFile(
-      val modules: Map<String, TargetsFileModuleDescription>,
-      val projectLibraries: Map<String, LibraryDescription>,
-    )
-  }
 }
 
-@ApiStatus.Internal
+internal class BazelTargetsInfo {
+  companion object {
+    fun bazelTargetsJsonFile(projectHome: Path): Path = projectHome.resolve("build").resolve("bazel-targets.json")
+
+    fun loadBazelTargetsJson(projectRoot: Path): TargetsFile {
+      val targetsFile = bazelTargetsJsonFile(projectRoot).inputStream().use { Json.decodeFromStream<TargetsFile>(it) }
+      return targetsFile
+    }
+  }
+
+  @Serializable
+  data class TargetsFileModuleDescription(
+    val productionTargets: List<String>,
+    val productionJars: List<String>,
+    val testTargets: List<String>,
+    val testJars: List<String>,
+    val exports: List<String>,
+    val moduleLibraries: Map<String, LibraryDescription>,
+  )
+
+  @Serializable
+  data class LibraryDescription(
+    val target: String,
+    val jars: List<String>,
+    val jarTargets: List<String>,
+    val sourceJars: List<String>,
+  )
+
+  @Serializable
+  data class TargetsFile(
+    val modules: Map<String, TargetsFileModuleDescription>,
+    val projectLibraries: Map<String, LibraryDescription>,
+  )
+}
+
+@Internal
 fun isRunningFromBazelOut(): Boolean = bazelOutputRoot != null
 
 internal val bazelOutputRoot: Path? by lazy {
@@ -218,9 +203,11 @@ internal val bazelOutputRoot: Path? by lazy {
 }
 
 val CompilationContextImpl.asBazelIfNeeded: CompilationContext
-  get() {
-    return when {
-      isRunningFromBazelOut() -> BazelCompilationContext(this)
-      else -> this
-    }
+  get() = toBazelIfNeeded(scope = null)
+
+internal fun CompilationContextImpl.toBazelIfNeeded(scope: CoroutineScope?): CompilationContext {
+  return when {
+    isRunningFromBazelOut() -> BazelCompilationContext(delegate = this, scope = scope)
+    else -> this
   }
+}

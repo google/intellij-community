@@ -21,7 +21,7 @@ import com.intellij.util.PlatformUtils
 
 internal data class SuitableRoot(val file: VirtualFile, val moduleQualifier: String?)
 
-private class DefaultWebServerRootsProvider : WebServerRootsProvider() {
+internal class DefaultWebServerRootsProvider : WebServerRootsProvider() {
   override fun resolve(path: String, project: Project, pathQuery: PathQuery): PathInfo? {
     val pathToFileManager = WebServerPathToFileManager.getInstance(project)
 
@@ -246,7 +246,7 @@ private fun findInLibrariesAndSdk(project: Project, rootTypes: Array<OrderRootTy
 
     val projectSdk = ProjectRootManager.getInstance(project).projectSdk
     return projectSdk?.let(inSdkFinder)
-           ?: ProjectJdkTable.getInstance().allJdks.asSequence().filter { it === projectSdk }.map { inSdkFinder(it) }.firstOrNull { it != null }
+           ?: ProjectJdkTable.getInstance(project).allJdks.asSequence().filter { it === projectSdk }.map { inSdkFinder(it) }.firstOrNull { it != null }
   }
 
   return rootTypes.asSequence().map { rootType ->

@@ -400,10 +400,10 @@ class PyTypeHintsInspection : PyInspection() {
         }
       }
 
-
       checkTypeCommentAndParameters(node)
       checkTypeVarsInFunctionAnnotations(node)
       reportTypeParametersUsedByOuterScope(node)
+      checkInitSelfParameterAnnotation(node)
     }
 
     override fun visitPyTargetExpression(node: PyTargetExpression) {
@@ -1096,8 +1096,14 @@ class PyTypeHintsInspection : PyInspection() {
     }
 
     private fun checkGenericTypeParameterization(node: PySubscriptionExpression) {
-      val declaration = node.operand.reference
-        ?.let { PyResolveUtil.resolveDeclaration(it, resolveContext) }
+      val operandRefExpression = node.operand as? PyReferenceExpression ?: return
+      val declaration = multiFollowAssignmentsChain(operandRefExpression) {
+        return@multiFollowAssignmentsChain when {
+          PyTypingTypeProvider.isExplicitTypeAlias(it, myTypeEvalContext) -> false
+          PyTypingAliasStubType.getAssignedValueStubLike(it) is PyReferenceExpression -> followNotTypingOpaque(it)
+          else -> false
+        }
+      }.firstOrNull()
 
       when (declaration) {
         is PyTargetExpression -> checkTypeAliasParameterization(node, declaration)
@@ -1134,11 +1140,9 @@ class PyTypeHintsInspection : PyInspection() {
 
     private fun checkTypeAliasParameterization(node: PySubscriptionExpression, declaration: PyTargetExpression) {
       val assignedValue = PyTypingAliasStubType.getAssignedValueStubLike(declaration) ?: return
-      if (PyTypingTypeProvider.resolveToQualifiedNames(assignedValue, myTypeEvalContext)
-          .any { PyTypingTypeProvider.OPAQUE_NAMES.contains(it) }) return
       val assignedValueType = Ref.deref(PyTypingTypeProvider.getType(assignedValue, myTypeEvalContext)) ?: return
 
-      val isExplicitTypeAlias = declaration.annotationValue != null
+      val isExplicitTypeAlias = PyTypingTypeProvider.isExplicitTypeAlias(declaration, myTypeEvalContext)
       val generics = collectTypeParametersFromTypeAlias(assignedValue, assignedValueType, isExplicitTypeAlias)
       if (generics.isEmpty) {
         registerProblem(node.indexExpression, PyPsiBundle.message("INSP.type.hints.generic.type.alias.is.not.generic.or.already.parameterized"), ProblemHighlightType.WARNING)
@@ -1435,7 +1439,7 @@ class PyTypeHintsInspection : PyInspection() {
       }
       else if (hasSelf && actualParametersSize == commentParametersSize) {
         val actualSelfType =
-          (myTypeEvalContext.getType(cls!!) as? PyInstantiableType<*>)
+          (myTypeEvalContext.getType(cls) as? PyInstantiableType<*>)
             ?.let { if (modifier == PyAstFunction.Modifier.CLASSMETHOD) it.toClass() else it.toInstance() }
           ?: return
 
@@ -1475,6 +1479,27 @@ class PyTypeHintsInspection : PyInspection() {
         if (type is PyTypeVarType && type.variance == Variance.CONTRAVARIANT) {
           registerProblem(returnAnnotation, PyPsiBundle.message("INSP.type.hints.cannot.use.contravariant.in.return.type"))
         }
+      }
+    }
+
+    private fun checkInitSelfParameterAnnotation(function: PyFunction) {
+      // Report the use of class-scoped type vars in a type hint for `self` parameter of the `__init__` method,
+      // which is not allowed
+      if (function.name != PyNames.INIT) return
+
+      val method = function.asMethod() ?: return
+      val containingClass = method.containingClass ?: return
+
+      val selfParameter = function.parameterList.parameters.firstOrNull()
+      if (selfParameter !is PyNamedParameter) return
+
+      val selfAnnotationValue = selfParameter.annotation?.value ?: return
+      val selfAnnotationType = PyTypingTypeProvider.getType(selfAnnotationValue, myTypeEvalContext) ?: return
+
+      val generics = PyTypeChecker.collectGenerics(selfAnnotationType.get(), myTypeEvalContext)
+      if (generics.typeVars.any { it.scopeOwner === containingClass }) {
+        registerProblem(selfAnnotationValue,
+                        PyPsiBundle.message("INSP.type.hints.cannot.use.class.scope.type.variables.in.annotation.for.self.parameter.of__init__"))
       }
     }
 

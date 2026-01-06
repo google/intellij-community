@@ -1,27 +1,50 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
+@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
 
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.util.io.toByteArray
+import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.io.ZipEntryProcessorResult
 import org.jetbrains.intellij.build.io.readZipFile
+import org.jetbrains.intellij.bazelEnvironment.BazelLabel
+import org.jetbrains.intellij.bazelEnvironment.BazelRunfiles
 import org.jetbrains.jps.model.module.JpsModule
+import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
 
-internal class BazelModuleOutputProvider(modules: List<JpsModule>, val projectHome: Path, val bazelOutputRoot: Path) : ModuleOutputProvider {
+internal class BazelModuleOutputProvider(
+  modules: List<JpsModule>,
+  private val projectHome: Path,
+  val bazelOutputRoot: Path,
+  scope: CoroutineScope?,
+) : ModuleOutputProvider {
   private val nameToModule = modules.associateByTo(HashMap(modules.size)) { it.name }
 
-  private val bazelTargetsMap: BazelCompilationContext.BazelTargetsInfo.TargetsFile by lazy {
-    BazelCompilationContext.BazelTargetsInfo.loadBazelTargetsJson(projectHome)
+  private val zipFilePool = ModuleOutputZipFilePool(scope)
+
+  /**
+   * Suspend version of [readFileContentFromModuleOutput] using cached zip file instances.
+   */
+  override suspend fun readFileContentFromModuleOutputAsync(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
+    for (moduleOutput in getModuleOutputRootsImpl(module, forTests)) {
+      zipFilePool.getData(moduleOutput, relativePath)?.let { return it }
+    }
+    return null
+  }
+
+  private val bazelTargetsMap: BazelTargetsInfo.TargetsFile by lazy {
+    BazelTargetsInfo.loadBazelTargetsJson(projectHome)
   }
 
   override fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
     val result = getModuleOutputRootsImpl(module, forTests).mapNotNull { moduleOutput ->
-      if (Files.notExists(moduleOutput)) return@mapNotNull null
+      if (Files.notExists(moduleOutput)) {
+        return@mapNotNull null
+      }
       var fileContent: ByteArray? = null
       readZipFile(moduleOutput) { name, data ->
         if (name == relativePath) {
@@ -32,7 +55,7 @@ internal class BazelModuleOutputProvider(modules: List<JpsModule>, val projectHo
           ZipEntryProcessorResult.CONTINUE
         }
       }
-      return@mapNotNull fileContent
+      fileContent
     }
     check(result.size < 2) {
       "More than one '$relativePath' file for module '${module.name}' in output roots"
@@ -63,7 +86,12 @@ internal class BazelModuleOutputProvider(modules: List<JpsModule>, val projectHo
       "Cannot find $libraryMoniker"
     )
 
-    val paths = library.jars.map { bazelOutputRoot.resolve(it) }
+    val paths = if (BazelRunfiles.isRunningFromBazel) {
+      library.jarTargets.map { BazelRunfiles.getFileByLabel(BazelLabel.fromString(it)) }
+    }
+    else {
+      library.jars.map { bazelOutputRoot.resolve(it) }
+    }
 
     check(paths.isNotEmpty()) {
       "No files found for $libraryMoniker"
@@ -90,8 +118,60 @@ internal class BazelModuleOutputProvider(modules: List<JpsModule>, val projectHo
 
   private fun getModuleOutputRootsImpl(module: JpsModule, forTests: Boolean): List<Path> {
     val moduleDescription = bazelTargetsMap.modules[module.name] ?: error("Cannot find module '${module.name}' in the project")
-    val jarsRelative = if (forTests) moduleDescription.testJars else moduleDescription.productionJars
-    val jars = jarsRelative.map { projectHome.resolve(it) }
-    return jars
+
+    return if (BazelRunfiles.isRunningFromBazel) {
+      val targets = if (forTests) moduleDescription.testTargets else moduleDescription.productionTargets
+      targets.map { BazelRunfiles.getFileByLabel(BazelLabel.fromString(it)) }
+    }
+    else {
+      val jarsRelative = if (forTests) moduleDescription.testJars else moduleDescription.productionJars
+      jarsRelative.map { projectHome.resolve(it) }
+    }
   }
+
+  override suspend fun findFileInAnyModuleOutput(relativePath: String, moduleNamePrefix: String?, processedModules: MutableSet<String>?): ByteArray? {
+    return findFileInAnyModuleOutput(
+      modules = nameToModule.values,
+      relativePath = relativePath,
+      provider = this,
+      moduleNamePrefix = moduleNamePrefix,
+      processedModules = processedModules,
+    )
+  }
+
+  override fun getModuleImlFile(module: JpsModule): Path {
+    val baseDir = requireNotNull(JpsModelSerializationDataService.getBaseDirectoryPath(module)) {
+      "Cannot find base directory for module ${module.name}"
+    }
+    return baseDir.resolve("${module.name}.iml")
+  }
+
+  override fun toString(): String = "BazelModuleOutputProvider(projectHome=$projectHome, bazelOutputRoot=$bazelOutputRoot)"
+}
+
+/**
+ * Searches for a file across module outputs.
+ * If [moduleNamePrefix] is specified, only searches in modules whose name starts with the prefix.
+ * If [processedModules] is specified, skips modules already in the set and adds searched modules to it.
+ */
+internal suspend fun findFileInAnyModuleOutput(
+  modules: Iterable<JpsModule>,
+  relativePath: String,
+  provider: ModuleOutputProvider,
+  moduleNamePrefix: String? = null,
+  processedModules: MutableSet<String>? = null,
+): ByteArray? {
+  for (module in modules) {
+    val name = module.name
+    if (moduleNamePrefix != null && !name.startsWith(moduleNamePrefix)) {
+      continue
+    }
+    if (processedModules != null && !processedModules.add(name)) {
+      continue
+    }
+    provider.readFileContentFromModuleOutputAsync(module = module, relativePath = relativePath, forTests = false)?.let {
+      return it
+    }
+  }
+  return null
 }

@@ -15,6 +15,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ProcessingContext;
 import com.intellij.util.containers.CollectionFactory;
+import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.psi.*;
 import com.jetbrains.python.psi.impl.PyTypeProvider;
 import com.jetbrains.python.psi.resolve.PyResolveContext;
@@ -27,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 
 
@@ -46,16 +48,30 @@ public sealed class TypeEvalContext {
   }
 
   private final @NotNull TypeEvalConstraints myConstraints;
+  private boolean isInsideExternalTypeProviderCall = false;
 
   private List<String> myTrace;
   private String myTraceIndent = "";
 
   private final ThreadLocal<ProcessingContext> myProcessingContext = ThreadLocal.withInitial(ProcessingContext::new);
 
-  protected final Map<PyTypedElement, PyType> myEvaluated = CollectionFactory.createConcurrentSoftValueMap();
-  protected final Map<PyTypedElement, PyType> myExternalEvaluated = CollectionFactory.createConcurrentSoftValueMap();
-  protected final Map<PyCallable, PyType> myEvaluatedReturn = CollectionFactory.createConcurrentSoftValueMap();
-  protected final Map<Pair<PyExpression, Object>, PyType> contextTypeCache = CollectionFactory.createConcurrentSoftValueMap();
+  protected final Map<PyTypedElement, PyType> myEvaluated = getConcurrentMapForCaching();
+  protected final Map<PyTypedElement, PyType> myExternalEvaluated = getConcurrentMapForCaching();
+  protected final Map<PyCallable, PyType> myEvaluatedReturn = getConcurrentMapForCaching();
+  protected final Map<Pair<PyExpression, Object>, PyType> contextTypeCache = getConcurrentMapForCaching();
+
+  private static <T> @NotNull ConcurrentMap<@NotNull T, @NotNull PyType> getConcurrentMapForCaching() {
+    if (Registry.is("python.typing.soft.keys.type.eval.context")) {
+      // In the current implementation, this value is only used to initialize the map and is basically ignored
+      // Just in case, set it to a reasonable value
+      // `Runtime.availableProcessors` shouldn't be called here, as that is a potentially expensive operation
+      int concurrencyLevel = 4;
+      return CollectionFactory.createConcurrentSoftKeySoftValueMap(10, 0.75f, concurrencyLevel);
+    }
+    else {
+      return CollectionFactory.createConcurrentSoftValueMap();
+    }
+  }
 
   protected static final Logger logger = Logger.getInstance(TypeEvalContext.class);
 
@@ -281,6 +297,10 @@ public sealed class TypeEvalContext {
     return Registry.is("python.use.separated.libraries.type.cache") && isLibraryElement(element);
   }
 
+  private static boolean isExternalTypeProviderApplicable(PyTypedElement element) {
+    return element instanceof PyInstantTypeProvider;
+  }
+
   public @Nullable PyType getType(final @NotNull PyTypedElement element) {
     if (canDelegateToLibraryContext(element)) {
       var context = getLibraryContext(element.getProject());
@@ -295,21 +315,26 @@ public sealed class TypeEvalContext {
       Pair.create(element, this),
       false,
       () -> {
-        // Try external providers first
-        for (var provider : TypeEvalExternalTypeProvider.EP_NAME.getExtensionList()) {
-          try {
-            var provided = provider.provideType(element, this);
-            if (provided != null) {
-              var type = provided.get();
-              myExternalEvaluated.put(element, type == null ? PyNullType.INSTANCE : type);
-              return type;
+        if (!isExternalTypeProviderApplicable(element) && !isInsideExternalTypeProviderCall) {
+          var externalTypeProvider =
+            ContainerUtil.find(TypeEvalExternalTypeProvider.EP_NAME.getExtensionList(), TypeEvalExternalTypeProvider::isAvailable);
+          if (externalTypeProvider != null) {
+            try {
+              isInsideExternalTypeProviderCall = true;
+              var provided = externalTypeProvider.provideType(element, this);
+              isInsideExternalTypeProviderCall = false;
+              if (provided != null) {
+                var type = provided.get();
+                myExternalEvaluated.put(element, type == null ? PyNullType.INSTANCE : type);
+                return type;
+              }
             }
-          }
-          catch (ProcessCanceledException e) {
-            throw e;
-          }
-          catch (Exception e) {
-            logger.warn("Exception during external type provider " + provider.getClass().getName(), e);
+            catch (ProcessCanceledException e) {
+              throw e;
+            }
+            catch (Exception e) {
+              logger.warn("Exception during external type provider " + externalTypeProvider.getClass().getName(), e);
+            }
           }
         }
 

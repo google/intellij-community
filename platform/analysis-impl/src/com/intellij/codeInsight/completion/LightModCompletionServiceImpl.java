@@ -11,6 +11,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.indexing.DumbModeAccessType;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNullByDefault;
 
@@ -28,16 +29,24 @@ public final class LightModCompletionServiceImpl {
   public static void getItems(PsiFile file, int caretOffset, int invocationCount, CompletionType type,
                               Consumer<ModCompletionItem> sink) {
     CharSequence sequence = file.getFileDocument().getCharsSequence();
+    int start = findStart(caretOffset, sequence);
+    DumbModeAccessType.RELIABLE_DATA_ONLY.ignoreDumbMode(() -> {
+      getItems(file, start, caretOffset, invocationCount, type, sink);
+    });
+  }
+
+  private static int findStart(int caretOffset, CharSequence sequence) {
     int start = caretOffset;
-    while (start > 0 && StringUtil.isJavaIdentifierPart(sequence.charAt(start-1))) {
+    while (start > 0 && StringUtil.isJavaIdentifierPart(sequence.charAt(start - 1))) {
       start--;
     }
-    getItems(file, start, caretOffset, invocationCount, type, sink);
+    return start;
   }
 
   public static void getItems(PsiFile file, int startOffset, int caretOffset, int invocationCount, CompletionType type,  
                               Consumer<ModCompletionItem> sink) {
     PsiElement element;
+    PsiElement original = Objects.requireNonNull(file.findElementAt(startOffset));
     if (startOffset == caretOffset) {
       PsiFile copy = (PsiFile)file.copy();
       Document document = copy.getFileDocument();
@@ -46,13 +55,13 @@ public final class LightModCompletionServiceImpl {
       manager.commitDocument(document);
       element = Objects.requireNonNull(copy.findElementAt(caretOffset));
     } else {
-      element = Objects.requireNonNull(file.findElementAt(startOffset));
+      element = original;
     }
     List<ModCompletionItemProvider> providers = ModCompletionItemProvider.EP_NAME.allForLanguage(file.getLanguage());
     String prefix = file.getFileDocument().getText(TextRange.create(startOffset, caretOffset));
     var matcher = new CamelHumpMatcher(prefix);
     ModCompletionItemProvider.CompletionContext context = new ModCompletionItemProvider.CompletionContext(
-      file, caretOffset, element, matcher, invocationCount, type);
+      file, caretOffset, original, element, matcher, invocationCount, type);
     for (ModCompletionItemProvider provider : providers) {
       provider.provideItems(context, item -> {
         if (matcher.prefixMatches(item.mainLookupString()) ||

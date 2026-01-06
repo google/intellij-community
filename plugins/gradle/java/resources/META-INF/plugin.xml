@@ -72,6 +72,7 @@
                         serviceImplementation="org.jetbrains.plugins.gradle.GradleJavaIdeManager"/>
 
     <treeStructureProvider implementation="org.jetbrains.plugins.gradle.projectView.GradleTreeStructureProvider" order="last"/>
+    <attachSourcesProviderFilter implementation="org.jetbrains.plugins.gradle.editor.GradleAttachSourcesProviderFilter"/>
 
     <compileServer.plugin classpath="gradle-jps.jar"/>
     <postStartupActivity implementation="org.jetbrains.plugins.gradle.startup.GradleJvmStartupActivity"/>
@@ -86,7 +87,6 @@
         implementation="org.jetbrains.plugins.gradle.execution.build.GradleUpdateResourcesBuildContributor"/>
     <compiler.task execute="BEFORE" implementation="org.jetbrains.plugins.gradle.config.GradleResourceConfigurationGeneratorCompileTask"/>
 
-    <attachSourcesProvider implementation="org.jetbrains.plugins.gradle.action.GradleAttachSourcesProvider"/>
     <projectImportProvider implementation="org.jetbrains.plugins.gradle.service.project.wizard.JavaGradleProjectImportProvider"/>
 
     <defender.config implementation="org.jetbrains.plugins.gradle.util.GradleWindowsDefenderCheckerExt"/>
@@ -164,9 +164,4 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleDeprecatedConfigurationInspection"/>
   </extensions>
-
-  <projectListeners>
-    <listener class="org.jetbrains.plugins.gradle.service.editor.GradleDownloadSourceEditorListener"
-              topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
-  </projectListeners>
 </idea-plugin>

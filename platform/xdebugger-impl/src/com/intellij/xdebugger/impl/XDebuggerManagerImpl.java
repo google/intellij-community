@@ -40,6 +40,7 @@ import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.wm.IdeGlassPaneUtil;
 import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.platform.debugger.impl.rpc.XFrontendDebuggerCapabilities;
+import com.intellij.platform.debugger.impl.shared.XDebuggerActionsCollector;
 import com.intellij.platform.debugger.impl.shared.XDebuggerWatchesManager;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.HintHint;
@@ -114,15 +115,16 @@ public final class XDebuggerManagerImpl extends XDebuggerManager implements Pers
     if (!SplitDebuggerMode.isSplitDebugger() || AppMode.isRemoteDevHost()) {
       startContentSelectionListening(messageBusConnection);
     }
-
-    GutterUiRunToCursorEditorListener listener = new GutterUiRunToCursorEditorListener();
-    EditorEventMulticaster eventMulticaster = EditorFactory.getInstance().getEventMulticaster();
-    eventMulticaster.addEditorMouseMotionListener(listener, this);
-    eventMulticaster.addEditorMouseListener(listener, this);
-    if (ExperimentalUI.isNewUI()) {
-      myNewRunToCursorListener = new InlayRunToCursorEditorListener(myProject, coroutineScope);
-      eventMulticaster.addEditorMouseMotionListener(myNewRunToCursorListener, this);
-      eventMulticaster.addEditorMouseListener(myNewRunToCursorListener, this);
+    if (!DapMode.isDap()) {
+      GutterUiRunToCursorEditorListener listener = new GutterUiRunToCursorEditorListener();
+      EditorEventMulticaster eventMulticaster = EditorFactory.getInstance().getEventMulticaster();
+      eventMulticaster.addEditorMouseMotionListener(listener, this);
+      eventMulticaster.addEditorMouseListener(listener, this);
+      if (ExperimentalUI.isNewUI()) {
+        myNewRunToCursorListener = new InlayRunToCursorEditorListener(myProject, coroutineScope);
+        eventMulticaster.addEditorMouseMotionListener(myNewRunToCursorListener, this);
+        eventMulticaster.addEditorMouseListener(myNewRunToCursorListener, this);
+      }
     }
   }
 
@@ -335,9 +337,11 @@ public final class XDebuggerManagerImpl extends XDebuggerManager implements Pers
 
   private void onActiveSessionChanged(@Nullable XDebugSession previousSession, @Nullable XDebugSession currentSession) {
     myBreakpointManager.getLineBreakpointManager().queueAllBreakpointsUpdate();
-    ApplicationManager.getApplication().invokeLater(() -> {
-      ValueLookupManagerController.getInstance(myProject).hideHint();
-    }, myProject.getDisposed());
+    if (!DapMode.isDap()) {
+      ApplicationManager.getApplication().invokeLater(() -> {
+        ValueLookupManagerController.getInstance(myProject).hideHint();
+      }, myProject.getDisposed());
+    }
     if (!myProject.isDisposed()) {
       myProject.getMessageBus().syncPublisher(TOPIC).currentSessionChanged(previousSession, currentSession);
       if (currentSession != null && previousSession != null) {

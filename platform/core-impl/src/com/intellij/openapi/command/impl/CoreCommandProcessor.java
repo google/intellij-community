@@ -171,6 +171,10 @@ public class CoreCommandProcessor extends CommandProcessorEx {
     }
 
     if (currentCommand != null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("startCommand failed: name = " + name + ", groupId = " + groupId + ". " +
+                  "Another command is already running: name = " + currentCommand.getName() + ", groupId = " + currentCommand.getGroupId());
+      }
       return null;
     }
 
@@ -207,7 +211,9 @@ public class CoreCommandProcessor extends CommandProcessorEx {
   @Override
   public void leaveModal() {
     ThreadingAssertions.assertEventDispatchThread();
-    LOG.assertTrue(currentCommand == null, "Command must not run: " + currentCommand);
+    if (currentCommand != null) {
+      LOG.error("Command must not run: " + currentCommand);
+    }
     currentCommand = interruptedCommands.pop();
     if (currentCommand != null) {
       fireCommandStarted();
@@ -338,7 +344,6 @@ public class CoreCommandProcessor extends CommandProcessorEx {
                 ", in transparent action = " + isUndoTransparentActionInProgress());
     }
     if (undoTransparentCount++ == 0) {
-      CommandIdService.advanceTransparentCommandId();
       eventPublisher.undoTransparentActionStarted();
     }
   }
@@ -353,7 +358,6 @@ public class CoreCommandProcessor extends CommandProcessorEx {
   }
 
   private void fireCommandStarted() {
-    CommandIdService.advanceCommandId();
     CommandEvent event = createCurrentCommandEvent();
     eventPublisher.commandStarted(event);
   }
@@ -367,7 +371,9 @@ public class CoreCommandProcessor extends CommandProcessorEx {
       currentCommand = null;
       eventPublisher.commandFinished(event);
     }
-    LOG.debug("finishCommand: name = " + event.getCommandName() + ", groupId = " + event.getCommandGroupId());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("finishCommand: name = " + event.getCommandName() + ", groupId = " + event.getCommandGroupId());
+    }
   }
 
   private @NotNull CommandEvent createCurrentCommandEvent() {

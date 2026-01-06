@@ -5,6 +5,8 @@ import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.dvcs.DvcsUtil
 import com.intellij.dvcs.isSyncOptionEnabled
+import com.intellij.dvcs.repo.repositoryId
+import com.intellij.dvcs.ui.VcsRepositoryIconsProvider
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -31,7 +33,6 @@ import com.intellij.util.textCompletion.DefaultTextCompletionValueDescriptor
 import com.intellij.util.textCompletion.TextCompletionProviderBase
 import com.intellij.util.textCompletion.TextFieldWithCompletion
 import com.intellij.util.ui.JBUI
-import com.intellij.vcs.git.ui.GitBranchesTreeIconProvider
 import git4idea.GitBranchesUsageCollector.branchDialogRepositoryManuallySelected
 import git4idea.branch.GitBranchOperationType.CHECKOUT
 import git4idea.branch.GitBranchOperationType.CREATE
@@ -212,7 +213,7 @@ internal class GitNewBranchDialog @JvmOverloads constructor(
           icon(AllIcons.Empty)
         }
         else if (repo != null) {
-          icon(GitBranchesTreeIconProvider.forRepository(project, repo.rpcId))
+          icon(VcsRepositoryIconsProvider.getInstance(project).getIcon(repo.repositoryId()))
           text(DvcsUtil.getShortRepositoryName(repo))
         }
       }

@@ -1371,6 +1371,10 @@ public final class EditorPainter implements TextDrawingCallback {
       return attributes;
     }
 
+    private static Color withOpacity(Color color, float opacity) {
+      return new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha() * opacity));
+    }
+
     private void paintCaret() {
       if (myEditor.isPurePaintingMode()) return;
       if (myEditor.isStickyLinePainting()) return; // suppress caret painting on sticky lines panel
@@ -1389,7 +1393,9 @@ public final class EditorPainter implements TextDrawingCallback {
         int y = (int)location.myPoint.getY() - topOverhang + myYShift;
         Caret caret = location.myCaret;
         CaretVisualAttributes attr = caret == null ? CaretVisualAttributes.getDefault() : caret.getVisualAttributes();
-        g.setColor(attr.getColor() != null ? attr.getColor() : caretColor);
+
+        var opacity = myEditor.getCaretBlinkOpacity();
+        g.setColor(withOpacity(attr.getColor() != null ? attr.getColor() : caretColor, opacity));
         boolean isRtl = location.myIsRtl;
         float width = location.myWidth;
         float startX = Math.max(minX, isRtl ? x - width : x);
@@ -1442,7 +1448,14 @@ public final class EditorPainter implements TextDrawingCallback {
     }
 
     private void paintCaretBar(@NotNull Graphics2D g, @Nullable Caret caret, float x, float y, float w, float h, boolean isRtl) {
-      g.fill(new Rectangle2D.Float(x, y, w, h));
+      int arc = JBUIScale.scale(Registry.intValue("editor.caret.corner.radius"));
+
+      var old = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      g.fill(new RoundRectangle2D.Float(x, y, w, h, arc, arc));
+      if (old != null) {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, old);
+      }
       paintCaretRtlMarker(g, caret, x, y, w, isRtl);
     }
 

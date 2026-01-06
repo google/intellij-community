@@ -32,17 +32,11 @@ import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.provider.LocalEelDescriptor
-import com.intellij.platform.eel.provider.asEelPath
-import com.intellij.platform.eel.provider.asNioPath
-import com.intellij.platform.eel.provider.getEelDescriptor
-import com.intellij.platform.eel.provider.toEelApi
+import com.intellij.platform.eel.provider.*
 import com.intellij.platform.eel.provider.utils.EelPathUtils.TransferTarget
 import com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalContentToRemote
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.psi.search.ExecutionSearchScopes
-import com.intellij.util.containers.with
-import com.intellij.util.io.Compressor
 import com.intellij.util.io.outputStream
 import com.intellij.util.text.nullize
 import org.jetbrains.idea.maven.artifactResolver.common.MavenModuleMap
@@ -55,7 +49,6 @@ import org.jetbrains.idea.maven.project.*
 import org.jetbrains.idea.maven.server.*
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenUtil
-import org.jetbrains.idea.maven.utils.MavenUtil.isRunningFromSources
 import java.io.BufferedOutputStream
 import java.io.IOException
 import java.nio.charset.Charset
@@ -67,7 +60,8 @@ import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 
-class MavenShCommandLineState(val environment: ExecutionEnvironment, private val myConfiguration: MavenRunConfiguration) : RunProfileState, RemoteConnectionCreator {
+class MavenShCommandLineState(val environment: ExecutionEnvironment, private val myConfiguration: MavenRunConfiguration) : RunProfileState,
+                                                                                                                           RemoteConnectionCreator {
   private var mavenConnectionWrapper: MavenRemoteConnectionWrapper? = null
   private val workingDir: EelPath by lazy {
     Path(myConfiguration.runnerParameters.workingDirPath).asEelPath()
@@ -82,16 +76,22 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       val exe = if (isWindows()) "cmd.exe" else "/bin/sh"
       val env = getEnv(eelApi.exec.fetchLoginShellEnvVariables(), debug)
 
-      val charset = tryToGetCharset(env, eelApi)
-      val envWithCharsets =
-        env.with("JAVA_TOOL_OPTIONS",
-                 listOfNotNull(env["JAVA_TOOL_OPTIONS"], "-Dfile.encoding=${charset?.name() ?: "UTF-8"}").joinToString(" "))
+      val charset = tryToGetCharset(env, eelApi) ?: Charsets.UTF_8
+      val envWithCharsets = applyCharset(env, charset)
 
-      val processHandler = runProcessInEel(eelApi, exe, envWithCharsets, charset ?: Charsets.UTF_8)
+      val processHandler = runProcessInEel(eelApi, exe, envWithCharsets, charset)
       JavaRunConfigurationExtensionManager.instance
         .attachExtensionsToProcess(myConfiguration, processHandler, environment.runnerSettings)
       return@runWithModalProgressBlocking processHandler
     }
+  }
+
+  private fun applyCharset(env: MutableMap<String, String>, charset: Charset): Map<String, String> {
+    val mavenOpts = env["MAVEN_OPTS"]
+    if (mavenOpts != null && mavenOpts.contains("-Dfile.encoding")) return env
+    val newOpts = listOf(mavenOpts, "-Dfile.encoding=${charset.name()}").joinToString(" ").trim()
+    env["MAVEN_OPTS"] = newOpts
+    return env
   }
 
   private suspend fun runProcessInEel(
@@ -125,7 +125,12 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
 
 
     MavenLog.LOG.debug("Running $tmpFile: ${params.list.joinToString(" ")}")
-    return doRunProcessInEel(eelApi, exe, env, listOf("/c", tmpFile.absolutePath), if (isSpyDebug) tmpFile.absolutePath else params.list.joinToString(" "), charset) {
+    return doRunProcessInEel(eelApi,
+                             exe,
+                             env,
+                             listOf("/c", tmpFile.absolutePath),
+                             if (isSpyDebug) tmpFile.absolutePath else params.list.joinToString(" "),
+                             charset) {
       try {
         tmpFile.delete()
       }
@@ -226,6 +231,9 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
         MavenLog.LOG.debug("extracted charset $it from JAVA_TOOL_OPTIONS")
         return Charset.forName(it)
       }
+      if(eelApi.descriptor.osFamily.isWindows) {
+        return null
+      }
       eelApi.exec.getCodepage()?.let {
         MavenLog.LOG.debug("extracted charset $it executing command")
         return Charset.forName(it)
@@ -246,7 +254,11 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
     val prefix = "-Dfile.encoding="
     val index = envValue.indexOf(prefix)
     if (index == -1) return null
-    return envValue.substring(index + prefix.length).substringBefore(" ").nullize(true)
+    return envValue.substring(index + prefix.length)
+      .substringBefore(" ")
+      .trim('"', '\'')
+      .nullize(true)
+
   }
 
   override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult {
@@ -284,7 +296,13 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       MavenLog.LOG.warn("buildView is null for " + myConfiguration.getName())
     }
     val eventProcessor =
-      MavenBuildEventProcessor(myConfiguration, buildView!!, descriptor, taskId, { it }, Function { ctx: MavenParsingContext? -> StartBuildEventImpl(descriptor, "") }, isWrapperedOutput())
+      MavenBuildEventProcessor(myConfiguration,
+                               buildView!!,
+                               descriptor,
+                               taskId,
+                               { it },
+                               Function { ctx: MavenParsingContext? -> StartBuildEventImpl(descriptor, "") },
+                               isWrapperedOutput())
 
     processHandler.addProcessListener(BuildToolConsoleProcessAdapter(eventProcessor))
     buildView.attachToProcess(MavenHandlerFilterSpyWrapper(processHandler, isWrapperedOutput(), isWindows()))
@@ -403,7 +421,8 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       args.addProperty("maven.repo.local", Path.of(generalSettings.localRepository).asEelPath().toString())
     }
     else {
-      args.addProperty("maven.repo.local", MavenSettingsCache.getInstance(myConfiguration.project).getEffectiveUserLocalRepo().asEelPath().toString())
+      args.addProperty("maven.repo.local",
+                       MavenSettingsCache.getInstance(myConfiguration.project).getEffectiveUserLocalRepo().asEelPath().toString())
     }
   }
 
@@ -463,16 +482,6 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
       throw IllegalStateException("$pathToMavenListener does not exist")
     }
     if (pathToMavenListener.isRegularFile()) return pathToMavenListener
-
-    if (isRunningFromSources()) {
-      val tempFile = FileUtil.createTempFile("idea", "-event-listener.jar", true).toPath()
-      MavenLog.LOG.warn("compressing maven event listener from $pathToMavenListener")
-      Compressor.Zip(tempFile)
-        .use { zip ->
-          zip.addDirectory(MavenServerManager.getInstance().getMavenEventListener().toPath())
-        }
-      return tempFile
-    }
     throw IllegalStateException("$pathToMavenListener does not exist")
   }
 
@@ -595,7 +604,8 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
     }
 
   private fun isWrapperedOutput(): Boolean {
-    val mavenDistribution = MavenDistributionsCache.getInstance(myConfiguration.project).getMavenDistribution(myConfiguration.runnerParameters.workingDirPath)
+    val mavenDistribution =
+      MavenDistributionsCache.getInstance(myConfiguration.project).getMavenDistribution(myConfiguration.runnerParameters.workingDirPath)
     return mavenDistribution.isMaven4() || mavenDistribution is DaemonedMavenDistribution
   }
 

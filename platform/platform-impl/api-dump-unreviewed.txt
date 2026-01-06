@@ -3520,9 +3520,7 @@ c:com.intellij.ide.plugins.newui.PluginSearchTextField
 - com.intellij.ui.SearchTextField
 - <init>():V
 - addNotify():V
-- getPreferredSize():java.awt.Dimension
 - isSkipDocumentEvents():Z
-- setBounds(I,I,I,I):V
 - p:setEmptyHistory():V
 - setHistoryPropertyName(java.lang.String):V
 - setSelectedItem(java.lang.String):V
@@ -5316,12 +5314,8 @@ f:com.intellij.openapi.command.impl.DummyProject
 f:com.intellij.openapi.command.impl.FinishMarkAction
 - com.intellij.openapi.command.undo.BasicUndoableAction
 - s:finish(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.openapi.command.impl.StartMarkAction):V
-- getAffectedDocument():com.intellij.openapi.command.undo.DocumentReference
-- getCommandName():java.lang.String
 - isGlobal():Z
 - redo():V
-- setCommandName(java.lang.String):V
-- setGlobal(Z):V
 - undo():V
 f:com.intellij.openapi.command.impl.StartMarkAction
 - com.intellij.openapi.command.undo.BasicUndoableAction
@@ -5333,7 +5327,6 @@ f:com.intellij.openapi.command.impl.StartMarkAction
 - getDocument():com.intellij.openapi.editor.Document
 - isGlobal():Z
 - redo():V
-- setCommandName(java.lang.String):V
 - setGlobal(Z):V
 - s:start(com.intellij.openapi.editor.Editor,com.intellij.openapi.project.Project,java.lang.String):com.intellij.openapi.command.impl.StartMarkAction
 - undo():V
@@ -6203,8 +6196,8 @@ f:com.intellij.openapi.editor.impl.EditorFactoryImpl
 - addEditorFactoryListener(com.intellij.openapi.editor.event.EditorFactoryListener):V
 - addEditorFactoryListener(com.intellij.openapi.editor.event.EditorFactoryListener,com.intellij.openapi.Disposable):V
 - createDocument(java.lang.CharSequence):com.intellij.openapi.editor.Document
-- f:createDocument(java.lang.CharSequence,Z,Z):com.intellij.openapi.editor.Document
-- f:createDocument(Z):com.intellij.openapi.editor.Document
+- createDocument(java.lang.CharSequence,Z,Z):com.intellij.openapi.editor.Document
+- createDocument(Z):com.intellij.openapi.editor.Document
 - createDocument(C[]):com.intellij.openapi.editor.Document
 - createEditor(com.intellij.openapi.editor.Document):com.intellij.openapi.editor.Editor
 - createEditor(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project):com.intellij.openapi.editor.Editor
@@ -13368,8 +13361,6 @@ a:com.intellij.ui.layout.Row
 - a:setCellMode(Z,Z,Z):V
 f:com.intellij.ui.layout.RowBuilder$DefaultImpls
 - bs:createChildRow$default(com.intellij.ui.layout.RowBuilder,javax.swing.JLabel,Z,I,java.lang.Object):com.intellij.ui.layout.Row
-- bs:row(com.intellij.ui.layout.RowBuilder,java.lang.String,Z,kotlin.jvm.functions.Function1):com.intellij.ui.layout.Row
-- bs:row(com.intellij.ui.layout.RowBuilder,javax.swing.JLabel,Z,kotlin.jvm.functions.Function1):com.intellij.ui.layout.Row
 - bs:row$default(com.intellij.ui.layout.RowBuilder,java.lang.String,Z,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.ui.layout.Row
 - bs:row$default(com.intellij.ui.layout.RowBuilder,javax.swing.JLabel,Z,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.ui.layout.Row
 f:com.intellij.ui.layout.RowBuilderWithButtonGroupProperty

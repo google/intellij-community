@@ -17,6 +17,7 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.changes.issueLinks.TreeLinkMouseListener;
 import com.intellij.platform.debugger.impl.rpc.XDebuggerTreeSelectedValueId;
+import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
 import com.intellij.ui.DoubleClickListener;
 import com.intellij.ui.PopupHandler;
 import com.intellij.ui.TreeSpeedSearch;
@@ -33,7 +34,6 @@ import com.intellij.xdebugger.frame.XValueNode;
 import com.intellij.xdebugger.frame.XValuePlace;
 import com.intellij.xdebugger.impl.actions.XDebuggerActions;
 import com.intellij.xdebugger.impl.collection.visualizer.XDebuggerNodeLinkActionProvider;
-import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
 import com.intellij.xdebugger.impl.frame.XValueMarkers;
 import com.intellij.xdebugger.impl.pinned.items.XDebuggerPinToTopManager;
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
@@ -55,7 +55,6 @@ import java.awt.datatransfer.Transferable;
 import java.awt.event.*;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Function;
 
 public class XDebuggerTree extends DnDAwareTree implements UiCompatibleDataProvider, Disposable {
@@ -384,9 +383,8 @@ public class XDebuggerTree extends DnDAwareTree implements UiCompatibleDataProvi
     var xValueIdsList = Arrays.stream(selection)
       .map(node -> {
         var xValueId = xDebugManagerProxy.getXValueId(node.getValueContainer());
-        return xValueId != null ? new XDebuggerTreeSelectedValueId(xValueId, node.getName()) : null;
+        return new XDebuggerTreeSelectedValueId(xValueId, node.getName(), node);
       })
-      .filter(Objects::nonNull)
       .toList();
     sink.set(SplitDebuggerUIUtil.SPLIT_SELECTED_VALUES_KEY, xValueIdsList);
 
@@ -484,11 +482,15 @@ public class XDebuggerTree extends DnDAwareTree implements UiCompatibleDataProvi
     return XDEBUGGER_TREE_KEY.getData(context);
   }
 
+  /**
+   * @return selected nodes in the debugger. Should not be called from backend, as there is no tree on the backend.
+   */
+  @ApiStatus.Internal
   public static @NotNull List<XValueNodeImpl> getSelectedNodes(@NotNull DataContext context) {
     if (SplitDebuggerMode.showSplitWarnings() && AppMode.isRemoteDevHost()) {
       LOG.error("""
         [Split debugger] XDebuggerTree.getSelectedNodes should not be called on the backend as it returns frontend node instances (XValueNodeImpl) which are only available on the frontend.
-        The action will not work correctly in Split mode. Please use XDebuggerTreeBackendOnlyActionBase to make your action backend-only and operates with XValue instances instead."""
+        The action will not work correctly in Split mode. Please use XDebuggerTreeBackendActionBase to make your action backend-only and operates with XValue instances instead."""
       );
     }
     return ContainerUtil.notNullize(SELECTED_NODES.getData(context));
