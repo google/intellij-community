@@ -13,7 +13,19 @@ import com.intellij.ide.ui.laf.darcula.ui.TextFieldWithPopupHandlerUI
 import com.intellij.ide.util.gotoByName.QuickSearchComponent
 import com.intellij.internal.statistic.eventLog.events.EventFields
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.CommonShortcuts
+import com.intellij.openapi.actionSystem.CustomShortcutSet
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.actionSystem.KeyboardShortcut
+import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.Shortcut
+import com.intellij.openapi.actionSystem.ShortcutSet
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.ex.ApplicationManagerEx
@@ -24,13 +36,20 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListItemDescriptorAdapter
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeProviderId
 import com.intellij.platform.searchEverywhere.data.SeDataKeys
-import com.intellij.platform.searchEverywhere.frontend.*
+import com.intellij.platform.searchEverywhere.frontend.AutoToggleAction
+import com.intellij.platform.searchEverywhere.frontend.SeSearchStatePublisher
+import com.intellij.platform.searchEverywhere.frontend.SeSelectionListener
+import com.intellij.platform.searchEverywhere.frontend.SeSelectionResultClose
+import com.intellij.platform.searchEverywhere.frontend.SeSelectionResultText
+import com.intellij.platform.searchEverywhere.frontend.SeSelectionState
+import com.intellij.platform.searchEverywhere.frontend.SearchEverywhereFrontendBundle
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionItemPresentationRenderer
 import com.intellij.platform.searchEverywhere.frontend.tabs.all.SeAllTab
 import com.intellij.platform.searchEverywhere.frontend.tabs.files.SeTargetItemPresentationRenderer
@@ -43,8 +62,13 @@ import com.intellij.platform.searchEverywhere.presentations.SeTargetItemPresenta
 import com.intellij.platform.searchEverywhere.presentations.SeTextSearchItemPresentation
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.withPresentation
-import com.intellij.ui.*
+import com.intellij.ui.AnimatedIcon
+import com.intellij.ui.ClientProperty
 import com.intellij.ui.ExperimentalUI.Companion.isNewUI
+import com.intellij.ui.OnePixelSplitter
+import com.intellij.ui.ScrollingUtil
+import com.intellij.ui.SearchTextField
+import com.intellij.ui.WindowMoveListener
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
@@ -66,21 +90,48 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.StartupUiUtil.isWaylandToolkit
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.accessibility.ScreenReader
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.awt.BorderLayout
 import java.awt.Dimension
-import java.awt.event.*
+import java.awt.event.FocusAdapter
+import java.awt.event.FocusEvent
+import java.awt.event.InputEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.util.function.Supplier
-import javax.swing.*
+import javax.swing.Icon
+import javax.swing.JComponent
+import javax.swing.JPanel
+import javax.swing.JScrollPane
+import javax.swing.KeyStroke
+import javax.swing.ListCellRenderer
+import javax.swing.ListSelectionModel
+import javax.swing.ScrollPaneConstants
 import javax.swing.event.ListSelectionEvent
 import javax.swing.text.Document
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalCoroutinesApi::class)
 @Internal
@@ -134,6 +185,9 @@ class SePopupContentPane(
   private val semanticWarning = MutableStateFlow(false)
 
   private var quickDocPopup: JBPopup? = null
+
+  val currentResultsInList: List<SeItemData> get() =
+    resultListModel.elements().iterator().asSequence().mapNotNull { (it as? SeResultListItemRow)?.item }.toList()
 
   init {
     layout = GridLayout()
@@ -257,8 +311,10 @@ class SePopupContentPane(
           }
 
           launch {
-            delay(DEFAULT_FREEZING_DELAY_MS)
+            SeLog.log(SeLog.FROZEN_COUNT) { "Will schedule freeze" }
+            delay(DEFAULT_FREEZING_DELAY_MS.milliseconds)
             withContext(Dispatchers.EDT) {
+              SeLog.log(SeLog.FROZEN_COUNT) { "Will freeze, because of the scheduled freezing" }
               resultListModel.freezer.enable()
             }
           }
@@ -306,7 +362,10 @@ class SePopupContentPane(
               semanticWarning.value = resultListModel.isValidAndHasOnlySemantic
 
               // Freeze back if it was frozen before
-              if (wasFrozen) resultListModel.freezer.enable()
+              if (wasFrozen) {
+                SeLog.log(SeLog.FROZEN_COUNT) { "Will freeze, because of it was frozen before" }
+                resultListModel.freezer.enable()
+              }
               updateFrozenCount()
 
               updateViewMode()
@@ -418,21 +477,22 @@ class SePopupContentPane(
       vm.previewConfigurationFlow.collectLatest { configuration ->
         val isVisible = configuration?.fetchPreview != null
 
-        withContext(Dispatchers.EDT) {
-          usagePreviewPanel?.isVisible = isVisible
+        if (!isVisible) {
+          withContext(Dispatchers.EDT) {
+            usagePreviewPanel?.isVisible = false
+          }
+          return@collectLatest
         }
 
-        if (isVisible) {
-          selectedItemDataFlow.collectLatest { itemData ->
-            withContext(Dispatchers.EDT) {
-              if (itemData != null) {
-                val usageInfos = configuration.fetchPreview(itemData)
-                usagePreviewPanel?.isVisible = true
-                usagePreviewPanel?.updateLayout(configuration.project, usageInfos)
-              }
-              else {
-                usagePreviewPanel?.isVisible = false
-              }
+        selectedItemDataFlow.collectLatest { itemData ->
+          withContext(Dispatchers.EDT) {
+            if (itemData != null) {
+              val usageInfos = configuration.fetchPreview(itemData)
+              usagePreviewPanel?.isVisible = true
+              usagePreviewPanel?.updateLayout(configuration.project, usageInfos)
+            }
+            else {
+              usagePreviewPanel?.isVisible = false
             }
           }
         }
@@ -1098,7 +1158,9 @@ class SePopupContentPane(
     quickDocPopup?.takeIf { it.isVisible }?.cancel()
   }
 
-  override fun dispose() {}
+  override fun dispose() {
+    usagePreviewPanel?.let { Disposer.dispose(it) }
+  }
 
   companion object {
     const val DEFAULT_FROZEN_VISIBLE_PART: Double = 1.1

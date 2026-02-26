@@ -8,22 +8,34 @@ import com.intellij.openapi.util.ClearableLazyValue
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.UserDataHolderEx
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.polySymbols.FrameworkId
 import com.intellij.polySymbols.PolyContextKind
 import com.intellij.polySymbols.PolyContextName
 import com.intellij.polySymbols.context.PolyContext
-import com.intellij.polySymbols.context.PolyContext.Companion.KIND_FRAMEWORK
 import com.intellij.polySymbols.context.PolyContextKindRules
 import com.intellij.polySymbols.context.PolyContextKindRules.DisablementRules
 import com.intellij.polySymbols.context.PolyContextKindRules.EnablementRules
 import com.intellij.polySymbols.context.PolyContextRulesProvider
+import com.intellij.polySymbols.framework.FrameworkId
+import com.intellij.polySymbols.framework.PolySymbolFramework.Companion.KIND_FRAMEWORK
+import com.intellij.polySymbols.framework.framework
 import com.intellij.polySymbols.impl.StaticPolySymbolScopeBase
 import com.intellij.polySymbols.query.PolySymbolNameConversionRules
 import com.intellij.polySymbols.query.PolySymbolNameConversionRulesProvider
 import com.intellij.polySymbols.utils.PolySymbolTypeSupport
 import com.intellij.polySymbols.webTypes.impl.WebTypesJsonContributionAdapter
 import com.intellij.polySymbols.webTypes.impl.WebTypesJsonContributionAdapter.Companion.wrap
-import com.intellij.polySymbols.webTypes.json.*
+import com.intellij.polySymbols.webTypes.json.ContextsConfig
+import com.intellij.polySymbols.webTypes.json.Contributions
+import com.intellij.polySymbols.webTypes.json.FrameworkConfig
+import com.intellij.polySymbols.webTypes.json.GenericContributionsHost
+import com.intellij.polySymbols.webTypes.json.SourceBase
+import com.intellij.polySymbols.webTypes.json.WebTypes
+import com.intellij.polySymbols.webTypes.json.buildNameConverters
+import com.intellij.polySymbols.webTypes.json.descriptionMarkupWithLegacy
+import com.intellij.polySymbols.webTypes.json.evaluate
+import com.intellij.polySymbols.webTypes.json.getAllContributions
+import com.intellij.polySymbols.webTypes.json.mergeConverters
+import com.intellij.polySymbols.webTypes.json.wrap
 import com.intellij.psi.PsiElement
 import com.intellij.util.containers.MultiMap
 import com.intellij.util.ui.EmptyIcon
@@ -44,8 +56,8 @@ abstract class WebTypesScopeBase :
 
   abstract override fun createPointer(): Pointer<out WebTypesScopeBase>
 
-  override fun getNameConversionRulesProvider(framework: FrameworkId): PolySymbolNameConversionRulesProvider {
-    return WebTypesSymbolNameConversionRulesProvider(framework, this, nameConversionRulesCache)
+  override fun getNameConversionRulesProvider(context: PolyContext): PolySymbolNameConversionRulesProvider? {
+    return context.framework?.let { WebTypesSymbolNameConversionRulesProvider(it, this, nameConversionRulesCache) }
   }
 
   override fun getContextRules(): MultiMap<PolyContextKind, PolyContextKindRules> = contextRulesCache.value
@@ -94,20 +106,18 @@ abstract class WebTypesScopeBase :
 
   override fun adaptAllRootContributions(
     root: Contributions,
-    framework: FrameworkId?,
     origin: WebTypesJsonOrigin,
   ): Sequence<WebTypesJsonContributionAdapter> =
-    root.getAllContributions(framework)
+    root.getAllContributions(origin.framework)
       .flatMap { (kind, list) ->
         list.map { it.wrap(origin, this@WebTypesScopeBase, kind) }
       }
 
   override fun adaptAllContributions(
     contribution: GenericContributionsHost,
-    framework: FrameworkId?,
     origin: WebTypesJsonOrigin,
   ): Sequence<WebTypesJsonContributionAdapter> =
-    contribution.getAllContributions(framework)
+    contribution.getAllContributions(origin.framework)
       .flatMap { (kind, list) ->
         list.map { it.wrap(origin, this@WebTypesScopeBase, kind) }
       }

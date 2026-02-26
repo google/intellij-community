@@ -433,9 +433,9 @@ class HighlightingTest : BaseTestCase() {
     myFixture.checkHighlighting()
 
     myFixture.configureByText("a.md", """
-      There are some English words and some other cases, e.g. "<STYLE_SUGGESTION descr="Grazie.RuleEngine.En.Typography.VARIANT_QUOTE_PUNCTUATION">h",</STYLE_SUGGESTION> "--help"
+      There are some English words and some other cases, e.g. "h", "--help"
             
-      The quote check is *also* working in fragments "with <STYLE_SUGGESTION descr="Grazie.RuleEngine.En.Typography.VARIANT_QUOTE_PUNCTUATION">markup",</STYLE_SUGGESTION> right?
+      The quote check is *also* working in fragments "with markup", right?
      """.trimIndent()
     )
     myFixture.checkHighlighting()
@@ -556,6 +556,18 @@ class HighlightingTest : BaseTestCase() {
     val intentions = availableIntentions
     assertEquals(intentions[1].text, "Jim, get")
     assertEquals(intentions[2].text, "Jim gets")
+  }
+
+  @NeedsCloud
+  @Test
+  fun `test articles before url are ignored`() {
+    checkCloudAndLocal(
+      "a.java",
+      """
+        // If we know that @currentToken is a url, we will strictly use it (--url).
+        // If we know that @currentToken is an url, we will strictly use it (--url).
+      """.trimIndent()
+    )
   }
 
   companion object {

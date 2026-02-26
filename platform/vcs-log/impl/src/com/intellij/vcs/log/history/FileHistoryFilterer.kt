@@ -21,8 +21,22 @@ import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.vcs.impl.shared.telemetry.VcsScope
 import com.intellij.util.containers.MultiMap
-import com.intellij.vcs.log.*
-import com.intellij.vcs.log.data.*
+import com.intellij.vcs.log.CommitId
+import com.intellij.vcs.log.Hash
+import com.intellij.vcs.log.UnsupportedHistoryFiltersException
+import com.intellij.vcs.log.VcsCommitMetadata
+import com.intellij.vcs.log.VcsLogCommitStorageIndex
+import com.intellij.vcs.log.VcsLogFileHistoryHandler
+import com.intellij.vcs.log.VcsLogFilterCollection
+import com.intellij.vcs.log.VcsLogObjectsFactory
+import com.intellij.vcs.log.VcsLogRootStoredRefs
+import com.intellij.vcs.log.VcsLogStructureFilter
+import com.intellij.vcs.log.data.EmptyRefs
+import com.intellij.vcs.log.data.VcsLogData
+import com.intellij.vcs.log.data.VcsLogGraphData
+import com.intellij.vcs.log.data.VcsLogGraphDataFactory
+import com.intellij.vcs.log.data.VcsLogProgress
+import com.intellij.vcs.log.data.VcsLogStorage
 import com.intellij.vcs.log.data.index.IndexDataGetter
 import com.intellij.vcs.log.data.index.VcsLogIndex
 import com.intellij.vcs.log.graph.GraphCommitImpl
@@ -33,10 +47,20 @@ import com.intellij.vcs.log.history.FileHistoryPaths.fileHistory
 import com.intellij.vcs.log.history.FileHistoryPaths.withFileHistory
 import com.intellij.vcs.log.statistics.VcsLogRepoSizeCollector
 import com.intellij.vcs.log.ui.frame.CommitPresentationUtil
-import com.intellij.vcs.log.util.*
-import com.intellij.vcs.log.visible.*
+import com.intellij.vcs.log.util.RevisionCollector
+import com.intellij.vcs.log.util.RevisionCollectorTask
+import com.intellij.vcs.log.util.StopWatch
+import com.intellij.vcs.log.util.VcsLogUtil
+import com.intellij.vcs.log.util.findBranch
+import com.intellij.vcs.log.visible.CommitCountStage
+import com.intellij.vcs.log.visible.EmptyVisibleGraph
+import com.intellij.vcs.log.visible.VcsLogFilterer
+import com.intellij.vcs.log.visible.VcsLogFiltererImpl
+import com.intellij.vcs.log.visible.VisiblePack
 import com.intellij.vcs.log.visible.filters.VcsLogFilterObject
 import com.intellij.vcs.log.visible.filters.without
+import com.intellij.vcs.log.visible.matchesNothing
+import com.intellij.vcs.log.visible.recordError
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
@@ -233,8 +257,8 @@ internal class FileHistoryFilterer(private val logData: VcsLogData, private val 
       return result
     }
 
-    private fun getFilteredRefs(dataPack: VcsLogGraphData): Map<VirtualFile, VcsLogRefsOfSingleRoot> {
-      val compressedRefs = dataPack.refsModel.refsByRoot[root] ?: CompressedRefs(emptySet(), storage)
+    private fun getFilteredRefs(dataPack: VcsLogGraphData): Map<VirtualFile, VcsLogRootStoredRefs> {
+      val compressedRefs = dataPack.refsModel.refsByRoot[root] ?: EmptyRefs
       return mapOf(Pair(root, compressedRefs))
     }
 
@@ -268,7 +292,7 @@ internal class FileHistoryFilterer(private val logData: VcsLogData, private val 
 
       val permanentGraph = dataPack.permanentGraph
       if (permanentGraph !is PermanentGraphImpl) {
-        val visibleGraph = createVisibleGraph(dataPack, graphOptions, matchingHeads, data.getCommits())
+        val visibleGraph = createVisibleGraph(dataPack, graphOptions, matchingHeads, data.commits)
         val fileHistory = FileHistory(data.buildFileStatesMap())
         return VisiblePack(dataPack, visibleGraph, false, filters).withFileHistory(fileHistory)
       }
@@ -281,7 +305,7 @@ internal class FileHistoryFilterer(private val logData: VcsLogData, private val 
       val historyBuilder = FileHistoryBuilder(commit, filePath, data, oldFileHistory,
                                               removeTrivialMerges = FileHistoryBuilder.isRemoveTrivialMerges,
                                               refine = FileHistoryBuilder.isRefine)
-      val visibleGraph = permanentGraph.createVisibleGraph(graphOptions, matchingHeads, data.getCommits(), historyBuilder)
+      val visibleGraph = permanentGraph.createVisibleGraph(graphOptions, matchingHeads, data.commits, historyBuilder)
       val fileHistory = historyBuilder.fileHistory
 
       return VisiblePack(dataPack, visibleGraph, fileHistory.unmatchedAdditionsDeletions.isNotEmpty(), filters).withFileHistory(fileHistory)

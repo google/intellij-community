@@ -6,7 +6,15 @@ import com.intellij.openapi.project.Project
 import com.intellij.python.junit5Tests.framework.PyDefaultTestApplication
 import com.intellij.python.junit5Tests.framework.metaInfo.Repository
 import com.intellij.python.junit5Tests.framework.metaInfo.TestClassInfo
-import com.intellij.python.pyproject.statistics.*
+import com.intellij.python.pyproject.statistics.DEPENDENCY_GROUP_OTHER
+import com.intellij.python.pyproject.statistics.PYTHON_PYPROJECT_BUILDSYSTEM
+import com.intellij.python.pyproject.statistics.PYTHON_PYPROJECT_COUNT
+import com.intellij.python.pyproject.statistics.PYTHON_PYPROJECT_DEPENDENCY_GROUP
+import com.intellij.python.pyproject.statistics.PYTHON_PYPROJECT_TOOLS
+import com.intellij.python.pyproject.statistics.PYTHON_TOOL_MARKERS
+import com.intellij.python.pyproject.statistics.PYTHON_TOOL_MARKERS_DETECTED
+import com.intellij.python.pyproject.statistics.PythonTomlStatsUsagesCollector
+import com.intellij.python.pyproject.statistics.TRACKED_DEPENDENCY_GROUPS
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.common.timeoutRunBlocking
 import kotlinx.coroutines.Dispatchers
@@ -41,30 +49,41 @@ class PythonTomlStatsUsagesCollectorTest(val project: Project) {
     // ".bandit" was selected as a non-declared tool randomly to cover a not-found case
     val detectedToolsViaMarkers = groups[PYTHON_TOOL_MARKERS_DETECTED.eventId]!!.map { it.values.first() as String }
     assertEquals(
-      (PythonTool.entries.filter { it.markerFileNames.isNotEmpty() && it != PythonTool.BANDIT }).map { it.fusName }.sorted(),
+      (PYTHON_TOOL_MARKERS.keys - setOf("bandit")).sorted(),
       detectedToolsViaMarkers.sorted(),
     ) {
       "Detected tools via marker files do not match the test data"
     }
 
-    // tools randomly distributed across [build-system.requires] and [tool.*]
     val buildSystemTools = setOf(
-      PythonTool.SETUPTOOLS, PythonTool.WHEEL, PythonTool.SETUPTOOLS_SCM, PythonTool.SETUPTOOLS_RUST,
-      PythonTool.FLIT_CORE, PythonTool.HATCHLING, PythonTool.POETRY_CORE, PythonTool.SCITK_BUILD_CORE,
-      PythonTool.CYTHON, PythonTool.PYBIND11, PythonTool.NINJA, PythonTool.SEMATIC_RELEASE, PythonTool.SCITK_BUILD
+      "setuptools", "wheel", "setuptools-scm", "setuptools-rust", "flit-core", "hatchling", "poetry-core", "scikit-build-core",
+      "cython", "pybind11", "ninja", "sematic-release", "scikit-build"
     )
 
     val toolsFromBuildSystem = groups[PYTHON_PYPROJECT_BUILDSYSTEM.eventId]!!.map { it.values.first() as String }
     assertEquals(
-      (PythonTool.entries.filter { it in buildSystemTools }).map { it.fusName }.sorted(),
+      buildSystemTools.sorted(),
       toolsFromBuildSystem.sorted(),
     ) {
       "Detected tools via [build-system.requires] do not match the test data"
     }
 
+    val sectionTools = listOf(
+      "autoflake", "autoimport", "bandit", "basedpyright", "black",
+      "check-jsonschema", "cibuildwheel", "codespell", "comfy", "conda-lock",
+      "coverage", "dagster", "darker", "deptry", "docformatter",
+      "flake8", "flit", "great-expectations", "hatch", "hatch-vcs",
+      "hypothesis", "isort", "make-env", "mkdoc", "mkdocstrings",
+      "mypy", "myst-parser", "nbqa", "nox", "pdm",
+      "pdoc", "pixi", "poe", "poetry", "prefect",
+      "py-spy", "pycln", "pydantic-mypy", "pyright", "pytkdocs",
+      "pytoniq", "pyupgrade", "refurb", "ruff", "safety",
+      "sphinx", "tox", "uv", "validate-pyproject", "vulture",
+      "yapf"
+    )
     val toolsFromPyProjectToml = groups[PYTHON_PYPROJECT_TOOLS.eventId]!!.map { it.values.first() as String }
     assertEquals(
-      (PythonTool.entries.filter { it !in buildSystemTools }).map { it.fusName }.sorted(),
+      sectionTools.sorted(),
       toolsFromPyProjectToml.sorted(),
     ) {
       "Detected tools [tool.*] via pyproject.toml do not match the test data"

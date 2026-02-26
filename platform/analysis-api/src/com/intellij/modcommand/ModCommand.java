@@ -22,7 +22,11 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -54,8 +58,8 @@ import java.util.function.Function;
  */
 public sealed interface ModCommand
   permits ModChooseAction, ModCompositeCommand, ModCopyToClipboard, ModCreateFile, ModDeleteFile, ModDisplayMessage, ModEditOptions,
-          ModHighlight, ModMoveFile, ModNavigate, ModNothing, ModOpenUrl, ModRegisterTabOut, ModShowConflicts, ModStartRename,
-          ModStartTemplate, ModUpdateFileText, ModUpdateReferences, ModUpdateSystemOptions {
+          ModHighlight, ModLaunchEditorAction, ModMoveFile, ModNavigate, ModNothing, ModOpenUrl, ModRegisterTabOut, ModShowConflicts,
+          ModStartRename, ModStartTemplate, ModUpdateFileText, ModUpdateReferences, ModUpdateSystemOptions {
 
   /**
    * @return true if the command does nothing

@@ -17,10 +17,20 @@ import com.intellij.openapi.application.impl.inModalContext
 import com.intellij.openapi.application.isModalAwareContext
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
-import com.intellij.openapi.progress.*
+import com.intellij.openapi.progress.CeProcessCanceledException
+import com.intellij.openapi.progress.CoroutineSuspenderElementKey
+import com.intellij.openapi.progress.CoroutineSuspenderImpl
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressIndicatorModel
+import com.intellij.openapi.progress.ProgressModel
+import com.intellij.openapi.progress.TaskInfo
+import com.intellij.openapi.progress.getLockPermitContext
+import com.intellij.openapi.progress.prepareThreadContext
 import com.intellij.openapi.progress.util.ProgressDialogUI
 import com.intellij.openapi.progress.util.ProgressWindow
 import com.intellij.openapi.progress.util.createDialogWrapper
+import com.intellij.openapi.progress.withCurrentThreadCoroutineScope
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.impl.DialogWrapperPeerImpl.isHeadlessEnv
@@ -34,8 +44,24 @@ import com.intellij.openapi.wm.ex.ProgressIndicatorEx
 import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.status.IdeStatusBarImpl
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
-import com.intellij.platform.ide.progress.*
-import com.intellij.platform.ide.progress.suspender.*
+import com.intellij.platform.ide.progress.CancellableTaskCancellation
+import com.intellij.platform.ide.progress.ComponentModalTaskOwner
+import com.intellij.platform.ide.progress.GuessModalTaskOwner
+import com.intellij.platform.ide.progress.ModalTaskOwner
+import com.intellij.platform.ide.progress.ProjectModalTaskOwner
+import com.intellij.platform.ide.progress.TaskCancellation
+import com.intellij.platform.ide.progress.TaskInfoEntity
+import com.intellij.platform.ide.progress.TaskManager
+import com.intellij.platform.ide.progress.TaskStatus
+import com.intellij.platform.ide.progress.TaskStorage
+import com.intellij.platform.ide.progress.TaskSupport
+import com.intellij.platform.ide.progress.statuses
+import com.intellij.platform.ide.progress.suspender.TaskSuspender
+import com.intellij.platform.ide.progress.suspender.TaskSuspenderElementKey
+import com.intellij.platform.ide.progress.suspender.TaskSuspenderImpl
+import com.intellij.platform.ide.progress.suspender.TaskSuspenderState
+import com.intellij.platform.ide.progress.suspender.TaskSuspension
+import com.intellij.platform.ide.progress.suspender.asContextElement
 import com.intellij.platform.kernel.withKernel
 import com.intellij.platform.util.coroutines.flow.throttle
 import com.intellij.platform.util.progress.ProgressPipe
@@ -53,7 +79,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
-import java.awt.*
+import java.awt.AWTEvent
+import java.awt.Component
+import java.awt.Container
+import java.awt.EventQueue
+import java.awt.Window
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
@@ -389,7 +419,7 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
  * and not to the unconfined loop as they do now.
  */
 @Suppress("INVISIBLE_REFERENCE")
-private inline fun <T> resetThreadLocalEventLoop(action: () -> T): T {
+private inline fun <T> resetThreadLocalEventLoop(action: () -> T): T {//
   val existingEventLoop = ThreadLocalEventLoop.currentOrNull()
   ThreadLocalEventLoop.resetEventLoop()
   try {
@@ -547,6 +577,9 @@ private fun CoroutineScope.showModalIndicator(
   }
 }
 
+/**
+ * See also [com.intellij.openapi.fileEditor.impl.blockingWaitForCompositeFileOpen] in [com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl]
+ */
 private suspend fun doShowModalIndicator(
   mainJob: Job,
   descriptor: ModalIndicatorDescriptor,

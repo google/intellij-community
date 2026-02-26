@@ -5,6 +5,7 @@ import com.intellij.codeInspection.SuppressionUtil;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.grazie.grammar.strategy.GrammarCheckingStrategy;
 import com.intellij.grazie.ide.language.LanguageGrammarChecking;
+import com.intellij.grazie.utils.HighlightingUtil;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
@@ -13,18 +14,37 @@ import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPoint;
-import com.intellij.openapi.util.*;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.RecursionGuard;
+import com.intellij.openapi.util.RecursionManager;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.UserDataHolderEx;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.psi.*;
+import com.intellij.psi.FileViewProvider;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiWhiteSpace;
+import com.intellij.psi.SyntaxTraverser;
 import com.intellij.psi.util.CachedValue;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.util.containers.ContainerUtil;
 import one.util.streamex.StreamEx;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+import org.jetbrains.annotations.Unmodifiable;
+import org.jetbrains.annotations.VisibleForTesting;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -46,6 +66,7 @@ public abstract class TextExtractor {
   private static final Pattern NOINSPECTION_SUPPRESSION = Pattern.compile(SuppressionUtil.COMMON_SUPPRESS_REGEXP);
   private static final Pattern PROPERTY_SUPPRESSION = Pattern.compile("\\s*suppress inspection \"" + LocalInspectionTool.VALID_ID_PATTERN + "\"");
   private static final Pattern LICENSE_PATTERN = Pattern.compile("(?i)License.*?(as is|MIT|GNU|GPL|Apache|BSD)", Pattern.DOTALL);
+  private static final Pattern KEY_PATTERN = Pattern.compile("-----BEGIN PUBLIC KEY-----.*?(-----END PUBLIC KEY-----)", Pattern.DOTALL);
 
   /**
    * Extract text from the given PSI element, if possible.
@@ -262,7 +283,13 @@ public abstract class TextExtractor {
   private static boolean shouldIgnore(TextContent content) {
     return isSuppressionComment(content) ||
            isCopyrightComment(content) ||
+           isKeyLike(content) ||
            hasIntersectingInjection(content, content.getContainingFile());
+  }
+
+  private static boolean isKeyLike(TextContent content) {
+    return content.getDomain() == TextContent.TextDomain.PLAIN_TEXT &&
+           KEY_PATTERN.matcher(content.toString()).matches();
   }
 
   private static boolean isCopyrightComment(TextContent content) {
@@ -303,6 +330,8 @@ public abstract class TextExtractor {
   /**
    * Extract all text contents from a file view provider that match the specified domains.
    * Traverses through all PSI elements in all root files of the view provider and collects matching text contents.
+   * <p>
+   * Cached version of this function can be used. See {@link HighlightingUtil#getCheckedFileTexts} or {@link HighlightingUtil#getAllFileTexts}
    */
   public static Set<TextContent> findAllTextContents(FileViewProvider vp, Set<TextContent.TextDomain> domains) {
     Set<TextContent> allContents = new HashSet<>();

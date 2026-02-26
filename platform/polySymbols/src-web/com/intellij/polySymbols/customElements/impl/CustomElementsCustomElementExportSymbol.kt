@@ -2,13 +2,16 @@
 package com.intellij.polySymbols.customElements.impl
 
 import com.intellij.model.Pointer
-import com.intellij.polySymbols.*
+import com.intellij.polySymbols.PolySymbol
+import com.intellij.polySymbols.PolySymbolApiStatus
+import com.intellij.polySymbols.PolySymbolKind
 import com.intellij.polySymbols.context.PolyContext
 import com.intellij.polySymbols.customElements.CustomElementsJsonOrigin
 import com.intellij.polySymbols.customElements.CustomElementsSymbol
 import com.intellij.polySymbols.customElements.json.CustomElementExport
 import com.intellij.polySymbols.customElements.json.createPattern
 import com.intellij.polySymbols.customElements.json.toApiStatus
+import com.intellij.polySymbols.framework.FrameworkId
 import com.intellij.polySymbols.html.HTML_ELEMENTS
 import com.intellij.polySymbols.impl.StaticPolySymbolScopeBase
 import com.intellij.polySymbols.patterns.PolySymbolPattern
@@ -17,7 +20,7 @@ import com.intellij.polySymbols.query.PolySymbolWithPattern
 
 class CustomElementsCustomElementExportSymbol private constructor(
   override val name: String,
-  override val origin: PolySymbolOrigin,
+  override val origin: CustomElementsJsonOrigin,
   override val pattern: PolySymbolPattern,
   override val apiStatus: PolySymbolApiStatus,
 ) : CustomElementsSymbol, PolySymbolWithPattern, StaticPolySymbolScopeBase.StaticSymbolContributionAdapter {

@@ -3,13 +3,11 @@ package com.intellij.polySymbols.query
 
 import com.intellij.model.Pointer
 import com.intellij.openapi.util.ModificationTracker
-import com.intellij.polySymbols.FrameworkId
 import com.intellij.polySymbols.PolySymbol
 import com.intellij.polySymbols.PolySymbolKind
 import com.intellij.polySymbols.PolySymbolQualifiedName
 import com.intellij.polySymbols.completion.PolySymbolCodeCompletionItem
 import com.intellij.polySymbols.context.PolyContext
-import com.intellij.polySymbols.context.PolyContext.Companion.KIND_FRAMEWORK
 import com.intellij.psi.PsiElement
 
 /**
@@ -28,8 +26,6 @@ interface PolySymbolQueryExecutor : ModificationTracker {
   val location: PsiElement?
 
   val context: PolyContext
-
-  val framework: FrameworkId? get() = context[KIND_FRAMEWORK]
 
   @get:JvmName("allowResolve")
   val allowResolve: Boolean

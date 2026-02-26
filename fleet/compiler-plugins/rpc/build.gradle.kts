@@ -18,7 +18,7 @@ val pluginVersion = run {
 }
 
 // the compiler plugin will be used together with this Kotlin compiler
-val KOTLIN_VERSION = "2.3.0"
+val KOTLIN_VERSION = "2.3.10-RC"
 
 // the compiler plugin will be built with these Kotlin LV/APIV
 val KOTLIN_LANGUAGE_VERSION = "2.3"
@@ -52,6 +52,7 @@ kotlin {
     apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_LANGUAGE_VERSION))
     languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_API_VERSION))
     // FREE COMPILER ARGS PLACEHOLDER PLEASE DO NOT CHANGE IT BEFORE DISCUSS IN #ij-monorepo-kotlin
+    freeCompilerArgs = listOf("-Xcontext-parameters")
   }
 }
 

@@ -71,4 +71,8 @@ internal class MonolithLineBreakpointProxy @Deprecated("Use breakpoint.asProxy()
   override fun setTemporary(isTemporary: Boolean) {
     breakpoint.isTemporary = isTemporary
   }
+
+  override fun updateIcon() {
+    breakpoint.clearIcon()
+  }
 }

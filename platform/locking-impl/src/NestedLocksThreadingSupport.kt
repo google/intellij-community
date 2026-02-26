@@ -1,10 +1,22 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.locking.impl
 
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.concurrency.installThreadContext
-import com.intellij.core.rwmutex.*
-import com.intellij.openapi.application.*
+import com.intellij.core.rwmutex.Permit
+import com.intellij.core.rwmutex.RWMutexIdea
+import com.intellij.core.rwmutex.ReadPermit
+import com.intellij.core.rwmutex.WriteIntentPermit
+import com.intellij.core.rwmutex.WritePermit
+import com.intellij.openapi.application.AccessToken
+import com.intellij.openapi.application.CleanupAction
+import com.intellij.openapi.application.ReadActionListener
+import com.intellij.openapi.application.ThreadingSupport
+import com.intellij.openapi.application.WriteActionListener
+import com.intellij.openapi.application.WriteIntentReadActionListener
+import com.intellij.openapi.application.WriteLockReacquisitionListener
+import com.intellij.openapi.application.readLockCompensationTimeout
+import com.intellij.openapi.application.reportInvalidActionChains
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.ProcessCanceledException
@@ -13,19 +25,26 @@ import com.intellij.platform.locking.impl.listeners.LegacyProgressIndicatorProvi
 import com.intellij.platform.locking.impl.listeners.LockAcquisitionListener
 import com.intellij.util.IntelliJCoroutinesFacade
 import com.intellij.util.ReflectionUtil
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
-import java.util.*
+import java.util.Arrays
+import java.util.Collections
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.Result
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
-import kotlin.getOrThrow
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -153,7 +172,6 @@ private data class ExposedWritePermitData(
 class NestedLocksThreadingSupport : ThreadingSupport {
   companion object {
     private const val SPIN_TO_WAIT_FOR_LOCK: Int = 100
-    private val logger = Logger.getInstance(NestedLocksThreadingSupport::class.java)
   }
 
   /**
@@ -470,9 +488,7 @@ class NestedLocksThreadingSupport : ThreadingSupport {
      * same as [acquireReadPermit], but returns `null` if acquisition failed
      */
     fun tryAcquireReadPermit(): ReadPermit? {
-      val permit = runSuspendMaybeConsuming(false) {
-        thisLevelLock.tryAcquireReadActionPermit()
-      }
+      val permit = thisLevelLock.tryAcquireReadActionPermit()
       if (permit != null) {
         thisLevelPermit.set(permit)
       }
@@ -1667,36 +1683,52 @@ private class RunSuspend<T>(val job: Job?, val interceptor: PermitWaitingInterce
 
   fun await(): T {
     if (interceptor == null) {
-      synchronized(this) {
-        var interrupted = false
-        while (true) {
-          if (resultDeferred.isCompleted) {
-            if (interrupted) {
-              // Restore "interrupted" flag
-              Thread.currentThread().interrupt()
-            }
-            return resultDeferred.getOrThrow()
-          }
-          else {
-            try {
-              @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-              ((this as Object).wait())
-            }
-            catch (_: InterruptedException) {
-              // Suppress exception or token could be lost.
-              interrupted = true
-            }
-          }
-        }
-      }
+      return waitForDeferredWithoutInterceptor()
     } else {
       if (!resultDeferred.isCompleted) {
-        interceptor.consumer(resultDeferred)
+        try {
+          interceptor.consumer(resultDeferred)
+        } catch (e: Throwable) {
+          val safeException = if (Logger.shouldRethrow(e)) {
+            RuntimeException(e)
+          } else {
+            e
+          }
+          logger.error(safeException)
+          return waitForDeferredWithoutInterceptor()
+        }
       }
       return resultDeferred.getOrThrow() // consumer returns when `result` gets non-nullable value
     }
   }
+
+  private fun waitForDeferredWithoutInterceptor(): T {
+    synchronized(this) {
+      var interrupted = false
+      while (true) {
+        if (resultDeferred.isCompleted) {
+          if (interrupted) {
+            // Restore "interrupted" flag
+            Thread.currentThread().interrupt()
+          }
+          return resultDeferred.getOrThrow()
+        }
+        else {
+          try {
+            @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+            ((this as Object).wait())
+          }
+          catch (_: InterruptedException) {
+            // Suppress exception or token could be lost.
+            interrupted = true
+          }
+        }
+      }
+    }
+  }
 }
+
+private val logger = Logger.getInstance(NestedLocksThreadingSupport::class.java)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 private fun <T> Deferred<T>.getOrThrow(): T {

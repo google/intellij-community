@@ -20,7 +20,6 @@ This section will guide you through getting the project sources and help avoid c
 
 #### Prerequisites
 - [Git](https://git-scm.com/) installed
-- ~2GB free disk space
 - Install [IntelliJ IDEA 2023.2](https://www.jetbrains.com/idea/download) or higher.
 - For **Windows** set these git config to avoid common issues during cloning:
   ```
@@ -63,6 +62,12 @@ Run the following script from project root `<IDEA_HOME>` to get the required mod
 
 ---
 ## Building IntelliJ IDEA
+
+> [Standard GitHub runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) can no longer be used to build the project due to the disk size limitation.
+> Now we use [larger runners](https://docs.github.com/en/enterprise-cloud@latest/actions/concepts/runners/larger-runners) which are only available for organizations and enterprises using the GitHub Team or GitHub Enterprise Cloud plans.
+> Users of personal GitHub accounts can use [the prebuilt binaries](https://github.com/JetBrains/intellij-community/releases), 
+> or build IntelliJ IDEA from source code locally.
+
 These instructions will help you build IntelliJ IDEA from source code, which is the basis for IntelliJ Platform development.
 IntelliJ IDEA '**2023.2**' or newer is required.
 

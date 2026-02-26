@@ -1,6 +1,7 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.tools.projectWizard.wizard
 
+import com.intellij.gradle.toolingExtension.util.GradleVersionUtil
 import com.intellij.ide.projectWizard.NewProjectWizardConstants.Language.KOTLIN
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.util.registry.Registry
@@ -23,8 +24,8 @@ import kotlin.io.path.walk
 
 class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() {
     @Test
-    fun testK1PluginIsUsed() {
-        Assertions.assertTrue(System.getProperty("idea.kotlin.plugin.use.k1").toBoolean())
+    fun testK2PluginIsUsed() {
+        Assertions.assertFalse(System.getProperty("idea.kotlin.plugin.use.k1").toBoolean())
     }
 
     @ParameterizedTest
@@ -244,7 +245,7 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @ParameterizedTest
     @CsvCrossProductSource("KOTLIN,GROOVY", "true,false")
     fun testNewModuleWithVersionCatalog(gradleDsl: GradleDsl, addBuildSrcVersionCatalogDependency: Boolean): Unit = runBlocking {
-        val kotlinJvmPluginVersion = "2.2.20"
+        val kotlinJvmPluginVersion = if (GradleVersionUtil.isGradleAtLeast(gradleVersion, "9.4.0")) "2.3.0" else "2.2.21"
         val versionTomlContent = """
             |[versions]
             |kotlin = "$kotlinJvmPluginVersion"

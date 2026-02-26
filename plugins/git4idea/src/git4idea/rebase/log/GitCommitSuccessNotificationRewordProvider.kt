@@ -25,7 +25,7 @@ internal class GitCommitSuccessNotificationRewordProvider : CommitSuccessNotific
       }
     })
     val rewordAction = NotificationAction.createSimpleExpiring(GitBundle.message("action.Git.Reword.Commit.text")) {
-      project.service<GitRewordService>().launchReword(repoWithCommitHash)
+      project.service<GitRewordService>().launchRewordForHeads(repoWithCommitHash.keys.toList())
     }
     return listOf(rewordAction)
   }

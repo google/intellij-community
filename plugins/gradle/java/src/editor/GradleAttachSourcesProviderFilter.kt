@@ -3,6 +3,7 @@ package org.jetbrains.plugins.gradle.editor
 
 import com.intellij.codeInsight.AttachSourcesProvider
 import com.intellij.codeInsight.AttachSourcesProviderFilter
+import com.intellij.jarFinder.InternetAttachSourceProvider
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.psi.PsiFile
 import org.jetbrains.plugins.gradle.util.GradleConstants
@@ -10,7 +11,10 @@ import org.jetbrains.plugins.gradle.util.GradleConstants
 class GradleAttachSourcesProviderFilter : AttachSourcesProviderFilter {
 
   override fun isApplicable(provider: AttachSourcesProvider, orderEntries: List<LibraryOrderEntry>, psiFile: PsiFile): Boolean {
-    return orderEntries.mapNotNull { it.library?.externalSource?.id }
-      .none { GradleConstants.SYSTEM_ID.id == it }
+    return if (orderEntries.mapNotNull { it.library?.externalSource?.id }.any { GradleConstants.SYSTEM_ID.id == it }) {
+      provider !is InternetAttachSourceProvider
+    } else {
+      true
+    }
   }
 }

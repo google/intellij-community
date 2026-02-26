@@ -9,7 +9,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.PopupRelativePosition
 import com.intellij.openapi.ui.popup.PopupShowOptionsBuilder
 import com.intellij.openapi.ui.popup.PopupShowOptionsImpl
-import com.intellij.openapi.util.TextRange
 import com.intellij.ui.MouseMovementTracker
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.WidthBasedLayout
@@ -21,10 +20,17 @@ import com.intellij.util.Alarm
 import com.intellij.util.asSafely
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.yield
-import java.awt.*
+import java.awt.AWTEvent
+import java.awt.Component
+import java.awt.Container
+import java.awt.Dimension
+import java.awt.MouseInfo
+import java.awt.Point
+import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.lang.ref.WeakReference
 import javax.swing.SwingUtilities
+import kotlin.math.max
 import kotlin.math.min
 
 internal class ComponentAreaPopupContext(
@@ -220,6 +226,10 @@ internal class ComponentAreaPopupContext(
 
 
     override suspend fun updatePopup(popup: AbstractPopup, resized: Boolean, popupUpdateEvent: PopupUpdateEvent) {
+      if (myComponentReference.get()?.isShowing != true) {
+        popup.cancel()
+        return
+      }
       if (!resized) {
         resizePopup(popup, popupUpdateEvent)
         yield()
@@ -269,8 +279,13 @@ internal class ComponentAreaPopupContext(
         it.x += componentLocation.x
         it.y += componentLocation.y
       }
-      if (TextRange(popupLocation.y, popupLocation.y + popupSize.height)
-          .intersectsStrict(componentActiveArea.y, componentActiveArea.y + componentActiveArea.height)) {
+      val popupStartOffset = popupLocation.y
+      val popupEndOffset = popupLocation.y + popupSize.height
+      val componentActiveAreaStartOffset = componentActiveArea.y
+      val componentActiveAreaEndOffset = componentActiveArea.y + componentActiveArea.height
+
+      // if popup area and component active area intersect
+      if (max(popupStartOffset, componentActiveAreaStartOffset) < min(popupEndOffset, componentActiveAreaEndOffset)) {
         // reposition popup above the component
         popupLocation.y = componentActiveArea.y - popupSize.height - 4
         popup.setLocation(popupLocation)

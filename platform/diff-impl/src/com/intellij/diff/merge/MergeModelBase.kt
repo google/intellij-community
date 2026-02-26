@@ -15,7 +15,11 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.util.SmartList
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
-import it.unimi.dsi.fastutil.ints.*
+import it.unimi.dsi.fastutil.ints.IntArrayList
+import it.unimi.dsi.fastutil.ints.IntList
+import it.unimi.dsi.fastutil.ints.IntLists
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet
+import it.unimi.dsi.fastutil.ints.IntSet
 import org.jetbrains.annotations.ApiStatus
 import java.lang.ref.WeakReference
 import java.util.function.IntConsumer
@@ -87,12 +91,12 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
   // Repaint
   //
   @RequiresEdt
-  fun invalidateHighlighters(index: Int) {
+  fun invalidateChange(index: Int) {
     if (bulkChangeUpdateDepth > 0) {
       changesToUpdate.add(index)
     }
     else {
-      reinstallHighlighters(index)
+      onChangeUpdated(index)
     }
   }
 
@@ -108,18 +112,19 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
 
     if (bulkChangeUpdateDepth == 0) {
       changesToUpdate.forEach(IntConsumer { index: Int ->
-        reinstallHighlighters(index)
+        onChangeUpdated(index)
       })
       changesToUpdate.clear()
-      postInstallHighlighters()
+      onBulkUpdateFinished()
     }
   }
 
   @RequiresEdt
-  protected abstract fun reinstallHighlighters(index: Int)
+  protected abstract fun onChangeUpdated(index: Int)
 
   @RequiresEdt
-  protected open fun postInstallHighlighters() {
+  protected open fun onBulkUpdateFinished() {
+
   }
 
   //
@@ -176,7 +181,7 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
         val oldState = processDocumentChange(index, lineRange.start, lineRange.end, shift)
         if (oldState == null) continue
 
-        invalidateHighlighters(index)
+        invalidateChange(index)
         if (!isInsideCommand) corruptedStates.add(oldState)
       }
 
@@ -268,7 +273,7 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
         model as MergeModelBase<State>
         for (state in states) {
           model.restoreChangeState(state)
-          model.invalidateHighlighters(state.index)
+          model.invalidateChange(state.index)
         }
       }
       finally {
@@ -322,7 +327,7 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
     if (getLineStart(index) != newOutputStartLine || getLineEnd(index) != newOutputEndLine) {
       setLineStart(index, newOutputStartLine)
       setLineEnd(index, newOutputEndLine)
-      invalidateHighlighters(index)
+      invalidateChange(index)
     }
 
     var beforeChange = true
@@ -341,15 +346,13 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
       if (startLine != newStartLine || endLine != newEndLine) {
         setLineStart(otherIndex, newStartLine)
         setLineEnd(otherIndex, newEndLine)
-        invalidateHighlighters(otherIndex)
+        invalidateChange(otherIndex)
       }
     }
   }
 
   /*
    * Nearby changes could be affected as well (ex: by moveChangesAfterInsertion)
-   *
-   * null means all changes could be affected
    */
   @RequiresEdt
   private fun collectAffectedChanges(directChanges: IntList): IntList {
@@ -397,4 +400,3 @@ abstract class MergeModelBase<S : MergeModelBase.State>(
     private val LOG = Logger.getInstance(MergeModelBase::class.java)
   }
 }
-

@@ -700,6 +700,7 @@
     <inspection_tool class="Java8MapApi" enabled="true" level="INFORMATION" enabled_by_default="true" />
     <inspection_tool class="Java8MapForEach" enabled="true" level="Strong Warning" enabled_by_default="true" />
     <inspection_tool class="Java8ReplaceMapGet" enabled="true" level="INFORMATION" enabled_by_default="true" />
+    <inspection_tool class="JavaApiUsageInspection" enabled="true" level="Strong Warning" enabled_by_default="true" />
     <inspection_tool class="JavaDoc" enabled="true" level="Strong Warning" enabled_by_default="false">
       <scope name="Tests" level="Strong Warning" enabled="false">
         <option name="TOP_LEVEL_CLASS_OPTIONS">
@@ -2083,6 +2084,12 @@
       </searchConfiguration>
       <searchConfiguration name="Catch is too broad" uuid="a8f5f167-f44f-3964-a6c9-98dee827110c" text="runCatching" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
         <constraint name="__context__" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Catch is too broad" uuid="a8f5f167-f44f-3964-a6c9-98dee827110c" text="try {&#10;    $TryStatement$&#10;} catch($Exception$ : $Class$) {&#10;}" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="TryStatement" maxCount="2147483647" within="" contains="" />
+        <constraint name="Exception" within="" contains="" />
+        <constraint name="Class" regexp="(Exception|Throwable|RuntimeException)" within="" contains="" />
       </searchConfiguration>
       <searchConfiguration name="CefMessageRouter.create" description="Instances of CefMessagerRouter created directly are not supported on the backend in remote development. Use JBCefApp.createMessageRouter or migrate to JBCefJSQuery.  " problemDescriptor="Use JBCefApp.createMessageRouter or migrate to JBCefJSQuery." text="$Instance$.$MethodCall$($Parameter$)" recursive="true" caseInsensitive="true" type="JAVA" pattern_context="default">
         <constraint name="__context__" within="" contains="" />

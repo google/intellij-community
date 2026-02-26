@@ -1,10 +1,21 @@
 <idea-plugin visibility="internal">
   <dependencies>
     <module name="intellij.platform.backend"/>
-    <module name="intellij.platform.kernel.backend"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.libraries.kotlinx.coroutines.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.json"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.ui"/>
     <module name="intellij.platform.execution.dashboard"/>
     <module name="intellij.platform.execution.serviceView"/>
     <module name="intellij.platform.execution.serviceView.backend"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.kernel.backend"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.projectModel"/>
+    <!-- endregion -->
   </dependencies>
 
   <extensionPoints>

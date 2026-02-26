@@ -2,6 +2,7 @@
 package com.intellij.platform.debugger.impl.frontend.frame
 
 import com.intellij.ide.ui.icons.icon
+import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.project.Project
 import com.intellij.platform.debugger.impl.frontend.storage.findStackFrame
 import com.intellij.platform.debugger.impl.frontend.storage.getOrCreateStackFrame
@@ -10,6 +11,7 @@ import com.intellij.platform.debugger.impl.rpc.XExecutionStackApi
 import com.intellij.platform.debugger.impl.rpc.XExecutionStackDto
 import com.intellij.platform.debugger.impl.rpc.XExecutionStackId
 import com.intellij.platform.debugger.impl.rpc.XStackFramesEvent
+import com.intellij.platform.debugger.impl.ui.XDebuggerEntityConverter
 import com.intellij.xdebugger.frame.XDescriptor
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
@@ -25,6 +27,12 @@ internal class FrontendXExecutionStack(
   private val project: Project,
   private val suspendContextLifetimeScope: CoroutineScope,
 ) : XExecutionStack(stackDto.displayName, stackDto.icon?.icon()) {
+  init {
+    suspendContextLifetimeScope.launch {
+      stackDto.iconFlow.toFlow().collect { iconId -> icon = iconId?.icon() }
+    }
+  }
+
   val id: XExecutionStackId = stackDto.executionStackId
 
   private val topValue: CompletableFuture<XStackFrame?> = stackDto.topFrame.asCompletableFuture().thenApply<XStackFrame> { frameDto ->
@@ -80,6 +88,11 @@ internal class FrontendXExecutionStack(
 
   override fun getXExecutionStackDescriptorAsync(): CompletableFuture<XDescriptor?>? {
     return stackDto.descriptor?.asCompletableFuture()
+  }
+
+  override fun getExecutionLineIconRenderer(): GutterIconRenderer? {
+    // TODO Supported only in monolith
+    return XDebuggerEntityConverter.getExecutionStack(id)?.executionLineIconRenderer
   }
 
   override fun hashCode(): Int {

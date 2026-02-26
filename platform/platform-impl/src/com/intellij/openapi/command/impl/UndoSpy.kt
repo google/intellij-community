@@ -1,27 +1,27 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.command.impl
 
 import com.intellij.ide.impl.UndoRemoteBehaviorService
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.impl.cmd.CmdEvent
-import com.intellij.openapi.command.undo.UndoableAction
 import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.project.Project
-import org.jetbrains.annotations.ApiStatus
+import com.intellij.util.application
+import org.jetbrains.annotations.ApiStatus.Internal
+
 
 /**
  * Advanced listener of [UndoManagerImpl].
  */
-@ApiStatus.Experimental
-@ApiStatus.Internal
+@Internal
 interface UndoSpy {
 
-  fun commandStarted(cmdEvent: CmdEvent)
+  fun commandStarted(cmdStartEvent: CmdEvent)
 
-  fun undoableActionAdded(undoProject: Project?, action: UndoableAction, type: UndoableActionType)
+  fun commandFinished(cmdFinishEvent: CmdEvent)
 
-  fun commandFinished(cmdEvent: CmdEvent)
+  fun currentCmdEvent(): CmdEvent?
+
+  fun markCurrentCommandAsBackendOnly()
 
   fun <T> withBlind(action: () -> T): T
 
@@ -30,8 +30,7 @@ interface UndoSpy {
     fun getInstance(): UndoSpy? {
       return ProgressManager.getInstance().computeInNonCancelableSection<UndoSpy?, Exception> {
         if (UndoRemoteBehaviorService.isSpeculativeUndoEnabled()) {
-          val application = ApplicationManager.getApplication()
-          application?.serviceOrNull<UndoSpy>()
+          application.serviceOrNull<UndoSpy>()
         } else {
           null
         }

@@ -102,6 +102,7 @@ internal class JpsModuleToBazel {
         ultimateRoot = ultimateRoot,
         communityRoot = communityRoot,
         project = project,
+        projectDir = projectDir,
         urlCache = urlCache,
         customModules = if (defaultCustomModules.toBooleanStrict()) DEFAULT_CUSTOM_MODULES else emptyMap(),
       )
@@ -113,7 +114,7 @@ internal class JpsModuleToBazel {
       generator.save(ultimateResult.moduleBuildFiles)
 
       generator.generateLibs(jarRepositories = jarRepositories, m2Repo = Path.of(m2Repo))
-      if (ultimateRoot != null) {
+      if (ultimateRoot != null && ultimateRoot.resolve("toolbox").exists()) {
         generator.generateToolboxDeps()
       }
 
@@ -154,6 +155,8 @@ internal class JpsModuleToBazel {
           assertAllModuleOutputsExist = assertAllModuleOutputsExist,
           bazelOutputBase = if (bazelWorkspaceRoot == ultimateRoot) bazelOutputBase else null,
         )
+
+        saveDevServerRunConfigurations(ultimateRoot = ultimateRoot, targetFilePath = ultimateRoot.resolve("build").resolve("dev_server_run_configurations.bzl"))
       }
       else {
         check(bazelWorkspaceRoot == null || bazelWorkspaceRoot == communityRoot) { "Bazel workspace root ($bazelWorkspaceRoot) must be community root ($communityRoot)" }

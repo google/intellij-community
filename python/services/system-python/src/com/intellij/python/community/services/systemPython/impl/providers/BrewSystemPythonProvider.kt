@@ -4,14 +4,14 @@ package com.intellij.python.community.services.systemPython.impl.providers
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.isMac
-import com.jetbrains.python.PyToolUIInfo
-import com.intellij.python.community.services.systemPython.icons.PythonCommunityServicesSystemPythonIcons
 import com.intellij.python.community.services.systemPython.SystemPythonProvider
+import com.intellij.python.community.services.systemPython.icons.PythonCommunityServicesSystemPythonIcons
+import com.jetbrains.python.PyToolUIInfo
 import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.errorProcessing.PyResult
-import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.file.Path
 
 
 internal class BrewSystemPythonProvider : SystemPythonProvider {
@@ -25,7 +25,7 @@ internal class BrewSystemPythonProvider : SystemPythonProvider {
 
     val pythons = withContext(Dispatchers.IO) {
       try {
-        return@withContext collectPythonsInPaths(eelApi, listOf(binDirectory), listOf(python3XNamePattern))
+        return@withContext collectPythonsInPaths( listOf(binDirectory), listOf(python3XNamePattern))
       }
       catch (e: RuntimeException) {
         LOGGER.error("failed to discover brew pythons", e)

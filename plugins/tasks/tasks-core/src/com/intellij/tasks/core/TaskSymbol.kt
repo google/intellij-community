@@ -2,7 +2,9 @@
 package com.intellij.tasks.core
 
 import com.intellij.ide.BrowserUtil
-import com.intellij.lang.documentation.DocumentationMarkup.*
+import com.intellij.lang.documentation.DocumentationMarkup.CLASS_GRAYED
+import com.intellij.lang.documentation.DocumentationMarkup.GRAYED_END
+import com.intellij.lang.documentation.DocumentationMarkup.GRAYED_START
 import com.intellij.markdown.utils.doc.DocMarkdownToHtmlConverter
 import com.intellij.model.Pointer
 import com.intellij.model.Pointer.hardPointer
@@ -21,7 +23,6 @@ import com.intellij.platform.backend.navigation.NavigationTarget
 import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.polySymbols.PolySymbol
 import com.intellij.polySymbols.PolySymbolKind
-import com.intellij.polySymbols.PolySymbolOrigin
 import com.intellij.polySymbols.PolySymbolProperty
 import com.intellij.polySymbols.documentation.PolySymbolDocumentationTarget
 import com.intellij.pom.Navigatable
@@ -64,9 +65,6 @@ sealed class AbstractTaskSymbol : PolySymbol, DocumentationSymbol {
   }
 
   abstract val task: Task?
-
-  override val origin: PolySymbolOrigin
-    get() = PolySymbolOrigin.empty()
 
   override val kind: PolySymbolKind
     get() = TASKS_TASKS
@@ -161,7 +159,7 @@ sealed class AbstractTaskSymbol : PolySymbol, DocumentationSymbol {
     when (property) {
       PolySymbol.PROP_IJ_TEXT_ATTRIBUTES_KEY -> property.tryCast(EditorColors.REFERENCE_HYPERLINK_COLOR.externalName)
       TASK_PROPERTY -> property.tryCast(task)
-      else -> null
+      else -> super.get(property)
     }
 
   override val presentation: TargetPresentation

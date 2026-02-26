@@ -42,4 +42,15 @@ jvm_library(
     "@lib//:kotlinc-kotlin-dataframe-compiler-plugin",
   ]
 )
+
+jvm_library(
+  name = "compiler-dependencies_test_lib",
+  module_name = "kotlin.util.compiler-dependencies",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  runtime_deps = [
+    ":compiler-dependencies",
+    "//libraries/kotlin/reflect:reflect_test_lib",
+  ]
+)
 ### auto-generated section `build kotlin.util.compiler-dependencies` end

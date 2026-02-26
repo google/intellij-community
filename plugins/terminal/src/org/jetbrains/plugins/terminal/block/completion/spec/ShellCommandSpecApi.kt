@@ -6,7 +6,11 @@ import com.intellij.terminal.completion.spec.ShellCommandSpec
 import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
-import org.jetbrains.plugins.terminal.block.completion.spec.dsl.*
+import org.jetbrains.plugins.terminal.block.completion.spec.dsl.ShellCommandContext
+import org.jetbrains.plugins.terminal.block.completion.spec.dsl.ShellCommandContextImpl
+import org.jetbrains.plugins.terminal.block.completion.spec.dsl.ShellCommandSpecDsl
+import org.jetbrains.plugins.terminal.block.completion.spec.dsl.ShellCompletionSuggestionContext
+import org.jetbrains.plugins.terminal.block.completion.spec.dsl.ShellCompletionSuggestionContextImpl
 
 /**
  * The single true way of creating [ShellCommandSpec].
@@ -24,7 +28,9 @@ fun ShellCommandSpec(name: String, content: ShellCommandContext.() -> Unit = {})
 /**
  * Creates [com.intellij.terminal.completion.spec.ShellCompletionSuggestion] instance.
  *
- * @param name the string to be shown in the completion popup and inserted on completion
+ * @param name is used to filter the completion popup to show only relevant items.
+ * Also, it is inserted when chosen from the popup, if [ShellCompletionSuggestion.insertValue] is not specified.
+ * Also, it is shown in the completion popup, if [ShellCompletionSuggestion.displayName] is not specified.
  * @param description text to be shown in the documentation popup
  */
 @ApiStatus.Experimental
@@ -38,7 +44,9 @@ fun ShellCompletionSuggestion(
 /**
  * Creates [com.intellij.terminal.completion.spec.ShellCompletionSuggestion] instance.
  *
- * @param name the string to be shown in the completion popup and inserted on completion
+ * @param name is used to filter the completion popup to show only relevant items.
+ * Also, it is inserted when chosen from the popup, if [ShellCompletionSuggestion.insertValue] is not specified.
+ * Also, it is shown in the completion popup, if [ShellCompletionSuggestion.displayName] is not specified.
  * @param content the builder function where you can configure other parameters.
  * It is called immediately during this function call.
  */
@@ -55,7 +63,9 @@ fun ShellCompletionSuggestion(
 /**
  * Creates a [com.intellij.terminal.completion.spec.ShellAliasSuggestion] with the following parameters.
  *
- * @param name the string to be shown in the completion popup and inserted on completion
+ * @param name is used to filter the completion popup to show only relevant items.
+ * Also, it is inserted when chosen from the popup, if [ShellCompletionSuggestion.insertValue] is not specified.
+ * Also, it is shown in the completion popup, if [ShellCompletionSuggestion.displayName] is not specified.
  * @param aliasValue the expanded form of the alias used to generate suggestions
  */
 @ApiStatus.Experimental

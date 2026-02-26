@@ -2,9 +2,11 @@
   <dependencies>
     <module name="intellij.libraries.junit4"/>
     <module name="intellij.libraries.junit5.launcher"/>
+    <module name="intellij.platform.testFramework.impl"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.platform.testFramework.common"/>
     <module name="intellij.platform.testFramework.core"/>
-    <module name="intellij.platform.testFramework.impl"/>
+    <!-- endregion -->
   </dependencies>
 
   <extensions defaultExtensionNs="com.intellij">

@@ -20,7 +20,7 @@ c:com.intellij.diagnostic.logging.DefaultLogFormatter
 - formatPrefix(java.lang.String):java.lang.String
 f:com.intellij.diagnostic.logging.LogConfigurationPanel
 - com.intellij.openapi.options.SettingsEditor
-- b:$$$getRootComponent$$$():javax.swing.JComponent
+- $$$getRootComponent$$$():javax.swing.JComponent
 - <init>():V
 - refreshPredefinedLogFiles(com.intellij.execution.configurations.RunConfigurationBase):V
 a:com.intellij.diagnostic.logging.LogConsoleBase
@@ -2147,8 +2147,6 @@ c:com.intellij.terminal.JBTerminalWidget
 - dispose():V
 - p:executeCommand(java.lang.String):V
 - p:getComponentGraphics(java.awt.Graphics):java.awt.Graphics
-- getFontSize():I
-- getFontSize2D():F
 - getListener():com.intellij.terminal.JBTerminalWidgetListener
 - getProcessTtyConnector():com.jediterm.terminal.ProcessTtyConnector
 - getProject():com.intellij.openapi.project.Project
@@ -2160,9 +2158,6 @@ c:com.intellij.terminal.JBTerminalWidget
 - getText():java.lang.String
 - p:hasRunningCommands():Z
 - notifyStarted():V
-- resetFontSize():V
-- setFontSize(F):V
-- setFontSize(I):V
 - setListener(com.intellij.terminal.JBTerminalWidgetListener):V
 - p:setShellCommand(java.util.List):V
 - start(com.jediterm.terminal.TtyConnector):V

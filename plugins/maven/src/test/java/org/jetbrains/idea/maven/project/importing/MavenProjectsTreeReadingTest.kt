@@ -26,13 +26,8 @@ import org.jetbrains.idea.maven.model.MavenId
 import org.jetbrains.idea.maven.project.MavenProject
 import org.jetbrains.idea.maven.project.MavenProjectsTree
 import org.junit.Test
-import java.util.*
+import java.util.Arrays
 import java.util.Set
-import kotlin.collections.ArrayList
-import kotlin.collections.List
-import kotlin.collections.listOf
-import kotlin.collections.map
-import kotlin.collections.mutableListOf
 
 class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
   @Test
@@ -1741,6 +1736,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
 
   @Test
   fun testCollectingProfilesFromParentsAfterResolve() = runBlocking {
+    projectsManager.initForTests()
     val parent1 = createModulePom("parent1",
                                   """
                       <groupId>test</groupId>

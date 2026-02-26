@@ -12,7 +12,8 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.CommitContext
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.commit.CommitExceptionWithActions
-import com.intellij.vcs.commit.isAmendCommitMode
+import com.intellij.vcs.commit.CommitToAmend
+import com.intellij.vcs.commit.commitToAmend
 import com.intellij.vcs.commit.isCleanupCommitMessage
 import com.intellij.vcs.log.VcsUser
 import git4idea.checkin.GitCheckinEnvironment.Companion.COMMIT_DATE_FORMAT
@@ -23,25 +24,26 @@ import git4idea.commands.GitLineEventDetector
 import git4idea.commands.GitLineHandler
 import git4idea.commit.signing.GpgAgentConfigurationNotificator
 import git4idea.i18n.GitBundle
+import git4idea.rebase.GitSquashedCommitsMessage
 import git4idea.repo.GitRepository
 import java.io.File
-import java.util.*
+import java.util.Date
 
 data class GitCommitOptions(
-  val isAmend: Boolean = false,
+  val commitToAmend: CommitToAmend = CommitToAmend.None,
   val isSignOff: Boolean = false,
   val isSkipHooks: Boolean = false,
   val commitAuthor: VcsUser? = null,
   val commitAuthorDate: Date? = null,
-  val isCleanupCommitMessage: Boolean = false
+  val isCleanupCommitMessage: Boolean = false,
 ) {
   constructor(context: CommitContext) : this(
-    context.isAmendCommitMode,
+    context.commitToAmend,
     context.isSignOffCommit,
     context.isSkipHooks,
     context.commitAuthor,
     context.commitAuthorDate,
-    context.isCleanupCommitMessage
+    context.isCleanupCommitMessage,
   )
 }
 
@@ -51,7 +53,14 @@ internal class GitRepositoryCommitter(val repository: GitRepository, private val
 
   @Throws(VcsException::class)
   fun commitStaged(commitMessage: String) {
-    runWithMessageFile(project, root, commitMessage) { messageFile -> commitStaged(messageFile) }
+    val fullMessage = when (val commitToAmend = commitOptions.commitToAmend) {
+      is CommitToAmend.Specific -> GitSquashedCommitsMessage.formatAmendSpecificCommitMessage(commitToAmend.targetSubject, commitMessage)
+      else -> commitMessage
+    }
+
+    runWithMessageFile(project, root, fullMessage) { messageFile ->
+      commitStaged(messageFile)
+    }
   }
 
   @Throws(VcsException::class)
@@ -91,7 +100,7 @@ internal class GitRepositoryCommitter(val repository: GitRepository, private val
 }
 
 private fun GitLineHandler.setCommitOptions(options: GitCommitOptions) {
-  if (options.isAmend) addParameters("--amend")
+  if (options.commitToAmend is CommitToAmend.Last) addParameters("--amend")
   if (options.isSignOff) addParameters("--signoff")
   if (options.isSkipHooks) addParameters("--no-verify")
   if (options.isCleanupCommitMessage) addParameters("--cleanup=strip")

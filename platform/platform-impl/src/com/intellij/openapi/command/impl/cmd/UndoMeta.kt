@@ -1,43 +1,52 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.command.impl.cmd
 
-import com.intellij.openapi.command.undo.DocumentReference
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
-import org.jetbrains.annotations.ApiStatus.Experimental
-import org.jetbrains.annotations.ApiStatus.Internal
 
 
-@Experimental
-@Internal
 interface UndoMeta {
   fun undoProject(): Project?
   fun focusedEditor(): FileEditor?
-  fun focusedDocument(): DocumentReference?
+  fun undoableActions(): List<UndoableActionMeta>
+  fun isForcedGlobal(): Boolean
 
   companion object {
     @JvmStatic
-    fun create(project: Project?, editor: FileEditor?, docRef: DocumentReference?): UndoMeta {
-      if (project == null && editor == null && docRef == null) {
+    fun create(undoProject: Project?, focusedEditor: FileEditor?): UndoMeta {
+      return create(undoProject, focusedEditor, emptyList(), false)
+    }
+
+    @JvmStatic
+    fun create(
+      project: Project?,
+      editor: FileEditor?,
+      actions: List<UndoableActionMeta>,
+      isForcedGlobal: Boolean,
+    ): UndoMeta {
+      if (project == null && editor == null && actions.isEmpty() && !isForcedGlobal) {
         return EmptyUndoMeta
       }
-      return ImmutableUndoMeta(project, editor, docRef)
+      return ImmutableUndoMeta(project, editor, actions, isForcedGlobal)
     }
   }
-}
 
-private class ImmutableUndoMeta(
-  private val project: Project?,
-  private val editor: FileEditor?,
-  private val docRef: DocumentReference?
-): UndoMeta {
-  override fun undoProject(): Project? = project
-  override fun focusedEditor(): FileEditor? = editor
-  override fun focusedDocument(): DocumentReference? = docRef
-}
+  private class ImmutableUndoMeta(
+    private val project: Project?,
+    private val editor: FileEditor?,
+    private val actions: List<UndoableActionMeta>,
+    private val isForcedGlobal: Boolean,
+  ) : UndoMeta {
+    override fun undoProject(): Project? = project
+    override fun focusedEditor(): FileEditor? = editor
+    override fun undoableActions(): List<UndoableActionMeta> = actions
+    override fun isForcedGlobal(): Boolean = isForcedGlobal
+  }
 
-private object EmptyUndoMeta : UndoMeta {
-  override fun undoProject(): Project? = null
-  override fun focusedEditor(): FileEditor? = null
-  override fun focusedDocument(): DocumentReference? = null
+  private object EmptyUndoMeta : UndoMeta {
+    override fun undoProject(): Project? = null
+    override fun focusedEditor(): FileEditor? = null
+    override fun undoableActions(): List<UndoableActionMeta> = emptyList()
+    override fun isForcedGlobal(): Boolean = false
+  }
 }

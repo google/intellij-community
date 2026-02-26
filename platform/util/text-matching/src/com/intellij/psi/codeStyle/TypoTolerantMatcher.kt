@@ -2,15 +2,19 @@
 package com.intellij.psi.codeStyle
 
 import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.util.text.Strings
 import com.intellij.util.containers.FList
 import com.intellij.util.text.NameUtilCore
 import com.intellij.util.text.matching.AsciiUtils
+import com.intellij.util.text.matching.BitSet
+import com.intellij.util.text.matching.MatchedFragment
 import com.intellij.util.text.matching.MatchingMode
+import com.intellij.util.text.matching.deprecated
+import com.intellij.util.text.matching.indexOf
+import com.intellij.util.text.matching.indexOfAny
+import com.intellij.util.text.matching.undeprecate
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.VisibleForTesting
-import java.util.*
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -18,7 +22,7 @@ import kotlin.math.pow
 class TypoTolerantMatcher @VisibleForTesting constructor(
   pattern: String,
   private val myMatchingMode: MatchingMode,
-  private val myHardSeparators: String,
+  hardSeparators: String,
 ) : MinusculeMatcher() {
   private val myPattern: CharArray
   private val myMixedCase: Boolean
@@ -31,6 +35,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
   private val toLowerCase: CharArray
   private val myMeaningfulCharacters: CharArray
   private val myMinNameLength: Int
+  private val myHardSeparators = hardSeparators.toCharArray()
 
   /**
    * Constructs a matcher by a given pattern.
@@ -92,7 +97,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
   }
 
   override val pattern: String
-    get() = String(myPattern)
+    get() = myPattern.concatToString()
 
   private fun isWordSeparator(c: Char): Boolean {
     return c.isWhitespace() || c == '_' || c == '-' || c == ':' || c == '+' || c == '.'
@@ -106,21 +111,27 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
     }
   }
 
-  private fun prependRange(ranges: FList<Range>, range: Range): FList<Range> {
-    val head = ranges.head
-    return if (head != null && head.startOffset == range.endOffset) {
-      ranges.tail.prepend(Range(range.startOffset, head.endOffset, range.errorCount + head.errorCount))
+  private fun appendRange(ranges: List<MatchedFragment>, range: MatchedFragment): List<MatchedFragment> {
+    if (ranges.isEmpty()) {
+      return mutableListOf(range)
+    }
+
+    require(ranges is MutableList<MatchedFragment>)
+    val last = ranges.last()
+    if (last.startOffset == range.endOffset) {
+      ranges[ranges.size - 1] = MatchedFragment(range.startOffset, last.endOffset, range.errorCount + last.errorCount)
     }
     else {
-      ranges.prepend(range)
+      ranges.add(range)
     }
+    return ranges
   }
 
-  override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: FList<out TextRange>?): Int {
+  override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: List<MatchedFragment>?): Int {
     if (fragments == null) return Int.MIN_VALUE
     if (fragments.isEmpty()) return 0
 
-    val first = fragments.head
+    val first = fragments.first()
     val startMatch = first.startOffset == 0
     val valuedStartMatch = startMatch && valueStartCaseMatch
 
@@ -146,7 +157,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
         }
 
         val c = name[i]
-        p = Strings.indexOf(myPattern, c, p + 1, myPattern.size, false)
+        p = indexOf(myPattern, c, p + 1, myPattern.size, ignoreCase = true)
         if (p < 0) {
           break
         }
@@ -158,12 +169,11 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
         matchingCase += evaluateCaseMatching(valuedStartMatch, p, humpStartMatchedUpperCase, i, afterGap, isHumpStart, c)
       }
 
-      val errorCount = (range as? Range)?.errorCount ?: 0
-      errors += (2000.0 * (1.0 * errorCount / range.length).pow(2)).toInt()
+      errors += (2000.0 * (1.0 * range.errorCount / range.length).pow(2)).toInt()
     }
 
     val startIndex = first.startOffset
-    val afterSeparator = Strings.indexOfAny(name, myHardSeparators, 0, startIndex) >= 0
+    val afterSeparator = indexOfAny(name, myHardSeparators, 0, startIndex) >= 0
     val wordStart = startIndex == 0 || NameUtilCore.isWordStart(name, startIndex) && !NameUtilCore.isWordStart(name, startIndex - 1)
     val finalMatch = fragments.last().endOffset == name.length
 
@@ -175,6 +185,11 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
            (if (afterSeparator) 0 else 2) +
            (if (startMatch) 1 else 0) +
            (if (finalMatch) 1 else 0)
+  }
+
+  @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: FList<out TextRange>?): Int {
+    return matchingDegree(name, valueStartCaseMatch, fragments?.undeprecate())
   }
 
   private fun evaluateCaseMatching(
@@ -212,24 +227,20 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
     }
   }
 
-  override fun isStartMatch(name: String): Boolean {
-    val fragments = matchingFragments(name)
-    return fragments != null && isStartMatch(fragments)
-  }
-
-  override fun matches(name: String): Boolean {
-    return matchingFragments(name) != null
-  }
-
-  override fun matchingFragments(name: String): FList<TextRange>? {
+  override fun match(name: String): List<MatchedFragment>? {
     return if (name.length >= myMinNameLength) {
       val ascii = AsciiUtils.isAscii(name)
-      Session(name, myTypoAware = false, ascii).matchingFragments() as FList<TextRange>?
-      ?: Session(name, myTypoAware = true, ascii).matchingFragments() as FList<TextRange>?
+      Session(name, myTypoAware = false, ascii).matchingFragments()
+      ?: Session(name, myTypoAware = true, ascii).matchingFragments()
     }
     else {
       null
     }
+  }
+
+  @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  override fun matchingFragments(name: String): FList<TextRange>? {
+    return match(name)?.deprecated()
   }
 
   private inner class Session(
@@ -275,7 +286,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       return errorState.length(myPattern)
     }
 
-    fun matchingFragments(): FList<Range>? {
+    fun matchingFragments(): List<MatchedFragment>? {
       val length = myName.length
       if (length < myMinNameLength) {
         return null
@@ -301,7 +312,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
         }
       }
 
-      return matchWildcards(patternIndex = 0, nameIndex = 0, errorState = ErrorState())
+      return matchWildcards(patternIndex = 0, nameIndex = 0, errorState = ErrorState())?.asReversed()
     }
 
     /**
@@ -312,14 +323,14 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       patternIndex: Int,
       nameIndex: Int,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       var patternIndex = patternIndex
       if (nameIndex < 0) {
         return null
       }
       if (!isWildcard(patternIndex)) {
         return if (patternIndex == patternLength(errorState)) {
-          FList.emptyList()
+          emptyList()
         }
         else {
           matchFragment(patternIndex, nameIndex, errorState)
@@ -338,14 +349,14 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
                    (patternIndex < 2 || !isUpperCaseOrDigit(patternIndex - 2, errorState))) {
           val spaceIndex = myName.indexOf(' ', startIndex = nameIndex)
           if (spaceIndex >= 0) {
-            FList.singleton(Range(spaceIndex, spaceIndex + 1, errorCount = 0))
+            mutableListOf(MatchedFragment(spaceIndex, spaceIndex + 1, errorCount = 0))
           }
           else {
             null
           }
         }
         else {
-          FList.emptyList()
+          emptyList()
         }
       }
 
@@ -370,7 +381,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       nameIndex: Int,
       allowSpecialChars: Boolean,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       val wordStartsOnly = !isPatternChar(patternIndex - 1, '*', errorState) && !isWordSeparator(patternIndex, errorState)
 
       var nameIndex = nameIndex
@@ -415,10 +426,10 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
 
       return when {
         // pattern humps are allowed to match in words separated by " ()", lowercase characters aren't
-        !allowSpecialChars && !myHasSeparators && !myMixedCase && Strings.containsAnyChar(myName, myHardSeparators, startAt, next) -> -1
+        !allowSpecialChars && !myHasSeparators && !myMixedCase && indexOfAny(myName, myHardSeparators, start = startAt, end = next) != -1 -> -1
         // if the user has typed a dot, don't skip other dots between humps
         // but one pattern dot may match several name dots
-        !allowSpecialChars && myHasDots && !isPatternChar(patternIndex - 1, '.', errorState) && Strings.contains(myName, startAt, next, '.') -> -1
+        !allowSpecialChars && myHasDots && !isPatternChar(patternIndex - 1, '.', errorState) && indexOf(myName, '.', start = startAt, end = next, ignoreCase = false) != -1 -> -1
         else -> next
       }
     }
@@ -490,7 +501,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       patternIndex: Int,
       nameIndex: Int,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       val fragment = maxMatchingFragment(patternIndex, nameIndex, errorState)
       return fragment?.let { matchInsideFragment(patternIndex, nameIndex, it) }
     }
@@ -521,7 +532,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       patternIndex: Int,
       nameIndex: Int,
       fragment: Fragment,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       // exact middle matches have to be at least of length 3, to prevent too many irrelevant matches
       val minFragment = if (isMiddleMatch(patternIndex, nameIndex, fragment.errorState)) 3 else 1
       return improveCamelHumps(patternIndex, nameIndex, fragment.length, minFragment, fragment.errorState)
@@ -538,14 +549,14 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       nameIndex: Int,
       fragmentLength: Int, minFragment: Int,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       if (patternIndex + fragmentLength >= patternLength(errorState)) {
         val errors = errorState.countErrors(patternIndex, patternIndex + fragmentLength)
         return if (errors == fragmentLength) {
           null
         }
         else {
-          FList.singleton(Range(nameIndex, nameIndex + fragmentLength, errors))
+          mutableListOf(MatchedFragment(nameIndex, nameIndex + fragmentLength, errors))
         }
       }
 
@@ -566,7 +577,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
             null
           }
           else {
-            prependRange(ranges, Range(nameIndex, nameIndex + i, errors))
+            appendRange(ranges, MatchedFragment(nameIndex, nameIndex + i, errors))
           }
         }
         i--
@@ -584,7 +595,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       maxFragment: Int,
       minFragment: Int,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       for (i in minFragment..<maxFragment) {
         if (isUppercasePatternVsLowercaseNameChar(patternIndex + i, nameIndex + i, errorState)) {
           val ranges = findUppercaseMatchFurther(patternIndex + i, nameIndex + i, errorState.deriveFrom(patternIndex + i))
@@ -594,7 +605,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
               null
             }
             else {
-              prependRange(ranges, Range(nameIndex, nameIndex + i, errors))
+              appendRange(ranges, MatchedFragment(nameIndex, nameIndex + i, errors))
             }
           }
         }
@@ -610,7 +621,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
       patternIndex: Int,
       nameIndex: Int,
       errorState: ErrorState,
-    ): FList<Range>? {
+    ): List<MatchedFragment>? {
       val nextWordStart = indexOfWordStart(patternIndex, nameIndex, errorState)
       return matchWildcards(patternIndex, nextWordStart, errorState.deriveFrom(patternIndex))
     }
@@ -687,7 +698,7 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
 
   @NonNls
   override fun toString(): @NonNls String {
-    return "TypoTolerantMatcher{myPattern=" + String(myPattern) + ", myMatchingMode=" + myMatchingMode + '}'
+    return "TypoTolerantMatcher{myPattern=${pattern}, myMatchingMode=$myMatchingMode}"
   }
 
   private data class ErrorWithIndex(val index: Int, val error: Error)
@@ -844,12 +855,6 @@ class TypoTolerantMatcher @VisibleForTesting constructor(
   }
 
   private class Fragment(val length: Int, val errorState: ErrorState)
-
-  private class Range(startOffset: Int, endOffset: Int, val errorCount: Int) : TextRange(startOffset, endOffset) {
-    override fun shiftRight(delta: Int): Range {
-      return if (delta == 0) this else Range(startOffset + delta, endOffset + delta, this.errorCount)
-    }
-  }
 
   private val keyboard = arrayOf(charArrayOf('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'),
                                  charArrayOf('a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'),

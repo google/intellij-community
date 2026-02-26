@@ -2,11 +2,21 @@
 
 package org.jetbrains.idea.maven.execution.run
 
-import com.intellij.build.*
+import com.intellij.build.BuildDescriptor
+import com.intellij.build.BuildView
+import com.intellij.build.BuildViewManager
+import com.intellij.build.DefaultBuildDescriptor
+import com.intellij.build.WeakFilterableSupplier
+import com.intellij.build.createFilteringActionsGroup
 import com.intellij.build.events.BuildEvent
 import com.intellij.build.events.impl.StartBuildEventImpl
 import com.intellij.debugger.impl.GenericDebuggerRunner
-import com.intellij.execution.*
+import com.intellij.execution.CommandLineUtil
+import com.intellij.execution.DefaultExecutionResult
+import com.intellij.execution.ExecutionException
+import com.intellij.execution.ExecutionResult
+import com.intellij.execution.Executor
+import com.intellij.execution.JavaRunConfigurationExtensionManager
 import com.intellij.execution.configurations.ParametersList
 import com.intellij.execution.configurations.RemoteConnection
 import com.intellij.execution.configurations.RemoteConnectionCreator
@@ -30,11 +40,19 @@ import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunCo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.eel.*
+import com.intellij.platform.eel.EelApi
+import com.intellij.platform.eel.EelOsFamily
+import com.intellij.platform.eel.ExecuteProcessException
+import com.intellij.platform.eel.isWindows
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.provider.*
+import com.intellij.platform.eel.provider.LocalEelDescriptor
+import com.intellij.platform.eel.provider.asEelPath
+import com.intellij.platform.eel.provider.asNioPath
+import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.platform.eel.provider.utils.EelPathUtils.TransferTarget
 import com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalContentToRemote
+import com.intellij.platform.eel.spawnProcess
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.psi.search.ExecutionSearchScopes
 import com.intellij.util.io.outputStream
@@ -42,11 +60,27 @@ import com.intellij.util.text.nullize
 import org.jetbrains.idea.maven.artifactResolver.common.MavenModuleMap
 import org.jetbrains.idea.maven.buildtool.BuildToolConsoleProcessAdapter
 import org.jetbrains.idea.maven.buildtool.MavenBuildEventProcessor
-import org.jetbrains.idea.maven.execution.*
+import org.jetbrains.idea.maven.execution.MavenExecutionOptions
+import org.jetbrains.idea.maven.execution.MavenExternalParameters
 import org.jetbrains.idea.maven.execution.MavenExternalParameters.encodeProfiles
+import org.jetbrains.idea.maven.execution.MavenResumeAction
+import org.jetbrains.idea.maven.execution.MavenRunConfiguration
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+import org.jetbrains.idea.maven.execution.MavenRunner
+import org.jetbrains.idea.maven.execution.RunnerBundle
 import org.jetbrains.idea.maven.externalSystemIntegration.output.MavenParsingContext
-import org.jetbrains.idea.maven.project.*
-import org.jetbrains.idea.maven.server.*
+import org.jetbrains.idea.maven.project.BundledMaven
+import org.jetbrains.idea.maven.project.BundledMaven3
+import org.jetbrains.idea.maven.project.MavenHomeType
+import org.jetbrains.idea.maven.project.MavenProjectBundle
+import org.jetbrains.idea.maven.project.MavenProjectsManager
+import org.jetbrains.idea.maven.project.MavenSettingsCache
+import org.jetbrains.idea.maven.project.MavenWrapper
+import org.jetbrains.idea.maven.server.DaemonedMavenDistribution
+import org.jetbrains.idea.maven.server.MavenDistributionsCache
+import org.jetbrains.idea.maven.server.MavenServerEmbedder
+import org.jetbrains.idea.maven.server.MavenServerManager
+import org.jetbrains.idea.maven.server.isMaven4
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenUtil
 import java.io.BufferedOutputStream
@@ -54,7 +88,7 @@ import java.io.IOException
 import java.nio.charset.Charset
 import java.nio.charset.UnsupportedCharsetException
 import java.nio.file.Path
-import java.util.*
+import java.util.Properties
 import java.util.function.Function
 import kotlin.io.path.Path
 import kotlin.io.path.exists
@@ -67,26 +101,46 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
     Path(myConfiguration.runnerParameters.workingDirPath).asEelPath()
   }
 
+
+  private suspend fun collectParameters(eelApi: EelApi, debug: Boolean): MavenProcessExecutionData {
+    val exe = if (isWindows()) "cmd.exe" else "/bin/sh"
+    val env = getEnv(eelApi.exec.fetchLoginShellEnvVariables(), debug)
+
+    val charset = tryToGetCharset(env, eelApi) ?: Charsets.UTF_8
+    val envWithCharsets = applyCharset(env, charset)
+
+    val params = collectArguments(eelApi)
+    MAVEN_EXECUTION_CONFIGURATOR.forEachExtensionSafe {
+      it.createConfigurator(environment, myConfiguration)?.configureParameters(envWithCharsets, params)
+    }
+
+    return MavenProcessExecutionData(
+      isWindows(),
+      exe,
+      envWithCharsets,
+      charset,
+      params,
+      debug
+    )
+
+  }
+
   @Throws(ExecutionException::class)
 
   private fun startProcess(debug: Boolean): ProcessHandler {
     return runWithModalProgressBlocking(myConfiguration.project, RunnerBundle.message("maven.target.run.label")) {
       val eelApi = myConfiguration.project.getEelDescriptor().toEelApi()
 
-      val exe = if (isWindows()) "cmd.exe" else "/bin/sh"
-      val env = getEnv(eelApi.exec.fetchLoginShellEnvVariables(), debug)
+      val executionParameters = collectParameters(eelApi, debug)
 
-      val charset = tryToGetCharset(env, eelApi) ?: Charsets.UTF_8
-      val envWithCharsets = applyCharset(env, charset)
-
-      val processHandler = runProcessInEel(eelApi, exe, envWithCharsets, charset)
+      val processHandler = runProcessInEel(eelApi, executionParameters)
       JavaRunConfigurationExtensionManager.instance
         .attachExtensionsToProcess(myConfiguration, processHandler, environment.runnerSettings)
       return@runWithModalProgressBlocking processHandler
     }
   }
 
-  private fun applyCharset(env: MutableMap<String, String>, charset: Charset): Map<String, String> {
+  private fun applyCharset(env: MutableMap<String, String>, charset: Charset): MutableMap<String, String> {
     val mavenOpts = env["MAVEN_OPTS"]
     if (mavenOpts != null && mavenOpts.contains("-Dfile.encoding")) return env
     val newOpts = listOf(mavenOpts, "-Dfile.encoding=${charset.name()}").joinToString(" ").trim()
@@ -96,41 +150,32 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
 
   private suspend fun runProcessInEel(
     eelApi: EelApi,
-    exe: String,
-    env: Map<String, String>,
-    charset: Charset,
+    parameters: MavenProcessExecutionData,
   ): KillableColoredProcessHandler.Silent {
 
-
-    val params = collectArguments(eelApi)
-
     return if (isWindows()) {
-      executeBatScriptForWindows(exe, eelApi, env, params, charset)
+      executeBatScriptForWindows(eelApi, parameters)
     }
     else {
-      doRunProcessInEel(eelApi, exe, env, params.list, "$exe ${params.list.joinToString(" ")}", charset, null)
+      doRunProcessInEel(eelApi, parameters, "${parameters.exeName} ${parameters.parametersList.list.joinToString(" ")}", null)
     }
   }
 
   private suspend fun executeBatScriptForWindows(
-    exe: String,
     eelApi: EelApi,
-    env: Map<String, String>,
-    params: ParametersList,
-    charset: Charset,
+    parameters: MavenProcessExecutionData,
   ): KillableColoredProcessHandler.Silent {
 
     val isSpyDebug = Registry.`is`("maven.spy.events.debug")
-    val tmpFile = writeParamsToBatBecauseCmdIsReallyReallyBad(params, isSpyDebug)
+    val tmpFile = writeParamsToBatBecauseCmdIsReallyReallyBad(parameters.parametersList, isSpyDebug)
 
 
-    MavenLog.LOG.debug("Running $tmpFile: ${params.list.joinToString(" ")}")
-    return doRunProcessInEel(eelApi,
-                             exe,
-                             env,
-                             listOf("/c", tmpFile.absolutePath),
-                             if (isSpyDebug) tmpFile.absolutePath else params.list.joinToString(" "),
-                             charset) {
+    MavenLog.LOG.debug("Running $tmpFile: ${parameters.parametersList.list.joinToString(" ")}")
+    return doRunProcessInEel(eelApi, parameters.copy(
+      parametersList = ParametersList().also {
+        it.add("/c")
+        it.add(tmpFile.absolutePath)
+      }), if (isSpyDebug) tmpFile.absolutePath else parameters.parametersList.list.joinToString(" ")) {
       try {
         tmpFile.delete()
       }
@@ -191,21 +236,18 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
 
   private suspend fun doRunProcessInEel(
     eelApi: EelApi,
-    exe: String,
-    env: Map<String, String>,
-    args: List<String>,
+    parameters: MavenProcessExecutionData,
     commandLineToShowUser: String,
-    charset: Charset,
     onTerminate: (() -> Unit)?,
   ): KillableColoredProcessHandler.Silent {
-    val processOptions = eelApi.exec.spawnProcess(exe)
-      .env(env)
+    val processOptions = eelApi.exec.spawnProcess(parameters.exeName)
+      .env(parameters.env)
       .workingDirectory(workingDir)
-      .args(args)
+      .args(parameters.parametersList.list)
 
     try {
       val result = processOptions.eelIt()
-      return KillableColoredProcessHandler.Silent(result.convertToJavaProcess(), commandLineToShowUser, charset, emptySet())
+      return KillableColoredProcessHandler.Silent(result.convertToJavaProcess(), commandLineToShowUser, parameters.charset, emptySet())
         .also {
           it.addProcessListener(object : ProcessListener {
             override fun processTerminated(event: ProcessEvent) {
@@ -618,3 +660,12 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
   override fun isPollConnection(): Boolean = true
 
 }
+
+private data class MavenProcessExecutionData(
+  val isWindows: Boolean,
+  val exeName: String,
+  val env: Map<String, String>,
+  val charset: Charset,
+  val parametersList: ParametersList,
+  val debug: Boolean,
+)

@@ -11,13 +11,23 @@ import com.intellij.psi.PsiElementVisitor
 import com.jetbrains.python.PyNames
 import com.jetbrains.python.PyPsiBundle
 import com.jetbrains.python.documentation.PythonDocumentationProvider
-import com.jetbrains.python.psi.*
+import com.jetbrains.python.psi.LanguageLevel
+import com.jetbrains.python.psi.PyAsPattern
+import com.jetbrains.python.psi.PyAssignmentStatement
+import com.jetbrains.python.psi.PyClass
+import com.jetbrains.python.psi.PyClassPattern
+import com.jetbrains.python.psi.PyElement
+import com.jetbrains.python.psi.PyElementGenerator
+import com.jetbrains.python.psi.PyKeywordPattern
+import com.jetbrains.python.psi.PyPattern
 import com.jetbrains.python.psi.impl.PyBuiltinCache
 import com.jetbrains.python.psi.impl.PyClassPatternImpl
 import com.jetbrains.python.psi.impl.PyPsiUtils
 import com.jetbrains.python.psi.types.PyClassType
 import com.jetbrains.python.psi.types.PyTupleType
 import com.jetbrains.python.psi.types.PyTypeChecker
+import com.jetbrains.python.psi.types.PyTypeUtil.toStream
+import com.jetbrains.python.psi.types.PyUnionType
 import com.jetbrains.python.psi.types.TypeEvalContext
 
 class PyPatternInspection : PyInspection() {
@@ -49,7 +59,20 @@ private class PyPatternInspectionVisitor(holder: ProblemsHolder, context: TypeEv
 
 
   override fun visitPyClassPattern(node: PyClassPattern) {
-    val classType = myTypeEvalContext.getType(node.classNameReference) as? PyClassType ?: return
+    val type = myTypeEvalContext.getType(node.classNameReference)
+    val types = type.toStream().toList()
+    if (types.isNotEmpty() && types.none { PyTypeChecker.isUnknown(it, myTypeEvalContext) }) {
+      val invalidTypes = types.filter { it !is PyClassType || !it.isDefinition }
+      if (invalidTypes.isNotEmpty()) {
+        val invalidTypesUnion = PyUnionType.union(invalidTypes)
+        val invalidTypeName = PythonDocumentationProvider.getTypeName(invalidTypesUnion, myTypeEvalContext)
+        holder.problem(node.classNameReference,
+                       PyPsiBundle.message("INSP.patterns.not.a.class", node.classNameReference.text, invalidTypeName)).register()
+        return
+      }
+    }
+
+    val classType = type as? PyClassType ?: return
     val pyClass = classType.pyClass
     if (pyClass.name in PyClassPattern.SPECIAL_BUILTINS) return
 

@@ -8,6 +8,7 @@ import com.intellij.codeInsight.AttachSourcesProviderFilter;
 import com.intellij.ide.JavaUiBundle;
 import com.intellij.ide.highlighter.JavaClassFileType;
 import com.intellij.ide.highlighter.JavaFileType;
+import com.intellij.java.JavaPluginDisposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
@@ -53,13 +54,21 @@ import com.intellij.util.concurrency.NonUrgentExecutor;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
-import javax.swing.*;
+import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -170,7 +179,7 @@ public final class AttachSourcesNotificationProvider implements EditorNotificati
 
         throw new RuntimeException(JavaUiBundle.message("can.t.find.library.for.0", file.getName()));
       })
-      .expireWith(project)
+      .expireWith(JavaPluginDisposable.getInstance(project))
       .expireWhen(() -> !file.isValid())
       .coalesceBy(file, project)
       .finishOnUiThread(ModalityState.current(), uiThreadAction)

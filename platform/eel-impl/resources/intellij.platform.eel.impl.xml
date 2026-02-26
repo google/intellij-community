@@ -21,9 +21,20 @@
       description="Using incremental walking transfer for IJent"
       key="ijent.incremental.walking.transfer"
       restartRequired="false"
-      defaultValue="false"/>
+      defaultValue="true"/>
+
+    <advancedSetting
+      id="container.environments.env.var.shell.mode"
+      enumClass="com.intellij.platform.eel.impl.settings.EnvVarShellMode"
+      default="LOGIN_INTERACTIVE"
+      bundle="messages.EelImplBundle"
+      groupKey="advanced.settings.container.environments"
+    />
   </extensions>
   <extensionPoints>
+    <extensionPoint qualifiedName="com.intellij.platform.eel.impl.portAccessibleLocally"
+                    dynamic="false"
+                    interface="com.intellij.platform.eel.impl.portAccessibleLocally.EelPortAccessibleLocally"/>
     <extensionPoint name="multiRoutingFileSystemBackend" interface="com.intellij.platform.eel.provider.MultiRoutingFileSystemBackend"
                     dynamic="true"/>
   </extensionPoints>

@@ -4,9 +4,21 @@ package com.intellij.testFramework.junit5.fixture
 import com.intellij.platform.util.coroutines.attachAsChildTo
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.testFramework.junit5.TestApplication
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 
-internal class TestFixtureImpl<T>(
+@ApiStatus.Internal
+class TestFixtureImpl<T>(
   private val debugString: String,
   initializer: TestFixtureInitializer<T>,
 ) : TestFixture<T> {

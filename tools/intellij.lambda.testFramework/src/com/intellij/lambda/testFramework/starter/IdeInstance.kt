@@ -2,9 +2,7 @@ package com.intellij.lambda.testFramework.starter
 
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.splitMode
-import com.intellij.ide.starter.coroutine.perClassSupervisorScope
 import com.intellij.ide.starter.ide.isRemDevContext
-import com.intellij.ide.starter.junit5.cancelSupervisorScope
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.runner.Starter
 import com.intellij.ide.starter.runner.events.IdeLaunchEvent
@@ -35,6 +33,9 @@ object IdeInstance {
   fun isStarted(): Boolean = _ide != null
 
   fun startIde(runMode: IdeRunMode): IdeWithLambda = synchronized(this) {
+    // Allow IDE building to access test modules
+    System.setProperty("idea.build.pack.test.source.enabled", "true")
+
     try {
       if (isStarted() && currentIdeMode == runMode && IdeStartConfig.current == currentIdeConfig) {
         LOG.info("IDE is already running in mode: $runMode and there were no requests to change it's config. Reusing the current instance of IDE.")
@@ -90,15 +91,13 @@ object IdeInstance {
 
   fun stopIde(): Unit = synchronized(this) {
     if (isStarted()) {
-      LOG.info("Stopping IDE with current ide mode: $currentIdeMode")
+      LOG.info("Killing IDE with current ide mode: $currentIdeMode")
       catchAll { _ide?.forceKill() }
       _ide = null
     }
     else {
-      LOG.info("IDE wasn't started. Skipping stopping it.")
+      LOG.info("IDE wasn't started. Skipping killing it.")
     }
-
-    cancelSupervisorScope(perClassSupervisorScope, "IDE was stopped/not running so cancelling it's scope as well")
   }
 
   fun publishArtifacts(): Unit = synchronized(this) {

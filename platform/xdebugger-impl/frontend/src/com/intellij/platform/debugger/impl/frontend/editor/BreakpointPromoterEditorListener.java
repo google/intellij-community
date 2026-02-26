@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.EditorGutter;
 import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.event.EditorMouseEvent;
 import com.intellij.openapi.editor.event.EditorMouseEventArea;
+import com.intellij.openapi.editor.event.EditorMouseListener;
 import com.intellij.openapi.editor.event.EditorMouseMotionListener;
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
@@ -23,12 +24,12 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.Icon;
+import java.awt.Cursor;
 import java.util.Objects;
 
 @ApiStatus.Internal
-public final class BreakpointPromoterEditorListener implements EditorMouseMotionListener {
+public final class BreakpointPromoterEditorListener implements EditorMouseMotionListener, EditorMouseListener {
   private XSourcePositionImpl myLastPosition = null;
   private Icon myLastIcon = null;
 
@@ -48,32 +49,50 @@ public final class BreakpointPromoterEditorListener implements EditorMouseMotion
 
   @Override
   public void mouseMoved(@NotNull EditorMouseEvent e) {
-    if (!ExperimentalUI.isNewUI() || !ShowBreakpointsOverLineNumbersAction.isSelected()) return;
-    Editor editor = e.getEditor();
-    if (editor.getProject() != myProject || editor.getEditorKind() != EditorKind.MAIN_EDITOR) return;
-    EditorGutter editorGutter = editor.getGutter();
-    if (editorGutter instanceof EditorGutterComponentEx gutter) {
-      if (e.getArea() == EditorMouseEventArea.LINE_NUMBERS_AREA && EditorUtil.isBreakPointsOnLineNumbers()) {
-        int line = EditorUtil.yToLogicalLineNoCustomRenderers(editor, e.getMouseEvent().getY());
-        Document document = editor.getDocument();
-        if (DocumentUtil.isValidLine(line, document)) {
-          XSourcePositionImpl position = XSourcePositionImpl.create(FileDocumentManager.getInstance().getFile(document), line);
-          if (position != null) {
-            if (myLastPosition == null || !myLastPosition.getFile().equals(position.getFile()) || myLastPosition.getLine() != line) {
-              // drop an icon first and schedule the available types calculation
-              clear(gutter);
-              myLastPosition = position;
-              lineChangeHandler.lineChanged(editor, position);
-            }
-            return;
+    var context = getMouseEventContext(e);
+    if (context == null) return;
+    var editor = context.editor();
+    var gutter = context.gutter();
+    if (e.getArea() == EditorMouseEventArea.LINE_NUMBERS_AREA && EditorUtil.isBreakPointsOnLineNumbers()) {
+      int line = EditorUtil.yToLogicalLineNoCustomRenderers(editor, e.getMouseEvent().getY());
+      Document document = editor.getDocument();
+      if (DocumentUtil.isValidLine(line, document)) {
+        XSourcePositionImpl position = XSourcePositionImpl.create(FileDocumentManager.getInstance().getFile(document), line);
+        if (position != null) {
+          if (myLastPosition == null || !myLastPosition.getFile().equals(position.getFile()) || myLastPosition.getLine() != line) {
+            // drop an icon first and schedule the available types calculation
+            clear(gutter);
+            myLastPosition = position;
+            lineChangeHandler.lineChanged(editor, position);
           }
+          return;
         }
       }
-      if (myLastIcon != null) {
-        clear(gutter);
-        myLastPosition = null;
-        lineChangeHandler.exitedGutter();
-      }
+    }
+    clearOnMouseExit(gutter); // the "mouse has entered another gutter area" case
+  }
+
+  @Override
+  public void mouseExited(@NotNull EditorMouseEvent e) {
+    var context = getMouseEventContext(e);
+    if (context == null) return;
+    clearOnMouseExit(context.gutter()); // the "mouse has exited the gutter" case
+  }
+
+  private @Nullable MouseEventContext getMouseEventContext(@NotNull EditorMouseEvent e) {
+    if (!ExperimentalUI.isNewUI() || !ShowBreakpointsOverLineNumbersAction.isSelected()) return null;
+    Editor editor = e.getEditor();
+    if (editor.getProject() != myProject || editor.getEditorKind() != EditorKind.MAIN_EDITOR) return null;
+    EditorGutter editorGutter = editor.getGutter();
+    if (!(editorGutter instanceof EditorGutterComponentEx gutter)) return null;
+    return new MouseEventContext(editor, gutter);
+  }
+
+  private void clearOnMouseExit(@NotNull EditorGutterComponentEx gutter) {
+    if (myLastIcon != null) {
+      clear(gutter);
+      myLastPosition = null;
+      lineChangeHandler.exitedGutter();
     }
   }
 
@@ -103,4 +122,6 @@ public final class BreakpointPromoterEditorListener implements EditorMouseMotion
       gutter.repaint();
     }
   }
+
+  private record MouseEventContext(@NotNull Editor editor, @NotNull EditorGutterComponentEx gutter) { }
 }

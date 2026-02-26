@@ -20,7 +20,12 @@ import com.intellij.psi.impl.source.xml.XmlDescriptorUtil.wrapInDelegating
 import com.intellij.psi.xml.XmlAttribute
 import com.intellij.psi.xml.XmlTag
 import com.intellij.util.asSafely
-import com.intellij.xml.*
+import com.intellij.xml.XmlAttributeDescriptor
+import com.intellij.xml.XmlCustomElementDescriptor
+import com.intellij.xml.XmlElementDescriptor
+import com.intellij.xml.XmlElementDescriptorAwareAboutChildren
+import com.intellij.xml.XmlElementsGroup
+import com.intellij.xml.XmlNSDescriptor
 import com.intellij.xml.impl.XmlElementDescriptorEx
 import com.intellij.xml.impl.schema.AnyXmlElementDescriptor
 import org.jetbrains.annotations.NonNls
@@ -174,7 +179,7 @@ open class HtmlElementSymbolDescriptor private constructor(
   companion object {
 
     fun HtmlElementSymbolInfo.toElementDescriptor(tag: XmlTag): HtmlElementSymbolDescriptor =
-      HtmlFrameworkSymbolsSupport.get(this.symbol.origin.framework)
+      HtmlFrameworkSymbolsSupport.get(this.symbol)
         .createHtmlElementDescriptor(this, tag)
 
   }

@@ -15,6 +15,7 @@ import com.intellij.collaboration.util.RefComparisonChange
 import com.intellij.collaboration.util.SingleCoroutineLauncher
 import com.intellij.collaboration.util.getOrNull
 import com.intellij.diff.util.LineRange
+import com.intellij.diff.util.Side
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diff.impl.patch.PatchHunk
@@ -27,7 +28,14 @@ import com.intellij.platform.util.coroutines.childScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.stateIn
 import org.jetbrains.plugins.github.api.data.GHActor
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestReviewComment
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestReviewCommentState
@@ -41,7 +49,7 @@ import org.jetbrains.plugins.github.pullrequest.ui.comment.GHPRReviewThreadComme
 import org.jetbrains.plugins.github.pullrequest.ui.comment.GHPRReviewThreadViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.comment.UpdateableGHPRReviewThreadCommentViewModel
 import org.jetbrains.plugins.github.ui.icons.GHAvatarIconsProvider
-import java.util.*
+import java.util.Date
 
 interface GHPRTimelineThreadViewModel
   : GHPRReviewThreadViewModel,
@@ -204,10 +212,15 @@ internal class UpdateableGHPRTimelineThreadViewModel internal constructor(
     }
 
     val anchorLocation = thread.originalLine?.let { thread.side to it - 1 }
-    val startAnchorLocation = if (thread.startSide != null && thread.originalStartLine != null) {
-      thread.startSide to thread.originalStartLine - 1
+    val startAnchorLocation = thread.startSide?.let { side ->
+      thread.originalStartLine?.let { line ->
+        val hunkStartLine = when (side) {
+          Side.LEFT -> hunk.startLineBefore
+          Side.RIGHT -> hunk.startLineAfter
+        }
+        side to (line - 1).coerceAtLeast(hunkStartLine)
+      }
     }
-    else null
 
     val anchorLength = if (startAnchorLocation?.first == anchorLocation?.first) {
       ((anchorLocation?.second ?: 0) - (startAnchorLocation?.second ?: 0)).coerceAtLeast(0)

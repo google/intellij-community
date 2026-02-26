@@ -6,12 +6,18 @@ import com.intellij.openapi.util.Key
 import com.intellij.terminal.frontend.view.impl.toRelative
 import com.intellij.util.asDisposable
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.terminal.view.TerminalContentChangeEvent
@@ -74,6 +80,13 @@ class TerminalLookupPrefixUpdater private constructor(
     }
 
     val commonPrefixLength = newPrefix.commonPrefixWith(curPrefix).length
+    if (curPrefix.isNotEmpty() && commonPrefixLength == 0) {
+      // The whole prefix was replaced in a single action - probably it is better to close the lookup
+      // to avoid reopening it in the incorrect context.
+      lookup.hideLookup(false)
+      return
+    }
+
     val truncateTimes = curPrefix.length - commonPrefixLength
     truncatePrefix(truncateTimes)
     val textToAppend = newPrefix.substring(commonPrefixLength, newPrefix.length)

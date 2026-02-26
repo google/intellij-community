@@ -14,4 +14,17 @@ jvm_library(
     "@lib//:jetbrains-annotations",
   ]
 )
+
+jvm_library(
+  name = "diff_test_lib",
+  module_name = "intellij.platform.util.diff",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  kotlinc_opts = "@community//:k8",
+  runtime_deps = [
+    ":diff",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+  ]
+)
 ### auto-generated section `build intellij.platform.util.diff` end

@@ -20,6 +20,8 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
+    <projectService serviceImplementation="com.intellij.xdebugger.impl.frame.XDebuggerExecutionStackDescriptionService" open="true" />
+
     <statistics.validation.customValidationRule implementation="com.intellij.platform.debugger.impl.shared.FrameTypeValidator"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.platform.debugger.impl.shared.XDebuggerActionsCollector"/>
     <xdebugger.customXDescriptorSerializerProvider implementation="com.intellij.xdebugger.impl.mixedmode.XMixedModeExecutionStackDescriptorSerializerProvider"/>

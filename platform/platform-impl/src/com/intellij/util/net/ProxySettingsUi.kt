@@ -38,7 +38,13 @@ import java.net.URISyntaxException
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
-import javax.swing.*
+import javax.swing.JButton
+import javax.swing.JCheckBox
+import javax.swing.JComponent
+import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.JPasswordField
+import javax.swing.JTextField
 import javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
 import javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS
 
@@ -118,7 +124,7 @@ internal class ProxySettingsUi(
         indent {
           row {
             pacUrlCheckBox = checkBox(UIBundle.message("proxy.pac.url.label")).component
-            pacUrlTextField = textField().align(AlignX.FILL).comment(UIBundle.message("proxy.pac.url.example")).component
+            pacUrlTextField = textField().align(AlignX.FILL).comment(UIBundle.message("proxy.pac.url.example")).enabledIf(pacUrlCheckBox.selected).component
           }
           row {
             clearPasswordsButton = button(UIBundle.message("proxy.pac.pw.clear.button")) {

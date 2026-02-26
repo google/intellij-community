@@ -5,18 +5,39 @@ import com.intellij.codeInsight.completion.CompletionUtil;
 import com.intellij.codeInsight.completion.JavaGenerateMemberCompletionContributor;
 import com.intellij.codeInsight.completion.JavaKeywordCompletion;
 import com.intellij.codeInsight.completion.JavaMemberNameCompletionContributor;
-import com.intellij.codeInsight.generation.*;
+import com.intellij.codeInsight.generation.GenerateMembersUtil;
+import com.intellij.codeInsight.generation.GenerationInfo;
+import com.intellij.codeInsight.generation.GetterSetterPrototypeProvider;
+import com.intellij.codeInsight.generation.OverrideImplementExploreUtil;
+import com.intellij.codeInsight.generation.OverrideImplementUtil;
+import com.intellij.codeInsight.generation.PsiGenerationInfo;
+import com.intellij.codeInsight.generation.TemplateGenerationInfo;
 import com.intellij.icons.AllIcons;
 import com.intellij.modcommand.ModPsiUpdater;
-import com.intellij.modcompletion.ModCompletionItem;
+import com.intellij.modcompletion.CommonCompletionItem;
 import com.intellij.modcompletion.ModCompletionItemPresentation;
-import com.intellij.modcompletion.ModCompletionItemProvider;
+import com.intellij.modcompletion.ModCompletionResult;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.Iconable;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.MarkupText;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.psi.*;
+import com.intellij.psi.PsiAnnotation;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiIdentifier;
+import com.intellij.psi.PsiJavaCodeReferenceElement;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiModifier;
+import com.intellij.psi.PsiModifierList;
+import com.intellij.psi.PsiNameHelper;
+import com.intellij.psi.PsiParameter;
+import com.intellij.psi.PsiSubstitutor;
+import com.intellij.psi.PsiType;
+import com.intellij.psi.PsiTypeElement;
+import com.intellij.psi.SyntheticElement;
 import com.intellij.psi.infos.CandidateInfo;
 import com.intellij.psi.util.MethodSignature;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -29,17 +50,21 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 import org.jetbrains.java.generate.exception.GenerateCodeException;
 
-import javax.swing.*;
-import java.util.*;
-import java.util.function.Consumer;
+import javax.swing.Icon;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.intellij.patterns.PlatformPatterns.psiElement;
 
 @NotNullByDefault
-final class GenerateMemberItemProvider implements ModCompletionItemProvider {
+final class GenerateMemberItemProvider extends JavaModCompletionItemProvider {
   @Override
-  public void provideItems(CompletionContext context, Consumer<ModCompletionItem> sink) {
+  public void provideItems(CompletionContext context, ModCompletionResult sink) {
     PsiElement position = context.getPosition();
     if (JavaMemberNameCompletionContributor.INSIDE_TYPE_PARAMS_PATTERN.accepts(position)) return;
     if (psiElement(PsiIdentifier.class).withParents(PsiJavaCodeReferenceElement.class, PsiTypeElement.class, PsiClass.class).
@@ -60,7 +85,7 @@ final class GenerateMemberItemProvider implements ModCompletionItemProvider {
     }
   }
 
-  private static void suggestGeneratedMethods(Consumer<ModCompletionItem> sink,
+  private static void suggestGeneratedMethods(ModCompletionResult sink,
                                               PsiElement position,
                                               @Nullable PsiModifierList modifierList) {
     PsiClass parent = CompletionUtil.getOriginalElement(Objects.requireNonNull(PsiTreeUtil.getParentOfType(position, PsiClass.class)));
@@ -73,7 +98,7 @@ final class GenerateMemberItemProvider implements ModCompletionItemProvider {
     }
   }
 
-  private static void addGetterSetterElements(Consumer<ModCompletionItem> sink,
+  private static void addGetterSetterElements(ModCompletionResult sink,
                                               PsiClass parent,
                                               Set<? super MethodSignature> addedSignatures) {
     int count = 0;
@@ -123,7 +148,7 @@ final class GenerateMemberItemProvider implements ModCompletionItemProvider {
 
   private static void addSuperSignatureElements(PsiClass parent,
                                                 boolean implemented,
-                                                Consumer<ModCompletionItem> sink,
+                                                ModCompletionResult sink,
                                                 Set<? super MethodSignature> addedSignatures,
                                                 boolean generateDefaultMethods) {
     for (CandidateInfo candidate : OverrideImplementExploreUtil.getMethodsToOverrideImplement(parent, implemented)) {

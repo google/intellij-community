@@ -1,14 +1,24 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.frontend.evaluate.quick
 
+import com.intellij.ide.ui.colors.attributes
 import com.intellij.ide.ui.icons.icon
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
 import com.intellij.platform.debugger.impl.frontend.frame.VariablesPreloadManager
-import com.intellij.platform.debugger.impl.rpc.*
+import com.intellij.platform.debugger.impl.rpc.XContainerId
+import com.intellij.platform.debugger.impl.rpc.XDebuggerTreeNodeHyperlinkDto
+import com.intellij.platform.debugger.impl.rpc.XStackFrameId
+import com.intellij.platform.debugger.impl.rpc.XValueApi
+import com.intellij.platform.debugger.impl.rpc.XValueComputeChildrenEvent
+import com.intellij.platform.debugger.impl.rpc.XValueGroupDto
 import com.intellij.platform.debugger.impl.shared.XValuesPresentationBuilder
 import com.intellij.ui.SimpleTextAttributes
-import com.intellij.xdebugger.frame.*
+import com.intellij.xdebugger.frame.XCompositeNode
+import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
+import com.intellij.xdebugger.frame.XNamedValue
+import com.intellij.xdebugger.frame.XValueChildrenList
+import com.intellij.xdebugger.frame.XValueContainer
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTreeState
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueContainerNode
 import kotlinx.coroutines.CoroutineScope
@@ -61,8 +71,7 @@ internal class FrontendXValueContainer(
     // Children of this container should be tied to the container scope,
     // not the node scope. The XValue may be reused in other nodes, e.g. inline debugger.
     val containerScope = cs
-    val nodeScope = node.childCoroutineScope(containerScope, "FrontendXValueContainer#computeChildren", childrenManager)
-    nodeScope.launch(Dispatchers.EDT) {
+    containerScope.launch(Dispatchers.EDT) {
       val flow = childrenManager.getChildrenEventsFlow(id)
       val builder = XValuesPresentationBuilder()
       flow.collect { event ->
@@ -93,23 +102,32 @@ internal class FrontendXValueContainer(
               childrenList.addTopValue(xValue as XNamedValue)
             }
 
-            node.addChildren(childrenList, event.isLast)
+            // Important: event when a node is obsolete,
+            // we should continue to call createFlows,
+            // so that the presentation of the xValue continues to update.
+            if (!node.isObsolete) {
+              node.addChildren(childrenList, event.isLast)
+            }
           }
           is XValueComputeChildrenEvent.SetAlreadySorted -> {
+            if (node.isObsolete) return@collect
             node.setAlreadySorted(event.value)
           }
           is XValueComputeChildrenEvent.SetErrorMessage -> {
-            node.setErrorMessage(event.message, event.link?.hyperlink(nodeScope))
+            if (node.isObsolete) return@collect
+            node.setErrorMessage(event.message, event.link?.hyperlink(containerScope))
           }
           is XValueComputeChildrenEvent.SetMessage -> {
+            if (node.isObsolete) return@collect
             node.setMessage(
               event.message,
               event.icon?.icon(),
-              event.attributes.toSimpleTextAttributes(),
-              event.link?.hyperlink(nodeScope)
+              event.attributes.attributes(),
+              event.link?.hyperlink(containerScope)
             )
           }
           is XValueComputeChildrenEvent.TooManyChildren -> {
+            if (node.isObsolete) return@collect
             val addNextChildren = event.addNextChildren
             if (addNextChildren != null) {
               node.tooManyChildren(event.remaining) { addNextChildren.trySend(Unit) }

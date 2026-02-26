@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplacePutWithAssignment", "ReplaceGetOrSet")
 
 package com.intellij.ide.actions.searcheverywhere
@@ -10,17 +10,29 @@ import com.intellij.ide.plugins.DynamicPluginListener
 import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.util.EditSourceUtil
 import com.intellij.ide.util.ElementsChooser
-import com.intellij.ide.util.gotoByName.*
+import com.intellij.ide.util.gotoByName.ChooseByNameInScopeItemProvider
+import com.intellij.ide.util.gotoByName.ChooseByNameModel
+import com.intellij.ide.util.gotoByName.ChooseByNameModelEx
+import com.intellij.ide.util.gotoByName.ChooseByNamePopup
+import com.intellij.ide.util.gotoByName.ChooseByNameViewModel
+import com.intellij.ide.util.gotoByName.ChooseByNameWeightedItemProvider
+import com.intellij.ide.util.gotoByName.FilteringGotoByModel
 import com.intellij.ide.util.scopeChooser.ScopeDescriptor
 import com.intellij.ide.util.scopeChooser.ScopeOption
 import com.intellij.ide.util.scopeChooser.ScopeService
 import com.intellij.navigation.AnonymousElementProvider
 import com.intellij.navigation.NavigationItem
 import com.intellij.navigation.PsiElementNavigationItem
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.DataProvider
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils
@@ -40,7 +52,7 @@ import com.intellij.util.containers.map2Array
 import com.intellij.util.indexing.FindSymbolParameters
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import org.jetbrains.annotations.ApiStatus
-import java.util.*
+import java.util.EnumSet
 import java.util.regex.Pattern
 import javax.swing.ListCellRenderer
 
@@ -59,8 +71,7 @@ internal val patternToDetectAnonymousClasses: Pattern = Pattern.compile("([.\\w]
 abstract class AbstractGotoSEContributor @ApiStatus.Internal protected constructor(
   event: AnActionEvent,
   @ApiStatus.Internal val contributorModules: List<SearchEverywhereContributorModule>?
-)
-  : WeightedSearchEverywhereContributor<Any>, ScopeSupporting, SearchEverywhereExtendedInfoProvider {
+) : WeightedSearchEverywhereContributor<Any>, ScopeSupporting, SearchEverywhereExtendedInfoProvider {
   @JvmField
   protected val myProject: Project = event.getRequiredData(CommonDataKeys.PROJECT)
   @JvmField
@@ -269,25 +280,32 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
   }
 
   private val fetchers =
-    (contributorModules?.map2Array<SearchEverywhereContributorModule, (String, ProgressIndicator, Processor<in FoundItemDescriptor<Any>>) -> Unit> {
-      { localPattern, localProgressIndicator, localConsumer -> it.perProductFetchWeightedElements(localPattern, localProgressIndicator, localConsumer) }
-    } ?: emptyArray()) + { localPattern, localProgressIndicator, localConsumer -> performByGotoContributorSearch(localPattern, localProgressIndicator, localConsumer) }
+    (contributorModules?.map2Array<SearchEverywhereContributorModule, (String, ProgressIndicator, Disposable?, Processor<in FoundItemDescriptor<Any>>) -> Unit> {
+      { localPattern, localProgressIndicator, _, localConsumer -> it.perProductFetchWeightedElements(localPattern, localProgressIndicator, localConsumer) }
+    } ?: emptyArray()) + { localPattern, localProgressIndicator, op, localConsumer -> performByGotoContributorSearch(localPattern, localProgressIndicator, op, localConsumer) }
 
   override fun fetchWeightedElements(
     pattern: String,
     progressIndicator: ProgressIndicator,
     consumer: Processor<in FoundItemDescriptor<Any>>,
   ) {
-    fetchWeightedElementsMixing(
-      pattern, progressIndicator, consumer,
-      // Ordering is important here
-      *fetchers
-    )
+    fetchers.forEach { fetcher -> fetcher(pattern, progressIndicator, null, consumer) }
+  }
+
+  @ApiStatus.Internal
+  override fun fetchWeightedElementsWithOperationDisposable(
+    pattern: String,
+    progressIndicator: ProgressIndicator,
+    operationDisposable: Disposable,
+    consumer: Processor<in FoundItemDescriptor<Any>>
+  ) {
+    fetchers.forEach { fetcher -> fetcher(pattern, progressIndicator, operationDisposable, consumer) }
   }
 
   private fun performByGotoContributorSearch(
     pattern: String,
     progressIndicator: ProgressIndicator,
+    operationDisposable: Disposable?,
     consumer: Processor<in FoundItemDescriptor<Any>>
   ) {
     if (!isEmptyPatternSupported && pattern.isEmpty()) {
@@ -299,7 +317,7 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
         return@Runnable
       }
 
-      val model = createModel(myProject)
+      val model = createModelWithOperationDisposable(myProject, operationDisposable)
       if (progressIndicator.isCanceled) {
         return@Runnable
       }
@@ -396,6 +414,15 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
 
   protected abstract fun createModel(project: Project): FilteringGotoByModel<*>
 
+  @ApiStatus.Internal
+  protected open fun createModelWithOperationDisposable(project: Project, operationDisposable: Disposable?): FilteringGotoByModel<*> {
+    val model = createModel(project)
+    if (operationDisposable != null && model is Disposable) {
+      Disposer.register(operationDisposable, model)
+    }
+    return model
+  }
+
   override fun filterControlSymbols(pattern: String): String {
     if (StringUtil.containsAnyChar(pattern, ":,;@[( #") ||
         pattern.contains(" line ") ||
@@ -428,7 +455,9 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
       if (LOG.isTraceEnabled) {
         LOG.trace("Selected item for $searchText is not PsiElement, it is: ${selected}; performing non-suspending navigation")
       }
-      EditSourceUtil.navigate((selected as NavigationItem), true, false)
+      WriteIntentReadAction.run {
+        EditSourceUtil.navigate((selected as NavigationItem), true, false)
+      }
       return true
     }
 

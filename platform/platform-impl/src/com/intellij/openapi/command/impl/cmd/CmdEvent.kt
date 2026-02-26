@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.command.impl.cmd
 
 import com.intellij.openapi.command.CommandEvent
@@ -16,7 +16,9 @@ interface CmdEvent {
   fun confirmationPolicy(): UndoConfirmationPolicy
   fun recordOriginalDocument(): Boolean
   fun isTransparent(): Boolean
+  fun isForeign(): Boolean
   fun meta(): CmdMeta
+  fun withNameAndGroupId(name: @Command String?, groupId: Any?): CmdEvent
 
   companion object {
     @JvmStatic
@@ -25,13 +27,36 @@ interface CmdEvent {
     }
 
     @JvmStatic
-    fun createTransparent(id: CommandId, meta: CmdMeta): CmdEvent {
-      return CmdEventTransparent(null, id, meta)
+    fun createTransparent(id: CommandId, isForeign: Boolean, meta: CmdMeta): CmdEvent {
+      return CmdEventTransparent(null, isForeign, id, meta)
     }
 
     @JvmStatic
     fun createNonUndoable(commandId: CommandId, meta: CmdMeta): CmdEvent {
       return CmdEventNonUndoable(commandId, meta)
+    }
+
+    @JvmStatic
+    fun create(
+      commandId: CommandId,
+      commandProject: Project?,
+      commandName: @Command String?,
+      groupId: Any?,
+      confirmationPolicy: UndoConfirmationPolicy,
+      recordOriginator: Boolean,
+      isForeign: Boolean,
+      commandMeta: CmdMeta,
+    ): CmdEvent {
+      return CmdEventImmutable(
+        commandId,
+        commandProject,
+        commandName,
+        groupId,
+        confirmationPolicy,
+        recordOriginator,
+        isForeign,
+        commandMeta,
+      )
     }
   }
 }

@@ -267,6 +267,39 @@ _KOPTS = {
             True: ["-Xno-param-assertions"],
         },
     ),
+    "progressive": struct(
+        flag = "-progressive",
+        args = dict(
+            default = False,
+            doc = "Enable the progressive mode for the compiler",
+        ),
+        type = attr.bool,
+        value_to_flag = {
+            True: ["-progressive"],
+        },
+    ),
+    "x_render_internal_diagnostic_names": struct(
+        flag = "-Xrender-internal-diagnostic-names",
+        args = dict(
+            default = False,
+            doc = "Render the internal names of warnings and errors.",
+        ),
+        type = attr.bool,
+        value_to_flag = {
+            True: ["-Xrender-internal-diagnostic-names"],
+        },
+    ),
+    "x_report_all_warnings": struct(
+        flag = "-Xreport-all-warnings",
+        args = dict(
+            default = False,
+            doc = "Report all warnings even if errors are found.",
+        ),
+        type = attr.bool,
+        value_to_flag = {
+            True: ["-Xreport-all-warnings"],
+        },
+    ),
     "x_sam_conversions": struct(
         flag = "-Xsam-conversions",
         args = dict(

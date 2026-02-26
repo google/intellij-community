@@ -21,6 +21,8 @@ import com.jetbrains.python.PathShortener
 import com.jetbrains.python.Result
 import com.jetbrains.python.sdk.configuration.CreateSdkInfo
 import com.jetbrains.python.sdk.configuration.PyProjectSdkConfigurationExtension
+import com.jetbrains.python.sdk.configuration.createSdk
+import com.jetbrains.python.sdk.configuration.getSdkCreator
 import com.jetbrains.python.sdk.getOrCreateAdditionalData
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import com.jetbrains.python.sdk.pythonSdk
@@ -68,7 +70,7 @@ internal class ModulesSdkConfigurator private constructor(
         is ModuleCreateInfo.CreateSdkInfoWrapper -> {
           val version = when (val r = createInfo.createSdkInfo) {
             is CreateSdkInfo.ExistingEnv -> r.pythonInfo.languageLevel.toPythonVersion()
-            is CreateSdkInfo.WillCreateEnv -> null
+            is CreateSdkInfo.WillCreateEnv, is CreateSdkInfo.WillInstallTool -> null
           }
           ModuleDTO(moduleName,
                     path = createInfo.moduleDir?.let { pathShorter.toString(it) },
@@ -141,7 +143,7 @@ internal class ModulesSdkConfigurator private constructor(
           val createInfo = (modules[module.name] ?: error("No create info for module $module, caller broke the contract"))
           when (createInfo) {
             is ModuleCreateInfo.CreateSdkInfoWrapper -> {
-              when (val r = createInfo.createSdkInfo.createSdkWithoutConfirmation()) {
+              when (val r = createInfo.createSdkInfo.createSdk(module)) {
                 is Result.Failure -> { //TODO: Show SDK creation error?
                   logger.warn("Failed to create SDK for ${module.name}: ${r.error}")
                 }
@@ -222,9 +224,10 @@ private suspend fun configureSdkForModuleAutomatically(module: Module, createEnv
             info.createAndSetToModule(module)
           }
           else {
-            logger.trace { "${module.name} can't be configured automatically: no venv for ${info.intentionName}" }
+            logger.trace { "${module.name} can't be configured automatically: no venv for ${moduleInfo.toolId}" }
           }
         }
+        is CreateSdkInfo.WillInstallTool -> logger.trace { "${module.name} can't be configured automatically: no tool installed - ${moduleInfo.toolId}" }
       }
     }
     is ModuleCreateInfo.SameAs -> {
@@ -236,12 +239,12 @@ private suspend fun configureSdkForModuleAutomatically(module: Module, createEnv
 }
 
 private suspend fun CreateSdkInfo.createAndSetToModule(module: Module) {
-  when (val r = sdkCreator(false)) {
+  when (val r = getSdkCreator(module).createSdk()) {
     is Result.Failure -> {
       logger.trace { "Failed to create sdk for ${module.name} : ${r.error}" }
     }
     is Result.Success -> {
-      val sdk = r.result!! // It can't be null: this is an old buggy API that will be fixed soon
+      val sdk = r.result
       module.pythonSdk = sdk
       logger.trace { "SDK creation result for  ${module.name} : $sdk" }
     }

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor;
 
 import com.intellij.codeInsight.hint.HintManager;
@@ -74,6 +74,12 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
 
   /**
    * Inserts given string at each caret's position. Effective caret shift will be equal to {@code caretShift} for each caret.
+   *
+   * @param editor editor to type in
+   * @param str string to type
+   * @param toProcessOverwriteMode whether to process overwrite mode
+   * @param caretShift effective caret shift for each caret, i.e., the number of characters to move the caret after insertion.
+   * @throws ReadOnlyFragmentModificationException if the operation is attempted on a read-only fragment
    */
   public static void typeInStringAtCaretHonorMultipleCarets(@NotNull Editor editor, @NotNull String str, boolean toProcessOverwriteMode, int caretShift)
     throws ReadOnlyFragmentModificationException {
@@ -92,8 +98,9 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
 
   public static @NotNull List<CaretState> calcBlockSelectionState(@NotNull Editor editor,
                                                                   @NotNull LogicalPosition blockStart, @NotNull LogicalPosition blockEnd) {
-    int startLine = Math.max(Math.min(blockStart.line, editor.getDocument().getLineCount() - 1), 0);
-    int endLine = Math.max(Math.min(blockEnd.line, editor.getDocument().getLineCount() - 1), 0);
+    Document document = editor.getUiDocument();
+    int startLine = Math.max(Math.min(blockStart.line, document.getLineCount() - 1), 0);
+    int endLine = Math.max(Math.min(blockEnd.line, document.getLineCount() - 1), 0);
     int step = endLine < startLine ? -1 : 1;
     int count = 1 + Math.abs(endLine - startLine);
     List<CaretState> caretStates = new LinkedList<>();
@@ -101,7 +108,7 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
     for (int line = startLine, i = 0; i < count; i++, line += step) {
       int startColumn = blockStart.column;
       int endColumn = blockEnd.column;
-      int lineEndOffset = editor.getDocument().getLineEndOffset(line);
+      int lineEndOffset = document.getLineEndOffset(line);
       LogicalPosition lineEndPosition = editor.offsetToLogicalPosition(lineEndOffset);
       int lineWidth = lineEndPosition.column;
       if (startColumn > lineWidth && endColumn > lineWidth && !editor.isColumnMode()) {

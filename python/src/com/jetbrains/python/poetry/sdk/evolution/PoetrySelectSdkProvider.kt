@@ -20,7 +20,6 @@ import com.jetbrains.python.PyBundle
 import com.jetbrains.python.PythonHomePath
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.PyResult
-import com.jetbrains.python.getOrNull
 import com.jetbrains.python.icons.PythonIcons
 import com.jetbrains.python.sdk.poetry.getPoetryExecutable
 import com.jetbrains.python.sdk.poetry.runPoetry
@@ -46,8 +45,8 @@ internal class PoetrySelectSdkProvider() : EvoSelectSdkProvider {
 
 
     val (projectName, requiresPython) = withContext(Dispatchers.IO) {
-      val toml = PyProjectToml.parse(pyProjectTomlFile.readText()).getOrNull()
-      (toml?.project?.name) to (toml?.project?.requiresPython)
+      val toml = PyProjectToml.parse(pyProjectTomlFile.readText())
+      (toml.project?.name) to (toml.project?.requiresPython)
     }
     val poetryVirtualenvsPath = runPoetry(pyProjectTomlFile.parent.toNioPath(), "config", "virtualenvs.path")
       .getOr { return@EvoTreeLazyNodeElement it }.let { Path(it.trim()) }

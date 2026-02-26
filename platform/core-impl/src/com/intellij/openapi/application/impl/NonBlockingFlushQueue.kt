@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.impl
 
 import com.intellij.concurrency.ContextAwareRunnable
@@ -220,15 +220,17 @@ class NonBlockingFlushQueue(private val threadingSupport: ThreadingSupport) {
           require(currentWriteIntentLockMode == WriteIntentLockMode.UI_ONLY) {
             "Write action finished, but FlushQueue is unexpectedly allowed to run all runnables"
           }
+          synchronized(lockObject) {
+            uiQueue.pollFirst() // we remove WriteActionFinished from the queue and allow processing of further UI runnables.
+          }
           if (threadingSupport.isWriteActionPending() || threadingSupport.isWriteActionInProgress()) {
+            // if we failed to move the queue to the ALL mode, we need to unblock the processing of pending UI runnables.
+            uiQueue.enqueue(WriteActionFinished(timeCounter.getAndIncrement()))
             threadingSupport.runWhenWriteActionIsCompleted {
               requestFlush()
             }
             return null
           } else {
-            synchronized(lockObject) {
-              uiQueue.pollFirst() // now we remove WriteActionFinished from the queue
-            }
             currentWriteIntentLockMode = WriteIntentLockMode.ALL
           }
         }
@@ -410,6 +412,17 @@ class NonBlockingFlushQueue(private val threadingSupport: ThreadingSupport) {
     ThreadingAssertions.assertEventDispatchThread()
     reincludeSkippedItems(skippedUiQueue, uiQueue)
     reincludeSkippedItems(skippedWriteIntentQueue, writeIntentQueue)
+  }
+
+  fun purgeExpiredItems() {
+    ThreadingAssertions.assertEventDispatchThread()
+    synchronized(lockObject) {
+      skippedUiQueue.get().removeAll { it.isExpired.value(null) }
+      skippedWriteIntentQueue.get().removeAll { it.isExpired.value(null) }
+      writeIntentQueue.removeAll { it.isExpired.value(null) }
+      uiQueue.removeAll { it is RunnableInfo && it.isExpired.value(null) }
+      requestFlush()
+    }
   }
 
   /**

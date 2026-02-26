@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.idea.devkit.DevKitBundle
-import java.util.*
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -219,7 +219,11 @@ class LockReqAnalyzerParallelBFS {
   }
 
   fun reportCurrentlyProcessedMethod(holder: MutableList<MethodSignature>, rawReporter: RawProgressReporter) {
-    val presentableName = holder.getOrNull(0) ?: return
+    val presentableName = try {
+      holder[0]
+    } catch (_: IndexOutOfBoundsException) {
+      return
+    }
     val qualifiedName = presentableName.containingClassName + "." + presentableName.methodName
     rawReporter.details(DevKitBundle.message("progress.details.analyzing.method.during.lock.requirement.search", qualifiedName))
   }

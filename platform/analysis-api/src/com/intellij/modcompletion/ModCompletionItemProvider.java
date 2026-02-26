@@ -2,10 +2,12 @@
 package com.intellij.modcompletion;
 
 import com.intellij.codeInsight.completion.BaseCompletionParameters;
+import com.intellij.codeInsight.completion.CompletionSorter;
 import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
+import com.intellij.lang.LanguageExtensionWithAny;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiElement;
@@ -15,14 +17,13 @@ import org.jetbrains.annotations.NotNullByDefault;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.Consumer;
 
 /**
  * A language-specific provider for {@link ModCompletionItem} completion options 
  */
 @NotNullByDefault
 public interface ModCompletionItemProvider {
-  LanguageExtension<ModCompletionItemProvider> EP_NAME = new LanguageExtension<>("com.intellij.modcompletion.completionItemProvider");
+  LanguageExtension<ModCompletionItemProvider> EP_NAME = new LanguageExtensionWithAny<>("com.intellij.modcompletion.completionItemProvider");
 
   /**
    * Provide completion items for given context
@@ -30,7 +31,15 @@ public interface ModCompletionItemProvider {
    * @param context context to use
    * @param sink a consumer to pass completion items to
    */
-  void provideItems(CompletionContext context, Consumer<ModCompletionItem> sink);
+  void provideItems(CompletionContext context, ModCompletionResult sink);
+
+  /**
+   * @param context context to use
+   * @return the completion sorter that should be used to sort the items provided by this provider
+   */
+  default CompletionSorter getSorter(CompletionContext context) {
+    return CompletionSorter.defaultSorter(context, context.matcher());
+  }
 
   /**
    * @param language language to get providers for
@@ -116,6 +125,11 @@ public interface ModCompletionItemProvider {
 
     public Project getProject() {
       return originalFile.getProject();
+    }
+
+    @Override
+    public int getInvocationCount() {
+      return invocationCount();
     }
   }
 }

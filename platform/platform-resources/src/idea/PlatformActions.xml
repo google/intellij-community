@@ -952,7 +952,6 @@
         <group id="LearnGroup"/>
         <separator/>
         <action id="WhatsNewAction" class="com.intellij.ide.actions.WhatsNewAction"/>
-        <action id="MeetNewUIAction" class="com.intellij.ide.ui.experimental.meetNewUi.MeetNewUIAction"/>
         <action id="OnlineDocAction" class="com.intellij.ide.actions.OnlineDocAction"/>
         <action id="Help.JetBrainsTV" class="com.intellij.ide.actions.JetBrainsTvAction"/>
         <action id="Help.KeymapReference" class="com.intellij.ide.actions.RefCardAction"/>
@@ -1305,7 +1304,7 @@
       <action id="FileChooser.NewFolder" class="com.intellij.openapi.fileChooser.actions.NewFolderAction"
               icon="AllIcons.Actions.NewFolder"/>
       <action id="FileChooser.Delete" class="com.intellij.openapi.fileChooser.actions.FileDeleteAction"
-              icon="AllIcons.Actions.Cancel" use-shortcut-of="$Delete"/>
+              icon="AllIcons.General.Delete" use-shortcut-of="$Delete"/>
       <separator/>
       <action id="FileChooser.Refresh" class="com.intellij.openapi.fileChooser.actions.RefreshFileChooserAction"
               icon="AllIcons.Actions.Refresh" use-shortcut-of="Synchronize"/>
@@ -1329,7 +1328,9 @@
       <action id="ChangeToolWindowLayout" class="com.intellij.ide.actions.QuickChangeToolWindowLayout">
         <override-text place="GoToAction"/>
       </action>
-      <action id="ChangeIdeScale" class="com.intellij.ide.actions.QuickChangeIdeScaleAction"/>
+      <action id="ChangeIdeScale" class="com.intellij.ide.actions.QuickChangeIdeScaleAction">
+        <override-text place="GoToAction"/>
+      </action>
     </group>
 
     <group id="MaintenanceGroup">
@@ -1391,6 +1392,7 @@
                 text="Dump Workspace Entities to a File as Json"/>
       </group>
 
+      <action id="ShowRegisteredRemoteApis" internal="true" class="com.intellij.internal.rpc.ShowRegisteredRemoteApisAction" />
       <action id="ShowEdtUtilizationChart" internal="true" class="com.intellij.internal.ShowEdtUtilizationChartAction"/>
       <action internal="true" id="ShowMainMenu" class="com.intellij.internal.ui.ShowMainMenuAction"/>
       <action id="DumbMode" internal="true" class="com.intellij.internal.ToggleDumbModeAction">
@@ -1470,6 +1472,7 @@
         <action id="ComponentPanelTestAction" internal="true" class="com.intellij.internal.ui.ComponentPanelTestAction"/>
         <action id="WrapLayoutTestAction" internal="true" class="com.intellij.internal.ui.WrapLayoutTestAction"/>
         <action id="UIFreeze" internal="true" class="com.intellij.internal.UIFreezeAction"/>
+        <action id="PooledFreeze" internal="true" class="com.intellij.internal.PooledFreezeAction"/>
         <separator/>
         <action id="UISandboxAction" internal="true" class="com.intellij.internal.ui.sandbox.UISandboxAction"/>
         <action id="UiInspector" internal="true" class="com.intellij.internal.inspector.UiInspectorAction">
@@ -1508,6 +1511,8 @@
         <action id="AddManyTestProcesses" internal="true" class="com.intellij.openapi.wm.impl.status.AddManyTestProcesses"/>
         <action id="WriteActionUnderProgress" internal="true" class="com.intellij.internal.TestWriteActionUnderProgress"/>
         <action id="LongBackgroundWriteAction" internal="true" class="com.intellij.internal.LongBackgroundWriteAction"/>
+        <action id="FrequentBackgroundWriteAction" internal="true" class="com.intellij.internal.FrequentBackgroundWriteAction"/>
+        <action id="FrequentBackgroundReadAction" internal="true" class="com.intellij.internal.FrequentBackgroundReadAction"/>
         <action id="TestProgressWindow" internal="true" class="com.intellij.internal.TestProgressWindow"/>
         <action id="TestCoroutineProgress" internal="true" class="com.intellij.internal.TestCoroutineProgressAction"/>
         <separator/>
@@ -1788,7 +1793,6 @@
 
     <group id="ActivateToolWindowActions" searchable="false">
       <action id="ActivateFindToolWindow" class="com.intellij.find.actions.ActivateFindToolWindowAction"/>
-      <action id="ActivateMeetNewUIToolWindow" class="com.intellij.ide.ui.experimental.meetNewUi.ActivateMeetNewUIToolWindowAction"/>
     </group>
 
     <group id="UpdateEntryPointGroup"/>
@@ -1892,7 +1896,8 @@
       <reference ref="MainToolbarQuickActionsRaw"/>
     </group>
 
-    <action id="UndoDumpAction" internal="true" class="com.intellij.ide.actions.UndoDumpAction"/>
+    <action id="UndoDumpAction" internal="true" class="com.intellij.ide.actions.UndoDumpHistoryAction"/>
+    <action id="UndoClearAction" internal="true" class="com.intellij.ide.actions.UndoClearHistoryAction"/>
 
     <action id="DisableMinimap" class="com.intellij.ide.minimap.actions.DisableMinimapAction"/>
     <action id="ToggleMinimap" class="com.intellij.ide.minimap.actions.ToggleMinimapAction"/>

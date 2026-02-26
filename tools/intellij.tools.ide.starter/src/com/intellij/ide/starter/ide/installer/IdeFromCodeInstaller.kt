@@ -3,13 +3,19 @@ package com.intellij.ide.starter.ide.installer
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.isScramblingEnabled
 import com.intellij.ide.starter.config.useDockerContainer
-import com.intellij.ide.starter.ide.*
+import com.intellij.ide.starter.ide.IDEStartConfig
+import com.intellij.ide.starter.ide.IdeInstaller
+import com.intellij.ide.starter.ide.InstalledIde
+import com.intellij.ide.starter.ide.JBRResolver
+import com.intellij.ide.starter.ide.LinuxIdeDistribution
 import com.intellij.ide.starter.models.IdeInfo
 import com.intellij.ide.starter.models.VMOptions
 import com.intellij.ide.starter.models.VMOptionsDiff
 import com.intellij.ide.starter.path.GlobalPaths
 import com.intellij.ide.starter.runner.AdditionalModulesForDevBuildServer
 import com.intellij.ide.starter.runner.DevBuildServerRunner
+import com.intellij.ide.starter.runner.FINGERPRINT_DEBUG_FILE_NAME
+import com.intellij.ide.starter.runner.FINGERPRINT_DEBUG_PROPERTY
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.findOrCreateFile
@@ -210,12 +216,24 @@ class IdeFromCodeInstaller(private val useInstallationCache: Boolean = true) : I
       ideInfo.copy(additionalModules = ideInfo.additionalModules + AdditionalModulesForDevBuildServer.getAdditionalModules(ideInfo))
 
     val existingInstallationPath = cachedInstallationDirectories[ideWithProvidedAdditionalModules]
+    val hasCachedInstallation =
+      useInstallationCache && existingInstallationPath != null && existingInstallationPath.exists() && !ConfigurationStorage.isScramblingEnabled()
+    val isFingerprintDebugRequested = System.getProperty(FINGERPRINT_DEBUG_PROPERTY).toBoolean()
+    val canReuseCachedInstallation =
+      hasCachedInstallation &&
+      (!isFingerprintDebugRequested || existingInstallationPath.resolve(FINGERPRINT_DEBUG_FILE_NAME).exists())
+
     val installationDirectory =
-      if (useInstallationCache && existingInstallationPath != null && existingInstallationPath.exists() && !ConfigurationStorage.isScramblingEnabled()) {
+      if (canReuseCachedInstallation) {
         logOutput("Using cached installation directory: $existingInstallationPath for $ideWithProvidedAdditionalModules")
         existingInstallationPath
       }
       else {
+        if (hasCachedInstallation) {
+          logOutput(
+            "Cached installation directory $existingInstallationPath doesn't contain ${FINGERPRINT_DEBUG_FILE_NAME}. Rebuilding $ideWithProvidedAdditionalModules."
+          )
+        }
         logOutput("startDevBuild IDE: $ideWithProvidedAdditionalModules")
         DevBuildServerRunner.instance.startDevBuild(ideWithProvidedAdditionalModules).also {
           cachedInstallationDirectories[ideWithProvidedAdditionalModules] = it

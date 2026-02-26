@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:Suppress("BlockingMethodInNonBlockingContext")
+
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.openapi.util.SystemInfoRt
@@ -274,13 +276,21 @@ class MacDistributionBuilder(
     MachOUuid(copy, customizer, context).patch()
     copyFile(licensePath, macDistDir.resolve("license/launcher-third-party-libraries.html"))
 
-    val icnsPath = customizer.icnsPathForEAP?.takeIf { context.applicationInfo.isEAP } ?: customizer.icnsPath
+    val icnsPath = locateIcnsForMacApp(customizer, context)
     val resourcesDistDir = macDistDir.resolve("Resources")
     copyFile(icnsPath, resourcesDistDir.resolve(targetIcnsFileName))
 
+    @Suppress("DEPRECATION")
     val alternativeIcon = customizer.icnsPathForAlternativeIconForEAP?.takeIf { context.applicationInfo.isEAP } ?: customizer.icnsPathForAlternativeIcon
     if (alternativeIcon != null) {
       copyFile(alternativeIcon, resourcesDistDir.resolve("custom.icns"))
+    }
+    if (context.isEmbeddedFrontendEnabled) {
+      val icnsForFrontendApp = locateIcnsForFrontendMacApp(context)
+      if (icnsForFrontendApp != null) {
+        //path to the copied file will be passed as the value of `apple.awt.application.icon` property in `getAdditionalEmbeddedClientVmOptions`
+        copyFile(icnsForFrontendApp, resourcesDistDir.resolve("frontend.icns"))
+      }
     }
 
     for (fileAssociation in customizer.fileAssociations) {
@@ -343,8 +353,10 @@ class MacDistributionBuilder(
     }
   }
 
-  override fun generateExecutableFilesPatterns(includeRuntime: Boolean, arch: JvmArchitecture, libc: LibcImpl): Sequence<String> {
-    return customizer.generateExecutableFilesPatterns(includeRuntime, arch, context)
+  override suspend fun generateExecutableFilesPatterns(includeRuntime: Boolean, arch: JvmArchitecture, libc: LibcImpl): Sequence<String> {
+    val base = customizer.generateExecutableFilesPatterns(includeRuntime, arch, context)
+    val pluginPatterns = collectPluginExecutablePatterns(context, OsFamily.MACOS, arch, libc)
+    return base + pluginPatterns
   }
 
   private suspend fun buildForArch(
@@ -515,9 +527,9 @@ class MacDistributionBuilder(
 
   private fun writeMacOsVmOptions(distBinDir: Path, context: BuildContext): Path {
     val executable = context.productProperties.baseFileName
-    val vmOptions = VmOptionsGenerator.generate(context).asSequence() + sequenceOf("-Dapple.awt.application.appearance=system")
+    val vmOptions = generateVmOptions(context).asSequence() + sequenceOf("-Dapple.awt.application.appearance=system")
     val vmOptionsPath = distBinDir.resolve("${executable}.vmoptions")
-    VmOptionsGenerator.writeVmOptions(vmOptionsPath, vmOptions, separator = "\n")
+    writeVmOptions(vmOptionsPath, vmOptions, separator = "\n")
     return vmOptionsPath
   }
 
@@ -663,7 +675,7 @@ private fun prepareDmgBuildScripts(tempDir: Path, staple: Boolean, customizer: M
   NioFiles.deleteRecursively(tempDir)
   Files.createDirectories(tempDir)
   val dmgImageCopy = tempDir.resolve("${context.fullBuildNumber}.png")
-  Files.copy((if (context.applicationInfo.isEAP) customizer.dmgImagePathForEAP else null) ?: customizer.dmgImagePath, dmgImageCopy)
+    Files.copy(locateDmgImageForMacApp(customizer, context), dmgImageCopy)
   val scriptsDir = context.paths.communityHomeDir.resolve("platform/build-scripts/tools/mac/scripts")
   Files.copy(scriptsDir.resolve("makedmg.sh"), tempDir.resolve("makedmg.sh"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
   NioFiles.setExecutable(tempDir.resolve("makedmg.sh"))
@@ -696,12 +708,12 @@ private fun publishDmgBuildScripts(entrypoint: Path, tempDir: Path, context: Bui
       Files.copy(it, artifactDir.resolve(it.name), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
     }
     val message = """
-    To build .dmg(s):
-    1. transfer .sit(s) to macOS host;
-    2. transfer ${artifactDir.name}/ content to the same folder;
-    3. execute ${entrypoint.name} from Terminal. 
-    .dmg(s) will be built in the same folder.
-  """.trimIndent()
+  To build .dmg(s):
+  1. transfer .sit(s) to macOS host;
+  2. transfer ${artifactDir.name}/ content to the same folder;
+  3. execute ${entrypoint.name} from Terminal. 
+  .dmg(s) will be built in the same folder.
+""".trimIndent()
     artifactDir.resolve("README.txt").writeText(message)
     context.messages.info(message)
     context.notifyArtifactBuilt(artifactDir)

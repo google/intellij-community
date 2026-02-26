@@ -16,13 +16,16 @@ import com.intellij.openapi.externalSystem.service.project.manage.ExternalSystem
 import com.intellij.openapi.externalSystem.service.project.settings.BeforeRunTaskImporter
 import com.intellij.openapi.externalSystem.service.project.settings.ConfigurationHandler
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.project.stateStore
 import com.intellij.util.ObjectUtils.consumeIfCast
 import org.jetbrains.plugins.gradle.execution.GradleBeforeRunTaskProvider
 import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData
 import org.jetbrains.plugins.gradle.settings.GradleSettings
-import org.jetbrains.plugins.gradle.settings.TestRunner.*
+import org.jetbrains.plugins.gradle.settings.TestRunner.CHOOSE_PER_TEST
+import org.jetbrains.plugins.gradle.settings.TestRunner.GRADLE
+import org.jetbrains.plugins.gradle.settings.TestRunner.PLATFORM
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import java.io.File
 import java.nio.file.Files
@@ -141,7 +144,10 @@ class IDEAProjectFilesPostProcessor: ConfigurationHandler {
       return
     }
 
-    activator.addTask(taskActivationEntry)
+   activator.addTask(taskActivationEntry)
+    runBlockingCancellable {
+      project.stateStore.save(forceSavingAllSettings = true)
+    }
     val f = File(projectData.linkedExternalProjectPath).toPath()
     val extProjectDir = if (f.isDirectory()) {
       f

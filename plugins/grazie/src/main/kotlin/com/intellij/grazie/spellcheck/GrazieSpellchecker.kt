@@ -4,7 +4,7 @@ package com.intellij.grazie.spellcheck
 import ai.grazie.detector.heuristics.rule.RuleFilter
 import ai.grazie.utils.toLinkedSet
 import com.intellij.grazie.GrazieConfig
-import com.intellij.grazie.GrazieDynamic.getLangDynamicFolder
+import com.intellij.grazie.GrazieDynamic.dynamicFolder
 import com.intellij.grazie.GraziePlugin
 import com.intellij.grazie.ide.msg.CONFIG_STATE_TOPIC
 import com.intellij.grazie.ide.msg.GrazieStateLifecycle
@@ -21,15 +21,25 @@ import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.util.ClassLoaderUtil.computeWithClassLoader
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.spellchecker.dictionary.Dictionary
-import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.*
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Absent
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Alien
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Present
 import com.intellij.util.io.computeDetached
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import org.languagetool.JLanguageTool
 import org.languagetool.rules.spelling.SpellingCheckRule
 import java.nio.file.Files
 import java.util.concurrent.Callable
+import java.util.concurrent.atomic.AtomicBoolean
 
 @ApiStatus.Internal
 @Service(Service.Level.APP)
@@ -39,7 +49,7 @@ class GrazieCheckers(coroutineScope: CoroutineScope) : GrazieStateLifecycle {
 
   private fun isHunspellAvailable(lang: Lang, enabledLanguages: Set<Lang>): Boolean {
     val hunspell = lang.hunspellRemote ?: return false
-    return lang in enabledLanguages && Files.exists(getLangDynamicFolder(lang).resolve(hunspell.file))
+    return lang in enabledLanguages && Files.exists(dynamicFolder.resolve(hunspell.file))
   }
 
   private fun filterCheckers(word: String): Set<SpellerTool> {
@@ -58,38 +68,59 @@ class GrazieCheckers(coroutineScope: CoroutineScope) : GrazieStateLifecycle {
   }
 
   data class SpellerTool(val tool: JLanguageTool, val lang: Lang, val speller: SpellingCheckRule) {
+    private val isFirstInvocation = AtomicBoolean(true)
+
     fun check(word: String): Boolean? {
       if (word.isBlank()) return true
       return synchronized(speller) {
         computeWithClassLoader<Boolean, Throwable>(GraziePlugin.classLoader) {
-          val sentence = tool.getRawAnalyzedSentence(word)
-          // First token is always sentence start
-          if (sentence.nonWhitespaceTokenCount <= 2) return@computeWithClassLoader !speller.isMisspelled(word)
-          if (speller.match(sentence).isEmpty()) {
-            if (!speller.isMisspelled(word)) true
-            else {
-              // if the speller does not return matches, but the word is still misspelled (not in the dictionary),
-              // then this word was ignored by the rule (e.g., alien word), and we cannot be sure about its correctness
-              // let's try adding a small change to a word to see if it's alien
-              val mutated = word + word.last() + word.last()
-              if (speller.match(tool.getRawAnalyzedSentence(mutated)).isEmpty()) null else true
+          runCancellableOnFirstInvocation {
+            val sentence = tool.getRawAnalyzedSentence(word)
+            // First token is always sentence start
+            if (sentence.nonWhitespaceTokenCount <= 2) return@runCancellableOnFirstInvocation !speller.isMisspelled(word)
+            if (speller.match(sentence).isEmpty()) {
+              if (!speller.isMisspelled(word)) true
+              else {
+                // if the speller does not return matches, but the word is still misspelled (not in the dictionary),
+                // then this word was ignored by the rule (e.g., alien word), and we cannot be sure about its correctness
+                // let's try adding a small change to a word to see if it's alien
+                val mutated = word + word.last() + word.last()
+                if (speller.match(tool.getRawAnalyzedSentence(mutated)).isEmpty()) null else true
+              }
             }
+            else false
           }
-          else false
         }
       }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     fun suggest(text: String): Set<String> = synchronized(speller) {
       computeWithClassLoader<Set<String>, Throwable>(GraziePlugin.classLoader) {
-        speller.match(tool.getRawAnalyzedSentence(text))
-          .flatMap { match ->
-            match.suggestedReplacements.map {
-              text.replaceRange(match.fromPos, match.toPos, it)
-            }
+        runBlockingCancellable {
+          computeDetached {
+            speller.match(tool.getRawAnalyzedSentence(text))
+              .flatMap { match ->
+                match.suggestedReplacements.map {
+                  text.replaceRange(match.fromPos, match.toPos, it)
+                }
+              }
+              .toSet()
           }
-          .toSet()
+        }
       }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun <T> runCancellableOnFirstInvocation(block: () -> T): T {
+      if (!isFirstInvocation.get()) return block()
+      val result = runBlockingCancellable {
+        computeDetached {
+          block()
+        }
+      }
+      isFirstInvocation.set(false)
+      return result
     }
   }
 

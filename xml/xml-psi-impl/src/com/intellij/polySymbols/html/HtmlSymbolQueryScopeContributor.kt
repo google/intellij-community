@@ -5,13 +5,23 @@ import com.intellij.documentation.mdn.MdnSymbolDocumentation
 import com.intellij.documentation.mdn.getDomEventDocumentation
 import com.intellij.model.Pointer
 import com.intellij.openapi.project.Project
-import com.intellij.polySymbols.*
+import com.intellij.polySymbols.PolySymbol
+import com.intellij.polySymbols.PolySymbolKind
+import com.intellij.polySymbols.PolySymbolModifier
+import com.intellij.polySymbols.PolySymbolQualifiedName
 import com.intellij.polySymbols.html.attributes.HtmlAttributeSymbolDescriptor
 import com.intellij.polySymbols.html.attributes.asHtmlSymbol
 import com.intellij.polySymbols.html.elements.HtmlElementSymbolDescriptor
 import com.intellij.polySymbols.html.elements.asHtmlSymbol
 import com.intellij.polySymbols.js.JS_EVENTS
-import com.intellij.polySymbols.query.*
+import com.intellij.polySymbols.query.PolySymbolCompoundScope
+import com.intellij.polySymbols.query.PolySymbolListSymbolsQueryParams
+import com.intellij.polySymbols.query.PolySymbolNameMatchQueryParams
+import com.intellij.polySymbols.query.PolySymbolQueryExecutor
+import com.intellij.polySymbols.query.PolySymbolQueryScopeContributor
+import com.intellij.polySymbols.query.PolySymbolQueryScopeProviderRegistrar
+import com.intellij.polySymbols.query.PolySymbolQueryStack
+import com.intellij.polySymbols.query.PolySymbolScope
 import com.intellij.polySymbols.utils.PolySymbolPrioritizedScope
 import com.intellij.polySymbols.utils.match
 import com.intellij.psi.PsiElement
@@ -175,6 +185,9 @@ class HtmlSymbolQueryScopeContributor : PolySymbolQueryScopeContributor {
     override fun getMdnDocumentation(): MdnSymbolDocumentation? =
       getDomEventDocumentation(name)
 
+    override val source: PsiElement?
+      get() = null
+
     override val project: Project?
       get() = descriptor.declaration?.project
 
@@ -182,9 +195,6 @@ class HtmlSymbolQueryScopeContributor : PolySymbolQueryScopeContributor {
       get() = JS_EVENTS
 
     override val name: String = descriptor.name.substring(2)
-
-    override val origin: PolySymbolOrigin
-      get() = PolySymbolOrigin.empty()
 
     override val priority: PolySymbol.Priority
       get() = PolySymbol.Priority.LOW

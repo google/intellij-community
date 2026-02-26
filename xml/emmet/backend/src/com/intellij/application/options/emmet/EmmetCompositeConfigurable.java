@@ -14,7 +14,8 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -47,7 +48,7 @@ public class EmmetCompositeConfigurable extends SearchableConfigurable.Parent.Ab
   @Override
   public @Nullable JComponent createComponent() {
     final JPanel rootPanel = new JPanel(new GridLayoutManager(myInnerConfigurables.length + 1, 1, JBInsets.emptyInsets(), -1, -1, false, false));
-    rootPanel.add(myTemplateExpandShortcutPanel, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_NORTH,
+    rootPanel.add(myTemplateExpandShortcutPanel.getPanel(), new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_NORTH,
                                                                      GridConstraints.FILL_HORIZONTAL,
                                                                      GridConstraints.SIZEPOLICY_CAN_GROW |
                                                                      GridConstraints.SIZEPOLICY_CAN_SHRINK,

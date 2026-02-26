@@ -1,7 +1,11 @@
 <idea-plugin visibility="public">
   <dependencies>
-    <module name="intellij.platform.vcs"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.libraries.jackson3"/>
+    <module name="intellij.libraries.jackson3.databind"/>
     <module name="intellij.platform.backend"/>
+    <module name="intellij.platform.vcs"/>
+    <!-- endregion -->
   </dependencies>
   <extensions defaultExtensionNs="com.intellij">
     <appStarter id="inspect" implementation="com.intellij.codeInspection.InspectionMain"/>

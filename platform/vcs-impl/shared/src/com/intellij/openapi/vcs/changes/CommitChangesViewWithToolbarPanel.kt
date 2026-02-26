@@ -21,6 +21,7 @@ import com.intellij.openapi.vcs.changes.ui.ChangesListView
 import com.intellij.openapi.vcs.changes.ui.ChangesTree
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import com.intellij.openapi.vcs.changes.ui.VcsTreeModelData
+import com.intellij.openapi.vcs.changes.ui.selectedDiffableNode
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.ide.navigation.NavigationOptions
@@ -42,12 +43,17 @@ import com.intellij.util.application
 import com.intellij.util.asDisposable
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.CalledInAny
 import java.awt.event.MouseEvent
@@ -241,7 +247,7 @@ private class ChangesViewInputHandler(
   private fun handleEnterOrDoubleClick(requestFocus: Boolean): Boolean {
     if (!performHoverAction()) {
       val diffPreviewOnDoubleClickOrEnter = changesView.project.service<CommitToolWindowViewModel>().diffPreviewOnDoubleClickOrEnter
-      if (diffPreviewOnDoubleClickOrEnter) {
+      if (diffPreviewOnDoubleClickOrEnter && changesView.selectedDiffableNode != null) {
         diffRequests.tryEmit(ChangesViewDiffAction.PERFORM_DIFF to ClientId.current)
       }
       else {

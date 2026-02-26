@@ -16,7 +16,18 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.MarkupText;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.psi.*;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiClassType;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiImportStatementBase;
+import com.intellij.psi.PsiImportStaticStatement;
+import com.intellij.psi.PsiJavaCodeReferenceElement;
+import com.intellij.psi.PsiJavaFile;
+import com.intellij.psi.PsiSubstitutor;
+import com.intellij.psi.PsiType;
+import com.intellij.psi.PsiTypeParameter;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
 import com.intellij.psi.impl.source.codeStyle.ImportHelper;
 import com.intellij.psi.javadoc.PsiDocComment;
@@ -29,6 +40,7 @@ import org.jetbrains.annotations.NotNullByDefault;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.Set;
 
 @NotNullByDefault
 public final class ClassReferenceCompletionItem extends PsiUpdateCompletionItem<PsiClass> {
@@ -50,7 +62,12 @@ public final class ClassReferenceCompletionItem extends PsiUpdateCompletionItem<
   public ClassReferenceCompletionItem(PsiClass psiClass) {
     this(psiClass, PsiSubstitutor.EMPTY, null);
   }
-  
+
+  @Override
+  public Set<@NlsSafe String> additionalLookupStrings() {
+    return myForcedPresentableName == null ? Set.of() : Set.of(myForcedPresentableName);
+  }
+
   public ClassReferenceCompletionItem withPresentableName(@Nullable String forcedPresentableName) {
     return new ClassReferenceCompletionItem(contextObject(), mySubstitutor, forcedPresentableName);
   }
@@ -66,6 +83,7 @@ public final class ClassReferenceCompletionItem extends PsiUpdateCompletionItem<
   @Override
   public void update(ActionContext actionContext, InsertionContext insertionContext, ModPsiUpdater updater) {
     if (!contextObject().isValid()) return;
+    PsiDocumentManager.getInstance(updater.getProject()).commitDocument(updater.getDocument());
     if (processInImport(updater)) return;
     if (processJavaDoc(actionContext.offset(), updater)) return;
     AllClassesGetter.tryShorten(updater.getPsiFile(), updater, contextObject());
@@ -149,6 +167,10 @@ public final class ClassReferenceCompletionItem extends PsiUpdateCompletionItem<
     }
 
     return StringUtil.notNullize(name);
+  }
+
+  @Nullable String getForcedPresentableName() {
+    return myForcedPresentableName;
   }
 
   private static String formatTypeParameters(final PsiSubstitutor substitutor, final PsiTypeParameter[] params) {

@@ -18,12 +18,7 @@ object KotlinBuildToolFusFlowCollector : CounterUsagesCollector() {
      * As the current pipline allows adding new metrics without changing the Kotlin project,
      * therefore these metrics will not be present in events from the legacy pipeline
      */
-    private val GROUP = EventLogGroup(
-        "kotlin.gradle.performance_v2",
-        GROUP_VERSION,
-        recorder = "FUS",
-        description = "Kotlin build performance statistics collected from Kotlin Gradle plugin and projects using the FUS Gradle plugin"
-    )
+    private val GROUP = EventLogGroup("kotlin.gradle.performance_v2", GROUP_VERSION)
 
     override fun getGroup(): EventLogGroup = GROUP
     private val eventIds: Map<FusFlowSendingStep, VarargEventId> = kotlinBuildToolsFusEvenList.associateWith {

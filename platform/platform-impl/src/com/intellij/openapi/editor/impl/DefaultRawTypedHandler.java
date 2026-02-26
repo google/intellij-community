@@ -1,11 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl;
 
 import com.intellij.codeInsight.editorActions.NonWriteAccessTypedHandler;
 import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.CommandProcessorEx;
 import com.intellij.openapi.command.CommandToken;
@@ -14,12 +13,15 @@ import com.intellij.openapi.command.impl.UndoManagerImpl;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.EditorBundle;
+import com.intellij.openapi.editor.EditorThreading;
 import com.intellij.openapi.editor.ReadOnlyFragmentModificationException;
-import com.intellij.openapi.editor.actionSystem.*;
+import com.intellij.openapi.editor.actionSystem.ActionPlan;
+import com.intellij.openapi.editor.actionSystem.EditorActionManager;
+import com.intellij.openapi.editor.actionSystem.TypedAction;
+import com.intellij.openapi.editor.actionSystem.TypedActionHandler;
+import com.intellij.openapi.editor.actionSystem.TypedActionHandlerEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.NlsContexts;
 import com.intellij.util.SlowOperations;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -51,7 +53,7 @@ public final class DefaultRawTypedHandler implements TypedActionHandlerEx {
     if (myCurrentCommandToken != null) {
       throw new IllegalStateException("Unexpected reentrancy of DefaultRawTypedHandler");
     }
-    myCurrentCommandToken = commandProcessorEx.startCommand(project, commandName(project), editor.getDocument(), UndoConfirmationPolicy.DEFAULT);
+    myCurrentCommandToken = commandProcessorEx.startCommand(project, "", editor.getDocument(), UndoConfirmationPolicy.DEFAULT);
     myInOuterCommand = myCurrentCommandToken == null;
     try {
       FileDocumentManager.WriteAccessStatus writeAccess =
@@ -69,7 +71,7 @@ public final class DefaultRawTypedHandler implements TypedActionHandlerEx {
         HintManager.getInstance().showInformationHint(editor, writeAccess.getReadOnlyMessage(), writeAccess.getHyperlinkListener());
         return;
       }
-      ApplicationManager.getApplication().runWriteAction(() -> {
+      EditorThreading.write(() -> {
         Document doc = editor.getDocument();
         doc.startGuardedBlockChecking();
         try {
@@ -101,16 +103,15 @@ public final class DefaultRawTypedHandler implements TypedActionHandlerEx {
     }
     CommandProcessorEx commandProcessorEx = (CommandProcessorEx)CommandProcessor.getInstance();
     Project project = myCurrentCommandToken.getProject();
+    if (!isCommandRestartSupported(project)) {
+      return;
+    }
     commandProcessorEx.finishCommand(myCurrentCommandToken, null);
     myCurrentCommandToken = commandProcessorEx.startCommand(project, "", null, UndoConfirmationPolicy.DEFAULT);
   }
 
-  @NlsContexts.Command
-  private static @NotNull String commandName(@Nullable Project project) {
+  private static boolean isCommandRestartSupported(@Nullable Project project) {
     UndoManager undoManager = project == null ? UndoManager.getGlobalInstance() : UndoManager.getInstance(project);
-    if (((UndoManagerImpl) undoManager).isGroupIdChangeSupported()) {
-      return "";
-    }
-    return EditorBundle.message("typing.in.editor.command.name");
+    return ((UndoManagerImpl)undoManager).getUndoCapabilities().isCommandRestartSupported();
   }
 }

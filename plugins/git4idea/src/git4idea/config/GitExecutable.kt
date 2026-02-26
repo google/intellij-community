@@ -12,14 +12,18 @@ import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.eel.*
+import com.intellij.platform.eel.EelApi
+import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.EelPlatform
 import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
+import com.intellij.platform.eel.environmentVariables
 import com.intellij.platform.eel.fs.getPath
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.utils.awaitProcessResult
+import com.intellij.platform.eel.spawnProcess
 import com.intellij.vcs.VcsLocaleHelper
 import git4idea.commands.GitHandler
 import git4idea.i18n.GitBundle
@@ -211,7 +215,7 @@ sealed class GitExecutable {
           }
         }?.asNioPath()?.pathString
       })
-      if (executableContext.isWithNoTty) setupNoTtyExecution(commandLine, wait = false, setSidPath = {
+      if (isLocal && executableContext.isWithNoTty) setupNoTtyExecution(commandLine, wait = false, setSidPath = {
         GitConfigurationCache.getInstance().computeCachedValue(SetSidKey(eel.descriptor)) {
           runBlockingCancellable {
             listOf("setsid", "/usr/bin/setsid").map {

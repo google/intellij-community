@@ -22,10 +22,13 @@ class IdeWithLambda(delegate: BackgroundRun, val rdSession: LambdaRdTestSession,
   IBackgroundRun by delegate {
   fun defaultStepName(): String = "Step " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
   val isRemoteDev: Boolean = rdSession.rdIdeType == LambdaRdIdeType.FRONTEND
+  val defaultTimeout = 1.minutes
+
   suspend inline fun <T : LambdaIdeContext, R : Serializable> LambdaRdTestSession.runGetResult(
     name: String,
-    timeout: Duration = 1.minutes,
+    timeout: Duration = defaultTimeout,
     parameters: List<Serializable> = emptyList(),
+    globalTestScope: Boolean = false,
     lambdaConsumer: SerializedLambdaWithIdeContextHelper.SuspendingSerializableConsumer<T, R>,
   ): R? {
     val protocol = this@runGetResult.protocol
@@ -41,7 +44,8 @@ class IdeWithLambda(delegate: BackgroundRun, val rdSession: LambdaRdTestSession,
         LambdaRdSerialized(name,
                            serializedLambda.serializedDataBase64,
                            serializedLambda.classPath.map { it.canonicalPath },
-                           serializedLambda.parametersBase64)
+                           serializedLambda.parametersBase64,
+                           globalTestScope)
 
       return runLogged(lambdaRdSerialized.stepName, timeout) {
         val returnValueBase64 = runSerializedLambda.startSuspending(protocol.lifetime, lambdaRdSerialized)
@@ -53,18 +57,22 @@ class IdeWithLambda(delegate: BackgroundRun, val rdSession: LambdaRdTestSession,
   suspend inline fun runInFrontendGetResult(
     name: String = defaultStepName(),
     parameters: List<Serializable> = emptyList(),
+    globalTestScope: Boolean = false,
+    timeout: Duration = defaultTimeout,
     lambdaConsumer: SerializedLambdaWithIdeContextHelper.SuspendingSerializableConsumer<LambdaFrontendContext, Serializable>,
   ): Serializable {
-    return rdSession.runGetResult(name, parameters = parameters, lambdaConsumer = lambdaConsumer)
+    return rdSession.runGetResult(name, parameters = parameters, lambdaConsumer = lambdaConsumer, timeout = timeout, globalTestScope = globalTestScope)
            ?: error("Run hasn't returned a Serializable result")
   }
 
   suspend inline fun runInFrontend(
     name: String = defaultStepName(),
     parameters: List<Serializable> = emptyList(),
+    globalTestScope: Boolean = false,
+    timeout: Duration = defaultTimeout,
     lambdaConsumer: SerializedLambdaWithIdeContextHelper.SuspendingSerializableConsumer<LambdaFrontendContext, Any?>,
   ) {
-    runInFrontendGetResult(name, parameters) { parameters ->
+    runInFrontendGetResult(name, parameters, globalTestScope, timeout) { parameters ->
       with(lambdaConsumer) {
         runSerializedLambda(parameters)
       }
@@ -75,18 +83,26 @@ class IdeWithLambda(delegate: BackgroundRun, val rdSession: LambdaRdTestSession,
   suspend inline fun runInBackendGetResult(
     name: String = defaultStepName(),
     parameters: List<Serializable> = emptyList(),
+    globalTestScope: Boolean = false,
+    timeout: Duration = defaultTimeout,
     lambdaConsumer: SerializedLambdaWithIdeContextHelper.SuspendingSerializableConsumer<LambdaBackendContext, Serializable>,
   ): Serializable {
-    return (backendRdSession ?: rdSession).runGetResult(name, parameters = parameters, lambdaConsumer = lambdaConsumer)
+    return (backendRdSession ?: rdSession).runGetResult(name,
+                                                        parameters = parameters,
+                                                        lambdaConsumer = lambdaConsumer,
+                                                        globalTestScope = globalTestScope,
+                                                        timeout = timeout)
            ?: error("Run hasn't returned a Serializable result")
   }
 
   suspend inline fun runInBackend(
     name: String = defaultStepName(),
     parameters: List<Serializable> = emptyList(),
+    globalTestScope: Boolean = false,
+    timeout: Duration = defaultTimeout,
     lambdaConsumer: SerializedLambdaWithIdeContextHelper.SuspendingSerializableConsumer<LambdaBackendContext, Any?>,
   ) {
-    runInBackendGetResult(name, parameters) { parameters ->
+    runInBackendGetResult(name, parameters, globalTestScope, timeout) { parameters ->
       with(lambdaConsumer) {
         runSerializedLambda(parameters)
       }
@@ -120,5 +136,9 @@ class IdeWithLambda(delegate: BackgroundRun, val rdSession: LambdaRdTestSession,
 
   suspend inline fun afterAll(testClassName: String) {
     forEachSession("After each container") { it.afterAll.startSuspending(testClassName) }
+  }
+
+  suspend inline operator fun invoke(block: suspend IdeWithLambda.() -> Unit) {
+    block()
   }
 }

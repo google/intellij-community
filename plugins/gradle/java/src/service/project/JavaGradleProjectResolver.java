@@ -39,7 +39,16 @@ import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkUtil.matchJavaVersion;
@@ -480,7 +489,7 @@ public final class JavaGradleProjectResolver extends AbstractProjectResolverExte
   private @Nullable Sdk lookupGradleJvmByVersion(@NotNull JavaVersion sdkVersion) {
     var sdk = lookupGradleJvm();
     if (sdk == null) return null;
-    if (ExternalSystemJdkUtil.matchJavaVersion(sdkVersion, sdk.getVersionString())) {
+    if (matchJavaVersion(sdkVersion, sdk.getVersionString())) {
       return sdk;
     }
     return null;
@@ -488,10 +497,14 @@ public final class JavaGradleProjectResolver extends AbstractProjectResolverExte
 
   private @Nullable Sdk lookupGradleJvm() {
     var projectSettings = getProjectSettings();
-    if (projectSettings == null) return null;
+    if (projectSettings == null) {
+      return null;
+    }
     var gradleJvm = projectSettings.getGradleJvm();
-    if (gradleJvm == null) return null;
-    return ExternalSystemJdkUtil.getJdk(resolverCtx.getProject(), gradleJvm);
+    if (gradleJvm == null) {
+      return null;
+    }
+    return ExternalSystemJdkUtil.resolveJdkName(resolverCtx.getProject(), gradleJvm);
   }
 
   private @Nullable GradleProjectSettings getProjectSettings() {

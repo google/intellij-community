@@ -1,6 +1,10 @@
 package com.intellij.terminal.frontend.view.completion
 
-import com.intellij.codeInsight.completion.*
+import com.intellij.codeInsight.completion.CodeCompletionHandlerBase
+import com.intellij.codeInsight.completion.CompletionResult
+import com.intellij.codeInsight.completion.CompletionService
+import com.intellij.codeInsight.completion.PlainPrefixMatcher
+import com.intellij.codeInsight.completion.PrioritizedLookupElement
 import com.intellij.codeInsight.lookup.LookupArranger.DefaultArranger
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
@@ -13,14 +17,28 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
 import com.intellij.terminal.completion.spec.ShellSuggestionType
+import com.intellij.terminal.frontend.view.TerminalView
 import com.intellij.terminal.frontend.view.impl.toRelative
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.terminal.TerminalOptionsProvider
@@ -43,6 +61,13 @@ class TerminalCommandCompletionService(
   private val project: Project,
   coroutineScope: CoroutineScope,
 ) {
+  private val contributors: List<TerminalCommandCompletionContributor> = listOf(
+    PowerShellCompletionContributor(),
+    TerminalCommandSpecCompletionContributor(),
+  )
+
+  private val fallbackContributor: TerminalCommandCompletionContributor = TerminalFilesCompletionContributor()
+
   @get:RequiresEdt
   internal var activeProcess: TerminalCommandCompletionProcess? = null
     private set
@@ -74,6 +99,7 @@ class TerminalCommandCompletionService(
 
   @RequiresEdt
   fun invokeCompletion(
+    terminalView: TerminalView,
     editor: Editor,
     outputModel: TerminalOutputModel,
     shellIntegration: TerminalShellIntegration,
@@ -88,10 +114,11 @@ class TerminalCommandCompletionService(
     editor.caretModel.primaryCaret.moveToOffset(cursorOffset.toRelative(outputModel))
 
     val activeBlock = shellIntegration.blocksModel.activeBlock as TerminalCommandBlock
-    val commandText = getTypedCommandText(activeBlock, outputModel) ?: return
+    val commandText = getRawCommandText(activeBlock, outputModel) ?: return
 
     val context = TerminalCommandCompletionContext(
       project = project,
+      terminalView = terminalView,
       editor = editor,
       outputModel = outputModel,
       shellIntegration = shellIntegration,
@@ -148,9 +175,41 @@ class TerminalCommandCompletionService(
     }
   }
 
+  private suspend fun getCompletionSuggestions(context: TerminalCommandCompletionContext): TerminalCommandCompletionResult? {
+    val results = coroutineScope {
+      contributors.map { contributor ->
+        async {
+          contributor.getCompletionSuggestions(context)
+        }
+      }.awaitAll().filterNotNull()
+    }
+
+    val nonEmptyResults = results.filter { it.suggestions.isNotEmpty() }
+    if (nonEmptyResults.isEmpty()) {
+      return fallbackContributor.getCompletionSuggestions(context)
+    }
+
+    val maxReplacementLength = nonEmptyResults.maxOf { it.beforePrefixReplacementLength }
+    val maxLenResults = nonEmptyResults.filter { it.beforePrefixReplacementLength == maxReplacementLength }
+    if (maxLenResults.size == 1) {
+      return maxLenResults.first()
+    }
+
+    val suggestions = maxLenResults.asSequence()
+      .flatMap { it.suggestions }
+      .distinctBy { it.name }
+      .toList()
+    return TerminalCommandCompletionResult(
+      suggestions,
+      prefix = maxLenResults.first().prefix,
+      beforePrefixReplacementLength = maxReplacementLength,
+      afterPrefixReplacementLength = maxLenResults.first().afterPrefixReplacementLength,
+    )
+  }
+
   private fun submitSuggestions(
     process: TerminalCommandCompletionProcess,
-    result: TerminalCompletionResult,
+    result: TerminalCommandCompletionResult,
   ) {
     val prefixReplacementIndex = result.suggestions.firstOrNull()?.prefixReplacementIndex ?: 0
     val prefix = result.prefix.substring(prefixReplacementIndex)
@@ -161,7 +220,7 @@ class TerminalCommandCompletionService(
       val element = it.toLookupElement()
       CompletionResult.wrap(element, prefixMatcher, sorter)
     }
-    process.addItems(items)
+    process.addItems(items, result.beforePrefixReplacementLength, result.afterPrefixReplacementLength)
   }
 
   /**
@@ -172,9 +231,16 @@ class TerminalCommandCompletionService(
   private fun checkContextValid(context: TerminalCommandCompletionContext): Boolean {
     val outputModel = context.outputModel
     val activeBlock = context.shellIntegration.blocksModel.activeBlock as TerminalCommandBlock
-    val commandText = getTypedCommandText(activeBlock, outputModel)
+    val curCommandText = getRawCommandText(activeBlock, outputModel)?.let {
+      val cursorOffset = outputModel.cursorOffset - activeBlock.commandStartOffset!!
+      it.substring(0, cursorOffset.toInt())
+    }
+    val contextCommandText = context.commandText.let {
+      val cursorOffset = context.initialCursorOffset - context.commandStartOffset
+      it.substring(0, cursorOffset.toInt())
+    }
     return outputModel.cursorOffset == context.initialCursorOffset
-           && commandText == context.commandText
+           && curCommandText == contextCommandText
   }
 
   @RequiresEdt
@@ -201,18 +267,18 @@ class TerminalCommandCompletionService(
   }
 
   /**
-   * Returns command text typed before the cursor.
+   * Returns command text with possible trailing new lines and spaces.
    * Returns null if the cursor is in the incorrect place or the block is invalid.
    */
-  private fun getTypedCommandText(block: TerminalCommandBlock, model: TerminalOutputModel): String? {
+  private fun getRawCommandText(block: TerminalCommandBlock, model: TerminalOutputModel): String? {
     val start = block.commandStartOffset ?: return null
-    val end = model.cursorOffset
+    val end = block.endOffset
     if (start < model.startOffset || start > model.endOffset
         || end < model.startOffset || end > model.endOffset
         || start > end) {
       return null
     }
-    return model.getText(start, end).toString().trimStart()
+    return model.getText(start, end).toString()
   }
 
   @RequiresEdt
@@ -239,11 +305,9 @@ class TerminalCommandCompletionService(
 
   private fun ShellCompletionSuggestion.toLookupElement(): LookupElement {
     val actualIcon = icon ?: TerminalCompletionUtil.findIconForSuggestion(name, type)
-    val realInsertValue = insertValue?.replace("{cursor}", "")
     val nextSuggestions = TerminalCompletionUtil.getNextSuggestionsString(this).takeIf { it.isNotEmpty() }
-    val escapedInsertValue = StringUtil.escapeChar(realInsertValue ?: name, ' ')
 
-    val element = LookupElementBuilder.create(this, escapedInsertValue)
+    val element = LookupElementBuilder.create(this, name)
       .withPresentableText(displayName ?: name)
       .withTailText(nextSuggestions, true)
       .withIcon(TerminalStatefulDelegatingIcon(actualIcon))

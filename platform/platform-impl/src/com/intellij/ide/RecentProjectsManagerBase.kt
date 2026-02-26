@@ -19,7 +19,12 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.PathManager.getSystemDir
 import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
-import com.intellij.openapi.components.*
+import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.RoamingType
+import com.intellij.openapi.components.SettingsCategory
+import com.intellij.openapi.components.State
+import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
@@ -38,11 +43,16 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.WindowManagerEx
-import com.intellij.openapi.wm.impl.*
+import com.intellij.openapi.wm.impl.FrameInfo
+import com.intellij.openapi.wm.impl.IDE_FRAME_EVENT_LOG
+import com.intellij.openapi.wm.impl.IdeFrameImpl
+import com.intellij.openapi.wm.impl.ProjectFrameBounds
+import com.intellij.openapi.wm.impl.WindowManagerImpl
+import com.intellij.openapi.wm.impl.checkForNonsenseBounds
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil
 import com.intellij.platform.diagnostic.telemetry.impl.span
+import com.intellij.platform.eel.EelUnavailableException
 import com.intellij.platform.eel.provider.EelInitialization
-import com.intellij.platform.eel.provider.EelUnavailableException
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.getEelDescriptor
@@ -54,11 +64,16 @@ import com.intellij.ui.win.createWinDockDelegate
 import com.intellij.util.PathUtilRt
 import com.intellij.util.PlatformUtils
 import com.intellij.util.io.createParentDirectories
-import kotlinx.coroutines.*
+import com.intellij.util.text.nullize
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.annotations.VisibleForTesting
@@ -68,7 +83,8 @@ import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.util.*
+import java.util.AbstractMap
+import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.LongAdder
 import javax.swing.Icon
@@ -77,6 +93,7 @@ import kotlin.collections.Map.Entry
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.invariantSeparatorsPathString
+import kotlin.io.path.name
 import kotlin.io.path.relativeTo
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -268,10 +285,9 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       if (state.additionalInfo.remove(path) != null) {
         modCounter.increment()
       }
-      for (group in state.groups) {
-        if (group.removeProject(path)) {
-          modCounter.increment()
-        }
+      val removedFromGroups = removePathsFromGroups(setOf(path))
+      if (removedFromGroups > 0) {
+        modCounter.add(removedFromGroups.toLong())
       }
       fireChangeEvent()
     }
@@ -280,6 +296,35 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   override fun hasPath(path: String?): Boolean {
     synchronized(stateLock) {
       return state.additionalInfo.containsKey(path)
+    }
+  }
+
+  private fun removePathsFromGroups(paths: Collection<String>): Int {
+    if (paths.isEmpty() || state.groups.isEmpty()) {
+      return 0
+    }
+
+    val pathsToRemove = (paths as? Set<String>) ?: paths.toHashSet()
+    var removedFromGroups = 0
+    for (group in state.groups) {
+      for (path in pathsToRemove) {
+        if (!group.projects.contains(path)) {
+          continue
+        }
+        group.removeProject(path)
+        removedFromGroups++
+      }
+    }
+    return removedFromGroups
+  }
+
+  private fun validateRecentProjects() {
+    val removedPaths = trimRecentProjects(modCounter = modCounter, map = state.additionalInfo)
+    if (removedPaths.isNotEmpty()) {
+      val removedFromGroups = removePathsFromGroups(paths = removedPaths)
+      if (removedFromGroups > 0) {
+        modCounter.add(removedFromGroups.toLong())
+      }
     }
   }
 
@@ -519,7 +564,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       info.projectOpenTimestamp = openTimestamp
 
       state.lastOpenedProject = projectPathString
-      validateRecentProjects(modCounter, state.additionalInfo)
+      validateRecentProjects()
     }
 
     updateSystemDockMenu()
@@ -568,7 +613,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
 
   fun getRecentPaths(): List<String> {
     synchronized(stateLock) {
-      validateRecentProjects(modCounter, state.additionalInfo)
+      validateRecentProjects()
       return state.additionalInfo.filter { !it.value.hidden }.keys.reversed()
     }
   }
@@ -915,9 +960,14 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
 
     var file: Path? = projectPath
     while (file != null) {
-      val projectMetaInfo = state.additionalInfo.remove(file.invariantSeparatorsPathString)
+      val filePath = file.invariantSeparatorsPathString
+      val projectMetaInfo = state.additionalInfo.remove(filePath)
       if (projectMetaInfo != null) {
         modCounter.increment()
+        val removedFromGroups = removePathsFromGroups(setOf(filePath))
+        if (removedFromGroups > 0) {
+          modCounter.add(removedFromGroups.toLong())
+        }
         fireChangeEvent()
         break
       }
@@ -1051,7 +1101,9 @@ private suspend fun fireLastProjectsReopenedEvent(activeProject: Project) {
   }
 }
 
-private fun isUseProjectFrameAsSplash() = Registry.`is`("ide.project.frame.as.splash")
+private fun isUseProjectFrameAsSplash() = Registry.`is`("ide.project.frame.as.splash", false)
+
+private const val IDEA_PROJECT_FILE_EXTENSION = ".ipr"
 
 private fun readProjectName(path: String): String {
   if (!RecentProjectsManagerBase.isFileSystemPath(path)) {
@@ -1069,8 +1121,9 @@ private fun readProjectName(path: String): String {
   // Avoid greedy I/O under non-local projects. For example, in the case of WSL:
   //	1.	it may trigger Ijent initialization for each recent project
   //	2.	with Ijent disabled, performance may degrade further — 9P is very slow and could lead to UI freezes
-  if (file.getEelDescriptor() != LocalEelDescriptor) {
-    return path
+  val eelDescriptor = file.getEelDescriptor()
+  if (eelDescriptor != LocalEelDescriptor) {
+    return file.name.removeSuffix(IDEA_PROJECT_FILE_EXTENSION).nullize()?.let { it + " (" + eelDescriptor.name + ")" } ?: path
   }
 
   return ProjectStorePathManager.getInstance()
@@ -1080,26 +1133,23 @@ private fun readProjectName(path: String): String {
 
 private fun getLastProjectFrameInfoFile() = getSystemDir().resolve("lastProjectFrameInfo")
 
-private fun validateRecentProjects(modCounter: LongAdder, map: MutableMap<String, RecentProjectMetaInfo>) {
+private fun trimRecentProjects(modCounter: LongAdder, map: MutableMap<String, RecentProjectMetaInfo>): List<String> {
   val limit = AdvancedSettings.getInt("ide.max.recent.projects")
   var toRemove = map.size - limit
   if (limit < 1 || toRemove <= 0) {
-    return
+    return emptyList()
   }
 
-  val oldMapSize = map.size
-  val iterator = map.values.iterator()
-  while (true) {
-    if (!iterator.hasNext()) {
-      break
-    }
-
-    val info = iterator.next()
-    if (info.opened) {
+  val removedPaths = ArrayList<String>(toRemove)
+  val iterator = map.entries.iterator()
+  while (iterator.hasNext()) {
+    val entry = iterator.next()
+    if (entry.value.opened) {
       continue
     }
 
     iterator.remove()
+    removedPaths.add(entry.key)
     toRemove--
 
     if (toRemove <= 0) {
@@ -1107,14 +1157,15 @@ private fun validateRecentProjects(modCounter: LongAdder, map: MutableMap<String
     }
   }
 
-  if (oldMapSize != map.size) {
+  if (removedPaths.isNotEmpty()) {
     modCounter.increment()
   }
+  return removedPaths
 }
 
 internal fun getProjectNameOnlyByPath(path: String): String {
   val name = PathUtilRt.getFileName(path)
-  return if (path.endsWith(".ipr")) FileUtilRt.getNameWithoutExtension(name) else name
+  return if (path.endsWith(IDEA_PROJECT_FILE_EXTENSION)) FileUtilRt.getNameWithoutExtension(name) else name
 }
 
 @JvmInline

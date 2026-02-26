@@ -1,11 +1,11 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tools.ide.performanceTesting.commands.codeTyping
 
+import com.intellij.tools.ide.performanceTesting.commands.CommandChain
+import com.intellij.tools.ide.performanceTesting.commands.Keys
 import com.intellij.tools.ide.performanceTesting.commands.codeTyping.CodeTypingCommandGenerator.generateCommands
 import com.intellij.tools.ide.performanceTesting.commands.codeTyping.CodeTypingCommandGenerator.generateReverseCommands
 import com.intellij.tools.ide.performanceTesting.commands.codeTyping.CodeTypingCommandGenerator.preparePlan
-import com.intellij.tools.ide.performanceTesting.commands.CommandChain
-import com.intellij.tools.ide.performanceTesting.commands.Keys
 import com.intellij.tools.ide.performanceTesting.commands.delay
 import com.intellij.tools.ide.performanceTesting.commands.delayType
 import com.intellij.tools.ide.performanceTesting.commands.doComplete
@@ -63,7 +63,8 @@ import com.intellij.tools.ide.performanceTesting.commands.waitForCodeAnalysisFin
 
  */
 object CodeTypingCommandGenerator {
-  private const val CODE_TYPING_SPAN_NAME = "codeTyping"
+  const val CODE_TYPING_SPAN_NAME: String = "codeTyping"
+
   private const val CODE_TYPING_WARMUP_SPAN_NAME = "${CODE_TYPING_SPAN_NAME}_warmup"
 
   /**

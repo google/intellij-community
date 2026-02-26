@@ -2,7 +2,11 @@
 package com.intellij.diagnostic.logs
 
 import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.components.*
+import com.intellij.openapi.components.SerializablePersistentStateComponent
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.State
+import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.IdeaLogRecordFormatter
 import com.intellij.openapi.diagnostic.JulLogger
 import com.intellij.openapi.diagnostic.RollingFileHandler
@@ -15,7 +19,7 @@ import java.util.logging.Level
 import java.util.logging.LogRecord
 
 /**
- * Allows applying & persisting custom log debug categories
+ * Allows applying and persisting custom log debug categories
  * which can be turned on by user via the [com.intellij.ide.actions.DebugLogConfigureAction].
  * Applies these custom categories at startup.
  */
@@ -192,7 +196,7 @@ class LogLevelConfigurationManager : SerializablePersistentStateComponent<LogLev
 
   private fun cleanCurrentCategories() {
     synchronized(lock) {
-      for ((category, logger) in customizedLoggers) {
+      for ((_, logger) in customizedLoggers) {
         setSeparateFile(logger, false)
         logger.level = null
       }

@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.DefaultLogger;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.LeakHunter;
+import com.intellij.testFramework.PerformanceUnitTest;
 import com.intellij.testFramework.TestLoggerKt;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.tools.ide.metrics.benchmark.Benchmark;
@@ -15,7 +16,11 @@ import com.intellij.util.TimeoutUtil;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
 import com.intellij.util.ref.GCWatcher;
 import org.jetbrains.annotations.NonNls;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assume;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
 
 import java.util.ArrayList;
@@ -33,7 +38,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 public class DisposerTest  {
   private MyLoggingDisposable myRoot;
@@ -731,6 +739,7 @@ public class DisposerTest  {
     }
   }
 
+  @PerformanceUnitTest
   @Test
   public void testPerformanceOfRegisterOrDisposeManyChildrenMustBeGood() {
     Disposer.setDebugMode(false); // avoid expensive checks

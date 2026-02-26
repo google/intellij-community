@@ -1,15 +1,23 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl
 
 import com.intellij.injected.editor.DocumentWindow
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ModalityStateListener
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.editor.*
+import com.intellij.openapi.editor.ClientEditorManager
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.EditorKind
 import com.intellij.openapi.editor.actionSystem.ActionPlan
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler
 import com.intellij.openapi.editor.actionSystem.TypedActionHandlerEx
@@ -21,7 +29,9 @@ import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighter
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
+import com.intellij.openapi.editor.impl.ad.isRhizomeAdRebornEnabled
 import com.intellij.openapi.editor.impl.event.EditorEventMulticasterImpl
+import com.intellij.openapi.editor.impl.uiDocument.UiDocumentManager
 import com.intellij.openapi.editor.impl.view.EditorPainter
 import com.intellij.openapi.editor.impl.zombie.Necropolis
 import com.intellij.openapi.extensions.ExtensionPointName
@@ -123,6 +133,7 @@ class EditorFactoryImpl(coroutineScope: CoroutineScope?) : EditorFactory() {
 
   override fun createDocument(text: CharSequence, acceptsSlashR: Boolean, allowUpdatesWithoutWriteAction: Boolean): Document {
     val document = DocumentImpl(text, acceptsSlashR, allowUpdatesWithoutWriteAction)
+    UiDocumentManager.getInstance().bindUiDocument(document)
     editorEventMulticaster.registerDocument(document)
     return document
   }
@@ -324,7 +335,7 @@ private fun collectAllEditors(): Sequence<Editor> {
 }
 
 private fun hackyPutEditorIdToDocument(document: Document) {
-  if (isRhizomeAdEnabled) {
+  if (isRhizomeAdRebornEnabled) {
     if (document.getUserData(KERNEL_EDITOR_ID_KEY) == null) {
       document.putUserData(KERNEL_EDITOR_ID_KEY, EditorId.create())
     }
@@ -332,7 +343,7 @@ private fun hackyPutEditorIdToDocument(document: Document) {
 }
 
 private fun putEditorId(document: Document, editor: EditorImpl) {
-  if (isRhizomeAdEnabled) {
+  if (isRhizomeAdRebornEnabled) {
     editor.putUserData(KERNEL_EDITOR_ID_KEY, document.removeUserData(KERNEL_EDITOR_ID_KEY))
   }
   else {

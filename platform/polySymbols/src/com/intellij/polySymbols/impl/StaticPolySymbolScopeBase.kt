@@ -2,17 +2,27 @@
 package com.intellij.polySymbols.impl
 
 import com.intellij.model.Pointer
-import com.intellij.polySymbols.*
+import com.intellij.polySymbols.PolySymbol
+import com.intellij.polySymbols.PolySymbolKind
+import com.intellij.polySymbols.PolySymbolQualifiedName
 import com.intellij.polySymbols.completion.PolySymbolCodeCompletionItem
 import com.intellij.polySymbols.context.PolyContext
+import com.intellij.polySymbols.framework.FrameworkId
+import com.intellij.polySymbols.framework.framework
 import com.intellij.polySymbols.patterns.PolySymbolPattern
-import com.intellij.polySymbols.query.*
+import com.intellij.polySymbols.query.PolySymbolCodeCompletionQueryParams
+import com.intellij.polySymbols.query.PolySymbolListSymbolsQueryParams
+import com.intellij.polySymbols.query.PolySymbolNameMatchQueryParams
+import com.intellij.polySymbols.query.PolySymbolNamesProvider
+import com.intellij.polySymbols.query.PolySymbolQueryExecutor
+import com.intellij.polySymbols.query.PolySymbolQueryParams
+import com.intellij.polySymbols.query.PolySymbolQueryStack
 import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.util.concurrent.ConcurrentHashMap
 
 @Internal
-abstract class StaticPolySymbolScopeBase<Root : Any, Contribution : Any, Origin : PolySymbolOrigin> : StaticPolySymbolScope {
+abstract class StaticPolySymbolScopeBase<Root : Any, Contribution : Any, Origin> : StaticPolySymbolScope {
 
   private val namesProviderCache: MutableMap<PolySymbolNamesProvider, NameProvidersCache> =
     ContainerUtil.createConcurrentSoftKeySoftValueMap()
@@ -108,13 +118,11 @@ abstract class StaticPolySymbolScopeBase<Root : Any, Contribution : Any, Origin 
 
   protected abstract fun adaptAllContributions(
     contribution: Contribution,
-    framework: FrameworkId?,
     origin: Origin,
   ): Sequence<StaticSymbolContributionAdapter>
 
   protected abstract fun adaptAllRootContributions(
     root: Root,
-    framework: FrameworkId?,
     origin: Origin,
   ): Sequence<StaticSymbolContributionAdapter>
 
@@ -124,7 +132,7 @@ abstract class StaticPolySymbolScopeBase<Root : Any, Contribution : Any, Origin 
     origin: Origin,
   ): ContributionSearchMap =
     getOrCreateMap(queryExecutor, contribution) { consumer ->
-      adaptAllContributions(contribution, origin.framework, origin).forEach(consumer)
+      adaptAllContributions(contribution, origin).forEach(consumer)
     }
 
 
@@ -134,7 +142,7 @@ abstract class StaticPolySymbolScopeBase<Root : Any, Contribution : Any, Origin 
     origin: Origin,
   ): ContributionSearchMap =
     getOrCreateMap(queryExecutor, root) { consumer ->
-      adaptAllRootContributions(root, origin.framework, origin).forEach(consumer)
+      adaptAllRootContributions(root, origin).forEach(consumer)
     }
 
   private fun getOrCreateMap(

@@ -5,7 +5,22 @@ import com.intellij.ide.hierarchy.HierarchyNodeDescriptor;
 import com.intellij.ide.hierarchy.HierarchyTreeStructure;
 import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.*;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiAnonymousClass;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiClassType;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiExpression;
+import com.intellij.psi.PsiExpressionList;
+import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiMember;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiNewExpression;
+import com.intellij.psi.PsiQualifiedReference;
+import com.intellij.psi.PsiRecordComponent;
+import com.intellij.psi.PsiReference;
+import com.intellij.psi.PsiType;
+import com.intellij.psi.PsiTypeParameter;
 import com.intellij.psi.impl.PsiClassImplUtil;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.search.searches.MethodReferencesSearch;
@@ -17,7 +32,12 @@ import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public final class CallerMethodsTreeStructure extends HierarchyTreeStructure {
@@ -71,9 +91,9 @@ public final class CallerMethodsTreeStructure extends HierarchyTreeStructure {
 
     PsiMember member = enclosingElement;
     PsiClass originalClass = member.getContainingClass();
-    
+
     if (originalClass == null) return ArrayUtilRt.EMPTY_OBJECT_ARRAY;
-    
+
     PsiClassType originalType = JavaPsiFacade.getElementFactory(myProject).createType(originalClass);
     Set<PsiMethod> methodsToFind = new HashSet<>();
 
@@ -83,7 +103,9 @@ public final class CallerMethodsTreeStructure extends HierarchyTreeStructure {
 
       Map<PsiMember, NodeDescriptor<?>> methodToDescriptorMap = new HashMap<>();
       for (PsiMethod methodToFind : methodsToFind) {
-        JavaCallHierarchyData data = new JavaCallHierarchyData(originalClass, methodToFind, originalType, method, methodsToFind, descriptor, methodToDescriptorMap, myProject);
+        JavaCallHierarchyData data =
+          new JavaCallHierarchyData(originalClass, methodToFind, originalType, method, methodsToFind, descriptor, methodToDescriptorMap,
+                                    myProject);
 
         MethodReferencesSearch.search(methodToFind, searchScope, true).forEach(reference -> {
           // references in javadoc really couldn't "call" anything
@@ -118,15 +140,21 @@ public final class CallerMethodsTreeStructure extends HierarchyTreeStructure {
           return true;
         });
 
-        // add other method elements without references
+        // add other methods with augmented references to methodToFind
         for (CallHierarchyElementProvider provider : CallHierarchyElementProvider.EP_NAME.getExtensionList()) {
-            provider.appendReferencedMethods(methodToFind, data);
+          final Collection<PsiMethod> referencedMethods = provider.provideReferencedMethods(methodToFind);
+          referencedMethods.forEach(referencedMethod -> {
+            final Map<PsiMember, NodeDescriptor<?>> nodeDescriptorMap = data.getResultMap();
+            nodeDescriptorMap.computeIfAbsent(referencedMethod,
+                                              psiMember -> new CallHierarchyNodeDescriptor(myProject, descriptor, psiMember,
+                                                                                           false, true));
+          });
         }
       }
 
       return ArrayUtil.toObjectArray(methodToDescriptorMap.values());
     }
-    
+
     assert enclosingElement instanceof PsiField || enclosingElement instanceof PsiRecordComponent
       : "Enclosing element should be a field, but was " + enclosingElement.getClass() + ", text: " + enclosingElement.getText();
 
@@ -134,12 +162,10 @@ public final class CallerMethodsTreeStructure extends HierarchyTreeStructure {
       .search(enclosingElement, searchScope).findAll().stream()
       .map(PsiReference::getElement);
 
-    // collect other field elements without references
+    // collect other field elements without direct references
     Collection<@NotNull PsiElement> providedElements = new ArrayList<>();
     for (CallHierarchyElementProvider provider : CallHierarchyElementProvider.EP_NAME.getExtensionList()) {
-      if(provider.canProvide(enclosingElement)) {
-        providedElements.addAll(provider.provideReferencedMembers(enclosingElement));
-      }
+      providedElements.addAll(provider.provideReferencedMembers(enclosingElement));
     }
 
     return Stream.concat(referencedElements, providedElements.stream())

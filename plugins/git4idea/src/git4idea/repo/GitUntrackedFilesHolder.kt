@@ -12,7 +12,6 @@ import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.progress.util.BackgroundTaskUtil
 import com.intellij.openapi.project.InitialVfsRefreshService
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
@@ -32,7 +31,13 @@ import git4idea.index.getFileStatus
 import git4idea.index.isIgnored
 import git4idea.index.isUntracked
 import git4idea.status.GitRefreshListener
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.TestOnly
@@ -153,18 +158,6 @@ class GitUntrackedFilesHolder internal constructor(
     }
     scheduleUpdate()
   }
-
-  /**
-   * Returns the list of unversioned files.
-   * This method may be slow, if the full-refresh of untracked files is needed.
-   *
-   * @return untracked files.
-   * @throws VcsException if there is an unexpected error during Git execution.
-   */
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("use {@link #retrieveUntrackedFilePaths} instead")
-  @Throws(VcsException::class)
-  fun retrieveUntrackedFiles(): Collection<VirtualFile?> = retrieveUntrackedFilePaths().mapNotNull { it.getVirtualFile() }
 
   @Throws(VcsException::class)
   fun retrieveUntrackedFilePaths(): Collection<FilePath> {
@@ -346,10 +339,7 @@ class GitUntrackedFilesHolder internal constructor(
           is DirtyScope.Files -> dirtyScope.files
         }
         coroutineToIndicator {
-          val statusCommand =
-            if (Registry.`is`("git.status.no.lock")) GitCommand.STATUS_NO_LOCK else GitCommand.STATUS
-
-          getFileStatus(project, repoRoot, dirtyFiles, false, true, withIgnored, statusCommand)
+          getFileStatus(project, repoRoot, dirtyFiles, false, true, withIgnored)
         }
       }
 

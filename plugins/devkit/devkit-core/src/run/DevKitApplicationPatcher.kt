@@ -1,10 +1,14 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.run
 
 import com.intellij.execution.JavaRunConfigurationBase
 import com.intellij.execution.RunConfigurationExtension
 import com.intellij.execution.application.ApplicationConfiguration
-import com.intellij.execution.configurations.*
+import com.intellij.execution.configurations.DebuggingRunnerData
+import com.intellij.execution.configurations.JavaParameters
+import com.intellij.execution.configurations.ParametersList
+import com.intellij.execution.configurations.RunConfigurationBase
+import com.intellij.execution.configurations.RunnerSettings
 import com.intellij.execution.scratch.JavaScratchConfiguration
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.diagnostic.logger
@@ -17,7 +21,6 @@ import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.ijent.community.buildConstants.IJENT_BOOT_CLASSPATH_MODULE
 import com.intellij.platform.ijent.community.buildConstants.IJENT_REQUIRED_DEFAULT_NIO_FS_PROVIDER_CLASS
-import com.intellij.platform.ijent.community.buildConstants.IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY
 import com.intellij.platform.ijent.community.buildConstants.MULTI_ROUTING_FILE_SYSTEM_VMOPTIONS
 import com.intellij.util.PlatformUtils
 import com.intellij.util.lang.UrlClassLoader
@@ -275,7 +278,10 @@ internal fun enableIjentDefaultFsProvider(
       project = project,
       platformPrefix = vmParameters.getPropertyValue("idea.platform.prefix"),
     )
-    vmParameters.add("-D${IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY}=$isIjentWslFsEnabled")
+
+    // This option doesn't exist anymore, but it used to exist in old versions.
+    vmParameters.add("-Dwsl.use.remote.agent.for.nio.filesystem=$isIjentWslFsEnabled")
+
     vmParameters.addAll(getMultiRoutingFileSystemVmOptions_Reflective(project))
 
     val outputRoot = getOutputByModule(project, IJENT_BOOT_CLASSPATH_MODULE, "ijent boot classpath addition")

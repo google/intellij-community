@@ -1,0 +1,24 @@
+<idea-plugin visibility="internal">
+  <dependencies>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.platform.analysis"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.ide.concurrency"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.kernel"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.lang.core"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.rpc.topics"/>
+    <module name="intellij.platform.rpc.topics.frontend"/>
+    <module name="intellij.platform.util.ui"/>
+    <!-- endregion -->
+  </dependencies>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <structurePopupProvider implementation="com.intellij.platform.structureView.frontend.impl.StructurePopupProviderImpl"/>
+    <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.structureView.frontend.ShowStructurePopupRemoteTopicListener"/>
+  </extensions>
+</idea-plugin>

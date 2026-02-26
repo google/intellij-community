@@ -21,7 +21,13 @@ import org.jetbrains.kotlin.idea.base.test.IgnoreTests;
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase;
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseKt;
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor;
-import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.KtClass;
+import org.jetbrains.kotlin.psi.KtFunction;
+import org.jetbrains.kotlin.psi.KtObjectDeclaration;
+import org.jetbrains.kotlin.psi.KtParameter;
+import org.jetbrains.kotlin.psi.KtProperty;
+import org.jetbrains.kotlin.psi.KtTypeAlias;
+import org.jetbrains.kotlin.psi.KtTypeParameter;
 
 import java.io.File;
 import java.io.IOException;
@@ -138,6 +144,9 @@ public abstract class AbstractSafeDeleteTest extends KotlinLightCodeInsightFixtu
               return KotlinLightCodeInsightFixtureTestCaseKt.withCustomCompilerOptions(myFixture.getFile().getText(), getProject(), getModule(), () -> {
                   try {
                       SafeDeleteHandler.invoke(getProject(), new PsiElement[] {element}, null, true, null);
+                      if (new File(path + ".messages").exists()) {
+                          throw new AssertionError("Expected conflicts are not found.");
+                      }
                       for (int j = 0; j < filePaths.length; j++) {
                           File file = new File(filePaths[j] + ".after");
                           if (isFirPlugin()) {

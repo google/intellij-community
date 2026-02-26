@@ -16,7 +16,7 @@ import com.intellij.openapi.util.Condition
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import org.jetbrains.annotations.Nls
-import java.util.*
+import java.util.BitSet
 
 internal abstract class ApplySelectedChangesActionBase protected constructor(
   protected val viewer: MergeThreesideViewer
@@ -34,19 +34,13 @@ internal abstract class ApplySelectedChangesActionBase protected constructor(
     val editor = e.getData(CommonDataKeys.EDITOR)
 
     val side = viewer.getEditorSide(editor)
-    if (side == null) {
-      presentation.setEnabledAndVisible(false)
-      return
+    when {
+      side == null || !isVisible(side) ->  presentation.setEnabledAndVisible(false)
+      else -> {
+        presentation.setText(getText(side))
+        presentation.setEnabledAndVisible(isSomeChangeSelected(side) && !viewer.isExternalOperationInProgress)
+      }
     }
-
-    if (!isVisible(side)) {
-      presentation.setEnabledAndVisible(false)
-      return
-    }
-
-    presentation.setText(getText(side))
-
-    presentation.setEnabledAndVisible(isSomeChangeSelected(side) && !viewer.isExternalOperationInProgress)
   }
 
   final override fun actionPerformed(e: AnActionEvent) {
@@ -105,7 +99,7 @@ internal class IgnoreSelectedChangesSideAction(
 
   override fun apply(side: ThreeSide, changes: List<TextMergeChange>) {
     for (change in changes) {
-      viewer.ignoreChange(change, this@IgnoreSelectedChangesSideAction.side, false)
+      viewer.model.ignoreChange(change.index, this@IgnoreSelectedChangesSideAction.side, false)
     }
   }
 
@@ -131,7 +125,7 @@ internal class IgnoreSelectedChangesAction(viewer: MergeThreesideViewer) : Apply
 
   override fun apply(side: ThreeSide, changes: List<TextMergeChange>) {
     for (change in changes) {
-      viewer.markChangeResolved(change)
+      viewer.model.markChangeResolved(change.index)
     }
   }
 }
@@ -143,7 +137,7 @@ internal class ResetResolvedChangeAction(viewer: MergeThreesideViewer) : ApplySe
 
   override fun apply(side: ThreeSide, changes: List<TextMergeChange>) {
     for (change in changes) {
-      viewer.resetResolvedChange(change)
+      viewer.model.resetResolvedChange(change.index)
     }
   }
 
@@ -195,7 +189,7 @@ internal class ResolveSelectedChangesAction(
   }
 
   override fun getText(side: ThreeSide): String {
-    return DiffBundle.message("action.presentation.merge.resolve.using.side.text", side.index)
+    return DiffBundle.message("action.presentation.merge.resolve.using.side.text", this@ResolveSelectedChangesAction.side.index)
   }
 
   override fun isVisible(side: ThreeSide): Boolean {
@@ -222,6 +216,6 @@ internal class ResolveSelectedConflictsAction(viewer: MergeThreesideViewer) : Ap
   override fun isVisible(side: ThreeSide): Boolean = side == ThreeSide.BASE
 
   override fun isEnabled(change: TextMergeChange): Boolean {
-    return viewer.canResolveChangeAutomatically(change, ThreeSide.BASE)
+    return viewer.model.canResolveChangeAutomatically(change.index, ThreeSide.BASE)
   }
 }

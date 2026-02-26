@@ -26,7 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
-import java.awt.*;
+import java.awt.Component;
+import java.awt.Graphics;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -171,7 +172,9 @@ public final class IdeaLogger extends JulLogger {
 
   @Override
   public void error(String message, @Nullable Throwable t, String @NotNull ... details) {
-    if (isTooFrequentException(t)) return;
+    if (isTooFrequentException(t)) {
+      return;
+    }
 
     var detailString = String.join("\n", details);
     if (!detailString.isEmpty()) {

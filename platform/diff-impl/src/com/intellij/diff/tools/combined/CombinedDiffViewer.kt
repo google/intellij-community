@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.combined
 
 import com.intellij.diff.DiffContext
@@ -17,11 +17,21 @@ import com.intellij.diff.tools.util.base.DiffViewerBase
 import com.intellij.diff.tools.util.base.TextDiffViewerUtil
 import com.intellij.diff.util.DiffUtil
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.CommonShortcuts
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.ShortcutSet
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.editor.*
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.LogicalPosition
+import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.editor.ScrollingModel
+import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.editor.actions.EditorActionUtil
 import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
 import com.intellij.openapi.editor.ex.FocusChangeListener
@@ -55,8 +65,15 @@ import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
-import java.util.*
-import javax.swing.*
+import java.util.BitSet
+import java.util.EventListener
+import java.util.Objects
+import javax.swing.JComponent
+import javax.swing.JLayeredPane
+import javax.swing.JPanel
+import javax.swing.JScrollPane
+import javax.swing.ScrollPaneConstants
+import javax.swing.SwingUtilities
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 import kotlin.math.min
@@ -385,13 +402,11 @@ class CombinedDiffViewer(
     hidden: ArrayList<CombinedBlockId>,
   ) {
     val currentBlock = blockState.currentBlock
-    val totalVisible = getBlocksAroundCurrent(currentBlock)
+    val blocksAroundCurrent = getBlocksAroundCurrent(currentBlock)
+    val viewportVisible = inViewport + afterViewport + beforeViewport
+    val totalVisible = (blocksAroundCurrent + viewportVisible).distinct()
 
-    val blocksToHide =
-      hidden.filter { it !in totalVisible } +
-      inViewport.filter { it !in totalVisible } +
-      beforeViewport.filter { it !in totalVisible } +
-      afterViewport.filter { it !in totalVisible }
+    val blocksToHide = hidden.filter { it !in totalVisible }
 
     if (blocksToHide.isNotEmpty()) {
       blockListeners.multicaster.blocksHidden(blocksToHide)

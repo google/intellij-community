@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.codeInsight.lookup.impl;
 
@@ -81,6 +81,9 @@ public final class LookupTypedHandler extends TypedActionHandlerBase {
     }
   }
 
+  /**
+   * @return true if `charTyped` was consumed by lookup and other typed handlers should not be invoked.
+   */
   private static boolean beforeCharTyped(char charTyped,
                                          @NotNull Project project,
                                          @NotNull Editor originalEditor,
@@ -133,6 +136,9 @@ public final class LookupTypedHandler extends TypedActionHandlerBase {
     return true;
   }
 
+  /**
+   * Adds the given character to the lookup prefix, sends corresponding events, and adds the char to the document honoring multiple carets.
+   */
   private static void addCharToPrefix(char charTyped,
                                       @NotNull Editor originalEditor,
                                       @NotNull Editor editor,

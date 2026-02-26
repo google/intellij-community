@@ -4,13 +4,13 @@ package com.intellij.python.community.services.systemPython.impl.providers
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.isMac
-import com.jetbrains.python.PyToolUIInfo
 import com.intellij.python.community.services.systemPython.SystemPythonProvider
+import com.jetbrains.python.PyToolUIInfo
 import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.errorProcessing.PyResult
-import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.file.Path
 
 
 internal class MacSystemPythonProvider : SystemPythonProvider {
@@ -39,7 +39,7 @@ internal class MacSystemPythonProvider : SystemPythonProvider {
 
     val pythons = withContext(Dispatchers.IO) {
       try {
-        return@withContext collectPythonsInPaths(eelApi, directories, names)
+        return@withContext collectPythonsInPaths( directories, names)
       }
       catch (e: RuntimeException) {
         LOGGER.error("Failed to discover mac system pythons", e)

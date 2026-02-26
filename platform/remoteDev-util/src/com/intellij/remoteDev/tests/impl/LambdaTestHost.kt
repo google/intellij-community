@@ -12,25 +12,46 @@ import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginModuleDescriptor
 import com.intellij.ide.plugins.PluginModuleId
 import com.intellij.idea.AppMode
-import com.intellij.openapi.application.*
-import com.intellij.openapi.application.impl.LaterInvocator
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.client.ClientKind
 import com.intellij.openapi.client.ClientSessionsManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.rd.util.setSuspend
-import com.intellij.remoteDev.tests.*
+import com.intellij.remoteDev.tests.LambdaBackendContextClass
+import com.intellij.remoteDev.tests.LambdaFrontendContextClass
+import com.intellij.remoteDev.tests.LambdaIdeContext
+import com.intellij.remoteDev.tests.LambdaIdeContextClass
+import com.intellij.remoteDev.tests.LambdaMonolithContextClass
+import com.intellij.remoteDev.tests.LambdaTestBridge
+import com.intellij.remoteDev.tests.LambdaTestsConstants
 import com.intellij.remoteDev.tests.impl.utils.SerializedLambdaWithIdeContextHelper
 import com.intellij.remoteDev.tests.impl.utils.runLogged
 import com.intellij.remoteDev.tests.impl.utils.waitSuspendingNotNull
 import com.intellij.remoteDev.tests.modelGenerated.LambdaRdIdeType
 import com.intellij.remoteDev.tests.modelGenerated.LambdaRdTestActionParameters
 import com.intellij.remoteDev.tests.modelGenerated.lambdaTestModel
-import com.jetbrains.rd.framework.*
+import com.jetbrains.rd.framework.IdKind
+import com.jetbrains.rd.framework.Identities
+import com.jetbrains.rd.framework.Protocol
+import com.jetbrains.rd.framework.Serializers
+import com.jetbrains.rd.framework.SocketWire
 import com.jetbrains.rd.util.lifetime.EternalLifetime
 import com.jetbrains.rd.util.reactive.viewNotNull
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.io.File
@@ -198,10 +219,11 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
           }
         }
 
-        var ideContext = getLambdaIdeContext()
+        var ideContext: LambdaIdeContextClass? = null
 
         session.beforeAll.setSuspend(sessionBgtDispatcher) { _, testClassName ->
           LOG.info("========================= Test class '$testClassName' started ==========================")
+          assert(ideContext == null) { "Lambda task coroutine context should not be defined" }
         }
 
         session.beforeEach.setSuspend(sessionBgtDispatcher) { _, testName ->
@@ -218,16 +240,22 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         }
 
         session.afterEach.setSuspend(sessionBgtDispatcher) { _, testName ->
-          ideContext.runAfterEachCleanup()
-          runLogged("Cancelling scopes in after each") {
-            ideContext.coroutineContext.job.cancelAndJoin()
-          }
           LOG.info("------------------------- Test '$testName' finished -------------------------")
+          assert(ideContext?.coroutineContext?.isActive == true) { "Lambda task coroutine context should be active" }
+          try {
+            ideContext!!.runAfterEachCleanup()
+          }
+          catch (t: Throwable) {
+            LOG.error("Error during afterEach cleanup for test '$testName': ${t.message}", t)
+          }
+          finally {
+            ideContext = null
+          }
         }
 
         session.afterAll.setSuspend(sessionBgtDispatcher) { _, testClassName ->
-          ideContext.runAfterAllCleanup()
           LOG.info("========================= Test class '$testClassName' finished =========================")
+          assert(ideContext == null) { "Lambda task coroutine context should not be defined" }
         }
         // Advice for processing events
         session.runLambda.setSuspend(sessionBgtDispatcher) { _, parameters ->
@@ -238,7 +266,9 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
           }
           try {
             val lambdaReference = parameters.reference
-            val namedLambdas = findLambdaClasses(lambdaReference, testModuleDescriptor!!, ideContext)
+            assert(ideContext?.coroutineContext?.isActive == true) { "Lambda task coroutine context should be active" }
+
+            val namedLambdas = findLambdaClasses(lambdaReference, testModuleDescriptor!!, ideContext!!)
 
             val ideAction = namedLambdas.singleOrNull { it.name() == lambdaReference } ?: run {
               val text = "There is no Action with reference '${lambdaReference}', something went terribly wrong, " +
@@ -279,7 +309,16 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
           }
 
           assert(ClientId.current.isLocal) { "ClientId '${ClientId.current}' should be local before test method starts" }
-          withContext(ideContext.coroutineContext + Dispatchers.Default + CoroutineName("Lambda task: ${lambda.stepName}") + clientIdContextToRunLambda()) {
+
+          val scopeToUse = if (lambda.globalTestScope) {
+            getLambdaIdeContext()
+          }
+          else {
+            assert(ideContext?.coroutineContext?.isActive == true) { "Lambda task coroutine context should be active" }
+            ideContext!!
+          }
+
+          withContext(scopeToUse.coroutineContext + Dispatchers.Default + CoroutineName("Lambda task: ${lambda.stepName}") + clientIdContextToRunLambda()) {
             runLogged(lambda.stepName, 10.minutes) {
               val urls = lambda.classPath.map { Path(it).toUri().toURL() }
               URLClassLoader(urls.toTypedArray(), testModuleDescriptor?.pluginClassLoader ?: this::class.java.classLoader).use { cl ->
@@ -287,9 +326,10 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
                   val params = lambda.parametersBase64.map {
                     loader.decodeObject<String>(it, classLoader = cl) ?: error("Parameter $it is not serializable")
                   }
-                  val serializableConsumer = loader.getSuspendingSerializableConsumer<LambdaIdeContext, Any>(lambda.serializedDataBase64, classLoader = cl)
+                  val serializableConsumer =
+                    loader.getSuspendingSerializableConsumer<LambdaIdeContext, Any>(lambda.serializedDataBase64, classLoader = cl)
                   val result = with(serializableConsumer) {
-                    with(ideContext) {
+                    with(scopeToUse) {
                       runSerializedLambda(params)
                     }
                   }
@@ -309,58 +349,6 @@ open class LambdaTestHost(coroutineScope: CoroutineScope) {
         session.isResponding.setSuspend(sessionBgtDispatcher + NonCancellable) { _, _ ->
           LOG.info("Answering for session is responding...")
           true
-        }
-
-        session.projectsNames.setSuspend(sessionBgtDispatcher) { _, _ ->
-          ProjectManagerEx.getOpenProjects().map { it.name }.also {
-            LOG.info("Projects: ${it.joinToString(", ", "[", "]")}")
-          }
-        }
-
-        suspend fun waitProjectInitialisedOrDisposed(project: Project) {
-          runLogged("Wait project '${project.name}' is initialised or disposed", 10.seconds) {
-            while (!(project.isInitialized || project.isDisposed)) {
-              delay(1.seconds)
-            }
-          }
-        }
-
-        suspend fun leaveAllModals(throwErrorIfModal: Boolean) {
-          withContext(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) {
-            repeat(10) {
-              if (ModalityState.current() == ModalityState.nonModal()) {
-                return@withContext
-              }
-              delay(1.seconds)
-            }
-            if (throwErrorIfModal) {
-              LOG.error("Unexpected modality: " + ModalityState.current())
-            }
-            LaterInvocator.forceLeaveAllModals("LambdaTestHost - leaveAllModals")
-            repeat(10) {
-              if (ModalityState.current() == ModalityState.nonModal()) {
-                return@withContext
-              }
-              delay(1.seconds)
-            }
-            LOG.error("Failed to close modal dialog: " + ModalityState.current())
-          }
-        }
-
-        session.closeAllOpenedProjects.setSuspend(sessionBgtDispatcher) { _, _ ->
-          leaveAllModals(throwErrorIfModal = true)
-
-          ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
-          withContext(Dispatchers.EDT + NonCancellable) {
-            writeIntentReadAction {
-              ProjectManagerEx.getInstanceEx().closeAndDisposeAllProjects(checkCanClose = false)
-            }
-          }
-        }
-
-
-        session.projectsAreInitialised.setSuspend(sessionBgtDispatcher) { _, _ ->
-          ProjectManagerEx.getOpenProjects().map { it.isInitialized }.all { true }
         }
 
         LOG.info("Test session ready!")

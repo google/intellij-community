@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.impl;
 
 import com.intellij.CommonBundle;
@@ -9,15 +9,33 @@ import com.intellij.diagnostic.ActivityCategory;
 import com.intellij.diagnostic.StartUpMeasurer;
 import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector;
-import com.intellij.ide.*;
+import com.intellij.ide.ActivityTracker;
+import com.intellij.ide.AppLifecycleListener;
+import com.intellij.ide.ApplicationActivationStateManager;
+import com.intellij.ide.GeneralSettings;
+import com.intellij.ide.IdeBundle;
+import com.intellij.ide.IdeEventQueue;
+import com.intellij.ide.SaveAndSyncHandler;
 import com.intellij.ide.plugins.ContainerDescriptor;
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl;
 import com.intellij.idea.AppExitCodes;
 import com.intellij.idea.AppMode;
 import com.intellij.idea.IdeaLogger;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.*;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationBundle;
+import com.intellij.openapi.application.ApplicationListener;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.InstantShutdown;
 import com.intellij.openapi.application.ModalityKt;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadActionListener;
+import com.intellij.openapi.application.ThreadingSupport;
+import com.intellij.openapi.application.TransactionGuard;
+import com.intellij.openapi.application.TransactionGuardImpl;
+import com.intellij.openapi.application.WriteActionListener;
+import com.intellij.openapi.application.WriteIntentReadActionListener;
+import com.intellij.openapi.application.WriteLockReacquisitionListener;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationUtil;
 import com.intellij.openapi.client.ClientAwareComponentManager;
@@ -25,7 +43,13 @@ import com.intellij.openapi.components.impl.stores.IComponentStore;
 import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.Extensions;
-import com.intellij.openapi.progress.*;
+import com.intellij.openapi.progress.Cancellation;
+import com.intellij.openapi.progress.EmptyProgressIndicator;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressIndicatorProvider;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.progress.impl.CoreProgressManager;
 import com.intellij.openapi.progress.impl.ProgressRunner;
 import com.intellij.openapi.progress.util.PotemkinProgress;
@@ -37,7 +61,14 @@ import com.intellij.openapi.project.ex.ProjectManagerEx;
 import com.intellij.openapi.ui.DoNotAskOption;
 import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.*;
+import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.util.Condition;
+import com.intellij.openapi.util.Conditions;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.util.NlsSafe;
+import com.intellij.openapi.util.ShutDownTracker;
+import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.platform.diagnostic.telemetry.PlatformScopesKt;
 import com.intellij.platform.diagnostic.telemetry.Scope;
@@ -51,21 +82,38 @@ import com.intellij.platform.locking.impl.listeners.LockAcquisitionListener;
 import com.intellij.psi.util.ReadActionCache;
 import com.intellij.ui.ComponentUtil;
 import com.intellij.ui.scale.JBUIScale;
-import com.intellij.util.*;
-import com.intellij.util.concurrency.*;
+import com.intellij.util.ArrayUtil;
+import com.intellij.util.ArrayUtilRt;
+import com.intellij.util.BitUtil;
+import com.intellij.util.EventDispatcher;
+import com.intellij.util.ExceptionUtil;
+import com.intellij.util.Restarter;
+import com.intellij.util.SystemProperties;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.concurrency.AppScheduledExecutorService;
+import com.intellij.util.concurrency.Propagation;
+import com.intellij.util.concurrency.SynchronizedClearableLazy;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.ui.EDT;
-import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.coroutines.CoroutineContext;
 import kotlin.jvm.functions.Function0;
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.GlobalScope;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+import org.jetbrains.annotations.VisibleForTesting;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
+import java.awt.Component;
+import java.awt.Frame;
+import java.awt.KeyboardFocusManager;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -497,12 +545,12 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     // - modal progress: `enterModal`;
     // - modal progress: schedule modal dialog to show after 300ms;
     // - modal progress: `pumpEventsForHierarchy`;
-    // - one of events runs `isConditionalModal() && !shouldStartInBackground()` task;
+    // - one of the events runs `isConditionalModal() && !shouldStartInBackground()` task;
     // - on EDT such tasks are executed synchronously;
     // - task starts nested `pumpEventsForHierarchy` without entering the modality;
-    // - nested `pumpEventsForHierarchy` shows scheduled modal progress dialog;
-    // - nested `pumpEventsForHierarchy` cannot finish because scheduled modal progress dialog runs nested event loop;
-    // - modal dialog cannot finish until task is finished because it's synchronous.
+    // - nested `pumpEventsForHierarchy` shows a scheduled modal progress dialog;
+    // - nested `pumpEventsForHierarchy` cannot finish because the scheduled modal progress dialog runs nested event loop;
+    // - modal dialog cannot finish until the task is finished because it's synchronous.
     //
     // Applying `ProgressRunner.modal()` only when `shouldShowModalWindow == true` is a correct solution,
     // but it forces the execution of non-modal synchronous tasks directly on the EDT
@@ -555,6 +603,10 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
       return;
     }
 
+    if (isWriteAccessAllowed()) {
+      throw new IllegalStateException("Calling invokeAndWait from write-action leads to deadlock.");
+    }
+
     if (holdsReadLock()) {
       throw new IllegalStateException("Calling invokeAndWait from read-action leads to possible deadlock.");
     }
@@ -563,8 +615,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     // Start from inner layer: transaction guard
     final var guarded = myTransactionGuard.wrapLaterInvocation(runnable, state);
     // Middle layer: lock and modality
-    boolean wrapWithLocksDeep = wrapWithLocks && !ThreadingRuntimeFlagsKt.getUseNonBlockingFlushQueue();
-    final var locked = wrapWithRunIntendedWriteActionAndModality(guarded, wrapWithLocksDeep, ctxAware ? null : state);
+    final var locked = wrapWithRunIntendedWriteActionAndModality(guarded, false, ctxAware ? null : state);
     // Outer layer context capture & reset
     final var finalRunnable = AppImplKt.rethrowExceptions(AppScheduledExecutorService::captureContextCancellationForRunnableThatDoesNotOutliveContextScope, locked);
 
@@ -1107,19 +1158,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     });
   }
 
-  private static void checkWriteActionAllowedOnCurrentThread() {
-    if (EDT.isCurrentThreadEdt()) {
-      return;
-    }
-    if (!InternalThreading.isBackgroundWriteActionAllowed()) {
-      throw new IllegalStateException(
-        "Background write action is not permitted on this thread. Consider using `backgroundWriteAction`, or switch to EDT");
-    }
-  }
-
   @Override
   public void runWriteAction(@NotNull Runnable action) {
-    checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
     try {
       getThreadingSupport().runWriteActionBlocking(runnableUnitFunction(action));
@@ -1131,7 +1171,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public <T> T runWriteAction(@NotNull Computable<T> computation) {
-    checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
     try {
       return getThreadingSupport().runWriteActionBlocking(computation::compute);
@@ -1143,7 +1182,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public <T, E extends Throwable> T runWriteAction(@NotNull ThrowableComputable<T, E> computation) throws E {
-    checkWriteActionAllowedOnCurrentThread();
     incrementBackgroundWriteActionCounter();
     try {
       return getThreadingSupport().runWriteActionBlocking(rethrowCheckedExceptions(computation));

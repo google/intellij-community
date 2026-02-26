@@ -50,7 +50,8 @@ class KotlinCreateTestDialog(
     private class KotlinTestMemberInfo(memberInfo: MemberInfo): MemberInfo(memberInfo.member) {
         init {
             val unwrapped = (memberInfo.member as? KtLightMethod)?.unwrapped
-            if (unwrapped is KtNamedFunction) {
+            // for enum synthetic methods like `values`, `valueOf` unwrapped is KtClass rather KtNamedFunction
+            if (unwrapped is KtNamedFunction || unwrapped is KtProperty) {
                 displayName =
                     allowAnalysisOnEdt {
                         KotlinMemberInfoSupport.getInstance().renderMemberInfo(unwrapped)

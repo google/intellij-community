@@ -25,7 +25,9 @@ jvm_library(
   associates = [":xslt-debugger-impl-rt"],
   deps = [
     "//plugins/xpath/xslt-rt:rt",
+    "//plugins/xpath/xslt-rt:rt_test_lib",
     "//plugins/xslt-debugger/engine:xslt-debugger-rt",
+    "//plugins/xslt-debugger/engine:xslt-debugger-rt_test_lib",
     "//plugins/xslt-debugger/engine/impl/lib:xslt-debugger-impl-rt-_saxon-9_h_e",
     "//plugins/xslt-debugger/engine/impl/lib:xslt-debugger-impl-rt-_saxon-6-5-5",
     "@lib//:xslt-debugger-impl-rt-_xalan-2-7-3",

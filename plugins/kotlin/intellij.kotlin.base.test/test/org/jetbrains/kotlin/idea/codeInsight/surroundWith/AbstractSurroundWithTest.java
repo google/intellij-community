@@ -13,10 +13,24 @@ import com.intellij.psi.PsiElement;
 import kotlin.io.FilesKt;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.*;
-import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.*;
-import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase;
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinIfElseExpressionSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinNotSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinParenthesesSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinStringTemplateSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinTryExpressionSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinWhenSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression.KotlinWithIfExpressionSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinDoWhileSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinForSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinFunctionLiteralSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinIfElseSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinIfSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinTryCatchFinallySurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinTryCatchSurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinTryFinallySurrounder;
+import org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement.KotlinWhileSurrounder;
+import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
 
 import java.io.File;
@@ -91,6 +105,18 @@ public abstract class AbstractSurroundWithTest extends KotlinLightCodeInsightFix
         doTest(path, new KotlinWithIfExpressionSurrounder(true));
     }
 
+    public void doTestWithWhileSurrounder(String path) throws Exception {
+        doTest(path, new KotlinWhileSurrounder());
+    }
+
+    public void doTestWithDoWhileSurrounder(String path) throws Exception {
+        doTest(path, new KotlinDoWhileSurrounder());
+    }
+
+    public void doTestWithForSurrounder(String path) throws Exception {
+        doTest(path, new KotlinForSurrounder());
+    }
+
     private void doTest(String path, Surrounder surrounder) throws Exception {
         myFixture.configureByFile(path);
 
@@ -124,8 +150,7 @@ public abstract class AbstractSurroundWithTest extends KotlinLightCodeInsightFix
         }
     }
 
-    @Nullable
-    private PsiElement[] getElementsToSurround(@NotNull Surrounder surrounder) {
+    private PsiElement @Nullable [] getElementsToSurround(@NotNull Surrounder surrounder) {
         List<SurroundDescriptor> surroundDescriptors =
                 LanguageSurrounders.INSTANCE.allForLanguage(getFile().getViewProvider().getBaseLanguage());
 

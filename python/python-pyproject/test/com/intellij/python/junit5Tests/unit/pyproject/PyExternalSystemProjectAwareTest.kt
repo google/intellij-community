@@ -4,7 +4,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.modules
 import com.intellij.python.pyproject.PY_PROJECT_TOML
 import com.intellij.python.pyproject.model.api.ModelRebuiltListener
-import com.intellij.python.pyproject.model.internal.autoImportBridge.MODEL_REBUILD
+import com.intellij.python.pyproject.model.api.isPyProjectTomlBased
+import com.intellij.python.pyproject.model.internal.MODEL_REBUILD
 import com.intellij.python.pyproject.model.internal.autoImportBridge.PyExternalSystemProjectAware
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
@@ -14,6 +15,7 @@ import com.intellij.testFramework.junit5.fixture.tempPathFixture
 import com.intellij.testFramework.utils.io.deleteRecursively
 import com.intellij.util.io.write
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions
@@ -58,11 +60,16 @@ class PyExternalSystemProjectAwareTest {
     }
     Assertions.assertEquals(members.size, files.size, "Wrong number of toml files")
 
-    sut.reloadProjectImpl()
+    launch {
+      sut.reloadProjectImpl()
+    }
 
     val m = Mutex(locked = true)
     projectFixture.get().messageBus.connect(disposable).subscribe(MODEL_REBUILD, ModelRebuiltListener { project ->
       try {
+        for (module in project.modules) {
+          Assertions.assertTrue(module.isPyProjectTomlBased, "$module isn't pyproject based")
+        }
         val moduleNames = project.modules.map { it.name }.sorted().toTypedArray()
         Assertions.assertArrayEquals(members, moduleNames, "Wrong modules created")
       }

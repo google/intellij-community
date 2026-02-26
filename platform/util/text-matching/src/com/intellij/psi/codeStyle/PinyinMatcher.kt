@@ -3,11 +3,14 @@ package com.intellij.psi.codeStyle
 
 import com.intellij.openapi.util.TextRange
 import com.intellij.util.containers.FList
+import com.intellij.util.text.matching.MatchedFragment
+import com.intellij.util.text.matching.deprecated
+import com.intellij.util.text.matching.undeprecate
 import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
 class PinyinMatcher internal constructor(override val pattern: String) : MinusculeMatcher() {
-  override fun matchingFragments(name: String): FList<TextRange>? {
+  override fun match(name: String): List<MatchedFragment>? {
     val pattern = this.pattern
     val patternLength = pattern.length
     val nameLength = name.length
@@ -36,18 +39,19 @@ class PinyinMatcher internal constructor(override val pattern: String) : Minuscu
           continue@OUTER
         }
       }
-      return FList.singleton(TextRange.create(start, start + patternLength))
+      return listOf(MatchedFragment(start, start + patternLength))
     }
     return null
   }
 
-  override fun matchingDegree(
-    name: String,
-    valueStartCaseMatch: Boolean,
-    fragments: FList<out TextRange>?,
-  ): Int {
-    return if (fragments != null && fragments.size == 1) {
-      val range = fragments.head
+  @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  override fun matchingFragments(name: String): FList<TextRange>? {
+    return match(name)?.deprecated()
+  }
+
+  override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: List<MatchedFragment>?): Int {
+    return if (!fragments.isNullOrEmpty()) {
+      val range = fragments.first()
       if (range.startOffset == 0) {
         return 500 + range.length
       }
@@ -63,6 +67,15 @@ class PinyinMatcher internal constructor(override val pattern: String) : Minuscu
     else {
       Int.MIN_VALUE
     }
+  }
+
+  @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  override fun matchingDegree(
+    name: String,
+    valueStartCaseMatch: Boolean,
+    fragments: FList<out TextRange>?,
+  ): Int {
+    return matchingDegree(name, valueStartCaseMatch, fragments?.undeprecate())
   }
 
   companion object {

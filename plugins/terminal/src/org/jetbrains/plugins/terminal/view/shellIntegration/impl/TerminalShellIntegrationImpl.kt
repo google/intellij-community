@@ -13,8 +13,17 @@ import org.jetbrains.plugins.terminal.session.impl.TerminalBlocksModelState
 import org.jetbrains.plugins.terminal.util.fireListenersAndLogAllExceptions
 import org.jetbrains.plugins.terminal.view.TerminalOffset
 import org.jetbrains.plugins.terminal.view.TerminalOutputModel
-import org.jetbrains.plugins.terminal.view.shellIntegration.*
-import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus.*
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandBlock
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandExecutionEvent
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandExecutionListener
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandFinishedEvent
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandStartedEvent
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus.ExecutingCommand
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus.TypingCommand
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus.WaitingForPrompt
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalShellBasedCompletionListener
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalShellIntegration
 
 @ApiStatus.Internal
 class TerminalShellIntegrationImpl(
@@ -32,6 +41,15 @@ class TerminalShellIntegrationImpl(
 
   private val mutableOutputStatus = MutableStateFlow<TerminalOutputStatus>(WaitingForPrompt)
   override val outputStatus: StateFlow<TerminalOutputStatus> = mutableOutputStatus.asStateFlow()
+
+  override var commandAliases: Map<String, String> = emptyMap()
+    private set
+
+  private val completionListeners = DisposableWrapperList<TerminalShellBasedCompletionListener>()
+
+  override fun addShellBasedCompletionListener(parentDisposable: Disposable, listener: TerminalShellBasedCompletionListener) {
+    completionListeners.add(listener, parentDisposable)
+  }
 
   fun onPromptStarted(offset: TerminalOffset) {
     blocksModel.startNewBlock(offset)
@@ -63,6 +81,16 @@ class TerminalShellIntegrationImpl(
 
     val block = blocksModel.activeBlock as TerminalCommandBlock
     fireCommandExecutionListeners(TerminalCommandFinishedEventImpl(outputModel, block))
+  }
+
+  fun onAliasesReceived(aliases: Map<String, String>) {
+    commandAliases = aliases.toMap()
+  }
+
+  fun onCompletionFinished(result: String) {
+    fireListenersAndLogAllExceptions(completionListeners, LOG, "Exception during handling completion finished event") {
+      it.completionFinished(result)
+    }
   }
 
   fun restoreFromState(blocksModelState: TerminalBlocksModelState) {

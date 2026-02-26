@@ -6,7 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
@@ -19,7 +23,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testConcurrentLoggingNoDuplicates() = timeoutRunBlocking(context = Dispatchers.Default) {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 1000)
 
     // Launch 10 coroutines that will all try to log simultaneously
@@ -43,7 +47,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testSupplierNotEvaluatedWhenThrottled() {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 100)
 
     val supplierCallCount = AtomicInteger(0)
@@ -66,27 +70,12 @@ class ThrottledLoggerTest {
   }
 
   /**
-   * Tests that zero throttle period means no throttling (every call logs).
-   */
-  @Test
-  fun testZeroThrottlePeriodLogsEveryCall() {
-    val testLogger = TestLogger()
-    val throttledLogger = ThrottledLogger(testLogger, 0)
-
-    throttledLogger.info("message 1")
-    throttledLogger.info("message 2")
-    throttledLogger.info("message 3")
-
-    assertEquals(3, testLogger.infoCount.get(), "With zero throttle, all messages should log")
-  }
-
-  /**
    * Tests basic throttling behavior: first message logs, subsequent messages within
    * throttle period are suppressed, messages after period logs again.
    */
   @Test
   fun testBasicThrottlingBehavior() = timeoutRunBlocking(context = Dispatchers.Default) {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 50)  // 50ms throttle
 
     // First call: should log
@@ -111,7 +100,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testHighContentionStress() = timeoutRunBlocking(context = Dispatchers.Default) {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 100)
 
     val coroutineCount = 50
@@ -139,7 +128,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testAllLogLevels() = timeoutRunBlocking(context = Dispatchers.Default) {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 50)
 
     // Test debug level
@@ -174,7 +163,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testThrottlingWithThrowable() {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 100)
 
     val ex = Exception("test exception")
@@ -191,7 +180,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testWrappedLogger() {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
     val throttledLogger = ThrottledLogger(testLogger, 100)
 
     assertSame(testLogger, throttledLogger.wrappedLogger())
@@ -202,16 +191,20 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testConstructorValidation() {
-    val testLogger = TestLogger()
+    val testLogger = CountingTestLogger()
 
     // Negative throttle should throw
     assertThrows(IllegalArgumentException::class.java) {
       ThrottledLogger(testLogger, -1)
     }
 
-    // Zero and positive values should be valid
-    assertDoesNotThrow {
+    // Zero values should be throw
+    assertThrows(IllegalArgumentException::class.java) {
       ThrottledLogger(testLogger, 0)
+    }
+
+    // Positive values should be valid
+    assertDoesNotThrow {
       ThrottledLogger(testLogger, 1000)
     }
   }
@@ -221,7 +214,7 @@ class ThrottledLoggerTest {
    */
   @Test
   fun testDebugEnabledCheck() {
-    val testLogger = TestLogger(debugEnabled = false)
+    val testLogger = CountingTestLogger(debugEnabled = false)
     val throttledLogger = ThrottledLogger(testLogger, 100)
 
     throttledLogger.debug("should not log")
@@ -235,7 +228,7 @@ class ThrottledLoggerTest {
   /**
    * Test logger that counts calls to each log level.
    */
-  private class TestLogger(var debugEnabled: Boolean = true) : Logger() {
+  private class CountingTestLogger(var debugEnabled: Boolean = true) : Logger() {
     val debugCount = AtomicInteger(0)
     val infoCount = AtomicInteger(0)
     val warnCount = AtomicInteger(0)

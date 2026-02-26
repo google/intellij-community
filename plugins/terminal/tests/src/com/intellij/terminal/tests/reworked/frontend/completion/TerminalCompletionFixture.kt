@@ -1,6 +1,11 @@
 package com.intellij.terminal.tests.reworked.frontend.completion
 
-import com.intellij.codeInsight.lookup.*
+import com.intellij.codeInsight.lookup.Lookup
+import com.intellij.codeInsight.lookup.LookupElement
+import com.intellij.codeInsight.lookup.LookupEvent
+import com.intellij.codeInsight.lookup.LookupListener
+import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.codeInsight.lookup.LookupManagerListener
 import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
@@ -21,13 +26,18 @@ import com.intellij.terminal.frontend.view.completion.TerminalLookupPrefixUpdate
 import com.intellij.terminal.frontend.view.impl.TerminalViewImpl
 import com.intellij.terminal.frontend.view.impl.TimedKeyEvent
 import com.intellij.terminal.tests.block.util.TestCommandSpecsProvider
-import com.intellij.terminal.tests.reworked.util.EchoingTerminalSession
+import com.intellij.terminal.tests.reworked.util.TerminalTestUtil.text
 import com.intellij.testFramework.ExtensionTestUtil
+import com.intellij.util.asDisposable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.plugins.terminal.JBTerminalSystemSettingsProvider
 import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import org.jetbrains.plugins.terminal.block.completion.TerminalCommandCompletionShowingMode
@@ -35,12 +45,15 @@ import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecConf
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecInfo
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellCommandSpecsProvider
 import org.jetbrains.plugins.terminal.block.reworked.TerminalCommandCompletion
-import org.jetbrains.plugins.terminal.util.terminalProjectScope
+import org.jetbrains.plugins.terminal.session.impl.TerminalSession
+import org.jetbrains.plugins.terminal.util.getNow
 import org.jetbrains.plugins.terminal.view.TerminalContentChangeEvent
 import org.jetbrains.plugins.terminal.view.TerminalCursorOffsetChangeEvent
 import org.jetbrains.plugins.terminal.view.TerminalOutputModel
 import org.jetbrains.plugins.terminal.view.TerminalOutputModelListener
 import org.jetbrains.plugins.terminal.view.impl.MutableTerminalOutputModel
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalCommandBlock
+import org.jetbrains.plugins.terminal.view.shellIntegration.TerminalOutputStatus
 import org.junit.Assume
 import java.awt.event.KeyEvent
 import java.awt.event.KeyEvent.VK_UNDEFINED
@@ -49,30 +62,32 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
-class TerminalCompletionFixture(val project: Project, val testRootDisposable: Disposable) {
-
-  private val view: TerminalViewImpl
+internal class TerminalCompletionFixture(
+  private val project: Project,
+  session: TerminalSession,
+  private val coroutineScope: CoroutineScope,
+) {
+  val view: TerminalViewImpl
 
   val outputModel: MutableTerminalOutputModel
     get() = view.activeOutputModel() as MutableTerminalOutputModel
 
   init {
-    Registry.get("terminal.type.ahead").setValue(true, testRootDisposable)
-    TerminalCommandCompletion.enableForTests(testRootDisposable)
+    val parentDisposable = coroutineScope.asDisposable()
+    Registry.get("terminal.type.ahead").setValue(true, parentDisposable)
+    TerminalCommandCompletion.enableForTests(parentDisposable)
     // Terminal completion might still be disabled if not supported yet on some OS.
     Assume.assumeTrue(TerminalCommandCompletion.isEnabled(project))
 
-    val terminalScope = terminalProjectScope(project).childScope("TerminalViewImpl")
-    Disposer.register(testRootDisposable) {
-      terminalScope.cancel()
-    }
-    view = TerminalViewImpl(project, JBTerminalSystemSettingsProvider(), null, terminalScope)
-    val session = EchoingTerminalSession(coroutineScope = terminalScope.childScope("EchoingTerminalSession"))
+    val terminalViewScope = coroutineScope.childScope("TerminalViewImpl")
+    view = TerminalViewImpl(project, JBTerminalSystemSettingsProvider(), null, terminalViewScope)
     view.connectToSession(session)
   }
 
   suspend fun awaitShellIntegrationFeaturesInitialized() {
     view.shellIntegrationFeaturesInitJob.join()
+    val shellIntegration = view.shellIntegrationDeferred.await()
+    shellIntegration.outputStatus.first { it == TerminalOutputStatus.TypingCommand }
   }
 
   suspend fun type(text: String) {
@@ -191,6 +206,19 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
     runActionById("Terminal.CommandCompletion.InsertSuggestion")
   }
 
+  fun insertCompletionItem(itemText: String) {
+    val lookup = getActiveLookup() ?: error("No active lookup")
+
+    val itemIndex = lookup.items.indexOfFirst { it.lookupString == itemText }
+    assertThat(itemIndex)
+      .overridingErrorMessage { "Item with text '$itemText' not found in lookup: ${lookup.itemStrings}" }
+      .isNotEqualTo(-1)
+
+    lookup.selectedIndex = itemIndex
+
+    insertSelectedItem()
+  }
+
   fun downCompletionPopup() {
     runActionById("Terminal.CommandCompletion.SelectSuggestionBelow")
   }
@@ -271,16 +299,62 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
           }
         })
       }
+
+      // Give the output model updates settle down for a moment
+      // to ensure that condition is met not in the middle of updates.
+      delay(300)
+      condition(view.activeOutputModel())
     }
 
-    return result != null
+    return result == true
   }
+
+  /**
+   * Awaits for command text state of the active block to match the [expectedCommandPattern].
+   * Pattern should include `<cursor>` marker to indicate the expected cursor position.
+   */
+  suspend fun assertCommandTextState(expectedCommandPattern: String) {
+    val cursorMarker = "<cursor>"
+    val expectedText = expectedCommandPattern.replace(cursorMarker, "")
+    val expectedCursorOffset = expectedCommandPattern.indexOf(cursorMarker).toLong()
+
+    val blockModel = view.shellIntegrationDeferred.getNow()!!.blocksModel
+    val activeBlock = blockModel.activeBlock as TerminalCommandBlock
+    val conditionMet = awaitOutputModelState(3.seconds) { outputModel ->
+      val commandStartOffset = activeBlock.commandStartOffset ?: return@awaitOutputModelState false
+      val textBeforeCursor = outputModel.getText(commandStartOffset, outputModel.cursorOffset).toString()
+      val textAfterCursor = outputModel.getText(outputModel.cursorOffset, outputModel.endOffset).toString()
+      val commandText = textBeforeCursor + textAfterCursor.trimEnd()
+
+      commandText == expectedText && outputModel.cursorOffset == commandStartOffset + expectedCursorOffset
+    }
+
+    val model = outputModel
+    assertThat(conditionMet)
+      .overridingErrorMessage {
+        val modelText = buildString {
+          append(model.text)
+          insert(model.cursorOffset.toAbsolute().toInt(), cursorMarker)
+        }
+        """
+          Command text doesn't match the expected pattern: '$expectedCommandPattern'
+          Current output model text:
+          
+        """.trimIndent() + modelText
+      }
+      .isTrue
+  }
+
 
   fun mockTestShellCommand(testCommandSpec: ShellCommandSpec) {
     val specsProvider: ShellCommandSpecsProvider = TestCommandSpecsProvider(
       ShellCommandSpecInfo.create(testCommandSpec, ShellCommandSpecConflictStrategy.DEFAULT)
     )
-    ExtensionTestUtil.maskExtensions(ShellCommandSpecsProvider.EP_NAME, listOf(specsProvider), testRootDisposable)
+    ExtensionTestUtil.maskExtensions(
+      ShellCommandSpecsProvider.EP_NAME,
+      listOf(specsProvider),
+      coroutineScope.asDisposable()
+    )
   }
 
   fun setCompletionOptions(
@@ -308,6 +382,24 @@ class TerminalCompletionFixture(val project: Project, val testRootDisposable: Di
   }
 
   companion object {
+    /**
+     * Creates the fixture for the [session], executes the [block] and cancels the [testScope] afterward.
+     */
+    suspend fun doWithCompletionFixture(
+      project: Project,
+      session: TerminalSession,
+      testScope: CoroutineScope,
+      block: suspend (TerminalCompletionFixture) -> Unit,
+    ) {
+      val fixture = TerminalCompletionFixture(project, session, testScope)
+      try {
+        block(fixture)
+      }
+      finally {
+        testScope.cancel()
+      }
+    }
+
     val Lookup.itemStrings: List<String>
       get() = items.map { it.lookupString }
   }

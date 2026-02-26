@@ -10,11 +10,16 @@ import com.intellij.execution.Executor
 import com.intellij.execution.JavaRunConfigurationBase
 import com.intellij.execution.RunConfigurationExtension
 import com.intellij.execution.application.ApplicationConfiguration
-import com.intellij.execution.configurations.*
+import com.intellij.execution.configurations.JavaParameters
+import com.intellij.execution.configurations.RunConfigurationBase
+import com.intellij.execution.configurations.RunProfile
+import com.intellij.execution.configurations.RunProfileState
+import com.intellij.execution.configurations.RunnerSettings
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunnableState
@@ -70,9 +75,13 @@ private const val DEVKIT_HOT_RELOAD_RUNNER_ID = "DevkitHotReloadRunner"
 private const val DEVKIT_GRADLE_HOT_RELOAD_RUNNER_ID = "DevkitGradleHotReloadRunner"
 private val DEVKIT_HOT_RELOAD_EXECUTOR_ID_KEY = Key.create<Boolean>(DEVKIT_HOT_RELOAD_EXECUTOR_ID)
 
+private fun isRelevantContext(project: Project): Boolean {
+  return isIntelliJPlatformProject(project) || isPluginProject(project) && hasCompose(project)
+}
+
 internal class DevkitHotReloadExecutor : Executor() {
   override fun getId(): @NonNls String = DEVKIT_HOT_RELOAD_EXECUTOR_ID
-  override fun getContextActionId(): @NonNls String = id
+  override fun getContextActionId(): @NonNls String = "DebugComposeHotReload"
   override fun getToolWindowId(): String = ToolWindowId.DEBUG
 
   override fun getToolWindowIcon(): Icon = AllIcons.Toolwindows.ToolWindowDebugger
@@ -96,8 +105,7 @@ internal class DevkitHotReloadExecutor : Executor() {
   override fun getHelpId(): @NonNls String? = null
 
   override fun isApplicable(project: Project): Boolean {
-    return isIntelliJPlatformProject(project)
-           || isPluginProject(project) && hasCompose(project)
+    return isRelevantContext(project)
   }
 }
 
@@ -107,6 +115,8 @@ internal class DevkitHotReloadRunner : GenericDebuggerRunner() {
   override fun canRun(executorId: String, profile: RunProfile): Boolean {
     return executorId == DEVKIT_HOT_RELOAD_EXECUTOR_ID
            && profile !is ExternalSystemRunConfiguration
+           && profile is ApplicationConfiguration
+           && isRelevantContext(profile.configurationModule.project)
   }
 
   @Throws(ExecutionException::class)
@@ -178,6 +188,7 @@ internal class DevkitGradleHotReloadRunner : ExternalSystemTaskDebugRunner() {
   override fun canRun(executorId: String, profile: RunProfile): Boolean {
     return executorId == DEVKIT_HOT_RELOAD_EXECUTOR_ID
            && profile is ExternalSystemRunConfiguration
+           && runReadActionBlocking { isRelevantContext(profile.project) }
   }
 
   override fun doExecute(state: RunProfileState, env: ExecutionEnvironment): RunContentDescriptor? {
@@ -213,14 +224,15 @@ internal class DevkitHotReloadCommandLinePatcher : RunConfigurationExtension() {
     configuration: T & Any,
     params: JavaParameters,
     runnerSettings: RunnerSettings?,
-    executor: Executor
+    executor: Executor,
   ) {
     if (executor.id != DEVKIT_HOT_RELOAD_EXECUTOR_ID) return
     if (!isIntelliJPlatformProject(configuration.project)) return
     if (configuration !is JavaRunConfigurationBase) return
 
     if (params.mainClass != "org.jetbrains.intellij.build.devServer.DevMainKt"
-        && params.mainClass != "com.intellij.idea.Main") {
+        && params.mainClass != "com.intellij.idea.Main"
+        && params.mainClass != "com.android.tools.idea.Main") {
       // only IDE build configurations supported here so far
       return
     }

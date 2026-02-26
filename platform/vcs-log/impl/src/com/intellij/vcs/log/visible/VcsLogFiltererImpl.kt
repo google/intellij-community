@@ -11,8 +11,29 @@ import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.vcs.impl.shared.telemetry.VcsScope
 import com.intellij.util.containers.ContainerUtil
-import com.intellij.vcs.log.*
-import com.intellij.vcs.log.data.*
+import com.intellij.vcs.log.CommitId
+import com.intellij.vcs.log.VcsCommitMetadata
+import com.intellij.vcs.log.VcsFullCommitDetails
+import com.intellij.vcs.log.VcsLogAggregatedStoredRefs
+import com.intellij.vcs.log.VcsLogBranchFilter
+import com.intellij.vcs.log.VcsLogCommitDataCache
+import com.intellij.vcs.log.VcsLogCommitStorageIndex
+import com.intellij.vcs.log.VcsLogDetailsFilter
+import com.intellij.vcs.log.VcsLogFilterCollection
+import com.intellij.vcs.log.VcsLogHashFilter
+import com.intellij.vcs.log.VcsLogParentFilter
+import com.intellij.vcs.log.VcsLogProvider
+import com.intellij.vcs.log.VcsLogRangeFilter
+import com.intellij.vcs.log.VcsLogRevisionFilter
+import com.intellij.vcs.log.VcsLogRootStoredRefs
+import com.intellij.vcs.log.VcsLogStructureFilter
+import com.intellij.vcs.log.VcsLogTextFilter
+import com.intellij.vcs.log.VcsRef
+import com.intellij.vcs.log.data.CommitIdByStringCondition
+import com.intellij.vcs.log.data.TopCommitsCache
+import com.intellij.vcs.log.data.VcsLogData
+import com.intellij.vcs.log.data.VcsLogGraphData
+import com.intellij.vcs.log.data.VcsLogStorage
 import com.intellij.vcs.log.data.index.IndexDataGetter
 import com.intellij.vcs.log.data.index.VcsLogIndex
 import com.intellij.vcs.log.graph.PermanentGraph
@@ -34,7 +55,11 @@ import com.intellij.vcs.log.util.GraphOptionsUtil.kindName
 import com.intellij.vcs.log.util.IntCollectionUtil
 import com.intellij.vcs.log.util.VcsLogUtil
 import com.intellij.vcs.log.util.VcsLogUtil.FULL_HASH_LENGTH
-import com.intellij.vcs.log.visible.filters.*
+import com.intellij.vcs.log.visible.filters.VcsLogFilterObject
+import com.intellij.vcs.log.visible.filters.keysToSet
+import com.intellij.vcs.log.visible.filters.matchesAll
+import com.intellij.vcs.log.visible.filters.with
+import com.intellij.vcs.log.visible.filters.without
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.StatusCode
 import it.unimi.dsi.fastutil.ints.IntConsumer
@@ -211,7 +236,7 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
                           ?: return Pair(dataGetter.filter(detailsFilters, commitCandidates), null)
 
     val historyData = dataGetter.createFileHistoryData(structureFilter.files).build()
-    val candidates = IntCollectionUtil.intersect(historyData.getCommits(), commitCandidates)
+    val candidates = IntCollectionUtil.intersect(historyData.commits, commitCandidates)
 
     val filtersWithoutStructure = detailsFilters.filterNot { it is VcsLogStructureFilter }
     if (filtersWithoutStructure.isEmpty()) {
@@ -242,8 +267,8 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
     // Let's not load more commits than can be currently displayed.
     // E.g., for a small data pack commitCountToTry is almost always greater than the number of commits there.
     val numberOfCommitsToLoad = min(graph.allCommits.size, commitCountToTry.count)
-    val commitsFromVcs = filterWithVcs(filters, graphOptions, numberOfCommitsToLoad)
-    return FilterByDetailsResult(commitsFromVcs, commitsFromVcs.size >= numberOfCommitsToLoad, commitCountToTry, FilterKind.Vcs)
+    val commitsFromVcs = filterWithVcs(filters, graphOptions, numberOfCommitsToLoad + 1)
+    return FilterByDetailsResult(commitsFromVcs, commitsFromVcs.size > numberOfCommitsToLoad, commitCountToTry, FilterKind.Vcs)
   }
 
   @Throws(VcsException::class)
@@ -396,7 +421,7 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
   }
 
   fun getMatchingHeads(
-    refs: VcsLogRefs,
+    refs: VcsLogAggregatedStoredRefs,
     roots: Collection<VirtualFile>,
     filters: VcsLogFilterCollection,
   ): Set<VcsLogCommitStorageIndex>? {
@@ -423,7 +448,7 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
   }
 
   private fun getMatchingHeads(
-    refs: VcsLogRefs,
+    refs: VcsLogAggregatedStoredRefs,
     roots: Collection<VirtualFile>,
     branchFilter: VcsLogBranchFilter?,
     revisionFilter: VcsLogRevisionFilter?,
@@ -435,12 +460,12 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
   }
 
   private fun getMatchingHeads(
-    refsModel: VcsLogRefs,
+    refsModel: VcsLogAggregatedStoredRefs,
     roots: Collection<VirtualFile>,
     filter: VcsLogBranchFilter,
   ): Set<VcsLogCommitStorageIndex> {
     return mapRefsForRoots(refsModel, roots) { refs ->
-      refs.getBranches().filter { filter.matches(it.name) }.toList()
+      refs.branches().filter { filter.matches(it.name) }.toList()
     }.toReferencedCommitIndexes()
   }
 
@@ -450,11 +475,15 @@ class VcsLogFiltererImpl(private val logProviders: Map<VirtualFile, VcsLogProvid
     }
   }
 
-  private fun getMatchingHeads(refsModel: VcsLogRefs, roots: Collection<VirtualFile>): Set<VcsLogCommitStorageIndex> {
+  private fun getMatchingHeads(refsModel: VcsLogAggregatedStoredRefs, roots: Collection<VirtualFile>): Set<VcsLogCommitStorageIndex> {
     return mapRefsForRoots(refsModel, roots) { refs -> refs.getRefsIndexes() }
   }
 
-  private fun <T> mapRefsForRoots(refsModel: VcsLogRefs, roots: Collection<VirtualFile>, mapping: (VcsLogRefsOfSingleRoot) -> Iterable<T>) =
+  private fun <T> mapRefsForRoots(
+    refsModel: VcsLogAggregatedStoredRefs,
+    roots: Collection<VirtualFile>,
+    mapping: (VcsLogRootStoredRefs) -> Iterable<T>,
+  ) =
     refsModel.refsByRoot.filterKeys { roots.contains(it) }.values.flatMapTo(mutableSetOf(), mapping)
 
   private fun filterDetailsInMemory(permanentGraph: PermanentGraph<VcsLogCommitStorageIndex>,

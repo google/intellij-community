@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.system;
 
 import com.intellij.ReviseWhenPortedToJDK;
@@ -9,10 +9,13 @@ import com.intellij.openapi.util.WinBuildNumber;
 import com.intellij.util.ArrayUtil;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.WinReg;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,17 +66,17 @@ public enum OS {
    * Returns an instance of {@link OsInfo} for the current OS.
    */
   public final @NotNull OsInfo getOsInfo() {
-    return
+    return (
       this == Windows ? WindowsInfo.INSTANCE :
       this == macOS ? MacOsInfo.INSTANCE :
       this == Linux ? LinuxInfo.INSTANCE :
-      UnixInfo.INSTANCE;
+      UnixInfo.INSTANCE
+    );
   }
 
   /** Represents an operating system this JVM is running on */
   public static final OS CURRENT = fromString(System.getProperty("os.name"));
 
-  @SuppressWarnings("SpellCheckingInspection")
   public static @NotNull OS fromString(@Nullable String os) {
     if (os != null) {
       os = os.toLowerCase(Locale.ENGLISH);
@@ -125,6 +128,8 @@ public enum OS {
   public static final class WindowsInfo implements OsInfo {
     private static final WindowsInfo INSTANCE = new WindowsInfo();
 
+    private volatile Charset systemCharset = null;
+
     private WindowsInfo() { }
 
     /**
@@ -133,6 +138,41 @@ public enum OS {
      */
     public @Nullable Long getBuildNumber() {
       return WinBuildNumber.getWinBuildNumber();
+    }
+
+    /**
+     * Returns the default ANSI code page on this system
+     * (corresponds to JNU encoding in JRE processes not launched by the IJ platform launcher).
+     */
+    @SuppressWarnings("InjectedReferences")
+    public @NotNull Charset getSystemCharset() {
+      if (systemCharset == null) {
+        Charset cs = null;
+        if (Boolean.getBoolean("ide.native.launcher") && JnaLoader.isLoaded()) {
+          try {
+            String acp = Advapi32Util.registryGetStringValue(
+              WinReg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage", "ACP"
+            );
+            switch (acp) {
+              case "65001": cs = StandardCharsets.UTF_8; break;
+              case "1361": cs = Charset.forName("MS1361"); break;
+              default: cs = Charset.forName("windows-" + acp); break;
+            }
+          }
+          catch (Exception ignored) { }
+        }
+        if (cs == null) {
+          try {
+            cs = Charset.forName(System.getProperty("sun.jnu.encoding"));
+          }
+          catch (Exception ignored) { }
+        }
+        if (cs == null) {
+          cs = Charset.defaultCharset();
+        }
+        systemCharset = cs;
+      }
+      return systemCharset;
     }
   }
 

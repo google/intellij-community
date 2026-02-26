@@ -5,8 +5,8 @@
     <module name="intellij.platform.jewel.samples.showcase"/>
     <module name="intellij.platform.compose.markdown"/>
     <module name="intellij.platform.jewel.markdown.extensions.images"/>
-    <plugin id="com.intellij.java"/>
-    <plugin id="com.intellij.gradle"/>
+    <module name="intellij.java.backend"/>
+    <module name="intellij.gradle" />
     <plugin id="org.jetbrains.kotlin"/>
     <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.libraries.skiko"/>
@@ -41,7 +41,7 @@
     <implicitUsageProvider implementation="com.intellij.devkit.compose.preview.ComposePreviewImplicitUsageProvider"/>
 
     <registryKey key="devkit.compose.hot.reload.agent.version" defaultValue="" description="'Compose Hot Reload' agent version override"/>
-    <runConfigurationExtension implementation="com.intellij.devkit.compose.hotreload.DevkitHotReloadCommandLinePatcher" />
+    <runConfigurationExtension implementation="com.intellij.devkit.compose.hotreload.DevkitHotReloadCommandLinePatcher"/>
     <executor implementation="com.intellij.devkit.compose.hotreload.DevkitHotReloadExecutor"/>
     <programRunner implementation="com.intellij.devkit.compose.hotreload.DevkitHotReloadRunner"/>
     <programRunner implementation="com.intellij.devkit.compose.hotreload.DevkitGradleHotReloadRunner"/>
@@ -54,17 +54,18 @@
   <actions>
     <group id="ComposeToolsGroup" searchable="false">
       <action id="JewelToolwindow" class="com.intellij.devkit.compose.demo.dialog.JewelToolwindowAction"
-              icon="com.intellij.devkit.compose.icons.DevkitComposeIcons.ComposeToolWindow"/>
+              icon="com.intellij.devkit.compose.icons.DevkitComposeIcons.JewelToolWindow"/>
       <action id="JewelComponentShowcaseDialog" class="com.intellij.devkit.compose.demo.dialog.ComponentShowcaseDialogAction"
               icon="com.intellij.devkit.core.icons.DevkitCoreIcons.Items"/>
       <action id="JewelWizardDialog" class="com.intellij.devkit.compose.demo.dialog.JewelWizardDialogAction"/>
       <action id="ComposeSandbox" class="com.intellij.devkit.compose.sandbox.ComposeSandboxAction" icon="AllIcons.FileTypes.UiForm"/>
 
+      <action id="AddComposeToIJModule"
+              class="com.intellij.devkit.compose.AddComposeToIJModuleAction"
+              icon="com.intellij.devkit.compose.icons.DevkitComposeIcons.ComposeToolWindow"/>
+
       <action id="ComposePerformanceDemo" class="com.intellij.devkit.compose.showcase.ComposePerformanceDemoAction"
               internal="true"/> <!-- only needed for the JetBrains team -->
-      <action id="JewelCustomPopupRenderer"
-              class="com.intellij.devkit.compose.JewelCustomPopupRendererAction"
-              internal="true"/>
       <separator/>
 
       <add-to-group group-id="ToolsMenu" relative-to-action="Dev.PsiViewerActions" anchor="after"/>
@@ -73,6 +74,13 @@
     <!-- Legacy actions, only available from Search Everywhere -->
     <action id="ComposeShowcase" class="com.intellij.devkit.compose.showcase.ComposeShowcaseAction"/>
     <action id="JewelActionSystemTest" class="com.intellij.devkit.compose.demo.ActionSystemTestAction"/>
+
+    <action id="JewelCustomPopupRenderer"
+            class="com.intellij.devkit.compose.JewelCustomPopupRendererAction"
+            internal="true"/>
+    <action id="ComposeVerboseStackTrace"
+            class="com.intellij.devkit.compose.ComposeVerboseStackTraceAction"
+            internal="true"/>
 
     <group id="ComposePreviewActions.Title" searchable="false">
       <action id="ComposePreviewRefresh"

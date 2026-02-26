@@ -1,9 +1,9 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl.productInfo
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.platform.buildData.productInfo.ProductInfoData
+import com.networknt.schema.InputFormat
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -52,7 +52,7 @@ internal fun validateProductJson(jsonText: String, installationDirectories: List
 
 private fun verifyJsonBySchema(jsonData: String, jsonSchemaFile: Path, messages: BuildMessages) {
   val schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7).getSchema(Files.readString(jsonSchemaFile))
-  val errors = schema.validate(ObjectMapper().readTree(jsonData))
+  val errors = schema.validate(jsonData, InputFormat.JSON)
   if (!errors.isEmpty()) {
     messages.logErrorAndThrow("Unable to validate JSON against ${jsonSchemaFile}:\n${errors.joinToString("\n")}\nfile content:\n${jsonData}")
   }

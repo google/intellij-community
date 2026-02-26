@@ -3,10 +3,14 @@ package com.intellij.terminal.backend
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.asDisposable
 import com.jediterm.terminal.TtyConnector
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 import org.jetbrains.plugins.terminal.arrangement.ProcessInfoUtil
 import org.jetbrains.plugins.terminal.block.reworked.TerminalShellIntegrationEventsListener
@@ -21,16 +25,20 @@ internal fun addWorkingDirectoryListener(
   addHeuristicBasedCwdListener(ttyConnector, heuristicBasedTrackerScope, listener)
 
   shellIntegrationController.addListener(object : TerminalShellIntegrationEventsListener {
-    override fun initialized(currentDirectory: String) {
+    override fun initialized(currentDirectory: String?) {
       // Stop heuristic-based working directory tracking if there is a shell integration.
       // We will receive the current directory from the shell integration.
       heuristicBasedTrackerScope.cancel()
 
-      listener(currentDirectory)
+      if (currentDirectory != null) {
+        listener(currentDirectory)
+      }
     }
 
-    override fun commandFinished(command: String, exitCode: Int, currentDirectory: String) {
-      listener(currentDirectory)
+    override fun commandFinished(command: String, exitCode: Int, currentDirectory: String?) {
+      if (currentDirectory != null) {
+        listener(currentDirectory)
+      }
     }
   })
 }
