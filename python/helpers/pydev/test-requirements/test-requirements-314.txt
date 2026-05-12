@@ -1,4 +1,4 @@
-pytest==8.3.5
+pytest==9.0.3
 teamcity-messages==1.33
 ipython==9.0.1
 Django==5.1.6
@@ -43,7 +43,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.1
 six==1.17.0
 soupsieve==2.6
-sqlparse==0.5.3
+sqlparse==0.5.4
 stack-data==0.6.3
 tomli==2.2.1
 traitlets==5.14.3
